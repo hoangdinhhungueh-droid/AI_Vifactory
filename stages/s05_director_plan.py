@@ -403,7 +403,7 @@ def build_vox_scene_prompts(
         i2v_omni = (
             f"[STYLE BLOCK]: Deep 3D paper diorama on archival cream newsprint #F4F1EA and kraft cardstock. Halftone B&W 60lpi cutouts with offset crimson red #D62E1F drop-shadows.\n"
             f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk. Settle on the {hero_obj}.\n"
-            f"[ACTION PHASE (0.2s - 0.4s)]: The {tool_prop} snaps briskly in 0.3s and {evidence.tactile_action_verb} {hero_obj}.\n"
+            f"[ACTION PHASE (0.2s - 0.4s)]: In 0.3s (9 frames at 30fps), the {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
             f"[PHYSICAL REACTION & RESIDUE]: {evidence.physical_reaction.capitalize()}, leaving {evidence.tactile_residue}.\n"
             f"[HOLD & LIVING TEXTURE]: All objects lock into dead-stop hold with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.\n"
             f"[AVOID]: no photorealism, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no music, no voice-over."

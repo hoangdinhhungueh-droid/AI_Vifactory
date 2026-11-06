@@ -1419,6 +1419,15 @@ def generate_scene_sub_director_plan(
     plan = {
         "schema_version": "scene_sub_director_plan.v3",
         "scene_id": scene_id,
+        "sentence": sentence,
+        "market": market,
+        "hero_cutout_object": hero_cutout_object,
+        "interacting_tool": evidence.interacting_tool_prop,
+        "tactile_action_verb": evidence.tactile_action_verb,
+        "physical_reaction": evidence.physical_reaction,
+        "tactile_residue": evidence.tactile_residue,
+        "action_type": dominant_families[0].value if dominant_families else "H1_IMPACT",
+        "archetype": evidence.archetype.value,
         "camera_directive": camera_directive or "TOP_DOWN_TRACKING",
         "scene_duration_sec": dur,
         "calculated_beat_count": len(micro_beats),
@@ -1441,6 +1450,61 @@ def generate_scene_sub_director_plan(
     }
 
     return plan
+
+
+def format_causal_reaction_clause(phys_react: str, target: str = "the exhibit") -> str:
+    """Formats causal physical reaction clause into strict grammatical Rule 140 syntax.
+
+    Guarantees:
+    - Never produces malformed 'causing [HERO] to [noun] [verb]'
+    - Ensures clean infinitive English ('causing the [subject] to [infinitive verb]...')
+    - If bare verb, applies directly to target ('causing [target] to [bare verb]...')
+    """
+    pr = (phys_react or "").strip().rstrip('.')
+    if not pr:
+        return ""
+    if pr.lower().startswith("causing "):
+        pr = pr[8:].strip()
+
+    # If it already contains an infinitive marker " to " (e.g. "evidence thread to vibrate..." or "paper fibers to visibly indent...")
+    if " to " in pr:
+        if not re.match(r"^(the|a|an|its|this|these|paper|waxy|creases|coin|parchment|mechanical|corporate|padlock)\b", pr, re.IGNORECASE):
+            return f"causing the {pr}"
+        return f"causing {pr}"
+
+    first_w = pr.split()[0].lower() if pr.split() else ""
+    bare_verbs = {
+        "indent", "curl", "separate", "unfold", "flatten", "highlight", "magnify",
+        "bite", "embed", "vibrate", "settle", "spin", "lock", "click", "flood",
+        "spill", "crimp", "align", "pull", "score", "stamp"
+    }
+    tgt = target if target.lower().startswith(("the ", "a ", "an ")) else f"the {target}"
+    if first_w in bare_verbs:
+        return f"causing {tgt} to {pr}"
+
+    # Map conjugated 3rd person verbs to infinitive with "to"
+    verb_map = {
+        "vibrates": "vibrate", "settles": "settle", "highlights": "highlight", "focuses": "focus",
+        "embeds": "embed", "indents": "indent", "spins": "spin", "locks": "lock",
+        "clicks": "click", "floods": "flood", "flattens": "flatten", "curls": "curl",
+        "separates": "separate", "unfolds": "unfold", "bites": "bite", "pulls": "pull",
+        "aligns": "align", "scores": "score", "stamps": "stamp", "magnifies": "magnify",
+        "crimps": "crimp", "spills": "spill", "lands": "land", "draws": "draw",
+    }
+    words = pr.split()
+    for i, w in enumerate(words):
+        w_clean = re.sub(r"[^a-zA-Z]", "", w).lower()
+        if w_clean in verb_map:
+            words[i] = verb_map[w_clean]
+            subj = " ".join(words[:i])
+            rest = " ".join(words[i:])
+            for k, v in verb_map.items():
+                rest = re.sub(r'\band ' + k + r'\b', f"and {v}", rest)
+            if not re.match(r"^(the|a|an|its|this|these|paper|waxy|creases|coin|parchment|mechanical|corporate|padlock)\b", subj, re.IGNORECASE):
+                subj = f"the {subj}" if subj else tgt
+            return f"causing {subj} to {rest}"
+
+    return f"causing {pr}"
 
 
 def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: str = "") -> str:
@@ -1476,8 +1540,9 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
             residue = c.get("residue", "")
 
             # Cú pháp liên hợp nhân quả chuẩn: [SOURCE] [verb] [TARGET], causing [reaction], leaving [residue]
-            clause = f"{t_win}: The {src_lbl} {verb} the {tgt_lbl}, causing {reaction}"
-            if residue and "leaving" not in reaction:
+            reaction_clause = format_causal_reaction_clause(reaction, tgt_lbl)
+            clause = f"{t_win}: The {src_lbl} {verb} the {tgt_lbl}, {reaction_clause}"
+            if residue and "leaving" not in reaction_clause:
                 clause += f", leaving {residue}"
             steps_text.append(clause.rstrip(".") + ".")
 
@@ -1752,14 +1817,15 @@ def build_cl3_paper_diorama_prompt(
     else:
         connective = " against " if any(w in clean_verb.lower() for w in ["stamp", "strike", "press", "slam"]) else " "
     hero_target = clean_hero if clean_hero.lower().startswith(("the ", "a ", "an ")) else f"the {clean_hero}"
-    if phys_react.lower().startswith("causing"):
-        causing_clause = phys_react
-    elif any(phys_react.lower().startswith(p) for p in ["the ", "its ", "paper ", "document ", "ledger ", "surface "]):
-        causing_clause = f"causing {phys_react}"
-    else:
-        causing_clause = f"causing {hero_target} to {phys_react}"
+    causing_clause = format_causal_reaction_clause(phys_react, hero_target)
     leaving_clause = f", leaving {tac_res}" if tac_res and "leaving" not in causing_clause.lower() else ""
-    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s (9 frames at 30fps) and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+
+    clean_verb_lower = clean_verb.lower()
+    snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices"]
+    if any(clean_verb_lower.startswith(w) for w in snappy_verbs):
+        action_text = f"Action: In 0.3s (9 frames at 30fps), the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+    else:
+        action_text = f"Action: The {clean_tool} snaps briskly in 0.3s (9 frames at 30fps) and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
     camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
     # Validate against forbidden camera words in shot text (e.g. no whip when static overhead)
