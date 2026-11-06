@@ -1805,27 +1805,37 @@ def build_cl3_paper_diorama_prompt(
     clean_hero = sanitize_prompt_for_imagen3(raw_hero)
     clean_tool = sanitize_prompt_for_imagen3(raw_tool)
 
-    mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout exhibit of {clean_hero} entering at distinct depth with rough white deckle border and offset ink stroke."
-    fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
+    is_stamp_tool = any(k in clean_hero.lower() for k in ["stamp", "seal"])
 
-    action_verb = plan_verb or ev.tactile_action_verb
-    phys_react = (plan_reaction or ev.physical_reaction).strip().rstrip('.')
-    tac_res = (plan_residue or ev.tactile_residue).strip().rstrip('.')
-    clean_verb = sanitize_tactile_action_verb(action_verb, clean_tool, clean_hero).strip()
-    if re.search(r"\b(on|onto|against|across|beside|into|with|over|around|through|of)\s*$", clean_verb, flags=re.IGNORECASE):
-        connective = " "
+    if is_stamp_tool:
+        # The primary hero is a stamp/seal striking onto an anchored accounting ledger (downward mechanical compression)
+        mg_cutout = "MG: authentic archival accounting ledger paper anchored solidly on the diorama plane with crisp 3px white deckle border and soft drop shadow."
+        fg_data = f"FG: {clean_hero} poised at foreground depth directly above the document."
+        clean_tool = clean_hero
+        action_text = f"Action: In 0.3s (9 frames at 30fps), the {clean_hero} strikes firmly down onto the archival ledger paper with crisp mechanical compression, causing an indelible vermilion official seal impression to imprint into the paper fibers, leaving a distressed circular seal impression with tactile paper indentation. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
     else:
-        connective = " against " if any(w in clean_verb.lower() for w in ["stamp", "strike", "press", "slam"]) else " "
-    hero_target = clean_hero if clean_hero.lower().startswith(("the ", "a ", "an ")) else f"the {clean_hero}"
-    causing_clause = format_causal_reaction_clause(phys_react, hero_target)
-    leaving_clause = f", leaving {tac_res}" if tac_res and "leaving" not in causing_clause.lower() else ""
+        mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout exhibit of {clean_hero} anchored solidly on the archival diorama plane with crisp 3px white deckle border, offset ink stroke, and soft drop shadow."
+        fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
-    clean_verb_lower = clean_verb.lower()
-    snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices"]
-    if any(clean_verb_lower.startswith(w) for w in snappy_verbs):
-        action_text = f"Action: In 0.3s (9 frames at 30fps), the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
-    else:
-        action_text = f"Action: The {clean_tool} snaps briskly in 0.3s (9 frames at 30fps) and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+        action_verb = plan_verb or ev.tactile_action_verb
+        phys_react = (plan_reaction or ev.physical_reaction).strip().rstrip('.')
+        tac_res = (plan_residue or ev.tactile_residue).strip().rstrip('.')
+        clean_verb = sanitize_tactile_action_verb(action_verb, clean_tool, clean_hero).strip()
+        if re.search(r"\b(on|onto|against|across|beside|into|with|over|around|through|of)\s*$", clean_verb, flags=re.IGNORECASE):
+            connective = " "
+        else:
+            connective = " against " if any(w in clean_verb.lower() for w in ["stamp", "strike", "press", "slam"]) else " "
+        hero_target = clean_hero if clean_hero.lower().startswith(("the ", "a ", "an ")) else f"the {clean_hero}"
+        causing_clause = format_causal_reaction_clause(phys_react, hero_target)
+        leaving_clause = f", leaving {tac_res}" if tac_res and "leaving" not in causing_clause.lower() else ""
+
+        clean_verb_lower = clean_verb.lower()
+        snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices"]
+        if any(clean_verb_lower.startswith(w) for w in snappy_verbs):
+            action_text = f"Action: In 0.3s (9 frames at 30fps), the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+        else:
+            action_text = f"Action: The {clean_tool} snaps briskly in 0.3s (9 frames at 30fps) and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+
     camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
     # Validate against forbidden camera words in shot text (e.g. no whip when static overhead)
@@ -1833,7 +1843,13 @@ def build_cl3_paper_diorama_prompt(
         action_text = re.sub(r'\b' + re.escape(f_term) + r'\b', 'moves', action_text, flags=re.IGNORECASE)
 
     focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival diorama paper (#F4F1EA), with zero competing decorative clutter or stacked ungrounded props."
-    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
+    parallax_cue = (
+        "3D Multi-Plane Parallax: Layered paper diorama in shallow depth of field. "
+        "Foreground interactive tool crosses close to the lens with 1.4x relative velocity and subtle motion blur; "
+        f"the primary exhibit ({clean_hero}) rests tack-sharp at 1.0x focal plane; "
+        "the background archival plane recedes with 0.3x differential tracking, producing authentic stereoscopic Vox papercraft depth."
+    )
+    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{parallax_cue}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
 
     # Semantic Compatibility check
     effective_action_type = plan_action or getattr(ev.archetype, 'value', str(ev.archetype))

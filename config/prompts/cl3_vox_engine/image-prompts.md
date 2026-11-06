@@ -19,7 +19,7 @@ The style block never changes. All creative variation lives in the SHOT.
 
 ## 2. The Style Block (copy verbatim)
 
-> Use the attached style sheet for materials only – aged-print collage textures, halftone black-and-white cutout people with rough keylines and offset accent strokes, giant stat numbers, print grain. Do NOT copy the sheet's layout or its flatness: every clip is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's palette. ALERT WASH means the entire frame floods to the hot accent tone in one beat. Motion: springs with overshoot, staggered entrances, ticking counters. Audio: sound design only – paper pops, whooshes, stamps, ticks. No music. No voice-over.
+> Use the attached style sheet for materials only – aged-print collage textures, halftone black-and-white cutout people with rough keylines and offset accent strokes, giant stat numbers, print grain. Do NOT copy the sheet's layout or its flatness: every clip is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's palette. Multi-plane stereoscopic depth: 1.4x fast foreground travel, 1.0x tack-sharp focal plane, 0.3x slow background drift in shallow depth of field. Motion: springs with overshoot, staggered entrances, ticking counters. Audio: sound design only – paper pops, whooshes, stamps, ticks. No music. No voice-over.
 
 ### Why each clause exists (do not delete these)
 
@@ -31,7 +31,7 @@ The style block never changes. All creative variation lives in the SHOT.
 | "shallow depth of field / foreground crossing the lens" | Sells the 3D lie |
 | "camera is an actor / one committed move" | Prevents mushy multi-move drift |
 | "Backgrounds change per clip" | Stops every shot looking identical |
-| "ALERT WASH" | Defines a reusable named beat |
+| "Multi-plane stereoscopic depth" | 3-tier differential velocity parallax |
 | "springs with overshoot, staggered, ticking" | Motion signature |
 | "sound design only, no music, no VO" | Audio lock |
 

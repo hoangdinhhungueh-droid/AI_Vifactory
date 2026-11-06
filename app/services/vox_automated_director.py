@@ -87,10 +87,10 @@ DIORAMA_STYLE_BLOCKS: Dict[str, str] = {
         "desaturated archival palette with one hot accent, condensed headline caps with giant stat numbers, "
         "halftone black-and-white cutout people with rough white keylines and offset accent strokes, and its print-grain finish. "
         "Do NOT copy the sheet's layout; it defines the language, not the composition. Layers sit at distinct depths like a paper diorama — "
-        "true parallax, never glossy 3D. Backgrounds are muted archival fields, varying per clip within this palette. "
-        "ALERT WASH means the whole frame floods toward the hot accent tone. Motion: spring pop-ups with overshoot, staggered entrances, "
-        "ticking counters, underline swipes; one slow camera move per clip. Audio: sound design only — paper pops, thwips, stamps, ticks, "
-        "low newsroom hum. No music. No voice-over."
+        "true parallax with 3-plane depth separation (foreground tool, anchored midground document, receding background plane), never glossy 3D. "
+        "Backgrounds are muted archival fields, varying per clip within this palette. Motion: spring pop-ups with overshoot within 0.2s - 0.4s, "
+        "staggered entrances, ticking counters, underline swipes; one slow camera move per clip. Audio: sound design only — paper pops, thwips, "
+        "stamps, ticks, low newsroom hum. No music. No voice-over."
     ),
     "DEEP_DIORAMA": (
         "Use the attached style sheet for materials only — aged-print collage textures, halftone black-and-white cutout people "
@@ -98,8 +98,9 @@ DIORAMA_STYLE_BLOCKS: Dict[str, str] = {
         "every clip is a deep 3D paper diorama — cutouts are physical layers separated in real space, strong shallow depth of field, "
         "foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus — "
         "one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's palette. "
-        "ALERT WASH means the entire frame floods to the hot accent tone in one beat. Motion: springs with overshoot, staggered entrances, "
-        "ticking counters. Audio: sound design only — paper pops, whooshes, stamps, ticks. No music. No voice-over."
+        "Multi-plane stereoscopic depth: 1.4x fast foreground tool travel, 1.0x tack-sharp focal plane, 0.3x slow background drift in shallow depth of field. "
+        "Motion: snappy stop-motion strikes <= 0.4s with overshoot, staggered entrances, contact dynamics leaving physical residue, locking into 12fps living texture hold on twos. "
+        "Audio: sound design only — paper pops, whooshes, stamps, ticks. No music. No voice-over."
     ),
     "LOCKED_STAGE": (
         "Documentary cutout-collage stage: a locked, muted archival map/texture background that never changes. "

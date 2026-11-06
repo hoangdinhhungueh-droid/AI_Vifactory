@@ -288,15 +288,15 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             camera_directive="Pushes in through the torn incision, focus racking from cut edges to the exposed layer",
             sound_foley="shears_paper_shearing_rip",
         ),
-        # Variant 1: Heavy Seal Stamp & ALERT WASH
+        # Variant 1: Heavy Seal Stamp Mechanical Strike
         ExtractedEvidence(
             archetype=ForensicArchetype.PARADOX_CLAIM,
             dominant_family="H1_IMPACT",
             hero_anchor_prop="promotional newsprint clipping with fine print footnotes",
-            interacting_tool_prop="heavy crimson circular seal stamp and alert wash tone",
-            tactile_action_verb="slams diagonally across the contradictory claim, triggering an ALERT WASH on",
-            physical_reaction="the entire frame to flood to hot crimson accent tone on the decisive strike, indelible red strike mark registering",
-            tactile_residue="heavy crimson diagonal ink strike-through bar with distressed print edges",
+            interacting_tool_prop="heavy turned-wood official sanction seal stamp",
+            tactile_action_verb="strikes firmly down across the contradictory claim on",
+            physical_reaction="an indelible vermilion seal mark to imprint into the fiber with sharp paper compression, registering official disapproval",
+            tactile_residue="crisp vermilion circular seal imprint with distressed ink edge and tactile paper compression indentation",
             layout_type="center_stage",
             camera_directive="Dives from above, landing hard on the strike impact",
             sound_foley="heavy_stamp_slam_with_sub_thud",
