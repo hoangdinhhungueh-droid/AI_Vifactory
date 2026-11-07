@@ -2336,6 +2336,9 @@ export const TwoLayerEpisode: React.FC<{
             sceneIndex={idx}
             cameraMovement={s.cameraMovement || (s.camera ? s.camera.movement : undefined)}
             chartProps={s.chartProps || s.chart_props}
+            presetId={s.motionPresetId || s.presetId || ((idx % 6) + 1)}
+            steppedPunches={s.steppedPunches || s.stepped_punches}
+            opticalAnchor={s.opticalAnchor || s.optical_anchor}
           />
           <TwoLayerScene
             background={bgRaw}

@@ -18,6 +18,8 @@ import {
 import { VoxParallaxLayer } from "./VoxParallaxLayer";
 import { VoxDynamicChart, VoxDynamicChartProps } from "./VoxDynamicChart";
 import { ProceduralMarkerSweep } from "../kinetics/ProceduralMarkerSweep";
+import { computeSteppedPose } from "./CameraRig";
+import { CANONICAL_MOTION_PRESETS, SteppedPose } from "./motionPresets";
 
 export interface VoxBuildOnCutout {
   id: string;
@@ -103,6 +105,18 @@ export interface VoxBuildOnStageProps {
 
   /** Procedural SVG Data Chart (Vox Dynamic Engine) */
   chartProps?: VoxDynamicChartProps;
+
+  /** Motion Preset ID (1 to 6) for Stepped Kinetic Framing */
+  presetId?: number;
+
+  /** Custom stepped punches override */
+  steppedPunches?: SteppedPose[];
+
+  /** Optical anchor point (normalized 0..1, default is {x: 0.5, y: 0.5}) */
+  opticalAnchor?: { x: number; y: number };
+
+  /** Disable micro drift during hold frames */
+  disableDrift?: boolean;
 }
 
 /**
@@ -132,6 +146,10 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   sceneIndex = 0,
   cameraMovement,
   chartProps,
+  presetId,
+  steppedPunches,
+  opticalAnchor,
+  disableDrift = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -167,7 +185,19 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const fMid = Math.max(1, Math.round(fTotal * 0.65));
   const fEnd = Math.max(fMid + 1, fTotal);
 
-  // Diverse Camera Choreography (Ken Burns push, pull, lateral drift)
+  // Stepped Kinetic Framing resolution (Boss Opus 5.5 Masterclass & Rule 140)
+  const resolvedPresetId = presetId || ((sceneIndex % 6) + 1);
+  const activePreset =
+    CANONICAL_MOTION_PRESETS[resolvedPresetId] ||
+    CANONICAL_MOTION_PRESETS[1];
+  const effectivePunches = steppedPunches || activePreset.steppedPunches;
+  const useSteppedFraming = Boolean(effectivePunches && effectivePunches.length > 0);
+
+  const steppedPose = useSteppedFraming
+    ? computeSteppedPose(frame, effectivePunches!, fps, disableDrift)
+    : null;
+
+  // Diverse Camera Choreography fallback (Ken Burns push, pull, lateral drift)
   const camDir = sceneIndex % 4;
   const isPullOut =
     cameraMovement === "pull_out" || (!cameraMovement && camDir === 1 && !isTactileCollage);
@@ -284,8 +314,12 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
           height: "100%",
           perspective: 1400,
           transformStyle: "preserve-3d",
-          transform: `scale(${cameraScale}) translate(${cameraPanX}px, 0px)`,
-          transformOrigin: "center center",
+          transform: steppedPose
+            ? `translate3d(${steppedPose.x.toFixed(2)}px, ${steppedPose.y.toFixed(2)}px, 0) scale(${steppedPose.scale.toFixed(4)}) rotate(${steppedPose.rotateZ.toFixed(2)}deg)`
+            : `scale(${cameraScale}) translate(${cameraPanX}px, 0px)`,
+          transformOrigin: opticalAnchor
+            ? `${(opticalAnchor.x * 100).toFixed(1)}% ${(opticalAnchor.y * 100).toFixed(1)}%`
+            : "center center",
           position: "relative",
         }}
       >
