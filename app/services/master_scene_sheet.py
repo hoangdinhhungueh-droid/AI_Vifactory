@@ -54,7 +54,7 @@ MOTION_THUMBNAIL_TYPES = [
     {
         "id": 1,
         "code": "top_down_tracking",
-        "title": "1 POP-UP UNFOLD & 90° DIAGONAL GLIDE",
+        "title": "1 POP-UP UNFOLD & 90° TRACKING DIAGONAL GLIDE",
         "directive": "Accordion paper unfold in 0.3s held steady, then gentle 10-15° diagonal tracking easing to resting stop",
         "h_family": "H7_DISPLACE / H6_MARK",
         "camera": "TOP_DOWN_TRACKING",
@@ -62,7 +62,7 @@ MOTION_THUMBNAIL_TYPES = [
     {
         "id": 2,
         "code": "rake_30_focus",
-        "title": "2 SEAL STAMP IMPACT & SEQUENTIAL RACK FOCUS",
+        "title": "2 SEAL STAMP IMPACT & 30° RAKE FOCUS",
         "directive": "Heavy seal stamp strikes with 8-frame damped impact, 6-frame pause, then smooth 20-frame focus rack to ledger",
         "h_family": "H1_IMPACT / H2_CONSTRAINT",
         "camera": "RAKE_30_RACK_FOCUS",
@@ -78,7 +78,7 @@ MOTION_THUMBNAIL_TYPES = [
     {
         "id": 4,
         "code": "whip_pan",
-        "title": "4 RED YARN TENSION & MOTIVATED FOLLOW-PAN",
+        "title": "4 RED YARN TENSION & MOTIVATED FOLLOW WHIP-PAN",
         "directive": "Taut crimson evidence yarn snaps taut, camera smoothly follows tension line with long gentle deceleration landing",
         "h_family": "H4_TETHER / H3_SEVER",
         "camera": "LATERAL_WHIP_PAN",
@@ -86,7 +86,7 @@ MOTION_THUMBNAIL_TYPES = [
     {
         "id": 5,
         "code": "orbit_arc",
-        "title": "5 OPTICAL LOUPE & 8° PIVOT ORBIT",
+        "title": "5 OPTICAL LOUPE & 8° PIVOT ORBIT ARC",
         "directive": "Convex loupe reveals fine print, subtle 8° orbit centered on lens maintaining magnified text locked at center",
         "h_family": "H5_OPTICAL / H7_DISPLACE",
         "camera": "ORBIT_ARC_15",
@@ -94,7 +94,7 @@ MOTION_THUMBNAIL_TYPES = [
     {
         "id": 6,
         "code": "dutch_snap",
-        "title": "6 PARADOX & FIXED DUTCH HIGHLIGHT PUSH",
+        "title": "6 PARADOX & FIXED DUTCH-ANGLE HIGHLIGHT PUSH",
         "directive": "Static overhead view at fixed 5° angle without roll, gentle 5% push-in decelerating smoothly onto highlighted clause",
         "h_family": "H1_IMPACT / H6_MARK",
         "camera": "DUTCH_FORENSIC_SNAP",
