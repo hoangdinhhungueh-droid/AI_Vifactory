@@ -56,6 +56,9 @@ FILES_TO_SYNC = [
     "app/services/director_planner_b3.py",
     "app/services/pilot_builder.py",
     "app/services/master_scene_sheet.py",
+    "app/services/template_registry.py",
+    "remotion/src/components/vox/CameraRig.tsx",
+    "remotion/src/components/vox/motionPresets.ts",
     "app/services/chapter_split.py",
     "app/services/story_engine_b2.py",
     "app/services/text_metrics.py",
@@ -171,7 +174,8 @@ def main():
         "/root/video_factory/stages/s05_director_plan.py "
         "/root/video_factory/stages/s06_critic_visual.py "
         "/root/video_factory/stages/s07_image_gen.py "
-        "/root/video_factory/stages/s08_video_gen.py "
+        "/root/video_factory/app/services/master_scene_sheet.py "
+        "/root/video_factory/app/services/template_registry.py "
         "/root/video_factory/scripts/run_vox_media_pipeline.py "
         "/root/video_factory/scripts/build_pilot_3min_and_evaluate.py "
         "/root/video_factory/scripts/render_episode_parameterized.py"

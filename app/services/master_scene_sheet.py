@@ -54,50 +54,86 @@ MOTION_THUMBNAIL_TYPES = [
     {
         "id": 1,
         "code": "top_down_tracking",
-        "title": "1 POP-UP UNFOLD & 90° TRACKING DIAGONAL GLIDE",
-        "directive": "Accordion paper unfold in 0.3s held steady, then gentle 10-15° diagonal tracking easing to resting stop",
+        "title": "1 POP-UP UNFOLD & 90° TRACKING STEPPED GLIDE",
+        "directive": "Accordion paper unfold in 0.3s held steady, then 8f micro-whip to Mid (1.35x, 45°) locked 40f, then 7f whip to Macro (1.70x, 90°) locked 55f for vector graphics.",
         "h_family": "H7_DISPLACE / H6_MARK",
         "camera": "TOP_DOWN_TRACKING",
+        "stepped_punches": [
+            {"frame": 0, "scale": 1.0, "rotateZ": 0, "hold": 20},
+            {"frame": 20, "scale": 1.35, "rotateZ": 45, "hold": 40, "whip_frames": 8},
+            {"frame": 68, "scale": 1.70, "rotateZ": 90, "hold": 55, "whip_frames": 7},
+        ],
+        "dead_stop_ratio": "70-85%",
     },
     {
         "id": 2,
         "code": "rake_30_focus",
-        "title": "2 SEAL STAMP IMPACT & 30° RAKE FOCUS",
-        "directive": "Heavy seal stamp strikes with 8-frame damped impact, 6-frame pause, then smooth 20-frame focus rack to ledger",
+        "title": "2 SEAL STAMP IMPACT & 30° RAKE FOCUS CALLOUT",
+        "directive": "Heavy seal stamp strikes with 6f whip impact and 3px shake, 35f dead-stop lock at Mid 15°, then 9f whip to Macro 30° locked 60f.",
         "h_family": "H1_IMPACT / H2_CONSTRAINT",
         "camera": "RAKE_30_RACK_FOCUS",
+        "stepped_punches": [
+            {"frame": 0, "scale": 1.0, "rotateZ": 0, "hold": 15},
+            {"frame": 15, "scale": 1.30, "rotateZ": 15, "hold": 35, "whip_frames": 6, "impact_shake": 3},
+            {"frame": 56, "scale": 1.65, "rotateZ": 30, "hold": 60, "whip_frames": 9},
+        ],
+        "dead_stop_ratio": "70-85%",
     },
     {
         "id": 3,
         "code": "macro_glide",
-        "title": "3 CALIPER CLAMP & ANCHORED MACRO GLIDE",
-        "directive": "Brass caliper clamps document margin locked at frame center while background paper drifts slowly at <= 4%/s",
+        "title": "3 CALIPER CLAMP & ANCHORED MACRO GLIDE ROLLUP",
+        "directive": "Wide establish held 18f, 12f smooth glide to Mid (1.30x) locked 45f with odometer rollup, then 7f whip to Macro (1.75x) locked 70f.",
         "h_family": "H2_CONSTRAINT / H5_OPTICAL",
         "camera": "SURFACE_MACRO_GLIDE",
+        "stepped_punches": [
+            {"frame": 0, "scale": 1.0, "hold": 18},
+            {"frame": 18, "scale": 1.30, "hold": 45, "whip_frames": 12, "curve": "glide"},
+            {"frame": 75, "scale": 1.75, "hold": 70, "whip_frames": 7, "curve": "whip"},
+        ],
+        "dead_stop_ratio": "70-85%",
     },
     {
         "id": 4,
         "code": "whip_pan",
-        "title": "4 RED YARN TENSION & MOTIVATED FOLLOW WHIP-PAN",
-        "directive": "Taut crimson evidence yarn snaps taut, camera smoothly follows tension line with long gentle deceleration landing",
+        "title": "4 RED YARN TENSION & MOTIVATED FOLLOW WHIP-PAN SNAP",
+        "directive": "Taut crimson yarn staccato snap: Wide held 8f, 7f snap to Pin A (1.35x) locked 20f, then 8f snap to Pin B (1.68x) locked 25f.",
         "h_family": "H4_TETHER / H3_SEVER",
         "camera": "LATERAL_WHIP_PAN",
+        "stepped_punches": [
+            {"frame": 0, "scale": 1.0, "hold": 8},
+            {"frame": 8, "scale": 1.35, "rotateZ": -2, "x": -120, "y": 40, "hold": 20, "whip_frames": 7, "curve": "staccato"},
+            {"frame": 35, "scale": 1.68, "rotateZ": 1.5, "x": 90, "y": -60, "hold": 25, "whip_frames": 8, "curve": "staccato"},
+        ],
+        "dead_stop_ratio": "70-85%",
     },
     {
         "id": 5,
         "code": "orbit_arc",
-        "title": "5 OPTICAL LOUPE & 8° PIVOT ORBIT ARC",
-        "directive": "Convex loupe reveals fine print, subtle 8° orbit centered on lens maintaining magnified text locked at center",
+        "title": "5 OPTICAL LOUPE & 8° PIVOT ORBIT ARC PUNCH",
+        "directive": "Wide establish held 10f, 10f punch to Loupe Macro (1.90x) with +/-2px tactile micro-drift locked 24f, then 6f pull to Mid (1.40x) locked 25f.",
         "h_family": "H5_OPTICAL / H7_DISPLACE",
         "camera": "ORBIT_ARC_15",
+        "stepped_punches": [
+            {"frame": 0, "scale": 1.0, "hold": 10},
+            {"frame": 10, "scale": 1.90, "x": 30, "y": -10, "hold": 24, "whip_frames": 10, "micro_drift": 2},
+            {"frame": 44, "scale": 1.40, "hold": 25, "whip_frames": 6},
+        ],
+        "dead_stop_ratio": "70-85%",
     },
     {
         "id": 6,
         "code": "dutch_snap",
         "title": "6 PARADOX & FIXED DUTCH-ANGLE HIGHLIGHT PUSH",
-        "directive": "Static overhead view at fixed 5° angle without roll, gentle 5% push-in decelerating smoothly onto highlighted clause",
+        "directive": "Neutral held 6f, 12f push to Fixed Dutch -8° (1.50x) locked 30f, then 10f micro-push to Highlight (1.75x) locked 40f without frame roll.",
         "h_family": "H1_IMPACT / H6_MARK",
         "camera": "DUTCH_FORENSIC_SNAP",
+        "stepped_punches": [
+            {"frame": 0, "scale": 1.0, "rotateZ": 0, "hold": 6},
+            {"frame": 6, "scale": 1.50, "rotateZ": -8, "hold": 30, "whip_frames": 12, "curve": "dutch"},
+            {"frame": 48, "scale": 1.75, "rotateZ": -8, "hold": 40, "whip_frames": 10},
+        ],
+        "dead_stop_ratio": "70-85%",
     },
 ]
 
@@ -107,17 +143,17 @@ def resolve_scene_motion_thumbnail(scene: Dict[str, Any]) -> Dict[str, Any]:
     cam = str(scene.get("camera_directive") or "").upper()
     h_fam = str(scene.get("h_family") or "").upper()
 
-    if "TOP_DOWN" in cam:
+    if "TOP_DOWN" in cam or "UNFOLD" in cam:
         return MOTION_THUMBNAIL_TYPES[0]
-    elif "RAKE" in cam:
+    elif "RAKE" in cam or "STAMP" in cam:
         return MOTION_THUMBNAIL_TYPES[1]
-    elif "MACRO" in cam or "GLIDE" in cam:
+    elif "MACRO" in cam or "GLIDE" in cam or "CALIPER" in cam:
         return MOTION_THUMBNAIL_TYPES[2]
-    elif "WHIP" in cam or "LATERAL" in cam:
+    elif "WHIP" in cam or "LATERAL" in cam or "YARN" in cam or "STACCATO" in cam:
         return MOTION_THUMBNAIL_TYPES[3]
-    elif "ORBIT" in cam:
+    elif "ORBIT" in cam or "LOUPE" in cam:
         return MOTION_THUMBNAIL_TYPES[4]
-    elif "DUTCH" in cam:
+    elif "DUTCH" in cam or "PARADOX" in cam:
         return MOTION_THUMBNAIL_TYPES[5]
 
     # Fallback to H-family mapping

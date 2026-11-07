@@ -10,15 +10,19 @@ import {
 import {
   CameraPose,
   CANONICAL_MOTION_PRESETS,
+  MICRO_WHIP_SPRING,
   MotionPreset,
   MotionTier,
   SPEED_BUDGET,
+  SteppedPose,
 } from "./motionPresets";
 
 export interface CameraRigProps {
   children: React.ReactNode;
   presetId?: number;
   preset?: MotionPreset;
+  /** Custom stepped punches override */
+  steppedPunches?: SteppedPose[];
   /** Explicit optical anchor override (normalized 0..1, default is center [0.5, 0.5]) */
   opticalAnchor?: { x: number; y: number };
   /** Depth factor for parallax layering: FG > 1.0, MG = 1.0, BG < 1.0 */
@@ -27,18 +31,147 @@ export interface CameraRigProps {
   disableDrift?: boolean;
 }
 
+interface ResolvedSteppedState {
+  scale: number;
+  rotateZ: number;
+  x: number;
+  y: number;
+  isLocked: boolean;
+}
+
+/**
+ * Computes deterministic stepped pose from multi-phase punch keyframes.
+ * Enforces discrete punch transitions (<= 8-12f) and dead-stop locks for 70-85% of duration.
+ */
+function computeSteppedPose(
+  frame: number,
+  steps: SteppedPose[],
+  fps: number
+): ResolvedSteppedState {
+  if (!steps || steps.length === 0) {
+    return { scale: 1.0, rotateZ: 0, x: 0, y: 0, isLocked: true };
+  }
+
+  // Find active step index
+  let activeIndex = 0;
+  for (let i = 0; i < steps.length; i++) {
+    if (frame >= steps[i].frame) {
+      activeIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  const current = steps[activeIndex];
+  const targetScale = current.scale;
+  const targetRot = current.rotateZ ?? current.rotation ?? 0;
+  const targetX = current.x ?? 0;
+  const targetY = current.y ?? 0;
+
+  // If this is the initial establishing step (i=0)
+  if (activeIndex === 0) {
+    return {
+      scale: targetScale,
+      rotateZ: targetRot,
+      x: targetX,
+      y: targetY,
+      isLocked: true,
+    };
+  }
+
+  const prev = steps[activeIndex - 1];
+  const prevScale = prev.scale;
+  const prevRot = prev.rotateZ ?? prev.rotation ?? 0;
+  const prevX = prev.x ?? 0;
+  const prevY = prev.y ?? 0;
+
+  const whip = current.whipFrames ?? current.whipDuration ?? 8;
+  const transitionStart = current.frame;
+  const transitionEnd = transitionStart + whip;
+
+  // Transition phase
+  if (frame < transitionEnd) {
+    const elapsed = frame - transitionStart;
+    let progress = 0;
+
+    const curve = current.curve ?? "whip";
+    if (curve === "glide") {
+      // Smooth glide (ease-in-out)
+      progress = interpolate(elapsed, [0, whip], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.bezier(0.45, 0, 0.55, 1),
+      });
+    } else if (curve === "staccato") {
+      // Steep snap staccato
+      progress = interpolate(elapsed, [0, whip], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.bezier(0.83, 0, 0.17, 1),
+      });
+    } else if (curve === "dutch") {
+      // Fixed dutch ease-in cubic
+      progress = interpolate(elapsed, [0, whip], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.bezier(0.45, 0, 0.55, 1),
+      });
+    } else {
+      // Default: rapid micro-whip spring with overshootClamping
+      progress = spring({
+        frame: elapsed,
+        fps,
+        config: MICRO_WHIP_SPRING,
+      });
+      progress = Math.min(Math.max(progress, 0), 1);
+    }
+
+    const scale = prevScale + (targetScale - prevScale) * progress;
+    const rotateZ = prevRot + (targetRot - prevRot) * progress;
+    const x = prevX + (targetX - prevX) * progress;
+    const y = prevY + (targetY - prevY) * progress;
+
+    return { scale, rotateZ, x, y, isLocked: false };
+  }
+
+  // Dead-stop lock phase
+  let shakeY = 0;
+  if (current.impactShake && current.impactShake > 0) {
+    const shakeElapsed = frame - transitionEnd;
+    if (shakeElapsed >= 0 && shakeElapsed <= 4) {
+      shakeY = current.impactShake * Math.exp(-0.8 * shakeElapsed) * Math.sin(shakeElapsed * Math.PI);
+    }
+  }
+
+  let driftOffset = 0;
+  if (current.microDrift && current.microDrift > 0) {
+    const quantized = Math.floor(frame / 2.5);
+    driftOffset = Math.sin(quantized * 0.4) * current.microDrift;
+  }
+
+  return {
+    scale: targetScale,
+    rotateZ: targetRot,
+    x: targetX + driftOffset,
+    y: targetY + shakeY,
+    isLocked: true,
+  };
+}
+
 /**
  * CameraRig — Deterministic 2.5D Cinematography Rig for Vox Explainer.
- * Implements the 4 Golden Cinematography Laws from Senior Directorial Council:
- * 1. Optical Rest Anchor: pins gaze fixation to the primary hero subject.
- * 2. Velocity Budget & Asymmetric Deceleration: 30% acc, 70% dec, ends in steady hold (v=0).
- * 3. Motivated Kinematics: natural reaction lag (2-4 frames) after physical contact.
- * 4. Spatial Horizon: strictly zero in-shot camera roll; rolls are static subtle rakes (-5..5 deg).
+ * Implements the 5 Kinetic Pillars from Senior Directorial Council (Boss Opus 5.5):
+ * 1. Stepped Framing: Discrete multi-phase punches (Wide -> Mid -> Macro) with rapid micro-whips (<= 8-12f).
+ * 2. Dead-Stop Locks: Complete freeze for 70-85% of scene duration as stable substrate for vector graphics.
+ * 3. Optical Rest Anchor: Pins gaze fixation to the primary hero subject.
+ * 4. Motivated Kinematics: Organic reaction lag and impact shake.
+ * 5. Spatial Horizon: Strictly zero in-shot camera rolls.
  */
 export const CameraRig: React.FC<CameraRigProps> = ({
   children,
   presetId = 1,
   preset: customPreset,
+  steppedPunches: customPunches,
   opticalAnchor = { x: 0.5, y: 0.5 },
   depthMultiplier = 1.0,
   disableDrift = false,
@@ -51,6 +184,38 @@ export const CameraRig: React.FC<CameraRigProps> = ({
     CANONICAL_MOTION_PRESETS[presetId] ||
     CANONICAL_MOTION_PRESETS[1];
 
+  const effectivePunches = customPunches || activePreset.steppedPunches;
+
+  // 1. STEPPED FRAMING & KINETIC DEAD-STOP PATH
+  if (effectivePunches && effectivePunches.length > 0) {
+    const stepped = computeSteppedPose(frame, effectivePunches, fps);
+
+    // Subtle 12fps paper grain vibration during lock if drift is enabled
+    let driftX = 0;
+    let driftY = 0;
+    if (!disableDrift && stepped.isLocked) {
+      const quantizedFrame = Math.floor(frame / 2.5);
+      driftX = Math.sin(quantizedFrame * 0.12) * 1.5 * depthMultiplier;
+      driftY = Math.cos(quantizedFrame * 0.08) * 1.5 * depthMultiplier;
+    }
+
+    const finalX = (stepped.x * depthMultiplier) + driftX;
+    const finalY = (stepped.y * depthMultiplier) + driftY;
+
+    return (
+      <AbsoluteFill
+        style={{
+          transform: `translate3d(${finalX.toFixed(2)}px, ${finalY.toFixed(2)}px, 0) scale(${stepped.scale.toFixed(4)}) rotate(${stepped.rotateZ.toFixed(2)}deg)`,
+          transformOrigin: `${(opticalAnchor.x * 100).toFixed(1)}% ${(opticalAnchor.y * 100).toFixed(1)}%`,
+          willChange: "transform",
+        }}
+      >
+        {children}
+      </AbsoluteFill>
+    );
+  }
+
+  // 2. BACKWARD COMPATIBLE CONTINUOUS PATH
   const {
     from,
     to,
@@ -85,11 +250,7 @@ export const CameraRig: React.FC<CameraRigProps> = ({
       progress = spring({
         frame: elapsed,
         fps,
-        config: {
-          damping: 200,
-          stiffness: 120,
-          mass: 1,
-        },
+        config: MICRO_WHIP_SPRING,
       });
       // Clamp overshoot to strictly [0..1] to prevent vertigo bounce
       progress = Math.min(Math.max(progress, 0), 1);

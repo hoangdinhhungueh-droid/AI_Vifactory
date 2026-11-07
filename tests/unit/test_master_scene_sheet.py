@@ -375,5 +375,18 @@ def test_manifest_stat_heroes_coverage(tmp_path):
     assert on_disk["stat_heroes"]["SCENE_01"] == "620B WON"
 
 
-
-
+def test_stepped_framing_motion_metadata():
+    """Boss Claude Opus 5.5 Masterclass: Verifies canonical stepped framing & dead-stop locks."""
+    for mt in MOTION_THUMBNAIL_TYPES:
+        assert "stepped_punches" in mt, f"Archetype {mt['id']} missing stepped_punches"
+        assert mt.get("dead_stop_ratio") == "70-85%"
+        punches = mt["stepped_punches"]
+        assert len(punches) >= 3, f"Archetype {mt['id']} must define at least 3 stepped punches"
+        # Punch 0 is Wide establish at scale 1.0
+        assert punches[0]["scale"] == 1.0
+        assert punches[0]["frame"] == 0
+        # Subsequent punches must be rapid whips (<= 12 frames)
+        for p in punches[1:]:
+            whip = p.get("whip_frames", 8)
+            assert whip <= 12, f"Archetype {mt['id']} whip duration {whip} exceeds 12 frames"
+            assert "hold" in p, f"Archetype {mt['id']} step missing hold lock duration"
