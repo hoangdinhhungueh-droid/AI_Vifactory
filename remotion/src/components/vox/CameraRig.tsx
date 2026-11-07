@@ -43,26 +43,30 @@ interface ResolvedSteppedState {
  * Computes deterministic stepped pose from multi-phase punch keyframes.
  * Enforces discrete punch transitions (<= 8-12f) and dead-stop locks for 70-85% of duration.
  */
-function computeSteppedPose(
+export function computeSteppedPose(
   frame: number,
   steps: SteppedPose[],
-  fps: number
+  fps: number,
+  disableDrift = false
 ): ResolvedSteppedState {
   if (!steps || steps.length === 0) {
     return { scale: 1.0, rotateZ: 0, x: 0, y: 0, isLocked: true };
   }
 
+  // Pre-sort steps by frame timestamp to guarantee monotonicity against arbitrary JSON
+  const sortedSteps = [...steps].sort((a, b) => a.frame - b.frame);
+
   // Find active step index
   let activeIndex = 0;
-  for (let i = 0; i < steps.length; i++) {
-    if (frame >= steps[i].frame) {
+  for (let i = 0; i < sortedSteps.length; i++) {
+    if (frame >= sortedSteps[i].frame) {
       activeIndex = i;
     } else {
       break;
     }
   }
 
-  const current = steps[activeIndex];
+  const current = sortedSteps[activeIndex];
   const targetScale = current.scale;
   const targetRot = current.rotateZ ?? current.rotation ?? 0;
   const targetX = current.x ?? 0;
@@ -79,13 +83,14 @@ function computeSteppedPose(
     };
   }
 
-  const prev = steps[activeIndex - 1];
+  const prev = sortedSteps[activeIndex - 1];
   const prevScale = prev.scale;
   const prevRot = prev.rotateZ ?? prev.rotation ?? 0;
   const prevX = prev.x ?? 0;
   const prevY = prev.y ?? 0;
 
-  const whip = current.whipFrames ?? current.whipDuration ?? 8;
+  const rawWhip = current.whipFrames ?? current.whip_frames ?? current.whipDuration ?? 8;
+  const whip = Math.max(1, rawWhip);
   const transitionStart = current.frame;
   const transitionEnd = transitionStart + whip;
 
@@ -117,11 +122,12 @@ function computeSteppedPose(
         easing: Easing.bezier(0.45, 0, 0.55, 1),
       });
     } else {
-      // Default: rapid micro-whip spring with overshootClamping
+      // Default: rapid micro-whip spring with overshootClamping scaled to whip duration
       progress = spring({
         frame: elapsed,
         fps,
         config: MICRO_WHIP_SPRING,
+        durationInFrames: whip,
       });
       progress = Math.min(Math.max(progress, 0), 1);
     }
@@ -136,17 +142,22 @@ function computeSteppedPose(
 
   // Dead-stop lock phase
   let shakeY = 0;
-  if (current.impactShake && current.impactShake > 0) {
+  const impactShake = current.impactShake ?? current.impact_shake ?? 0;
+  if (impactShake > 0) {
     const shakeElapsed = frame - transitionEnd;
-    if (shakeElapsed >= 0 && shakeElapsed <= 4) {
-      shakeY = current.impactShake * Math.exp(-0.8 * shakeElapsed) * Math.sin(shakeElapsed * Math.PI);
+    if (shakeElapsed >= 0 && shakeElapsed <= 5) {
+      // Damped harmonic shockwave oscillation on physical landing
+      const decay = Math.exp(-0.75 * shakeElapsed);
+      const osc = Math.cos(shakeElapsed * Math.PI * 0.7);
+      shakeY = impactShake * decay * osc;
     }
   }
 
   let driftOffset = 0;
-  if (current.microDrift && current.microDrift > 0) {
+  const microDrift = current.microDrift ?? current.micro_drift ?? 0;
+  if (!disableDrift && microDrift > 0) {
     const quantized = Math.floor(frame / 2.5);
-    driftOffset = Math.sin(quantized * 0.4) * current.microDrift;
+    driftOffset = Math.sin(quantized * 0.4) * microDrift;
   }
 
   return {
@@ -188,19 +199,10 @@ export const CameraRig: React.FC<CameraRigProps> = ({
 
   // 1. STEPPED FRAMING & KINETIC DEAD-STOP PATH
   if (effectivePunches && effectivePunches.length > 0) {
-    const stepped = computeSteppedPose(frame, effectivePunches, fps);
+    const stepped = computeSteppedPose(frame, effectivePunches, fps, disableDrift);
 
-    // Subtle 12fps paper grain vibration during lock if drift is enabled
-    let driftX = 0;
-    let driftY = 0;
-    if (!disableDrift && stepped.isLocked) {
-      const quantizedFrame = Math.floor(frame / 2.5);
-      driftX = Math.sin(quantizedFrame * 0.12) * 1.5 * depthMultiplier;
-      driftY = Math.cos(quantizedFrame * 0.08) * 1.5 * depthMultiplier;
-    }
-
-    const finalX = (stepped.x * depthMultiplier) + driftX;
-    const finalY = (stepped.y * depthMultiplier) + driftY;
+    const finalX = stepped.x * depthMultiplier;
+    const finalY = stepped.y * depthMultiplier;
 
     return (
       <AbsoluteFill

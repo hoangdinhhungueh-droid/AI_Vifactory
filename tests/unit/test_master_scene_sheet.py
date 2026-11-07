@@ -382,11 +382,43 @@ def test_stepped_framing_motion_metadata():
         assert mt.get("dead_stop_ratio") == "70-85%"
         punches = mt["stepped_punches"]
         assert len(punches) >= 3, f"Archetype {mt['id']} must define at least 3 stepped punches"
-        # Punch 0 is Wide establish at scale 1.0
+        # Punch 0 is Wide establish at scale 1.0 with zero rotation and zero translation
         assert punches[0]["scale"] == 1.0
         assert punches[0]["frame"] == 0
-        # Subsequent punches must be rapid whips (<= 12 frames)
+        assert punches[0]["x"] == 0
+        assert punches[0]["y"] == 0
+        assert punches[0]["rotateZ"] == 0
+        # Subsequent punches must be rapid whips (<= 12 frames) with full parameter parity
         for p in punches[1:]:
             whip = p.get("whip_frames", 8)
             assert whip <= 12, f"Archetype {mt['id']} whip duration {whip} exceeds 12 frames"
             assert "hold" in p, f"Archetype {mt['id']} step missing hold lock duration"
+            assert "x" in p and "y" in p, f"Archetype {mt['id']} step missing translational coordinates"
+            assert "rotateZ" in p, f"Archetype {mt['id']} step missing rotateZ"
+
+    # Specific archetype kinematic validations
+    arch2 = MOTION_THUMBNAIL_TYPES[1]
+    assert arch2["stepped_punches"][1]["impact_shake"] == 3
+    assert arch2["stepped_punches"][1]["whip_frames"] == 6
+
+    arch5 = MOTION_THUMBNAIL_TYPES[4]
+    assert arch5["stepped_punches"][1]["micro_drift"] == 2
+    assert arch5["stepped_punches"][1]["scale"] == 1.90
+
+    arch6 = MOTION_THUMBNAIL_TYPES[5]
+    assert arch6["stepped_punches"][1]["curve"] == "dutch"
+    assert arch6["stepped_punches"][2]["curve"] == "dutch"
+    assert arch6["stepped_punches"][1]["rotateZ"] == -8
+
+    # Verify landing impact shake math does not evaluate to 0 at integer frames (sin(k*pi) bug prevention)
+    impact_amp = 3.0
+    shake_values = []
+    import math
+    for elapsed in range(6):
+        decay = math.exp(-0.75 * elapsed)
+        osc = math.cos(elapsed * math.pi * 0.7)
+        shake_values.append(impact_amp * decay * osc)
+    
+    assert shake_values[0] == 3.0, "Landing strike must register full impact amplitude at t=0"
+    assert shake_values[1] < 0, "Rebound shockwave must invert direction at t=1"
+    assert abs(shake_values[5]) < 0.1, "Shockwave must settle within 5-6 frames"

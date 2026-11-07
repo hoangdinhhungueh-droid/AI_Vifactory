@@ -26,9 +26,12 @@ export interface SteppedPose {
   hold?: number;          // Hold duration in frames (dead-stop lock)
   whipFrames?: number;    // Duration of rapid transition (<= 8-12 frames)
   whipDuration?: number;  // Backward compatible alias for whipFrames
+  whip_frames?: number;   // Python snake_case alias for whipFrames
   curve?: "whip" | "glide" | "staccato" | "dutch";
   impactShake?: number;   // Amplitude in px for landing impact shake (e.g. 3px for stamp)
+  impact_shake?: number;  // Python snake_case alias for impactShake
   microDrift?: number;    // Amplitude in px for living loupe/micro-drift during hold
+  micro_drift?: number;   // Python snake_case alias for microDrift
   lock?: boolean;         // Explicit dead-stop lock flag (defaults to true)
   overshoot?: number;     // % overshoot before clamp
 }
