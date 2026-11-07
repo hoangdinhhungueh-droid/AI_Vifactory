@@ -127,27 +127,33 @@ class TemplateRegistry:
 
         if camera_directive:
             cam_str = str(camera_directive).upper()
-            generic_cam_sentence = "The camera is an actor: it flies between layers, orbits, dives, whips, racks focus — one committed cinematic move per clip."
+            generic_cam_patterns = [
+                "The camera is an actor with disciplined kinematics: it glides, tracks, or racks focus along one committed vector, decelerating smoothly to a steady resting hold — strictly no sudden whips, dives, or camera rolls.",
+                "The camera is an actor: it flies between layers, orbits, dives, whips, racks focus — one committed cinematic move per clip.",
+            ]
+            replacement_cam = None
             if "STATIC_OVERHEAD" in cam_str:
-                content = content.replace(
-                    generic_cam_sentence,
-                    "The camera remains locked in a disciplined overhead perspective: perfectly static — all dynamic motion comes strictly from tactile physical papercraft elements snapping and sliding across the tabletop diorama."
-                )
+                replacement_cam = "The camera remains locked in a disciplined overhead perspective: perfectly static — all dynamic motion comes strictly from tactile physical papercraft elements snapping and sliding across the tabletop diorama."
+            elif "TOP_DOWN" in cam_str:
+                replacement_cam = "The camera performs one disciplined, deliberate move: a smooth 90-degree overhead tracking gliding gently across document flow with ease-out landing hold."
+            elif "DUTCH" in cam_str:
+                replacement_cam = "The camera remains in a disciplined static overhead view tilted at a subtle fixed 5-degree angle without in-shot rotation, easing gently into a steady resting hold."
             elif "SLOW_PUSH_IN" in cam_str:
-                content = content.replace(
-                    generic_cam_sentence,
-                    "The camera performs one disciplined, deliberate move: a slow continuous push-in — smoothly gliding forward through papercraft depth without sudden whips, dives, or orbits."
-                )
+                replacement_cam = "The camera performs one disciplined, deliberate move: a slow continuous push-in — smoothly gliding forward through papercraft depth without sudden whips, dives, or orbits."
             elif "SLOW_HORIZONTAL_PAN" in cam_str:
-                content = content.replace(
-                    generic_cam_sentence,
-                    "The camera performs one disciplined, deliberate move: a slow continuous horizontal pan tracking along the evidence outflow path — smoothly traversing the tabletop diorama."
-                )
+                replacement_cam = "The camera performs one disciplined, deliberate move: a slow continuous horizontal pan tracking along the evidence outflow path — smoothly traversing the tabletop diorama."
             elif "SUBTLE_TILT_DOWN" in cam_str:
-                content = content.replace(
-                    generic_cam_sentence,
-                    "The camera performs one disciplined, deliberate move: a subtle continuous tilt down from the headline banner onto the newsprint text without sudden whips or orbits."
-                )
+                replacement_cam = "The camera performs one disciplined, deliberate move: a subtle continuous tilt down from the headline banner onto the newsprint text without sudden whips or orbits."
+            elif "ORBIT" in cam_str:
+                replacement_cam = "The camera performs one disciplined, deliberate move: a gentle 8-degree orbital arc revealing 3D papercraft diorama layers with steady settle."
+            elif "MACRO" in cam_str or "GLIDE" in cam_str:
+                replacement_cam = "The camera performs one disciplined, deliberate move: a gentle macro surface glide skimming along paper grain into a steady resting hold."
+
+            if replacement_cam:
+                for gen_pat in generic_cam_patterns:
+                    if gen_pat in content:
+                        content = content.replace(gen_pat, replacement_cam)
+                        break
         return content
 
     def get_t2i_style_block(self, trace: Optional[PromptTrace] = None) -> str:

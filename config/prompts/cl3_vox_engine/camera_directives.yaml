@@ -54,67 +54,95 @@ WHIP_LEFT_TO_RIGHT:
   camera_is_actor: true
 
 TOP_DOWN_TRACKING:
-  positive: "Camera: Overhead 90-degree flat-lay tracking smoothly across the archival desk surface, following the document flow without zoom."
+  positive: "Camera: Overhead 90-degree flat-lay gliding along a gentle diagonal vector across the archival desk, tracking with smooth ease-out and decelerating to a steady resting hold on the hero document for the final second."
   strip_from_avoid:
     - "no static locked-off camera"
+  add_to_avoid:
+    - "no sudden camera movement"
+    - "no camera roll"
+    - "no crash zoom"
+    - "no sliding background"
   forbidden_in_shot:
     - "orbit"
     - "crane"
     - "push-in"
     - "zoom"
+    - "snap"
   camera_is_actor: true
 
 RAKE_30_RACK_FOCUS:
-  positive: "Camera: 30-degree low-angle rake skimming across the desk, racking focus from foreground tool to midground evidence ledger."
+  positive: "Camera: 30-degree low-angle rake skimming gently across the desk; the camera holds steady during tool impact then eases into a smooth focus rack toward the midground evidence ledger, settling into a complete resting hold."
   add_to_avoid:
     - "no static locked-off camera"
+    - "no sudden camera movement"
+    - "no camera shake"
+    - "no whip pan"
   forbidden_in_shot:
     - "top-down"
     - "overhead"
     - "push-in"
     - "zoom"
+    - "snap"
   camera_is_actor: true
 
 LATERAL_WHIP_PAN:
-  positive: "Camera: Rapid lateral whip-pan from left to right past foreground layers, tracking momentum and settling crisply onto the target exhibit."
+  positive: "Camera: Motivated follow-pan from left to right tracking the tension line of the evidence thread, decelerating with a long gentle landing and holding motionless on the destination exhibit."
   add_to_avoid:
     - "no static locked-off camera"
+    - "no sudden camera movement"
+    - "no camera roll"
+    - "no motion blur smear"
   forbidden_in_shot:
     - "top-down settle"
     - "crane"
     - "orbit"
     - "push-in"
     - "zoom"
+    - "snap"
   camera_is_actor: true
 
 DUTCH_FORENSIC_SNAP:
-  positive: "Camera: Tilted Dutch-angle forensic snap settling sharply on the contradictory clause, emphasizing institutional tension."
+  positive: "Camera: Static overhead view tilted at a subtle fixed 5-degree angle without in-shot rotation; makes a gentle 5% push-in that decelerates smoothly into a dead-stop resting hold on the highlighted contradictory clause."
   add_to_avoid:
     - "no static locked-off camera"
+    - "no sudden camera movement"
+    - "no camera roll"
+    - "no rotating frame"
+    - "no crash zoom"
+    - "no rapid tilt"
   forbidden_in_shot:
-    - "push-in"
     - "orbit"
     - "zoom"
+    - "whip"
+    - "snap"
   camera_is_actor: true
 
 ORBIT_ARC_15:
-  positive: "Camera: Subtle 15-degree orbital arc around the layered paper diorama, showcasing 3D depth and paper deckle edges."
+  positive: "Camera: Subtle 8-degree pivot arc centered directly on the optical loupe, maintaining the magnified text locked at frame center while the diorama table rotates gently and comes to a resting stop."
   add_to_avoid:
     - "no static locked-off camera"
+    - "no sudden camera movement"
+    - "no wide orbit"
+    - "no perspective distortion"
   forbidden_in_shot:
     - "push-in"
     - "whip"
     - "zoom"
+    - "snap"
   camera_is_actor: true
 
 SURFACE_MACRO_GLIDE:
-  positive: "Camera: Macro glide skimming barely above the aged newsprint paper grain, tracking the ink line and inspection markings."
+  positive: "Camera: Steady macro glide synchronized with the inspection tool, maintaining the tool locked at frame center while the paper background drifts slowly at low speed, easing to a dead-stop hold."
   add_to_avoid:
     - "no static locked-off camera"
+    - "no sudden camera movement"
+    - "no rapid pan"
+    - "no focus hunting"
   forbidden_in_shot:
     - "top-down settle"
     - "push-in"
     - "orbit"
     - "zoom"
+    - "snap"
   camera_is_actor: true
 

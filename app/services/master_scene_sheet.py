@@ -54,48 +54,48 @@ MOTION_THUMBNAIL_TYPES = [
     {
         "id": 1,
         "code": "top_down_tracking",
-        "title": "1 POP-UP UNFOLD & 90° TRACKING",
-        "directive": "Accordion paper unfold in 0.3s followed by smooth 90° lateral tracking",
+        "title": "1 POP-UP UNFOLD & 90° DIAGONAL GLIDE",
+        "directive": "Accordion paper unfold in 0.3s held steady, then gentle 10-15° diagonal tracking easing to resting stop",
         "h_family": "H7_DISPLACE / H6_MARK",
         "camera": "TOP_DOWN_TRACKING",
     },
     {
         "id": 2,
         "code": "rake_30_focus",
-        "title": "2 SEAL STAMP IMPACT & 30° RAKE FOCUS",
-        "directive": "Heavy seal stamp strikes with paper depression, racking focus to midground ledger",
+        "title": "2 SEAL STAMP IMPACT & SEQUENTIAL RACK FOCUS",
+        "directive": "Heavy seal stamp strikes with 8-frame damped impact, 6-frame pause, then smooth 20-frame focus rack to ledger",
         "h_family": "H1_IMPACT / H2_CONSTRAINT",
         "camera": "RAKE_30_RACK_FOCUS",
     },
     {
         "id": 3,
         "code": "macro_glide",
-        "title": "3 CALIPER CLAMP & SURFACE MACRO GLIDE",
-        "directive": "Brass vernier caliper clamps document margin, camera gliding along paper grain",
+        "title": "3 CALIPER CLAMP & ANCHORED MACRO GLIDE",
+        "directive": "Brass caliper clamps document margin locked at frame center while background paper drifts slowly at <= 4%/s",
         "h_family": "H2_CONSTRAINT / H5_OPTICAL",
         "camera": "SURFACE_MACRO_GLIDE",
     },
     {
         "id": 4,
         "code": "whip_pan",
-        "title": "4 RED YARN TENSION & LATERAL WHIP-PAN",
-        "directive": "Taut crimson evidence yarn snaps taut, rapid lateral whip-pan reframing momentum",
+        "title": "4 RED YARN TENSION & MOTIVATED FOLLOW-PAN",
+        "directive": "Taut crimson evidence yarn snaps taut, camera smoothly follows tension line with long gentle deceleration landing",
         "h_family": "H4_TETHER / H3_SEVER",
         "camera": "LATERAL_WHIP_PAN",
     },
     {
         "id": 5,
         "code": "orbit_arc",
-        "title": "5 OPTICAL LOUPE & 15° ORBIT ARC",
-        "directive": "Convex magnifying loupe reveals fine print under 15° orbital arc showcasing 3D depth",
+        "title": "5 OPTICAL LOUPE & 8° PIVOT ORBIT",
+        "directive": "Convex loupe reveals fine print, subtle 8° orbit centered on lens maintaining magnified text locked at center",
         "h_family": "H5_OPTICAL / H7_DISPLACE",
         "camera": "ORBIT_ARC_15",
     },
     {
         "id": 6,
         "code": "dutch_snap",
-        "title": "6 PARADOX & DUTCH-ANGLE FORENSIC SNAP",
-        "directive": "Tilted Dutch-angle forensic snap settling sharply on contradictory clause",
+        "title": "6 PARADOX & FIXED DUTCH HIGHLIGHT PUSH",
+        "directive": "Static overhead view at fixed 5° angle without roll, gentle 5% push-in decelerating smoothly onto highlighted clause",
         "h_family": "H1_IMPACT / H6_MARK",
         "camera": "DUTCH_FORENSIC_SNAP",
     },
@@ -1398,33 +1398,33 @@ def generate_master_scene_dashboard_html(
             <div class="motion-grid">
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 1</span>
-                    <div class="motion-title">POP-UP UNFOLD & 90° TRACKING</div>
-                    <div class="motion-desc">Accordion paper pop-up in 0.3s followed by smooth 90-degree lateral tracking across document flow.</div>
+                    <div class="motion-title">POP-UP UNFOLD & 90° DIAGONAL GLIDE</div>
+                    <div class="motion-desc">Accordion paper unfold in 0.3s held steady, then gentle 10-15° diagonal tracking easing to resting stop.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 2</span>
-                    <div class="motion-title">SEAL STAMP IMPACT & 30° RAKE FOCUS</div>
-                    <div class="motion-desc">Heavy turned-wood seal stamp percussive strike with paper depression, racking focus to midground ledger.</div>
+                    <div class="motion-title">SEAL STAMP IMPACT & SEQUENTIAL RACK FOCUS</div>
+                    <div class="motion-desc">Heavy seal stamp strikes with 8-frame damped impact, 6-frame pause, then smooth 20-frame focus rack to ledger.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 3</span>
-                    <div class="motion-title">CALIPER CLAMP & SURFACE MACRO GLIDE</div>
-                    <div class="motion-desc">Brass vernier caliper clamps document margin, camera gliding along paper grain and inspection marks.</div>
+                    <div class="motion-title">CALIPER CLAMP & ANCHORED MACRO GLIDE</div>
+                    <div class="motion-desc">Brass caliper clamps document margin locked at frame center while background paper drifts slowly at &le; 4%/s.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 4</span>
-                    <div class="motion-title">RED YARN TENSION & LATERAL WHIP-PAN</div>
-                    <div class="motion-desc">Taut crimson evidence yarn snaps taut between copper pins, rapid lateral whip-pan reframing momentum.</div>
+                    <div class="motion-title">RED YARN TENSION & MOTIVATED FOLLOW-PAN</div>
+                    <div class="motion-desc">Taut crimson evidence yarn snaps taut, camera smoothly follows tension line with long gentle deceleration landing.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 5</span>
-                    <div class="motion-title">OPTICAL LOUPE & 15° ORBIT ARC</div>
-                    <div class="motion-desc">Convex magnifying loupe reveals fine print under 15-degree orbital arc showcasing 3D papercraft depth.</div>
+                    <div class="motion-title">OPTICAL LOUPE & 8° PIVOT ORBIT</div>
+                    <div class="motion-desc">Convex loupe reveals fine print, subtle 8° orbit centered on lens maintaining magnified text locked at center.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 6</span>
-                    <div class="motion-title">PARADOX & DUTCH-ANGLE FORENSIC SNAP</div>
-                    <div class="motion-desc">Tilted Dutch-angle forensic snap settling sharply on contradictory clause, emphasizing institutional tension.</div>
+                    <div class="motion-title">PARADOX & FIXED DUTCH HIGHLIGHT PUSH</div>
+                    <div class="motion-desc">Static overhead view at fixed 5° angle without roll, gentle 5% push-in decelerating smoothly onto highlighted clause.</div>
                 </div>
             </div>
         </div>

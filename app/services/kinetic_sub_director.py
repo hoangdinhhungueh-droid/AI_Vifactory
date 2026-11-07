@@ -734,27 +734,27 @@ def quantize_12fps(t_sec: float) -> float:
 
 
 def _derive_camera_micro_move(camera_directive: Optional[str]) -> str:
-    """Derives tactile micro-movement phrase matching the assigned camera directive (Rule 140)."""
+    """Derives tactile micro-movement phrase matching the assigned camera directive (Rule 140 / Vox v3)."""
     cam = (camera_directive or "").upper()
     if "TOP_DOWN" in cam:
-        return "smooth 90-degree lateral tracking across document flow without zoom"
+        return "smooth 90-degree overhead tracking gliding along gentle diagonal vector with ease-out landing hold"
     elif "RAKE" in cam:
-        return "low-angle rake with focus racking from foreground tool to midground exhibit"
+        return "low-angle rake with gentle focus racking from foreground tool to midground exhibit"
     elif "WHIP" in cam or "LATERAL" in cam:
-        return "rapid horizontal whip reframing momentum onto target exhibit"
+        return "motivated horizontal follow-pan reframing momentum onto target exhibit with smooth ease-out"
     elif "DUTCH" in cam:
-        return "tilted forensic Dutch snap settling firmly on contradictory clause"
+        return "static overhead view tilted at fixed 5-degree angle without in-shot rotation, easing gently onto contradictory clause"
     elif "ORBIT" in cam:
-        return "subtle 15-degree orbital arc revealing 3D papercraft diorama layers"
+        return "gentle 8-degree orbital arc revealing 3D papercraft diorama layers with steady settle"
     elif "MACRO" in cam or "GLIDE" in cam:
-        return "macro surface glide skimming along paper grain and markings"
+        return "macro surface glide skimming along paper grain and markings into a steady resting hold"
     elif "STATIC" in cam:
         return "locked-off perspective, camera holds dead still while objects move"
     elif "TILT" in cam:
         return "subtle vertical tilt down tracking evidentiary element"
     elif "PAN" in cam:
-        return "slow horizontal pan following evidence outflow"
-    return "tactile documentary framing settling sharply on hero exhibit"
+        return "slow horizontal pan following evidence outflow with resting landing hold"
+    return "tactile documentary framing settling smoothly on hero exhibit"
 
 
 def sanitize_tactile_action_verb(verb: str, tool: str, hero: str) -> str:
