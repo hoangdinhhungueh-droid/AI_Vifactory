@@ -213,8 +213,8 @@ def download_file_parallel(client: FastVPSClient, vps_path: str, local_path: Pat
                     try:
                         ret = json.loads(txt)
                         return offset, base64.b64decode(ret.get("stdout", "").strip())
-                    except Exception:
-                        pass
+                    except (json.JSONDecodeError, KeyError, ValueError) as parse_err:
+                        logger.warning(f"Failed to parse chunk at offset {offset}: {parse_err}")
         return offset, b""
 
     t0 = time.time()
