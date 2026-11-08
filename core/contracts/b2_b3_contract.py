@@ -143,10 +143,80 @@ def segment_multilingual(text: str, market: str = "JA") -> List[str]:
     return result
 
 
+
+
+def segment_into_micro_beats(
+    text_or_sentences: Union[str, List[str]],
+    max_chars: int = 28,
+    market: str = "JA"
+) -> List[str]:
+    """Decomposes sentences into snappy Vox micro-beats (3.0s-4.5s pacing, Rule 131/140).
+    For CJK: splits long run-ons (> max_chars) at clause delimiters (、, ,) outside quotes.
+    For Latin: splits at clause commas, semicolons when word count exceeds ~12 words.
+    """
+    m_up = (market or "JA").upper()
+    is_cjk = m_up in {"JA", "JP", "ZH", "KO"}
+    effective_max = max_chars if is_cjk else 65
+
+    # If passed a string, first run standard sentence segmentation
+    if isinstance(text_or_sentences, str):
+        sentences = segment_multilingual(text_or_sentences, market=market)
+    else:
+        sentences = list(text_or_sentences)
+
+    open_quotes = {"「", "『", "（", "(", "“", "{"}
+    close_quotes = {"」", "』", "）", ")", "”", "}"}
+    clause_delims = {"、", ","} if is_cjk else {",", ";"}
+
+    micro_beats: List[str] = []
+    for s in sentences:
+        s_clean = s.strip()
+        if not s_clean:
+            continue
+        if len(s_clean) <= effective_max:
+            micro_beats.append(s_clean)
+            continue
+
+        parts: List[str] = []
+        curr_part: List[str] = []
+        q_depth = 0
+        min_clause_len = 10 if is_cjk else 25
+
+        for char in s_clean:
+            curr_part.append(char)
+            if char in open_quotes:
+                q_depth += 1
+            elif char in close_quotes:
+                q_depth = max(0, q_depth - 1)
+            elif q_depth == 0:
+                curr_len = len("".join(curr_part))
+                if char in clause_delims and curr_len >= min_clause_len:
+                    part_str = "".join(curr_part).strip()
+                    if part_str:
+                        parts.append(part_str)
+                    curr_part = []
+
+        if curr_part:
+            rem = "".join(curr_part).strip()
+            if rem:
+                if parts and len(rem) < (8 if is_cjk else 15):
+                    parts[-1] += (" " if not is_cjk else "") + rem
+                else:
+                    parts.append(rem)
+
+        if parts:
+            micro_beats.extend(parts)
+        else:
+            micro_beats.append(s_clean)
+
+    return micro_beats
+
+
 def load_spoken_script(
     target_dir: Union[str, Path],
     episode_id: Optional[str] = None,
-    market: str = "JA"
+    market: str = "JA",
+    split_micro_beats: bool = False
 ) -> SpokenScript:
     """Strictly loads B2 spoken script from an episode directory.
 
@@ -261,6 +331,8 @@ def load_spoken_script(
     source_sha256 = hashlib.sha256(file_bytes).hexdigest()
 
     # Build beats
+    if split_micro_beats:
+        candidate_sentences = segment_into_micro_beats(candidate_sentences, market=market)
     beats: List[SpokenBeat] = []
     for idx, s_text in enumerate(candidate_sentences, start=1):
         clean_s = s_text.strip()

@@ -64,6 +64,8 @@ def _load_visual_taxonomy(
     Keyed by canonical path and validation requirements to guarantee cache isolation.
     """
     global _TAXONOMY_CACHE
+    if _TAXONOMY_CACHE is None:
+        _TAXONOMY_CACHE = {}
     tax_path = (custom_path or (ROOT_DIR / "config" / "taxonomies" / "visual_rosters.json")).resolve()
     req_tuple = tuple(sorted(required_domains)) if required_domains else ()
     cache_key = f"{tax_path}::{req_tuple}"

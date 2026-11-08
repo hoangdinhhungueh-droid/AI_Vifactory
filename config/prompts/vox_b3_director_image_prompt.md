@@ -75,14 +75,14 @@ Every image prompt must be constructed with 5 explicit layered brackets:
 `Editorial investigative documentary frame in signature VOX paper-cut collage style with Opuscar core boxes (visual-investigation, archive-lighttable, swiss-motion, halftone-dossier, briefing-board). `
 `[Layer 1: <canvas_workspace>, cool backlit light table #F7F9FB with faint erased whiteboard ghost strokes (7% opacity)] -> `
 `[Layer 2: bold flat geometric color block in <color_bar>] -> `
-`[Layer 3: Swiss extreme scale contrast negative space reserved for large bold editorial typography and giant stat numbers (30-35% frame mass) vs precision IBM Plex Mono source tags on 6x12 chips '<headline> // <english_tag>'] -> `
+`[Layer 3: pure clean archival diorama negative space and balanced compositional breathing room on aged cream newsprint #F4F1EA, strictly zero floating typography, zero letters, zero text labels] -> `
 `[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge, misregistration ink shadows (+8px offset pop in crimson red #D62E1F or mustard gold #D9A441), Ben-Day halftone density fields, pitted rubber stamps, and realistic soft drop shadow: <hero_cutout_object>. Interacting elements & acrylic loupe portals: <interacting_objects>] -> `
 `[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration, matte archival finish]. `
 `Strictly locked color palette: Crimson Red #D62E1F, Mustard Gold #D9A441, Charcoal #1A1A1A, Tan Kraft #C9BB9C on Archival Cream #F4F1EA and Cool Light Table #F7F9FB. `
 `Clear object-assembly composition, strong editorial hierarchy, tactile paper craft.`
 
 **NEGATIVE PROMPT (MANDATORY SUFFIX)**:
-`Negative prompt: no photorealism, no real photography, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no clutter, no unnecessary objects, no excessive icons, no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, no photorealistic background, no oversaturated rainbow colors, no poor composition, no distorted anatomy, no watermark, no logos, maintain a clean premium VOX-style editorial collage with layered paper textures and documentary-quality composition.`
+`Negative prompt: no photorealism, no real photography, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no clutter, no unnecessary objects, no excessive icons, no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, no photorealistic background, no oversaturated rainbow colors, no text, no letters, no words, no headlines, no typography, no English labels, no poor composition, no distorted anatomy, no watermark, no logos, maintain a clean premium VOX-style editorial collage with layered paper textures and documentary-quality composition.`
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

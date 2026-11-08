@@ -375,14 +375,14 @@ def build_vox_scene_prompts(
             f"Authentic Vox CL3 visual system editorial documentary frame in paper-cut collage style. "
             f"[Layer 1: Deep 3D paper diorama on aged archival cream newsprint #F4F1EA and kraft cardstock #C9BB9C with subtle print halftone grid] -> "
             f"[Layer 2: bold flat geometric color block in {color}] -> "
-            f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
+            f"[Layer 3: pure clean archival diorama negative space and balanced compositional breathing room on aged cream newsprint #F4F1EA, strictly zero floating typography, zero letters, zero text labels] -> "
             f"[Layer 4: high-contrast 60lpi halftone black-and-white photographic cutout with crisp 2-4px white deckle edge and offset crimson red #D62E1F or mustard gold #D9A441 drop shadow: {hero_obj}. "
             f"Interacting elements: {tool_prop}] -> "
             f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration, turned-wood vermilion seal stamps, vintage brass calipers, taut red evidence yarn]. "
             f"Strictly locked color palette: crimson red #D62E1F, mustard gold #D9A441, charcoal #1A1A1A on cream #F4F1EA. "
             f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
             f"Negative prompt: no photorealism, no real photography, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, "
-            f"no clutter, no unnecessary objects, no glossy 3D rendering, no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
+            f"no clutter, no unnecessary objects, no glossy 3D rendering, no oversaturated rainbow colors, no text, no letters, no words, no headlines, no typography, no English labels, maintain clean premium VOX editorial collage."
         )
 
     # 7. Sub-Director Plan & Canonical CL3 4-Block Video Prompts (Rule 140 & video_prompts_system.md)

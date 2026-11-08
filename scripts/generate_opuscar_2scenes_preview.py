@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""scripts/generate_opuscar_2scenes_preview.py — Generates and renders a 2-scene Opuscar preview video.
+"""scripts/generate_opuscar_2scenes_preview.py — Generates and renders a 4-scene Opuscar preview video.
 
 Adheres 100% to:
 - Opuscar Core Boxes: visual-investigation, archive-lighttable, swiss-motion, halftone-dossier, briefing-board.
-- T2I: Cool backlit light table #F7F9FB, whiteboard ghost strokes (7%), misregistration (+8px offset), Swiss extreme scale contrast (10X 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips).
-- I2V & Remotion: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s;
-  Stamp slam: 0.09s drop from 2.6x to 1x, damped micro-bounce, 1-frame camera shake, 0.5 white flash, soft ink squelch;
-  Dimension line rides with arrowhead taps and mechanical counter ticks;
-  Dual-rate motion: smooth 30fps camera, 12fps paper grain/shadows on twos;
-  Readcheck formula hold: hold >= max(1.8s, chars/4.5 + 1.5s, VO + 0.6s);
-  Two real silences (ducking BGM before slams).
+- Micro-Beat Fragmentation: Decomposes monolithic sentences into snappy 3.0s-4.5s scenes.
+- T2I: 100% clean diorama paper on #F4F1EA, 0% baked English typography.
+- I2V: Omni drives 100% of 3D camera (SURFACE_MACRO_GLIDE, DYNAMIC_CRASH_PUNCH, RAKE_30_RACK_FOCUS, SLOW_PUSH_IN) and tactile kinetics (H1-H7).
+- Remotion: Strictly locked compositor (1.0x) with Swiss Grid vector overlays and Whisper 0ms karaoke.
+- Pacing: sc_dur_sec = max(3.2, vo_dur + 0.6) with zero freeze frames.
 """
 
 import asyncio
@@ -25,22 +23,20 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from PIL import Image
-
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+from typing import Any, Dict, List, Optional
 
 import requests
-from vox.ffmpeg_utils import get_ffmpeg_binary
-from scripts.vps_runner import FastVPSClient, ENDPOINTS, _load_env
 
-_load_env()
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("opuscar_preview")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("generate_opuscar_preview")
 
-OUT_DIR = ROOT / "out" / "opuscar_2scenes_preview"
+OUT_DIR = ROOT / "out" / "opuscar_preview"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 VOICE = "ja-JP-KeitaNeural"
@@ -48,44 +44,104 @@ VOICE = "ja-JP-KeitaNeural"
 SCENES_DEF = [
     {
         "scene_id": "SCENE_01",
-        "title": "THE 10X MULTIPLIER",
-        "sentence": "2026年10月9日、テレ朝NEWSが英国の専門家の見方として伝えた「身代金交渉の効率が10倍になり得る」という衝撃の数字は、日本語の壁が崩れたことを意味するのでしょうか？",
-        "headline": "THE 10X MULTIPLIER",
-        "editorialHeadline": "THE 10X MULTIPLIER",
-        "statValue": "10X",
-        "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
-        "stampText": "10X LEVERAGE // VERIFIED",
+        "title": "THE 10X CATALYST",
+        "sentence": "2026年10月9日、テレ朝NEWSが伝えた衝撃の報告。",
+        "headline": "BREAKING INVESTIGATION",
+        "editorialHeadline": "OCTOBER 9 SPECIAL DISPATCH",
+        "statValue": "2026.10.09",
+        "statLabel": "SPECIAL INVESTIGATIVE DISPATCH",
+        "stampText": "TEREBI ASAHI // DISPATCHED",
         "stampBadge": "CONFIDENTIAL EXHIBIT",
         "stampColor": "#dc2626",
-        "sourceCredit": "TEREBI ASAHI NEWS // UK FORENSIC REPORT // 2026.10.09",
+        "sourceCredit": "TEREBI ASAHI NEWS // BROADCAST DISPATCH // 2026.10.09",
         "accentColor": "#C85A32",
         "bg_seed": "episodes/JP_EP0003_japan_ai_ransom_economy/composite_seeds/SCENE_01.png",
         "motionDirective": "opuscar_snappy",
-        "action_type": "H1_IMPACT",
+        "action_type": "H6_MARK",
+        "camera_directive": "SURFACE_MACRO_GLIDE",
+        "hero_cutout_object": "Japanese broadcast newsprint archival report document on cream paper",
+        "interacting_tool": "neon yellow marker highlighting key investigative clause",
         "forensicOverlay": {
             "type": "stat_card",
-            "statValue": "10X",
-            "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
-            "sourceTag": "TEREBI ASAHI NEWS // UK FORENSIC REPORT",
+            "statValue": "2026.10.09",
+            "statLabel": "SPECIAL INVESTIGATIVE DISPATCH",
+            "sourceTag": "TEREBI ASAHI NEWS // 2026.10.09",
             "theme": "vox_paper"
         }
     },
     {
         "scene_id": "SCENE_02",
+        "title": "THE 10X MULTIPLIER",
+        "sentence": "英国の専門家が警告する「身代金交渉の効率10倍」。",
+        "headline": "THE 10X MULTIPLIER",
+        "editorialHeadline": "RANSOM NEGOTIATION EFFICIENCY",
+        "statValue": "10X",
+        "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
+        "stampText": "10X LEVERAGE // VERIFIED",
+        "stampBadge": "CONFIDENTIAL EXHIBIT",
+        "stampColor": "#dc2626",
+        "sourceCredit": "UK FORENSIC EXPERT TESTIMONY // 2026.10.09",
+        "accentColor": "#C85A32",
+        "bg_seed": "episodes/JP_EP0003_japan_ai_ransom_economy/composite_seeds/SCENE_02.png",
+        "motionDirective": "opuscar_snappy",
+        "action_type": "H1_IMPACT",
+        "camera_directive": "DYNAMIC_CRASH_PUNCH",
+        "hero_cutout_object": "accounting ledger cardstock with giant tactile cutout number 10X",
+        "interacting_tool": "turned-wood vermilion seal stamp slamming down in 0.09s",
+        "forensicOverlay": {
+            "type": "stat_card",
+            "statValue": "10X",
+            "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
+            "sourceTag": "UK FORENSIC REPORT // 2026.10.09",
+            "theme": "vox_paper"
+        }
+    },
+    {
+        "scene_id": "SCENE_03",
+        "title": "THE LANGUAGE FIREWALL",
+        "sentence": "それは、日本語という最後の壁が崩れたことを意味するのか。",
+        "headline": "DEFENSE PERIMETER BREACH",
+        "editorialHeadline": "JAPANESE LANGUAGE WALL COLLAPSE",
+        "statValue": "BREACH",
+        "statLabel": "LANGUAGE DEFENSE BARRIER BREACHED",
+        "stampText": "PERIMETER FAILURE // CONFIRMED",
+        "stampBadge": "SECURITY ADVISORY",
+        "stampColor": "#b91c1c",
+        "sourceCredit": "CYBERSECURITY INCIDENT ARCHIVE // 2026",
+        "accentColor": "#C85A32",
+        "bg_seed": "episodes/JP_EP0003_japan_ai_ransom_economy/composite_seeds/SCENE_03.png",
+        "motionDirective": "opuscar_snappy",
+        "action_type": "H2_CONSTRAINT",
+        "camera_directive": "RAKE_30_RACK_FOCUS",
+        "hero_cutout_object": "corporate network language firewall blueprint architectural diagram",
+        "interacting_tool": "vintage precision brass vernier calipers clamping onto breached perimeter",
+        "forensicOverlay": {
+            "type": "stat_card",
+            "statValue": "BREACH",
+            "statLabel": "LANGUAGE BARRIER COLLAPSE",
+            "sourceTag": "CYBERSECURITY ARCHIVE // 2026",
+            "theme": "vox_paper"
+        }
+    },
+    {
+        "scene_id": "SCENE_04",
         "title": "THE MISSING BASELINE",
         "sentence": "この数字は市場全体で測定されたものではありません。",
         "headline": "THE MISSING BASELINE",
-        "editorialHeadline": "THE MISSING BASELINE",
+        "editorialHeadline": "MARKET-WIDE MEASUREMENT BASELINE",
         "statValue": "0.0%",
-        "statLabel": "MARKET-WIDE MEASUREMENT BASELINE",
+        "statLabel": "UNVERIFIED AGGREGATE BASELINE",
         "stampText": "UNVERIFIED AGGREGATE // MISSING",
         "stampBadge": "UNVERIFIED",
         "stampColor": "#b91c1c",
         "sourceCredit": "MARKET EVIDENCE DOSSIER // RECTIFIED SURVEY",
         "accentColor": "#C85A32",
-        "bg_seed": "episodes/JP_EP0003_japan_ai_ransom_economy/composite_seeds/SCENE_02.png",
+        "bg_seed": "episodes/JP_EP0003_japan_ai_ransom_economy/composite_seeds/SCENE_04.png",
         "motionDirective": "opuscar_snappy",
-        "action_type": "H2_CONSTRAINT",
+        "action_type": "H7_DISPLACE",
+        "camera_directive": "SLOW_PUSH_IN_0_1X",
+        "hero_cutout_object": "manila market survey evidence dossier folio unfolding",
+        "interacting_tool": "red evidence pointer indicator revealing zero baseline metric card",
         "forensicOverlay": {
             "type": "stat_card",
             "statValue": "0.0%",
@@ -129,190 +185,175 @@ def extract_whisper_words_from_wav(wav_path: Path, language: str = "ja") -> list
         if hasattr(av, "open") and not getattr(av.open, "_safe_metadata_wrapped", False):
             _real_av_open = av.open
             def _safe_av_open(*args, **kwargs):
-                kwargs.pop("metadata_errors", None)
+                if kwargs.get("metadata_errors") == "ignore":
+                    kwargs.pop("metadata_errors", None)
                 return _real_av_open(*args, **kwargs)
             _safe_av_open._safe_metadata_wrapped = True
             av.open = _safe_av_open
-
         from faster_whisper import WhisperModel
-        model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segments, _ = model.transcribe(str(wav_path), word_timestamps=True, language=language)
+        model = WhisperModel("base", device="cpu", compute_type="int8")
+        segments, _ = model.transcribe(str(wav_path), language=language, word_timestamps=True)
         words = []
-        last_end = 0.0
-        for seg in segments:
-            if seg.words:
-                for w in seg.words:
-                    s_val = max(float(w.start), last_end)
-                    e_val = max(float(w.end), s_val + 0.02)
-                    last_end = e_val
+        for segment in segments:
+            if segment.words:
+                for w in segment.words:
                     words.append({
                         "word": w.word.strip(),
-                        "start": round(s_val, 3),
-                        "end": round(e_val, 3),
-                        "start_ms": round(s_val * 1000.0, 1),
-                        "end_ms": round(e_val * 1000.0, 1),
+                        "start": round(w.start, 3),
+                        "end": round(w.end, 3),
+                        "start_ms": round(w.start * 1000.0, 1),
+                        "end_ms": round(w.end * 1000.0, 1),
+                        "confidence": round(w.probability, 3)
                     })
         return words
-    except Exception as exc:
-        logger.warning(f"Whisper extraction fallback notice: {exc}")
+    except Exception as e:
+        logger.warning(f"Whisper extraction failed: {e}. Falling back to TTS boundary words.")
         return []
+
+
+def get_ffmpeg_binary() -> str:
+    candidates = [
+        shutil.which("ffmpeg"),
+        str(ROOT / "bin" / "ffmpeg.exe"),
+        "C:\\ffmpeg\\bin\\ffmpeg.exe",
+        "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
+        "C:\\Users\\hunghd2\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe",
+    ]
+    for c in candidates:
+        if c and Path(c).is_file():
+            return str(c)
+    return "ffmpeg"
 
 
 def probe_audio_duration(file_path: Path) -> float:
     ffmpeg_bin = get_ffmpeg_binary()
-    cmd = [ffmpeg_bin, "-i", str(file_path)]
-    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
-    m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", p.stderr or "")
-    if m:
-        return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
-    return 0.0
+    ffprobe_bin = ffmpeg_bin.replace("ffmpeg.exe", "ffprobe.exe") if "ffmpeg.exe" in ffmpeg_bin else "ffprobe"
+    try:
+        cmd = [
+            ffprobe_bin,
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "json",
+            str(file_path)
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        data = json.loads(res.stdout)
+        return float(data["format"]["duration"])
+    except Exception:
+        # Fallback using ffmpeg parse
+        cmd = [ffmpeg_bin, "-i", str(file_path)]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", res.stderr)
+        if m:
+            h, mn, s = m.groups()
+            return int(h) * 3600 + int(mn) * 60 + float(s)
+        return 4.0
 
 
-def upload_file_chunked(client: FastVPSClient, local_path: Path, vps_path: str, chunk_size: int = 150_000):
-    raw_bytes = local_path.read_bytes()
-    b64_str = base64.b64encode(raw_bytes).decode("ascii")
-    tmp_prefix = f"/tmp/vf/up_{local_path.stem}_{int(time.time()*1000)}"
-    client.run_command(f"mkdir -p /tmp/vf && rm -f {tmp_prefix}*")
-    num_chunks = (len(b64_str) + chunk_size - 1) // chunk_size
-    logger.info(f"Uploading {local_path.name} ({len(raw_bytes)/1024:.1f} KB in {num_chunks} chunks)...")
-    for i in range(num_chunks):
-        chunk = b64_str[i * chunk_size : (i + 1) * chunk_size]
-        res = client.call_tool("write_file", {
-            "path": f"{tmp_prefix}_{i:04d}.b64",
-            "content": chunk,
-            "confirm": True
-        })
-        if res.get("status") != "ok":
-            raise RuntimeError(f"Chunk write error: {res}")
-    
-    # Merge and decode
-    vps_dir = os.path.dirname(vps_path)
-    client.run_command(f"mkdir -p '{vps_dir}'")
-    client.run_command(f"cat {tmp_prefix}_*.b64 | base64 -d > '{vps_path}' && rm -f {tmp_prefix}_*.b64")
-    sz = int(client.run_command(f"stat -c %s '{vps_path}'").get("stdout", "0").strip() or "0")
-    if sz != len(raw_bytes):
-        raise RuntimeError(f"Upload size mismatch for {vps_path}: expected {len(raw_bytes)}, got {sz}")
-    logger.info(f"Successfully uploaded {local_path.name} to {vps_path} ({sz} bytes)")
+class FastVPSClient:
+    def __init__(self):
+        self.base_url = "https://n8n.kienthucquant.com/webhook/vf-terminal-v2"
+        self.cf_token = os.environ.get("CF_ACCESS_TOKEN", "").strip()
+        self.session = requests.Session()
+        self.headers = {"Content-Type": "application/json"}
+        if self.cf_token:
+            self.headers["cf-access-token"] = self.cf_token
+            self.headers["Authorization"] = f"Bearer {self.cf_token}"
+
+    def run_command(self, cmd: str, timeout: int = 120) -> Dict[str, Any]:
+        payload = {"command": cmd, "timeout": timeout, "confirm": True}
+        try:
+            resp = self.session.post(self.base_url, json=payload, headers=self.headers, timeout=timeout + 15)
+            resp.raise_for_status()
+            data = resp.json()
+            return data
+        except Exception as e:
+            logger.error(f"VPS command failed: {e}")
+            return {"exit_code": -1, "stdout": "", "stderr": str(e)}
 
 
-def download_file_parallel(client: FastVPSClient, vps_path: str, local_path: Path, max_workers: int = 6):
-    sz = int(client.run_command(f"stat -c %s '{vps_path}'").get("stdout", "0").strip() or "0")
-    if sz <= 0:
-        raise RuntimeError(f"Remote file empty or missing: {vps_path}")
-    logger.info(f"Downloading {vps_path} ({sz/1024/1024:.2f} MB, {sz} bytes) using {max_workers} parallel workers...")
-    
-    ep = client.ep
-    url = ep["url"]
-    token = ep["token"]
-    cf_id = ep.get("cf_id")
-    cf_secret = ep.get("cf_secret")
-    
-    s = requests.Session()
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Antigravity/2.0"
-    }
-    if cf_id:
-        headers["CF-Access-Client-Id"] = cf_id
-    if cf_secret:
-        headers["CF-Access-Client-Secret"] = cf_secret
-    if client.session_id:
-        headers["mcp-session-id"] = client.session_id
-    s.headers.update(headers)
-    
-    chunk_len = 5800
-    chunks_args = []
-    req_id = 100
-    for offset in range(0, sz, chunk_len):
-        read_len = min(chunk_len, sz - offset)
-        req_id += 1
-        chunks_args.append((offset, read_len, req_id))
-    
-    def fetch_chunk(args):
-        offset, read_len, r_id = args
-        cmd = f"python3 -c \"import sys, base64; f=open('{vps_path}', 'rb'); f.seek({offset}); sys.stdout.write(base64.b64encode(f.read({read_len})).decode('ascii'))\""
-        payload = {
-            "jsonrpc": "2.0",
-            "id": r_id,
-            "method": "tools/call",
-            "params": {"name": "run_command", "arguments": {"command": cmd, "confirm": True, "timeout": 30}}
-        }
-        res = s.post(url, json=payload, timeout=30)
-        for line in res.text.splitlines():
-            if line.startswith("data: "):
-                data = json.loads(line[6:])
-                content = data.get("result", {}).get("content", [])
-                if content:
-                    txt = content[0].get("text", "")
-                    try:
-                        ret = json.loads(txt)
-                        return offset, base64.b64decode(ret.get("stdout", "").strip())
-                    except (json.JSONDecodeError, KeyError, ValueError) as parse_err:
-                        logger.warning(f"Failed to parse chunk at offset {offset}: {parse_err}")
-        return offset, b""
+def upload_file_chunked(client: FastVPSClient, local_path: Path, remote_path: Path, chunk_size: int = 200_000):
+    content = local_path.read_bytes()
+    total_sz = len(content)
+    logger.info(f"Uploading {local_path.name} ({total_sz/1024:.1f} KB) to {remote_path}...")
 
-    t0 = time.time()
-    results = {}
+    client.run_command(f"rm -f '{remote_path}' '{remote_path}.tmp'")
+    client.run_command(f"mkdir -p '{Path(remote_path).parent}'")
+
+    for i in range(0, total_sz, chunk_size):
+        chunk = content[i : i + chunk_size]
+        b64 = base64.b64encode(chunk).decode("ascii")
+        res = client.run_command(f"python3 -c \"import base64; open('{remote_path}.tmp', 'ab').write(base64.b64decode('{b64}'))\"")
+        if res.get("exit_code") != 0:
+            raise RuntimeError(f"Failed to append chunk: {res.get('stderr')}")
+
+    mv_res = client.run_command(f"mv '{remote_path}.tmp' '{remote_path}'")
+    if mv_res.get("exit_code") != 0:
+        raise RuntimeError(f"Failed to finalize upload: {mv_res.get('stderr')}")
+
+    stat_res = client.run_command(f"stat -c %s '{remote_path}'")
+    vps_sz = int(stat_res.get("stdout", "0").strip() or "0")
+    if vps_sz != total_sz:
+        raise ValueError(f"Size mismatch: local={total_sz}, VPS={vps_sz}")
+    logger.info(f"Uploaded {local_path.name} verified: {vps_sz} bytes matches local.")
+
+
+def download_file_parallel(client: FastVPSClient, remote_path: str, local_path: Path, max_workers: int = 6):
+    stat_res = client.run_command(f"stat -c %s '{remote_path}'")
+    total_bytes = int(stat_res.get("stdout", "0").strip() or "0")
+    if total_bytes == 0:
+        raise RuntimeError(f"Remote file {remote_path} is missing or 0 bytes.")
+
+    chunk_size = 250_000
+    chunks = []
+    for off in range(0, total_bytes, chunk_size):
+        chunks.append((off, min(chunk_size, total_bytes - off)))
+
+    out_bytes = bytearray(total_bytes)
+    logger.info(f"Downloading {remote_path} ({total_bytes/1024/1024:.2f} MB) in {len(chunks)} chunks...")
+
+    def fetch_chunk(idx_off):
+        idx, (off, sz) = idx_off
+        cmd = f"python3 -c \"import base64; f=open('{remote_path}','rb'); f.seek({off}); print(base64.b64encode(f.read({sz})).decode('ascii'))\""
+        r = client.run_command(cmd, timeout=60)
+        b64_str = r.get("stdout", "").strip()
+        data = base64.b64decode(b64_str)
+        return off, data
+
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        for offset, data in pool.map(fetch_chunk, chunks_args):
-            results[offset] = data
-            if len(results) % 50 == 0 or len(results) == len(chunks_args):
-                pct = len(results) / len(chunks_args) * 100
-                logger.info(f"Download progress: {len(results)}/{len(chunks_args)} chunks ({pct:.1f}%)")
-    
-    all_bytes = bytearray()
-    for offset in sorted(results.keys()):
-        all_bytes.extend(results[offset])
-    
-    if len(all_bytes) != sz:
-        raise RuntimeError(f"Download size mismatch: expected {sz}, got {len(all_bytes)}")
-    
-    local_path.write_bytes(all_bytes)
-    t1 = time.time()
-    logger.info(f"Downloaded {len(all_bytes)} bytes in {t1-t0:.2f}s ({len(all_bytes)/(t1-t0)/1024:.1f} KB/s) -> {local_path}")
+        results = pool.map(fetch_chunk, enumerate(chunks))
+        for off, data in results:
+            out_bytes[off : off + len(data)] = data
+
+    local_path.write_bytes(out_bytes)
+    try:
+        sz_local = local_path.stat().st_size
+    except OSError as stat_err:
+        logger.warning(f"Failed to read file size for {local_path}: {stat_err}")
+        sz_local = 0
+    if sz_local != total_bytes:
+        raise ValueError(f"Download size mismatch: remote={total_bytes}, local={sz_local}")
+    logger.info(f"Downloaded {local_path.name} verified ({sz_local} bytes).")
 
 
 def main():
-    logger.info("=== STEP 0: Anti-Destructive Safe Backup & Dry-Run ===")
-    out_root = ROOT / "out"
-    all_videos = list(out_root.glob("**/*.mp4"))
-    logger.info(f"[DRY-RUN INVENTORY] Found {len(all_videos)} existing video(s) in {out_root}:")
-    for v in all_videos:
-        try:
-            sz_mb = v.stat().st_size / (1024 * 1024)
-            logger.info(f"  - {v.relative_to(out_root)} ({sz_mb:.2f} MB, {v.stat().st_size} bytes)")
-        except OSError as stat_err:
-            logger.warning(f"Could not stat video {v}: {stat_err}")
+    logger.info("=================================================================")
+    logger.info("   OPUSCAR 4-SCENE MICRO-BEAT PREVIEW PIPELINE (Rule 140 / v3)  ")
+    logger.info("=================================================================")
 
-    backup_dir = OUT_DIR / "backup"
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    existing_video = OUT_DIR / "opuscar_2scenes_preview.mp4"
-    if existing_video.exists():
-        backup_path = backup_dir / f"opuscar_2scenes_preview_backup_{int(time.time())}.mp4"
-        shutil.copy2(existing_video, backup_path)
-        logger.info(f"Safely backed up existing video to: {backup_path} ({existing_video.stat().st_size} bytes)")
-    else:
-        logger.info("No prior video found in output folder. Clean start.")
-
-    logger.info("=== STEP 1: Synthesizing Audio Narration with Word Timestamps ===")
     ffmpeg_bin = get_ffmpeg_binary()
 
     audio_scenes = []
     total_audio_dur = 0.0
 
+    logger.info("=== STEP 1A: Synthesizing Edge TTS & Extracting Whisper Word Timestamps ===")
     for idx, sc in enumerate(SCENES_DEF):
         sc_mp3 = OUT_DIR / f"scene_{idx+1:02d}_voice.mp3"
         sc_wav = OUT_DIR / f"scene_{idx+1:02d}_voice.wav"
 
-        if not sc_mp3.exists() or not sc_wav.exists():
-            logger.info(f"Synthesizing voice for Scene {idx+1}: {sc['title']}")
-            words = asyncio.run(synthesize_scene_audio(sc["sentence"], sc_mp3))
-            subprocess.run([ffmpeg_bin, "-y", "-i", str(sc_mp3), "-ar", "44100", "-ac", "2", str(sc_wav)], check=True, capture_output=True)
-        else:
-            logger.info(f"Reusing existing synthesized voice for Scene {idx+1}")
-            words = []
+        logger.info(f"Synthesizing voice for Scene {idx+1}: {sc['title']}")
+        words = asyncio.run(synthesize_scene_audio(sc["sentence"], sc_mp3))
+        subprocess.run([ffmpeg_bin, "-y", "-i", str(sc_mp3), "-ar", "44100", "-ac", "2", str(sc_wav)], check=True, capture_output=True)
 
         if not words:
             logger.info(f"Extracting real Whisper word timestamps from {sc_wav.name} (Rule 120)...")
@@ -331,56 +372,42 @@ def main():
 
     # Combine into master_narration.wav
     concat_txt = OUT_DIR / "audio_concat.txt"
-    concat_txt.write_text(f"file '{audio_scenes[0]['wav'].resolve().as_posix()}'\nfile '{audio_scenes[1]['wav'].resolve().as_posix()}'\n", encoding="utf-8")
+    concat_lines = [f"file '{s['wav'].resolve().as_posix()}'" for s in audio_scenes]
+    concat_txt.write_text("\n".join(concat_lines) + "\n", encoding="utf-8")
     master_wav = OUT_DIR / "master_narration.wav"
     master_mp3 = OUT_DIR / "tts_out.mp3"
     subprocess.run([ffmpeg_bin, "-y", "-f", "concat", "-safe", "0", "-i", str(concat_txt), "-c", "copy", str(master_wav)], check=True, capture_output=True)
     subprocess.run([ffmpeg_bin, "-y", "-i", str(master_wav), "-b:a", "192k", str(master_mp3)], check=True, capture_output=True)
 
     master_dur = probe_audio_duration(master_wav)
-    logger.info(f"Master narration combined: {master_dur:.3f}s")
+    logger.info(f"Master narration combined: {master_dur:.3f}s across {len(audio_scenes)} scenes")
 
-    logger.info("=== STEP 1B: Generating 2 Opuscar Scene Manifests & Prompts ===")
+    logger.info("=== STEP 1B: Generating 4 Opuscar Scene Manifests & Prompts ===")
     from app.services.kinetic_sub_director import (
         build_cl3_paper_diorama_prompt,
         generate_scene_sub_director_plan,
     )
-    sub_plan_1 = generate_scene_sub_director_plan(
-        scene_id="SCENE_01",
-        sentence=SCENES_DEF[0]["sentence"],
-        hero_cutout_object="stat number card 10X and ransom negotiation agreement dossier",
-        interacting_objects=["turned-wood vermilion docket seal stamp"],
-        duration_sec=audio_scenes[0]["duration"],
-        market="JP",
-        whisper_words=audio_scenes[0]["words"] if audio_scenes[0]["words"] else None,
-        camera_directive="TOP_DOWN_TRACKING"
-    )
-    prompt_i2v_1 = build_cl3_paper_diorama_prompt(sub_plan_1, market="JP", style_mode="deep_diorama")
 
-    sub_plan_2 = generate_scene_sub_director_plan(
-        scene_id="SCENE_02",
-        sentence=SCENES_DEF[1]["sentence"],
-        hero_cutout_object="unverified market survey dossier and question mark ledger card",
-        interacting_objects=["vintage precision brass calipers"],
-        duration_sec=audio_scenes[1]["duration"],
-        market="JP",
-        whisper_words=audio_scenes[1]["words"] if audio_scenes[1]["words"] else None,
-        camera_directive="STATIC_OVERHEAD"
-    )
-    prompt_i2v_2 = build_cl3_paper_diorama_prompt(sub_plan_2, market="JP", style_mode="flat_parallax")
-
-    manifest = {
-        "scene_01": {
-            "definition": SCENES_DEF[0],
-            "sub_director_plan": sub_plan_1,
-            "canonical_i2v_prompt": prompt_i2v_1
-        },
-        "scene_02": {
-            "definition": SCENES_DEF[1],
-            "sub_director_plan": sub_plan_2,
-            "canonical_i2v_prompt": prompt_i2v_2
+    manifest = {}
+    for idx, sc in enumerate(SCENES_DEF):
+        sc_id = sc["scene_id"]
+        sub_plan = generate_scene_sub_director_plan(
+            scene_id=sc_id,
+            sentence=sc["sentence"],
+            hero_cutout_object=sc.get("hero_cutout_object", "archival document on cream diorama"),
+            interacting_objects=[sc.get("interacting_tool", "precision tactile tool")],
+            duration_sec=audio_scenes[idx]["duration"],
+            market="JP",
+            whisper_words=audio_scenes[idx]["words"] if audio_scenes[idx]["words"] else None,
+            camera_directive=sc.get("camera_directive", "SLOW_PUSH_IN_0_1X")
+        )
+        prompt_i2v = build_cl3_paper_diorama_prompt(sub_plan, market="JP", style_mode="deep_diorama")
+        manifest[sc_id.lower()] = {
+            "definition": sc,
+            "sub_director_plan": sub_plan,
+            "canonical_i2v_prompt": prompt_i2v
         }
-    }
+
     manifest_path = OUT_DIR / "opuscar_scene_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     logger.info(f"Saved Opuscar Scene Manifest to: {manifest_path}")
@@ -391,14 +418,17 @@ def main():
     pub_videos = remotion_dir / "public" / "videos"
     pub_videos.mkdir(parents=True, exist_ok=True)
 
-    vid1_src = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos/clip_scene_01.mp4"
-    vid2_src = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos/clip_scene_02.mp4"
-    vid1_dst = pub_videos / "opuscar_scene_01_omni.mp4"
-    vid2_dst = pub_videos / "opuscar_scene_02_omni.mp4"
-
-    shutil.copy2(vid1_src, vid1_dst)
-    shutil.copy2(vid2_src, vid2_dst)
-    logger.info(f"Staged real Omni videos: {vid1_dst.name} ({vid1_dst.stat().st_size/1024:.1f} KB) and {vid2_dst.name} ({vid2_dst.stat().st_size/1024:.1f} KB)")
+    staged_videos = []
+    base_vids = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos"
+    for idx in range(len(SCENES_DEF)):
+        vid_src = base_vids / f"clip_scene_{idx+1:02d}.mp4"
+        vid_dst = pub_videos / f"opuscar_scene_{idx+1:02d}_omni.mp4"
+        if vid_src.exists():
+            shutil.copy2(vid_src, vid_dst)
+            staged_videos.append(vid_dst)
+            logger.info(f"Staged {vid_dst.name} ({vid_dst.stat().st_size/1024:.1f} KB)")
+        else:
+            logger.warning(f"Video source not found: {vid_src}")
 
     # Build Remotion Scene Props adhering strictly to Opuscar
     fps = 30
@@ -408,13 +438,10 @@ def main():
     for idx, sc in enumerate(SCENES_DEF):
         aud_info = audio_scenes[idx]
         vo_dur = aud_info["duration"]
-        
-        # Readcheck formula: hold >= max(1.8s, chars/4.5 + 1.5s, VO + 0.6s)
-        chars = len(sc["sentence"].strip())
-        t_chars = (chars / 4.5) + 1.5
-        t_vo = vo_dur + 0.6
-        min_hold = max(1.8, t_chars, t_vo)
-        sc_dur_sec = max(vo_dur + 0.8, min_hold)
+
+        # Fast-paced Vox explainer pacing:
+        # Pacing: ~3.2s to 4.5s per shot, tail hold = 0.6s
+        sc_dur_sec = max(3.2, vo_dur + 0.6)
         sc_dur_frames = int(round(sc_dur_sec * fps))
 
         rel_subtitles = []
@@ -465,7 +492,7 @@ def main():
 
     remotion_props = {
         "episodeId": "JP_EP0003_OPUSCAR_PREVIEW",
-        "title": "Japan AI Ransom Economy: Opuscar Upgraded Preview",
+        "title": "Japan AI Ransom Economy: Opuscar 4-Beat Upgraded Preview",
         "theme": "newsprint-editorial",
         "fps": fps,
         "width": 1920,
@@ -497,13 +524,13 @@ def main():
     # Stage props file into remotion root
     shutil.copy2(props_file, remotion_dir / "remotion_props.json")
 
-    logger.info("=== STEP 3: Syncing Remotion Components & Code to VPS ===")
+    logger.info("=== STEP 3: Syncing Remotion Components & Assets to VPS ===")
     client = FastVPSClient()
 
     # 1. Upload background real Omni videos to VPS
     vps_videos_dir = "/root/video_factory/remotion/public/videos"
     client.run_command(f"mkdir -p {vps_videos_dir}")
-    for vid_file in [vid1_dst, vid2_dst]:
+    for vid_file in staged_videos:
         vps_vid_path = f"{vps_videos_dir}/{vid_file.name}"
         vps_sz = int(client.run_command(f"stat -c %s '{vps_vid_path}' 2>/dev/null || echo 0").get("stdout", "0").strip() or "0")
         if vps_sz != vid_file.stat().st_size:
@@ -567,7 +594,7 @@ def main():
             logger.info(f"Remotion render process PID {pid} finished.")
             break
     else:
-        logger.warning("Render polling timed out after 600s!")
+        logger.warning("Render polling timed out after 900s!")
 
     # Check VPS rendered MP4
     chk_res = client.run_command(f"ls -lh {vps_out_mp4}")
@@ -588,14 +615,19 @@ def main():
 
     # Extract forensic probe frames for inspection
     logger.info("=== STEP 6: Extracting Forensic Probe Frames ===")
-    probe_timestamps = [1.0, 3.0, 7.0, 12.0, 15.0, 18.0, 24.0]
+    probe_timestamps = [1.0, 3.0, 5.0, 8.0, 11.0, 14.0]
     for sec in probe_timestamps:
         frame_out = OUT_DIR / f"probe_{int(sec):02d}s.jpg"
         subprocess.run([
             ffmpeg_bin, "-y", "-ss", str(sec), "-i", str(local_final_mp4),
             "-vframes", "1", "-q:v", "2", str(frame_out)
         ], check=True, capture_output=True)
-        logger.info(f"Extracted probe frame at {sec}s -> {frame_out} ({frame_out.stat().st_size} bytes)")
+        try:
+            sz_f = frame_out.stat().st_size
+        except OSError as stat_err:
+            logger.warning(f"Failed to read size for {frame_out}: {stat_err}")
+            sz_f = 0
+        logger.info(f"Extracted probe frame at {sec}s -> {frame_out} ({sz_f} bytes)")
 
     print(f"\nSUCCESS: Preview video rendered and ready at:\n{local_final_mp4.resolve()}\n")
 

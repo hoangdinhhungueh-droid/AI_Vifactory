@@ -37,13 +37,13 @@ export const PaperStatCard: React.FC<PaperStatCardProps> = ({
   return (
     <PaperDrop
       dropFrame={dropFrame}
-      baseRotation={isLeft ? 1.8 : -1.8}
+      baseRotation={isLeft ? -1.8 : 1.8}
       seed={19}
       style={{
         position: "absolute",
         top,
-        left: isLeft ? "auto" : 76,
-        right: isLeft ? 76 : "auto",
+        left: isLeft ? 76 : "auto",
+        right: isLeft ? "auto" : 76,
         zIndex: 30,
         pointerEvents: "none",
       }}
