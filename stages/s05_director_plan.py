@@ -267,26 +267,41 @@ def build_vox_scene_prompts(
     # 2. Kinematics Actions Breakdown & Second-by-Second Decomposition (S0 -> S1 -> S2)
     t_entry_end = min(1.5, round(dur * 0.3, 1))
     t_hold_start = max(t_entry_end + 1.0, round(dur - 1.0, 1))
+    # Opuscar Readcheck formula hold calculation: hold >= max(1.8s, chars/4.5 + 1.5s, VO + 0.6s)
+    chars_cnt = len(sentence_text.strip()) if sentence_text else 0
+    readcheck_min_hold = max(1.8, (chars_cnt / 4.5) + 1.5, dur * 0.4)
+    t_hold_start = max(t_entry_end + 0.3, round(dur - min(dur - t_entry_end - 0.3, readcheck_min_hold), 1))
+
+    # Opuscar specialized kinetic action descriptions
+    is_impact = "IMPACT" in resolved_h_family.upper()
+    is_constraint = "CONSTRAINT" in resolved_h_family.upper()
+    if is_impact:
+        mech_action = f"Tactile {tool_prop} stamp slams in 0.09s drop from 2.6x to 1x onto {hero_obj} with damped micro-bounce and soft ink squelch, leaving permanent pitted impression"
+    elif is_constraint:
+        mech_action = f"Tactile {tool_prop} rides along dimension line with arrowhead taps and mechanical counter ticks locking coordinates across {hero_obj}"
+    else:
+        mech_action = f"Tactile {tool_prop} {evidence.tactile_action_verb} {hero_obj}, causing {evidence.physical_reaction}"
+
     second_by_second_action_breakdown = [
         {
             "time_window": f"0.0s - {t_entry_end:.1f}s",
             "active_object_id": f"o{idx+1}_1",
             "action_type": "slide_in",
-            "mechanical_action": f"{hero_obj} slides diagonally into center anchor with snappy deceleration",
+            "mechanical_action": f"{hero_obj} snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle within 0.2s-0.3s",
             "spatial_coordinate": "X:30%, Y:45%"
         },
         {
             "time_window": f"{t_entry_end:.1f}s - {t_hold_start:.1f}s",
             "active_object_id": f"o{idx+1}_2",
             "action_type": str(getattr(evidence.dominant_family, 'value', evidence.dominant_family)).lower(),
-            "mechanical_action": f"Tactile {tool_prop} {evidence.tactile_action_verb} {hero_obj}, causing {evidence.physical_reaction}",
+            "mechanical_action": mech_action,
             "spatial_coordinate": "X:35%, Y:60%"
         },
         {
             "time_window": f"{t_hold_start:.1f}s - {dur:.1f}s",
             "active_object_id": "ALL_OBJECTS",
             "action_type": "living_poster_hold",
-            "mechanical_action": "All objects freeze rigidly into spatial anchor, subtle 12fps paper drop shadow breathing",
+            "mechanical_action": "All objects freeze rigidly into spatial anchor, dual-rate motion (24/30fps camera with 12fps paper shadow breathing on twos)",
             "spatial_coordinate": "LOCKED_SPATIAL_ANCHOR"
         }
     ]

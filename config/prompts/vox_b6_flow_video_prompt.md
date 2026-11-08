@@ -35,12 +35,18 @@ Dành cho các phân cảnh đối thoại nhân vật hoặc tranh luận thể
 
 ---
 
-## ⚡ III. 7 HỌ ĐỘNG LỰC HỌC CƠ HỌC ($H_1 \to H_7$) VÀ NHỊP THỜI GIAN
+## ⚡ III. ĐỘNG LỰC HỌC CƠ HỌC OPUSCAR ($H_1 \to H_7$) VÀ NHỊP THỜI GIAN
 
-1. **Bứt tốc tức thì ($\le 0.4\text{s}$)**: Mọi thao tác dập dấu, kẹp thước, cắt giấy, cắm ghim BẮT BUỘC diễn ra dứt khoát trong $0.2\text{s} - 0.4\text{s}$ kèm độ nảy cơ học (overshoot).
-2. **Khóa cứng điểm đỗ (Dead-Stop Hold)**: Ngay sau va chạm, vật thể đứng im bất động tại tọa độ va chạm. CẤM kéo dài chuyển động chậm chạp lê thê suốt 5–8s.
-3. **Thớ giấy sống 12fps (Living Hold on Twos)**: Trong suốt thời gian giữ khung hình, duy trì vi rung thớ giấy báo và nhịp thở bóng đổ $\le 2\text{px}$ ở 12fps.
-4. **Điểm đỗ máy quay bắt buộc (`Settle on...`)**: Mọi cú máy BẮT BUỘC kết thúc bằng câu lệnh `Settle on [target] in sharp focus`.
+1. **Gia tốc bứt tốc snappy cubic-bezier**: Sử dụng đường cong gia tốc `cubic-bezier(.7, 0, .2, 1)` bứt tốc và hồi nảy cơ học (mechanical back-overshoot), ổn định điểm đỗ trong $0.2\text{s} - 0.3\text{s}$.
+2. **Cú dập dấu Stamp Slam Opuscar**: Rơi tự do trọng lực trong $0.09\text{s}$ từ tỷ lệ $2.6\times$ xuống $1.0\times$, rung vi chấn dập tắt dần (damped micro-bounce), rung camera 1 frame, chớp trắng $0.5$ flash, và âm thanh mút mực xúc giác (soft ink squelch).
+3. **Đường kích thước & Thước đo (Dimension Line Rides)**: Đầu mũi tên chạm nhẹ (arrowhead taps) kích hoạt chuỗi số nhảy cơ học (mechanical counter ticks).
+4. **Chuyển động đa tốc độ (Dual-Rate Motion)**: Máy quay di chuyển mượt mà ở 24/30fps, trong khi thớ giấy, bóng đổ bề mặt và nét viền (line-boil) rung nhẹ ở 12fps (on twos).
+5. **Công thức kiểm toán thời gian giữ mắt (Readcheck Formula)**:
+   $$\text{Hold Time} \ge \max\left(1.8\text{s},\; \frac{\text{chars}}{4.5} + 1.5\text{s},\; \text{VO} + 0.6\text{s}\right)$$
+   Đảm bảo người xem kịp đọc trọn vẹn số liệu và văn bản trước khi chuyển cảnh.
+6. **Khoảng lặng tuyệt đối (Two Real Silences)**: Tự động hạ âm lượng BGM (ducking silence) trước cú va chạm dập dấu và thời điểm bóc trần chứng cứ quan trọng.
+7. **Khóa cứng điểm đỗ (Dead-Stop Hold)**: Ngay sau va chạm, vật thể đứng im bất động tại tọa độ va chạm. CẤM kéo dài chuyển động chậm chạp lê thê suốt 5–8s.
+8. **Điểm đỗ máy quay bắt buộc (`Settle on...`)**: Mọi cú máy BẮT BUỘC kết thúc bằng câu lệnh `Settle on [target] in sharp focus`.
 
 ---
 

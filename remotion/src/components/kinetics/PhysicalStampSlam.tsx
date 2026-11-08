@@ -39,33 +39,39 @@ export const PhysicalStampSlam: React.FC<PhysicalStampSlamProps> = ({
     return null;
   }
 
-  // Stamp bounce physics: rapid drop from high altitude with bounce back up then settle
+  // Opuscar Stamp Slam physics: 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce
   const springProgress = spring({
     frame: relFrame,
     fps,
     config: {
-      damping: 10,
-      mass: 0.45,
-      stiffness: 150,
+      damping: 14,
+      mass: 0.3,
+      stiffness: 380,
     },
-    from: 2.4,
+    from: 2.6,
     to: 1.0,
   });
 
   const finalScale = springProgress * scaleMultiplier;
 
-  // Impact micro-shake on the stamp itself for 4 frames post-impact
+  // 1-frame camera shake and impact micro-jitter for 4 frames post-impact
   const impactJitter =
-    relFrame >= 0 && relFrame <= 4
-      ? Math.sin(relFrame * Math.PI) * (4 - relFrame) * 1.5
+    relFrame === 3
+      ? 5.0
+      : relFrame > 3 && relFrame <= 6
+      ? Math.sin((relFrame - 3) * Math.PI) * (6 - relFrame) * 1.2
       : 0;
 
+  // 0.5 white flash on impact frame
+  const flashOpacity =
+    relFrame === 3 ? 0.5 : relFrame === 4 ? 0.2 : 0;
+
   // Contact shadow under stamp: expands and darkens as stamp reaches surface
-  const shadowOpacity = interpolate(relFrame, [0, 2], [0.2, 0.85], {
+  const shadowOpacity = interpolate(relFrame, [0, 3], [0.15, 0.9], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const shadowScale = interpolate(relFrame, [0, 3], [0.6, 1.05], {
+  const shadowScale = interpolate(relFrame, [0, 3], [0.5, 1.08], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -97,6 +103,23 @@ export const PhysicalStampSlam: React.FC<PhysicalStampSlamProps> = ({
         ...style,
       }}
     >
+      {/* 0.5 White flash on impact frame */}
+      {flashOpacity > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "#ffffff",
+            opacity: flashOpacity,
+            pointerEvents: "none",
+            zIndex: 999,
+          }}
+        />
+      )}
+
       {/* Dynamic contact shadow */}
       <div
         aria-hidden="true"
@@ -113,7 +136,23 @@ export const PhysicalStampSlam: React.FC<PhysicalStampSlamProps> = ({
         }}
       />
 
-      {/* Outer Distressed Border Box */}
+      {/* Misregistration Ink Shadow (+8px offset) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 8,
+          left: 8,
+          width: "100%",
+          height: "100%",
+          border: `4px solid rgba(214, 46, 31, 0.35)`,
+          borderRadius: 8,
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      />
+
+      {/* Outer Distressed Pitted Rubber Stamp Box */}
       <div
         style={{
           border: `4px solid ${scheme.border}`,
@@ -124,12 +163,14 @@ export const PhysicalStampSlam: React.FC<PhysicalStampSlamProps> = ({
           boxShadow: `0 0 0 2px ${scheme.border}44, 0 12px 30px rgba(0,0,0,0.5), inset 0 0 15px ${scheme.border}22`,
           textAlign: "center",
           textTransform: "uppercase",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         {/* Main Stamp Text */}
         <div
           style={{
-            fontFamily: "'Courier New', Courier, monospace, 'Impact'",
+            fontFamily: "'IBM Plex Mono', 'Courier New', Courier, monospace, 'Impact'",
             fontWeight: 900,
             fontSize: 38,
             letterSpacing: 4,

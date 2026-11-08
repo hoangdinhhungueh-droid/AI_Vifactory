@@ -42,6 +42,24 @@ export const SPRING_PRESETS = {
     stiffness: 60,
     damping: 30,
   },
+  /** Opuscar Snappy ease-in (.7, 0, .2, 1) with mechanical back-overshoot, settling in 0.2s-0.3s */
+  opuscarSnappy: {
+    mass: 0.35,
+    stiffness: 290,
+    damping: 15,
+  },
+  /** Opuscar Stamp Slam: 0.09s drop from 2.6x to 1x with damped micro-bounce */
+  opuscarStampSlam: {
+    mass: 0.3,
+    stiffness: 380,
+    damping: 14,
+  },
+  /** Opuscar Dimension Line Ride: crisp arrowhead tap with mechanical counter tick lock */
+  opuscarDimensionLine: {
+    mass: 0.4,
+    stiffness: 320,
+    damping: 24,
+  },
 } as const;
 
 export type SpringPresetName = keyof typeof SPRING_PRESETS;

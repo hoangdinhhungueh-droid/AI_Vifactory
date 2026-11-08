@@ -2008,6 +2008,21 @@ export const computeCameraTransform = (
     return `scale(${scale}) translate(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px)`;
   }
 
+  if (mov === "opuscar_snappy" || mov === "swiss_motion") {
+    // Opuscar snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s (6-9 frames)
+    const snappyScale = interpolate(f, [0, 8, 14, dur], [1.0, 1.08, 1.05, 1.06], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.7, 0, 0.2, 1),
+    });
+    const snappyX = interpolate(f, [0, 8, 14, dur], [-20, 4, 0, -2], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.7, 0, 0.2, 1),
+    });
+    return `scale(${snappyScale}) translateX(${snappyX.toFixed(2)}px)`;
+  }
+
   if (mov === "continuous_drift") {
     // Vox/Veo continuous momentum: smooth directional glide without abrupt stops
     const panX = interpolate(f, [0, dur], [-14, 14], {
@@ -2390,7 +2405,17 @@ export const TwoLayerEpisode: React.FC<{
   const includeAudio = Boolean(props.includeAudio);
   const audioMaster = includeAudio && props.audioMaster ? resolveSrc(props.audioMaster) : null;
   const bgmFile = includeAudio && props.bgmFile ? resolveSrc(props.bgmFile) : null;
-  const bgmVolume = props.bgmVolume !== undefined ? props.bgmVolume : 0.12;
+  // Two real silences (ducking BGM before slams / critical evidence reveal)
+  const baseBgmVolume = props.bgmVolume !== undefined ? props.bgmVolume : 0.12;
+  const hasStampSlam = Boolean(
+    currentSceneInfo?.scene?.stampBadge ||
+    currentSceneInfo?.scene?.stampText ||
+    currentSceneInfo?.scene?.action_type === "H1_IMPACT"
+  );
+  const slamTargetRelFrame = 15;
+  const relSlamDelta = currentSceneInfo ? currentSceneInfo.relFrame - slamTargetRelFrame : 999;
+  const isSlamDucking = hasStampSlam && relSlamDelta >= -6 && relSlamDelta <= 4;
+  const bgmVolume = isSlamDucking ? 0.0 : baseBgmVolume;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a" }}>

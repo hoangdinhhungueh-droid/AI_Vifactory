@@ -128,6 +128,7 @@ class TemplateRegistry:
         if camera_directive:
             cam_str = str(camera_directive).upper()
             generic_cam_patterns = [
+                "The camera is an actor with disciplined kinematics: smooth 24/30fps tracking along one committed vector, decelerating smoothly to a steady resting hold.",
                 "The camera is an actor with disciplined kinematics: it glides, tracks, or racks focus along one committed vector, decelerating smoothly to a steady resting hold — strictly no sudden whips, dives, or camera rolls.",
                 "The camera is an actor: it flies between layers, orbits, dives, whips, racks focus — one committed cinematic move per clip.",
             ]
@@ -154,10 +155,15 @@ class TemplateRegistry:
                 replacement_cam = "The camera maintains a stable macro diorama plate with clean paper texture, skimming along paper grain into a dead-stop resting hold."
 
             if replacement_cam:
+                replaced = False
                 for gen_pat in generic_cam_patterns:
                     if gen_pat in content:
                         content = content.replace(gen_pat, replacement_cam)
+                        replaced = True
                         break
+                if not replaced:
+                    import re
+                    content = re.sub(r'The camera is an actor[^.]*\.', replacement_cam, content)
         return content
 
     def get_t2i_style_block(self, trace: Optional[PromptTrace] = None) -> str:

@@ -6,7 +6,14 @@
 
 ---
 
-## 1. Cấu Trúc Bất Biến (Canonical 2-Block Structure)
+## 1. Cấu Trúc Bất Biến & 5 Hộp Cốt Lõi Opuscar (Core Boxes Architecture)
+
+Hệ thống kế thừa và nâng cấp toàn diện dựa trên **Opuscar Core Boxes** (`lemomo-ai/lemo-opuscar`):
+1. **`visual-investigation`**: Dựng cấu trúc hồ sơ phá án, lần theo dấu vết dòng tiền và tài liệu đối soát.
+2. **`archive-lighttable`**: Bàn soi tài liệu ngược sáng lạnh (`#F7F9FB`), làm nổi rõ thớ giấy xuyên thấu, watermark và nét xóa mờ ghost strokes 7% trên bảng trắng.
+3. **`swiss-motion`**: Nghệ thuật tương phản tỷ lệ cực hạn Thụy Sĩ (Swiss extreme scale contrast: số liệu khổng lồ chiếm 30-35% diện tích khung hình đối lập sắc nét với nhãn nguồn IBM Plex Mono trên chip 6x12 siêu nhỏ).
+4. **`halftone-dossier`**: Hồ sơ bán sắc Ben-Day halftone density fields kết hợp con dấu cao su mòn rỗ (pitted rubber stamps) và bóng mực in lệch (+8px misregistration offset pop).
+5. **`briefing-board`**: Bảng tác chiến diorama với cổng kính lúp acrylic méo barrel distortion sắc sai viền, ghim đồng cắm phập và chỉ đỏ liên kết.
 
 Mọi prompt sinh ảnh đều được cấu thành từ 2 khối phân định rõ ràng:
 
@@ -22,7 +29,7 @@ SHOT:          — Khối biến đổi theo từng phân cảnh, mô tả lớp
 
 ## 2. Khối Style Block Chuẩn Mực (The Canonical Style Block - Copy Verbatim)
 
-> Use the attached style sheet for materials only – aged-print collage textures on aged archival cream newsprint and tan kraft cardstock, halftone black-and-white cutout people with rough white keylines and offset ink accent strokes (crimson red, mustard gold), giant stat numbers rendered as physical hero characters, and authentic print grain. Do NOT copy the sheet's layout or its flatness: every scene is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's muted archival palette (cream newsprint, tan kraft, ink black, halftone gray). Multi-plane stereoscopic depth: 1.4x fast foreground tool travel, 1.0x tack-sharp focal plane, 0.3x slow background drift in shallow depth of field. Motion: mechanical spring pop-ups with slight overshoot, staggered entrances, ticking counters, tactile paper contact residue. Audio: sound design only – paper pops, whooshes, stamps, ticks, newsroom hum. No music. No voice-over. Keep bottom 20% of the surface completely empty, plain bare cream paper only. No text, no objects, no cards in the bottom fifth.
+> Use the attached style sheet for materials only – aged-print collage textures on aged archival cream newsprint (#F4F1EA), tan kraft cardstock (#C9BB9C), and cool backlit light table (#F7F9FB) with faint erased whiteboard ghost strokes (7% opacity), halftone black-and-white cutout people with rough white keylines and misregistration ink shadows (+8px offset pop in crimson red #D62E1F or mustard gold #D9A441), Ben-Day halftone density fields, pitted rubber stamps with authentic ink bleed, Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), acrylic loupe portals with pincushion barrel distortion and edge chromatic aberration, and authentic print grain. Do NOT copy the sheet's layout or its flatness: every scene is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's muted archival palette (cream newsprint, tan kraft, cool light table, ink black, halftone gray). Multi-plane stereoscopic depth: 1.4x fast foreground tool travel, 1.0x tack-sharp focal plane, 0.3x slow background drift in shallow depth of field. Motion: mechanical spring pop-ups with slight overshoot, staggered entrances, ticking counters, tactile paper contact residue. Audio: sound design only – paper pops, whooshes, stamps, ticks, newsroom hum. No music. No voice-over. Keep bottom 20% of the surface completely empty, plain bare cream paper only. No text, no objects, no cards in the bottom fifth.
 
 ### Giải mã chức năng từng mệnh đề (Tại sao không được xóa):
 
@@ -31,6 +38,10 @@ SHOT:          — Khối biến đổi theo từng phân cảnh, mô tả lớp
 | `"style sheet for materials only"` | Vay mượn chất liệu xúc giác (texture), không sao chép bố cục (layout). |
 | `"Do NOT copy the sheet's layout or its flatness"` | Diệt trừ tử huyệt số 1: Tránh tạo ra ảnh phẳng 2D nhàm chán. |
 | `"deep 3D paper diorama / physical layers in real space"` | Ép mô hình AI tạo ra hiệu ứng thị sai (parallax) và phân tách tầng lớp rõ rệt. |
+| `"cool backlit light table #F7F9FB / ghost strokes 7%"` | Tái tạo bàn soi tài liệu và bảng điều tra chuyên sâu (Opuscar archive-lighttable). |
+| `"misregistration ink shadows (+8px offset) / Ben-Day"` | Kỹ thuật in ấn cơ học chân thực, loại bỏ cảm giác vector số hóa (Opuscar halftone-dossier). |
+| `"Swiss extreme scale contrast (30-35% mass vs IBM Plex Mono)"` | Phân cấp thị giác Thụy Sĩ cực đại: Số liệu đè bẹp thị giác, thẻ nguồn siêu chính xác. |
+| `"acrylic loupe with barrel distortion and chromatic aberration"` | Thấu kính kiểm chứng thực tế, tạo cổng quang học sâu (Opuscar briefing-board). |
 | `"shallow depth of field / foreground crossing the lens"` | Bán độ chân thực 3D qua quang học ống kính máy quay macro. |
 | `"camera is an actor / one committed move"` | Ngăn chặn hiện tượng lia camera lộn xộn hoặc trôi dạt mất phương hướng. |
 | `"Backgrounds change per clip"` | Đảm bảo mỗi phân cảnh mang một bề mặt hồ sơ mới (bản đồ, sổ cái, báo chí, bản vẽ). |
@@ -47,8 +58,8 @@ Viết thành một đoạn văn xuôi 2–5 câu theo đúng thứ tự sau. Kh
 
 ```
 Background: [Bề mặt tài liệu nền + cự ly + trạng thái mờ nét (depth of field)].
-MG: [Chủ thể nhân vật cắt dán halftone đen trắng + viền rách trắng + nét mực viền lệch].
-FG: [Đạo cụ cơ học tương tác H1->H7 / Thẻ số liệu khổng lồ / Thước cặp / Con dấu / Kẹp sắt] đặt ở các cự ly sâu khác nhau.
+MG: [Chủ thể nhân vật cắt dán halftone đen trắng + viền rách trắng + nét mực viền lệch / misregistration shadow +8px].
+FG: [Đạo cụ cơ học tương tác H1->H7 / Thẻ số liệu khổng lồ 30-35% / Thẻ nguồn IBM Plex Mono / Acrylic Loupe / Thước cặp / Con dấu rỗ pitted] đặt ở các cự ly sâu khác nhau.
 [Hành động kết nối: Mũi tên đỏ vẽ vòng lặp, thước kẹp siết số liệu, dấu mộc dập lún giấy, dao trổ rạch lớp báo].
 Camera [MỘT chuyển động duy nhất], focus [Hành vi chuyển nét / rack focus].
 Settle [Điểm dừng khung hình cuối cùng].
@@ -59,6 +70,7 @@ Settle [Điểm dừng khung hình cuối cùng].
 ## 4. Tủ Menu Thành Phần (Component Slot Menus)
 
 ### A. Background (Chọn 1, đặt nghiêng góc phối cảnh, mờ nét ở hậu cảnh):
+- `cool backlit light table #F7F9FB with faint erased whiteboard ghost strokes at 7% opacity`
 - `faded world map tilted in deep perspective, far out of focus`
 - `torn financial ledger page with verified quantitative metric columns`
 - `newspaper column wall with aged deckle borders receding into soft blur`
@@ -68,21 +80,24 @@ Settle [Điểm dừng khung hình cuối cùng].
 - `circuit trace print on fibrous cream parchment`
 - `topographic elevation survey map on aged cream cardstock`
 - `shipping manifest table with hand-annotated clearance marks`
+- `Ben-Day halftone density field audit card tilted in perspective`
 
 ### B. Foreground & Midground Elements (Lớp lang đối kháng):
-- **Midground (MG)**: Nhân vật cắt dán bán sắc đen trắng (Halftone B&W Cutout Figures) với đường viền cắt thô (rough white deckle keyline) và nét bóng mực đỏ/vàng lệch sau lưng (`offset stroke pop`).
+- **Midground (MG)**: Nhân vật cắt dán bán sắc đen trắng (Halftone B&W Cutout Figures 60lpi) với đường viền cắt thô (rough white deckle keyline) và nét bóng mực đỏ/vàng lệch sau lưng (`misregistration ink shadow +8px offset pop`).
 - **Foreground (FG)**: 
-  - Thẻ số liệu khổng lồ: `giant stat number [TEXT] (giant number)`
+  - Thẻ số liệu khổng lồ: `giant stat number [TEXT] (30-35% mass hero character)`
+  - Thẻ nguồn chính xác: `precision IBM Plex Mono source tag on 6x12 chip`
+  - Thấu kính quang học: `acrylic loupe portal with pincushion barrel distortion and edge chromatic aberration`
+  - Con dấu cao su mòn rỗ: `pitted rubber docket stamp with uneven ink bleed`
   - Kẹp tài liệu bằng đồng: `precision archival brass document clamp (interacting tool)`
   - Dấu mộc điều tra đỏ thắm: `turned-wood vermilion docket seal stamp (interacting tool)`
   - Kẹp lò xo thép công nghiệp: `blackened steel spring clamp (interacting tool)`
   - Dao trổ / Kéo biên tập: `machined steel editorial shears (interacting tool)`
   - Sợi chỉ đỏ điều tra: `red evidence yarn pinned taut between brass pushpins (tether)`
-  - Kính lúp quang học: `brass magnifying loupe revealing micro-print text (optical)`
   - Bút chì sáp đỏ / Dấu kiểm chứng: `archival crimson graphite pencil / official registry seal (mark)`
 
 ### C. 7 Họ Tương Tác Cơ Học ($H_1 \to H_7$ Kinetic Couplings):
-1. **$H_1$ (Impact / Percussion)**: Con dấu dập mạnh $\to$ Giấy lún, mực loang nhẹ, camera giật 1 frame.
+1. **$H_1$ (Impact / Percussion)**: Con dấu mòn rỗ dập mạnh $\to$ Giấy lún, mực loang nhẹ, camera giật 1 frame.
 2. **$H_2$ (Constraint / Clamp)**: Kẹp tài liệu hoặc chốt giữ siết mép giấy $\to$ Mép cardstock nhăn, chốt khóa cứng.
 3. **$H_3$ (Sever / Cut / Tear)**: Kéo kim loại cắt xé $\to$ Mảnh giấy tách rời làm lộ chứng cứ tầng bên dưới.
 4. **$H_4$ (Tether / Tension)**: Sợi chỉ đỏ kéo căng giữa 2 ghim đồng $\to$ Hai đối tượng bị kéo nghiêng về nhau.
