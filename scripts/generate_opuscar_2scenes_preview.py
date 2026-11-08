@@ -283,8 +283,8 @@ def main():
         try:
             sz_mb = v.stat().st_size / (1024 * 1024)
             logger.info(f"  - {v.relative_to(out_root)} ({sz_mb:.2f} MB, {v.stat().st_size} bytes)")
-        except Exception:
-            pass
+        except OSError as stat_err:
+            logger.warning(f"Could not stat video {v}: {stat_err}")
 
     backup_dir = OUT_DIR / "backup"
     backup_dir.mkdir(parents=True, exist_ok=True)
