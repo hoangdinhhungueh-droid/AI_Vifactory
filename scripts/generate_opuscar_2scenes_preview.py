@@ -25,10 +25,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import requests
-
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+
+from scripts.vps_runner import FastVPSClient
 
 logging.basicConfig(
     level=logging.INFO,
@@ -240,7 +240,6 @@ def probe_audio_duration(file_path: Path) -> float:
         data = json.loads(res.stdout)
         return float(data["format"]["duration"])
     except Exception:
-        # Fallback using ffmpeg parse
         cmd = [ffmpeg_bin, "-i", str(file_path)]
         res = subprocess.run(cmd, capture_output=True, text=True)
         m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", res.stderr)
@@ -250,61 +249,40 @@ def probe_audio_duration(file_path: Path) -> float:
         return 4.0
 
 
-class FastVPSClient:
-    def __init__(self):
-        self.base_url = "https://n8n.kienthucquant.com/webhook/vf-terminal-v2"
-        self.cf_token = os.environ.get("CF_ACCESS_TOKEN", "").strip()
-        self.session = requests.Session()
-        self.headers = {"Content-Type": "application/json"}
-        if self.cf_token:
-            self.headers["cf-access-token"] = self.cf_token
-            self.headers["Authorization"] = f"Bearer {self.cf_token}"
-
-    def run_command(self, cmd: str, timeout: int = 120) -> Dict[str, Any]:
-        payload = {"command": cmd, "timeout": timeout, "confirm": True}
-        try:
-            resp = self.session.post(self.base_url, json=payload, headers=self.headers, timeout=timeout + 15)
-            resp.raise_for_status()
-            data = resp.json()
-            return data
-        except Exception as e:
-            logger.error(f"VPS command failed: {e}")
-            return {"exit_code": -1, "stdout": "", "stderr": str(e)}
-
-
-def upload_file_chunked(client: FastVPSClient, local_path: Path, remote_path: Path, chunk_size: int = 200_000):
+def upload_file_chunked(client: FastVPSClient, local_path: Path, remote_path: Path, chunk_size: int = 32_000):
     content = local_path.read_bytes()
     total_sz = len(content)
-    logger.info(f"Uploading {local_path.name} ({total_sz/1024:.1f} KB) to {remote_path}...")
+    logger.info(f"Uploading {local_path.name} ({total_sz/1024:.1f} KB) to {remote_path} via hex...")
 
     client.run_command(f"rm -f '{remote_path}' '{remote_path}.tmp'")
     client.run_command(f"mkdir -p '{Path(remote_path).parent}'")
 
     for i in range(0, total_sz, chunk_size):
         chunk = content[i : i + chunk_size]
-        b64 = base64.b64encode(chunk).decode("ascii")
-        res = client.run_command(f"python3 -c \"import base64; open('{remote_path}.tmp', 'ab').write(base64.b64decode('{b64}'))\"")
-        if res.get("exit_code") != 0:
-            raise RuntimeError(f"Failed to append chunk: {res.get('stderr')}")
+        hex_str = chunk.hex()
+        cmd = f"python3 -c \"open('{remote_path}.tmp', 'ab').write(bytes.fromhex('{hex_str}'))\""
+        res = client.run_command(cmd)
+        if isinstance(res, str) or res.get("exit_code") != 0 or res.get("status") == "denied":
+            raise RuntimeError(f"Failed to append hex chunk: {res}")
 
     mv_res = client.run_command(f"mv '{remote_path}.tmp' '{remote_path}'")
-    if mv_res.get("exit_code") != 0:
-        raise RuntimeError(f"Failed to finalize upload: {mv_res.get('stderr')}")
+    if isinstance(mv_res, str) or mv_res.get("exit_code") != 0:
+        raise RuntimeError(f"Failed to finalize upload: {mv_res}")
 
     stat_res = client.run_command(f"stat -c %s '{remote_path}'")
-    vps_sz = int(stat_res.get("stdout", "0").strip() or "0")
+    vps_sz = int(stat_res.get("stdout", "0").strip() if isinstance(stat_res, dict) else "0")
     if vps_sz != total_sz:
         raise ValueError(f"Size mismatch: local={total_sz}, VPS={vps_sz}")
     logger.info(f"Uploaded {local_path.name} verified: {vps_sz} bytes matches local.")
 
 
-def download_file_parallel(client: FastVPSClient, remote_path: str, local_path: Path, max_workers: int = 6):
+def download_file_parallel(client: FastVPSClient, remote_path: str, local_path: Path, max_workers: int = 4):
     stat_res = client.run_command(f"stat -c %s '{remote_path}'")
-    total_bytes = int(stat_res.get("stdout", "0").strip() or "0")
+    total_bytes = int(stat_res.get("stdout", "0").strip() if isinstance(stat_res, dict) else "0")
     if total_bytes == 0:
         raise RuntimeError(f"Remote file {remote_path} is missing or 0 bytes.")
 
-    chunk_size = 250_000
+    chunk_size = 100_000
     chunks = []
     for off in range(0, total_bytes, chunk_size):
         chunks.append((off, min(chunk_size, total_bytes - off)))
@@ -312,25 +290,15 @@ def download_file_parallel(client: FastVPSClient, remote_path: str, local_path: 
     out_bytes = bytearray(total_bytes)
     logger.info(f"Downloading {remote_path} ({total_bytes/1024/1024:.2f} MB) in {len(chunks)} chunks...")
 
-    def fetch_chunk(idx_off):
-        idx, (off, sz) = idx_off
-        cmd = f"python3 -c \"import base64; f=open('{remote_path}','rb'); f.seek({off}); print(base64.b64encode(f.read({sz})).decode('ascii'))\""
-        r = client.run_command(cmd, timeout=60)
-        b64_str = r.get("stdout", "").strip()
-        data = base64.b64decode(b64_str)
-        return off, data
-
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        results = pool.map(fetch_chunk, enumerate(chunks))
-        for off, data in results:
-            out_bytes[off : off + len(data)] = data
+    for off, sz in chunks:
+        cmd = f"python3 -c \"f=open('{remote_path}','rb'); f.seek({off}); print(f.read({sz}).hex())\""
+        r = client.run_command(cmd)
+        hex_str = r.get("stdout", "").strip() if isinstance(r, dict) else ""
+        data = bytes.fromhex(hex_str)
+        out_bytes[off : off + len(data)] = data
 
     local_path.write_bytes(out_bytes)
-    try:
-        sz_local = local_path.stat().st_size
-    except OSError as stat_err:
-        logger.warning(f"Failed to read file size for {local_path}: {stat_err}")
-        sz_local = 0
+    sz_local = local_path.stat().st_size
     if sz_local != total_bytes:
         raise ValueError(f"Download size mismatch: remote={total_bytes}, local={sz_local}")
     logger.info(f"Downloaded {local_path.name} verified ({sz_local} bytes).")
@@ -524,69 +492,93 @@ def main():
     # Stage props file into remotion root
     shutil.copy2(props_file, remotion_dir / "remotion_props.json")
 
+    # Native VPS Execution Branch (Rule 126 / Rule 119)
+    is_on_vps = Path("/root/video_factory").exists() and str(ROOT).startswith("/root/video_factory")
+    if is_on_vps:
+        logger.info("=== STEP 3-5: Running Natively on VPS (Zero Network Lag) ===")
+        vps_out_mp4 = ROOT / "out" / "opuscar_2scenes_preview.mp4"
+        vps_out_mp4.parent.mkdir(parents=True, exist_ok=True)
+        render_cmd = [
+            "npx", "remotion", "render", "src/index.tsx", "VoxBuildOnStage",
+            str(vps_out_mp4),
+            f"--props={remotion_dir / 'remotion_props.json'}",
+            "--concurrency=2", "--timeout=60000", "--log=info", "--x264-preset=fast", "--crf=23"
+        ]
+        logger.info(f"Executing: {' '.join(render_cmd)}")
+        subprocess.run(render_cmd, cwd=str(remotion_dir), check=True)
+
+        logger.info("=== STEP 6: Extracting Forensic Probe Frames on VPS ===")
+        probe_timestamps = [1.0, 3.0, 5.0, 8.0, 11.0, 14.0]
+        for sec in probe_timestamps:
+            frame_out = OUT_DIR / f"probe_{int(sec):02d}s.jpg"
+            subprocess.run([
+                ffmpeg_bin, "-y", "-ss", str(sec), "-i", str(vps_out_mp4),
+                "-vframes", "1", "-q:v", "2", str(frame_out)
+            ], check=True, capture_output=True)
+            logger.info(f"Extracted probe frame at {sec}s -> {frame_out} ({frame_out.stat().st_size} bytes)")
+
+        print(f"\nSUCCESS: Preview video rendered and ready at:\n{vps_out_mp4.resolve()}\n")
+        return
+
+    # Remote Client Execution Branch (Windows -> VPS)
     logger.info("=== STEP 3: Syncing Remotion Components & Assets to VPS ===")
     client = FastVPSClient()
+    client.init_session()
 
-    # 1. Upload background real Omni videos to VPS
     vps_videos_dir = "/root/video_factory/remotion/public/videos"
-    client.run_command(f"mkdir -p {vps_videos_dir}")
+    client.run_command(f"mkdir -p '{vps_videos_dir}'")
     for vid_file in staged_videos:
         vps_vid_path = f"{vps_videos_dir}/{vid_file.name}"
-        vps_sz = int(client.run_command(f"stat -c %s '{vps_vid_path}' 2>/dev/null || echo 0").get("stdout", "0").strip() or "0")
+        stat_res = client.run_command(f"stat -c %s '{vps_vid_path}' 2>/dev/null || echo 0")
+        vps_sz = int(stat_res.get("stdout", "0").strip() if isinstance(stat_res, dict) else "0")
         if vps_sz != vid_file.stat().st_size:
-            upload_file_chunked(client, vid_file, vps_vid_path, chunk_size=150_000)
+            upload_file_chunked(client, vid_file, Path(vps_vid_path), chunk_size=32_000)
         else:
             logger.info(f"VPS already has {vid_file.name} ({vps_sz} bytes), skipping re-upload.")
 
-    # 2. Upload tts_out.mp3 to VPS
     vps_tts_path = "/root/video_factory/remotion/public/tts_out.mp3"
-    upload_file_chunked(client, master_mp3, vps_tts_path)
+    upload_file_chunked(client, master_mp3, Path(vps_tts_path))
 
-    # 3. Upload remotion_props.json to VPS
     logger.info("Uploading remotion_props.json to VPS...")
     vps_props_path = "/root/video_factory/remotion/remotion_props.json"
-    upload_file_chunked(client, props_file, vps_props_path)
+    upload_file_chunked(client, props_file, Path(vps_props_path))
 
-    # 4. Upload updated Remotion source files to VPS
     vps_remotion_src = "/root/video_factory/remotion/src"
-    upload_file_chunked(client, ROOT / "remotion/src/index.tsx", f"{vps_remotion_src}/index.tsx")
-    upload_file_chunked(client, ROOT / "remotion/src/components/vox/VoxBuildOnStage.tsx", f"{vps_remotion_src}/components/vox/VoxBuildOnStage.tsx")
-    upload_file_chunked(client, ROOT / "remotion/src/components/vox/VoxParallaxLayer.tsx", f"{vps_remotion_src}/components/vox/VoxParallaxLayer.tsx")
-    upload_file_chunked(client, ROOT / "remotion/src/components/vox/PaperStatCard.tsx", f"{vps_remotion_src}/components/vox/PaperStatCard.tsx")
-    upload_file_chunked(client, ROOT / "remotion/src/components/vox/papercraft/VoxDimensionLine.tsx", f"{vps_remotion_src}/components/vox/papercraft/VoxDimensionLine.tsx")
-    upload_file_chunked(client, ROOT / "remotion/src/components/vox/papercraft/index.ts", f"{vps_remotion_src}/components/vox/papercraft/index.ts")
+    upload_file_chunked(client, ROOT / "remotion/src/index.tsx", Path(f"{vps_remotion_src}/index.tsx"))
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/VoxBuildOnStage.tsx", Path(f"{vps_remotion_src}/components/vox/VoxBuildOnStage.tsx"))
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/VoxParallaxLayer.tsx", Path(f"{vps_remotion_src}/components/vox/VoxParallaxLayer.tsx"))
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/PaperStatCard.tsx", Path(f"{vps_remotion_src}/components/vox/PaperStatCard.tsx"))
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/papercraft/VoxDimensionLine.tsx", Path(f"{vps_remotion_src}/components/vox/papercraft/VoxDimensionLine.tsx"))
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/papercraft/index.ts", Path(f"{vps_remotion_src}/components/vox/papercraft/index.ts"))
 
-    # 5. Render preview video via Remotion on VPS
     logger.info(f"=== STEP 4: Executing Remotion Render on VPS ({total_frames} frames @ 30fps) ===")
     vps_out_mp4 = "/root/video_factory/out/opuscar_2scenes_preview.mp4"
     client.run_command("mkdir -p /root/video_factory/out")
-    client.run_command(f"rm -f {vps_out_mp4}")
+    client.run_command(f"rm -f '{vps_out_mp4}'")
 
     vps_log = "/tmp/remotion_render.log"
-    client.run_command(f"rm -f {vps_log}")
+    client.run_command(f"rm -f '{vps_log}'")
 
-    # Launch in background with nohup to avoid Cloudflare 100s proxy timeout (HTTP 524)
     bg_cmd = (
         f"cd /root/video_factory/remotion && "
-        f"nohup npx remotion render src/index.tsx VoxBuildOnStage {vps_out_mp4} "
+        f"nohup npx remotion render src/index.tsx VoxBuildOnStage '{vps_out_mp4}' "
         f"--props=/root/video_factory/remotion/remotion_props.json "
-        f"--concurrency=2 --timeout=60000 --log=info --x264-preset=fast --crf=23 > {vps_log} 2>&1 & echo $!"
+        f"--concurrency=2 --timeout=60000 --log=info --x264-preset=fast --crf=23 > '{vps_log}' 2>&1 & echo $!"
     )
     logger.info(f"Launching Remotion Render on VPS: {bg_cmd}")
     res = client.run_command(bg_cmd)
-    pid = res.get("stdout", "").strip()
+    pid = res.get("stdout", "").strip() if isinstance(res, dict) else ""
     logger.info(f"Remotion render started in background with PID {pid}")
 
-    # Poll until complete
     poll_start = time.time()
     max_poll_seconds = 900
     while time.time() - poll_start < max_poll_seconds:
         time.sleep(6)
         ps_chk = client.run_command(f"ps -p {pid} -o pid=")
-        running = bool(ps_chk.get("stdout", "").strip())
+        running = bool(ps_chk.get("stdout", "").strip() if isinstance(ps_chk, dict) else "")
 
-        tail_chk = client.run_command(f"tail -n 5 {vps_log}")
-        latest = tail_chk.get("stdout", "").strip()
+        tail_chk = client.run_command(f"tail -n 5 '{vps_log}'")
+        latest = tail_chk.get("stdout", "").strip() if isinstance(tail_chk, dict) else ""
         for line in latest.splitlines()[-2:]:
             logger.info(f"[VPS RENDER] {line}")
 
@@ -596,24 +588,21 @@ def main():
     else:
         logger.warning("Render polling timed out after 900s!")
 
-    # Check VPS rendered MP4
-    chk_res = client.run_command(f"ls -lh {vps_out_mp4}")
-    logger.info(f"VPS Output Check: {chk_res.get('stdout')}")
-    if not chk_res.get("stdout") or "No such file" in chk_res.get("stdout", ""):
-        err_log = client.run_command(f"cat {vps_log}")
-        logger.error(f"Render failed! Full log:\n{err_log.get('stdout')}")
+    chk_res = client.run_command(f"ls -lh '{vps_out_mp4}'")
+    out_str = chk_res.get("stdout", "") if isinstance(chk_res, dict) else ""
+    logger.info(f"VPS Output Check: {out_str}")
+    if not out_str or "No such file" in out_str:
+        err_log = client.run_command(f"cat '{vps_log}'")
+        logger.error(f"Render failed! Full log:\n{err_log.get('stdout', '')}")
         raise RuntimeError("Remotion render failed on VPS: output MP4 not found.")
 
-    # Download rendered video from VPS
     logger.info("=== STEP 5: Downloading Preview MP4 to Local Workspace ===")
     local_final_mp4 = OUT_DIR / "opuscar_2scenes_preview.mp4"
-    download_file_parallel(client, vps_out_mp4, local_final_mp4, max_workers=6)
+    download_file_parallel(client, vps_out_mp4, local_final_mp4, max_workers=4)
 
-    # Verify stream probe locally
     probe_dur = probe_audio_duration(local_final_mp4)
     logger.info(f"Local Final Video Verified: Duration={probe_dur:.2f}s, Size={local_final_mp4.stat().st_size} bytes")
 
-    # Extract forensic probe frames for inspection
     logger.info("=== STEP 6: Extracting Forensic Probe Frames ===")
     probe_timestamps = [1.0, 3.0, 5.0, 8.0, 11.0, 14.0]
     for sec in probe_timestamps:
@@ -622,11 +611,7 @@ def main():
             ffmpeg_bin, "-y", "-ss", str(sec), "-i", str(local_final_mp4),
             "-vframes", "1", "-q:v", "2", str(frame_out)
         ], check=True, capture_output=True)
-        try:
-            sz_f = frame_out.stat().st_size
-        except OSError as stat_err:
-            logger.warning(f"Failed to read size for {frame_out}: {stat_err}")
-            sz_f = 0
+        sz_f = frame_out.stat().st_size if frame_out.exists() else 0
         logger.info(f"Extracted probe frame at {sec}s -> {frame_out} ({sz_f} bytes)")
 
     print(f"\nSUCCESS: Preview video rendered and ready at:\n{local_final_mp4.resolve()}\n")
