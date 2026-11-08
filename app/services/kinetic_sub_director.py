@@ -1549,12 +1549,17 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
     chain_str = " ".join(steps_text)
 
     prompt = (
-        f"Forensic documentary motion graphics, tactile stop-motion editorial layout, animated on twos, "
-        f"12fps posterize-time stop-motion feel, graphic layout assembly, snappy infographic motion, "
-        f"crisp editorial typography on aged newsprint desk (#F4F1EA), soft directional physical drop shadows. "
+        f"Forensic documentary motion graphics with Opuscar core boxes architecture, tactile stop-motion editorial layout on aged newsprint desk (#F4F1EA), "
+        f"tan kraft (#C9BB9C), and cool backlit light table (#F7F9FB) with whiteboard erased ghost strokes (7% opacity). "
+        f"Halftone B&W 60lpi cutouts with misregistration ink shadows (+8px offset pop in crimson red #D62E1F), Ben-Day halftone density fields, pitted rubber stamps, "
+        f"Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), and acrylic loupe portals with pincushion barrel distortion. "
         f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
         f"[Style: Rigid documentary motion design, zero cartoon puppet motion, zero organic wobbling]. "
-        f"[Speed & Pacing: True Vox Stop-Motion Snappiness. High-velocity transient bursts: all movements complete rapidly in 0.3s - 0.4s on twos (12 discrete poses per second), immediately followed by motionless dead-stop holds. Zero slow drifting, zero floaty linear glide, zero continuous cruise]. "
+        f"[Speed & Pacing: True Vox Stop-Motion Snappiness. Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle within 0.2s-0.3s; "
+        f"stamp slams drop in 0.09s from 2.6x to 1x with damped micro-bounce and soft ink squelch; dimension line rides with arrowhead taps. "
+        f"Dual-rate motion: smooth 24/30fps camera, with independent 12fps paper grain and drop-shadow breathing on twos. "
+        f"Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). Audio: sound design only with two real silences ducking BGM before slams. "
+        f"Zero slow drifting, zero floaty linear glide, zero continuous cruise]. "
         f"[Focal Hierarchy: Strict Single Primary Hero Object focus. Exactly ONE primary evidentiary subject commands the scene focal hierarchy. Clean archival diorama paper surface (#F4F1EA) with zero competing decorative clutter, zero gratuitous stacked props, zero ungrounded embellishments]. "
         f"[Camera: {cam_directive_detected}]. "
         f"[Timeline Kinematics: [KINETIC CAUSAL CHAIN]: {chain_str}]. "
@@ -1615,9 +1620,10 @@ def build_natural_kinetic_i2v_prompt(
     style_mode = kwargs.get("style_mode", "deep_diorama")
     if style_mode == "flat_parallax":
         style_header = (
-            "[STYLE SYSTEM - FLAT PARALLAX]: Aged-newsprint paper collage (#F4F1EA), desaturated archival palette "
-            "with one hot red accent (#D62E1F), halftone black-and-white cutout people with rough white keylines "
-            "and offset accent strokes, authentic print grain. True paper diorama parallax, never glossy 3D."
+            "[STYLE SYSTEM - FLAT PARALLAX]: Aged-newsprint paper collage on cream archival paper (#F4F1EA), cool backlit light table (#F7F9FB) with whiteboard erased ghost strokes (7% opacity), "
+            "desaturated archival palette with one hot crimson accent (#D62E1F), Swiss extreme scale contrast (condensed headline typography with giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), "
+            "halftone black-and-white cutout people with rough white keylines and misregistration ink shadows (+8px offset pop), Ben-Day halftone density fields, pitted rubber stamps, and authentic print-grain finish. "
+            "True paper diorama parallax, never glossy 3D."
         )
         avoid_block = (
             "[AVOID]: no glossy CG 3D, no plastic specular shine, no lens flares, no camera cuts within clip, "
@@ -1625,8 +1631,11 @@ def build_natural_kinetic_i2v_prompt(
         )
     else:
         style_header = (
-            "[STYLE SYSTEM - DEEP DIORAMA]: Deep 3D paper diorama with aged-print collage textures (#F4F1EA / #C9BB9C), "
-            "halftone black-and-white cutouts with rough keylines and offset strokes (#D62E1F), giant stat numbers, print grain. "
+            "[STYLE SYSTEM - DEEP DIORAMA]: Deep 3D paper diorama with aged-print collage textures on aged cream newsprint (#F4F1EA), "
+            "tan kraft cardstock (#C9BB9C), and cool backlit light table (#F7F9FB) with faint erased whiteboard ghost strokes (7% opacity). "
+            "Halftone black-and-white cutouts (60lpi) with rough white keylines and misregistration ink shadows (+8px offset pop in crimson red #D62E1F or mustard gold #D9A441), "
+            "Ben-Day halftone density fields, pitted rubber stamps with authentic ink bleed, Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), "
+            "acrylic loupe portals with pincushion barrel distortion and edge chromatic aberration, and authentic print grain. "
             "Physical layers separated in real space, shallow depth of field, foreground elements crossing close to lens."
         )
         avoid_block = (
@@ -1651,14 +1660,25 @@ def build_natural_kinetic_i2v_prompt(
 
     focal_mandate = f"Strict single hero focal hierarchy on clean newsprint base (#F4F1EA). Exactly ONE primary evidentiary subject commands the composition, zero competing decorative clutter, zero ungrounded embellishments."
 
+    is_stamp = any(k in ev.interacting_tool_prop.lower() for k in ["stamp", "seal"])
+    if is_stamp:
+        action_phase = f"[ACTION PHASE (0.2s - 0.4s)]: Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, the {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}."
+    else:
+        action_phase = f"[ACTION PHASE (0.2s - 0.4s)]: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s, the {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}."
+
+    hold_block = (
+        "[HOLD & LIVING TEXTURE]: Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). "
+        "All objects lock into dead-stop hold with dual-rate motion (smooth 24/30fps camera, with independent 12fps paper grain and micro shadow breathing at 12fps (on twos)). Zero 3D camera drift, zero static freeze."
+    )
+
     prompt = (
         f"{style_header}\n"
         f"[CAMERA & ENVIRONMENT]: {resolved_camera}.\n"
         f"[FOCAL HIERARCHY]: {focal_mandate}\n"
-        f"[ACTION PHASE (0.2s - 0.4s)]: The {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}.\n"
+        f"{action_phase}\n"
         f"[PHYSICAL REACTION & RESIDUE]: {ev.physical_reaction.capitalize()}, leaving {ev.tactile_residue}.\n"
-        f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.\n"
-        f"[AUDIO]: {audio_sfx} — sound design only, no music, no narration.\n"
+        f"{hold_block}\n"
+        f"[AUDIO]: {audio_sfx}, with two real silences ducking BGM before slams — sound design only, no music, no narration.\n"
         f"{avoid_block}"
     )
     return prompt.strip()
@@ -1812,7 +1832,7 @@ def build_cl3_paper_diorama_prompt(
         mg_cutout = "MG: authentic archival accounting ledger paper anchored solidly on the diorama plane with crisp 3px white deckle border and soft drop shadow."
         fg_data = f"FG: {clean_hero} poised at foreground depth directly above the document."
         clean_tool = clean_hero
-        action_text = f"Action: In 0.3s (9 frames at 30fps), the {clean_hero} strikes firmly down onto the archival ledger paper with crisp mechanical compression, causing an indelible vermilion official seal impression to imprint into the paper fibers, leaving a distressed circular seal impression with tactile paper indentation. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+        action_text = f"Action: Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, the {clean_hero} strikes firmly down onto the archival ledger paper with crisp mechanical compression, causing an indelible vermilion official seal impression to imprint into the paper fibers, leaving a distressed circular seal impression with tactile paper indentation. Objects lock into dead-stop hold with dual-rate motion (smooth camera with 12fps paper grain vibration on twos) adhering to readcheck formula."
     else:
         mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout exhibit of {clean_hero} anchored solidly on the archival diorama plane with crisp 3px white deckle border, offset ink stroke, and soft drop shadow."
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
@@ -1832,9 +1852,9 @@ def build_cl3_paper_diorama_prompt(
         clean_verb_lower = clean_verb.lower()
         snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices"]
         if any(clean_verb_lower.startswith(w) for w in snappy_verbs):
-            action_text = f"Action: In 0.3s (9 frames at 30fps), the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+            action_text = f"Action: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s, the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with dual-rate motion (smooth camera with 12fps paper grain vibration on twos) adhering to readcheck formula."
         else:
-            action_text = f"Action: The {clean_tool} snaps briskly in 0.3s (9 frames at 30fps) and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+            action_text = f"Action: The {clean_tool} snaps briskly in cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with dual-rate motion (smooth camera with 12fps paper grain vibration on twos) adhering to readcheck formula."
 
     camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
@@ -1938,9 +1958,9 @@ def build_cl3_paper_diorama_image_prompt(
     bg_field = f"Background: {bg_choice}."
     mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
     if ev.extracted_metric:
-        fg_data = f"FG: {clean_tool} and a large tactile paper cutout number '{ev.extracted_metric}' cut from heavy cardstock crossing close to the lens."
+        fg_data = f"FG: {clean_tool} and Swiss extreme scale contrast giant tactile paper cutout number '{ev.extracted_metric}' (30-35% mass) with precision IBM Plex Mono source tag on 6x12 chip crossing close to the lens."
     elif getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
-        fg_data = f"FG: {clean_tool} and tactile accounting figures embossed onto cardstock crossing close to the lens."
+        fg_data = f"FG: {clean_tool} and Swiss extreme scale contrast tactile accounting figures embossed onto cardstock (30-35% mass) with precision IBM Plex Mono source tags on 6x12 chips crossing close to the lens."
     else:
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 

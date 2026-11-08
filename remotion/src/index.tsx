@@ -5,6 +5,7 @@ import {
   Composition,
   Easing,
   Img,
+  OffthreadVideo,
   Sequence,
   Video,
   continueRender,
@@ -30,6 +31,7 @@ import {
   VoxBuildOnStage,
   VoxPaperBackdrop,
   VoxGlobalPaperLife,
+  VoxDimensionLine,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -360,7 +362,7 @@ const ForensicStampBadge = ({
   isLeft,
   hasStatCard,
   durationInFrames = 180,
-  slamFrame,
+  slamFrame = 15,
 }: {
   badge: string;
   isLeft?: boolean;
@@ -371,55 +373,83 @@ const ForensicStampBadge = ({
   const frame = useCurrentFrame();
   const cfg = useVideoConfig();
   const dur = Math.max(1, durationInFrames || cfg.durationInFrames || 180);
-  const targetSlam = slamFrame !== undefined
-    ? slamFrame
-    : Math.min(180, Math.max(25, Math.round(dur * 0.65)));
+  const targetSlam = slamFrame !== undefined ? slamFrame : 15;
 
   const relSlam = frame - targetSlam;
   if (relSlam < 0) return null;
 
-  // Dynamic Stamp Slam physics: rapid scale drop from 2.4 down to 0.96 with bounce to 1.0
+  // Opuscar Stamp Slam physics: 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce
   const scale = spring({
     frame: relSlam,
     fps: cfg.fps || 30,
-    config: { damping: 9, mass: 0.35, stiffness: 160 },
-    from: 2.4,
+    config: { damping: 14, mass: 0.3, stiffness: 380 },
+    from: 2.6,
     to: 1.0,
   });
-  const opacity = interpolate(relSlam, [0, 2], [0.3, 0.92], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const bUp = (badge || "").toUpperCase();
-  const isAlert = ["基準値超過", "EXCEEDED", "超過", "VOID", "CRITICAL", "ALERT", "漏洩", "違反", "BREACH"].some((k) => bUp.includes(k));
-  const isAuth = ["未回答", "記録なし", "確認できず", "EVIDENCE", "RESTRICTED", "AUDIT", "CONFIDENTIAL", "不明", "極秘"].some((k) => bUp.includes(k));
 
-  const inkColor = isAlert ? "#991b1b" : isAuth ? "#92400e" : "#1e3a8a";
-  const paperBg = "rgba(250, 246, 236, 0.92)";
+  // 1-frame camera shake and impact micro-jitter for 4 frames post-impact
+  const impactJitter =
+    relSlam === 3
+      ? 5.0
+      : relSlam > 3 && relSlam <= 6
+      ? Math.sin((relSlam - 3) * Math.PI) * (6 - relSlam) * 1.2
+      : 0;
+
+  // 0.5 white flash on impact frame
+  const flashOpacity =
+    relSlam === 3 ? 0.5 : relSlam === 4 ? 0.2 : 0;
+
+  const opacity = interpolate(relSlam, [0, 2], [0.3, 0.95], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const bUp = (badge || "").toUpperCase();
+  const isAlert = ["基準値超過", "EXCEEDED", "超過", "VOID", "CRITICAL", "ALERT", "漏洩", "違反", "BREACH", "MISSING", "LEVERAGE"].some((k) => bUp.includes(k));
+  const isAuth = ["未回答", "記録なし", "確認できず", "EVIDENCE", "RESTRICTED", "AUDIT", "CONFIDENTIAL", "不明", "極秘", "VERIFIED"].some((k) => bUp.includes(k));
+
+  const inkColor = isAlert ? "#dc2626" : isAuth ? "#991b1b" : "#1e3a8a";
+  const paperBg = "rgba(250, 246, 236, 0.94)";
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: hasStatCard ? 195 : 70,
-        left: isLeft ? "auto" : 78,
-        right: isLeft ? 78 : "auto",
-        transform: `scale(${scale}) rotate(-7.5deg)`,
-        opacity,
-        zIndex: 32,
-        border: `4px double ${inkColor}`,
-        borderRadius: 3,
-        padding: "6px 18px",
-        backgroundColor: paperBg,
-        boxShadow: "0 6px 16px rgba(35, 22, 10, 0.35)",
-        fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
-        textTransform: "uppercase",
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        pointerEvents: "none",
-      }}
-    >
-      <span style={{ color: inkColor, fontSize: 13, fontWeight: 900, letterSpacing: 1.5 }}>[STAMP]</span>
-      <span style={{ color: inkColor, fontSize: 18, fontWeight: 900, letterSpacing: 2.2 }}>{badge}</span>
-    </div>
+    <>
+      {flashOpacity > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "#FFFFFF",
+            opacity: flashOpacity,
+            pointerEvents: "none",
+            zIndex: 99,
+          }}
+        />
+      )}
+      {relSlam >= 0 && relSlam <= 30 && (
+        <Audio src={resolveSrc("sfx/stamp_slam.mp3") || staticFile("sfx/stamp_slam.mp3")} volume={0.4} />
+      )}
+      <div
+        style={{
+          position: "absolute",
+          top: hasStatCard ? 240 : 70,
+          left: isLeft ? "auto" : 78,
+          right: isLeft ? 78 : "auto",
+          transform: `scale(${scale}) rotate(-6.5deg) translateY(${impactJitter}px)`,
+          opacity,
+          zIndex: 32,
+          border: `4px double ${inkColor}`,
+          borderRadius: 3,
+          padding: "6px 20px",
+          backgroundColor: paperBg,
+          boxShadow: "0 6px 18px rgba(35, 22, 10, 0.4)",
+          fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
+          textTransform: "uppercase",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          pointerEvents: "none",
+        }}
+      >
+        <span style={{ color: inkColor, fontSize: 13, fontWeight: 900, letterSpacing: 1.5 }}>[STAMP]</span>
+        <span style={{ color: inkColor, fontSize: 18, fontWeight: 900, letterSpacing: 2.2 }}>{badge}</span>
+      </div>
+    </>
   );
 };
 
@@ -1137,8 +1167,8 @@ const BackgroundSegment = ({
     <VoxPaperBackdrop theme={validTheme} bgImage={isVideo ? null : src} opacity={opacity}>
       {isVideo && src ? (
         <AbsoluteFill style={{ opacity }}>
-          <Video
-            src={resolveSrc(src)}
+          <OffthreadVideo
+            src={resolveSrc(src) || src}
             style={{
               width: "100%",
               height: "100%",
@@ -1149,7 +1179,6 @@ const BackgroundSegment = ({
                   : "brightness(0.90) saturate(0.7) sepia(0.20) contrast(1.05)",
             }}
             muted
-            loop
           />
           <div
             style={{
@@ -1307,7 +1336,12 @@ const SPECIALIZED_CHART_OVERLAY_TYPES = new Set([
 const computeOverlayKey = (s: any, idx: number = 0) => {
   const ov = s.forensicOverlay || s.forensic_overlay;
   const ovType = typeof ov === "string" ? ov : ov?.type;
-  if (!ovType || !SPECIALIZED_CHART_OVERLAY_TYPES.has(ovType)) return null;
+  const hasStat = Boolean(s.statValue || (ov && (ov.type === "stat_card" || ov.statValue)));
+  const hasStamp = Boolean(s.stampBadge || s.stamp_badge || s.stampText);
+  const hasDim = s.action_type === "H2_CONSTRAINT" || s.action_type === "dimension_line";
+
+  if (!ovType && !hasStat && !hasStamp && !hasDim) return null;
+  if (ovType && !SPECIALIZED_CHART_OVERLAY_TYPES.has(ovType) && ovType !== "stat_card" && !hasStat && !hasStamp && !hasDim) return null;
 
   const variant =
     s.layoutVariant ||
@@ -1321,11 +1355,13 @@ const computeOverlayKey = (s: any, idx: number = 0) => {
       : "evidence_dossier");
   if (variant === "kinetic_headline" || variant === "evidence_dossier") return null;
 
-  const pos = s.foregroundPosition || "left";
+  const pos = s.foregroundPosition || (idx % 2 === 0 ? "left" : "right");
   return JSON.stringify({
-    ovType,
-    ovTitle: ov?.title,
-    ovPayload: ov?.payload,
+    idx,
+    ovType: ovType || (hasStat ? "stat_card" : hasDim ? "dimension_line" : "stamp_badge"),
+    ovTitle: ov?.title || s.statLabel,
+    statValue: s.statValue || ov?.statValue,
+    stampBadge: s.stampBadge || s.stamp_badge || s.stampText,
     pos,
   });
 };
@@ -1337,19 +1373,24 @@ const buildOverlaySegments = (scenes: any[]) => {
     const dur = getSceneDurationFrames(s);
     const key = computeOverlayKey(s, idx);
     const last = raw[raw.length - 1];
-    const effectiveOv = key ? (s.forensicOverlay || s.forensic_overlay) : null;
+    const effectiveOv = s.forensicOverlay || s.forensic_overlay;
+    const hasStat = Boolean(s.statValue || (effectiveOv && (effectiveOv.type === "stat_card" || effectiveOv.statValue)));
+    const hasStamp = Boolean(s.stampBadge || s.stamp_badge || s.stampText);
+    const hasDim = s.action_type === "H2_CONSTRAINT" || s.action_type === "dimension_line";
 
     if (key && last && last.key === key) {
       last.end += dur;
-    } else if (key && effectiveOv) {
+    } else if (key && (effectiveOv || hasStat || hasStamp || hasDim)) {
       raw.push({
         key,
         start: cursor,
         end: cursor + dur,
         forensicOverlay: effectiveOv,
-        statValue: s.statValue,
-        statLabel: s.statLabel,
-        stampBadge: s.stampBadge || s.stamp_badge,
+        statValue: s.statValue || effectiveOv?.statValue,
+        statLabel: s.statLabel || effectiveOv?.statLabel,
+        sourceTag: s.sourceTag || effectiveOv?.sourceTag || s.sourceCredit,
+        stampBadge: s.stampBadge || s.stamp_badge || s.stampText,
+        actionType: s.action_type,
         isLeft: s.foregroundPosition === "left",
         hasForeground: Boolean(s.foreground || s.primary_hero),
       });
@@ -1362,7 +1403,9 @@ const buildOverlaySegments = (scenes: any[]) => {
     forensicOverlay: seg.forensicOverlay,
     statValue: seg.statValue,
     statLabel: seg.statLabel,
+    sourceTag: seg.sourceTag,
     stampBadge: seg.stampBadge,
+    actionType: seg.actionType,
     isLeft: seg.isLeft,
     hasForeground: seg.hasForeground,
   }));
@@ -1372,7 +1415,9 @@ const OverlaySegmentView = ({
   forensicOverlay,
   statValue,
   statLabel,
+  sourceTag,
   stampBadge,
+  actionType,
   isLeft,
   hasForeground,
   durationInFrames = 180,
@@ -1380,7 +1425,9 @@ const OverlaySegmentView = ({
   forensicOverlay?: any;
   statValue?: string;
   statLabel?: string;
+  sourceTag?: string;
   stampBadge?: string;
+  actionType?: string;
   isLeft: boolean;
   hasForeground?: boolean;
   durationInFrames?: number;
@@ -1390,35 +1437,55 @@ const OverlaySegmentView = ({
   // Stage 4 Entrance: Card drops in after background establishes
   const cardStartFrame = Math.min(25, Math.round(dur * 0.12));
 
-  // Stage 6 Slam timing: hits around 65% of segment duration
-  const slamFrame = Math.min(180, Math.max(25, Math.round(dur * 0.65)));
+  // Stamp Slam timing: frame 15 (0.5s into scene) matching BGM ducking
+  const slamFrame = 15;
+
+  const isStatCardOverlay = forensicOverlay && forensicOverlay.type === "stat_card";
+  const effectiveStatVal = statValue || (isStatCardOverlay ? forensicOverlay.statValue : undefined);
+  const effectiveStatLbl = statLabel || (isStatCardOverlay ? forensicOverlay.statLabel : undefined);
+  const effectiveSourceTag = sourceTag || (isStatCardOverlay ? forensicOverlay.sourceTag : undefined);
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {/* Stage 4/5: Evidentiary Stat Paper Note (Zero Emoji) */}
-      {statValue && !forensicOverlay ? (
+      {/* Evidentiary Stat Paper Note with Swiss Extreme Scale Contrast */}
+      {effectiveStatVal ? (
         <PaperStatCard
-          statValue={String(statValue)}
-          statLabel={statLabel ? String(statLabel) : undefined}
+          statValue={String(effectiveStatVal)}
+          statLabel={effectiveStatLbl ? String(effectiveStatLbl) : undefined}
+          sourceTag={effectiveSourceTag ? String(effectiveSourceTag) : undefined}
           isLeft={isLeft}
           dropFrame={cardStartFrame}
           top={68}
         />
       ) : null}
 
-      <VoxOverlayLayer
-        forensicOverlay={forensicOverlay}
-        isLeft={isLeft}
-        hasForeground={hasForeground}
-        statValue={statValue}
-        statLabel={statLabel}
-      />
+      {/* Forensic Caliper Dimension Line Ride for H2 Constraint actions */}
+      {(actionType === "H2_CONSTRAINT" || actionType === "dimension_line") && (
+        <VoxDimensionLine
+          startX={isLeft ? 45 : 34}
+          endX={isLeft ? 82 : 68}
+          y={52}
+          label={effectiveStatVal ? `${effectiveStatVal} // MEASURED` : "0.0% // MISSING BASELINE"}
+          color="#DC2626"
+          startFrame={cardStartFrame + 4}
+        />
+      )}
+
+      {forensicOverlay && !isStatCardOverlay ? (
+        <VoxOverlayLayer
+          forensicOverlay={forensicOverlay}
+          isLeft={isLeft}
+          hasForeground={hasForeground}
+          statValue={statValue}
+          statLabel={statLabel}
+        />
+      ) : null}
 
       {stampBadge ? (
         <ForensicStampBadge
           badge={String(stampBadge)}
           isLeft={isLeft}
-          hasStatCard={Boolean(statValue && !forensicOverlay)}
+          hasStatCard={Boolean(effectiveStatVal)}
           durationInFrames={dur}
           slamFrame={slamFrame}
         />
@@ -1426,6 +1493,7 @@ const OverlaySegmentView = ({
     </AbsoluteFill>
   );
 };
+
 
 
 
@@ -2243,7 +2311,20 @@ export const TwoLayerEpisode: React.FC<{
   const currentFrame = useCurrentFrame();
 
   const currentSceneInfo = getCurrentSceneInfo(scenes, currentFrame);
-  const currentCameraMov = currentSceneInfo
+  const isVideoScene = Boolean(
+    currentSceneInfo &&
+      ((currentSceneInfo.scene.background &&
+        /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.background)) ||
+        (currentSceneInfo.scene.backgroundSrc &&
+          /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.backgroundSrc)) ||
+        (currentSceneInfo.scene.targetBackground &&
+          /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.targetBackground)) ||
+        (currentSceneInfo.scene.video &&
+          /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.video)))
+  );
+  const currentCameraMov = isVideoScene
+    ? "locked"
+    : currentSceneInfo
     ? currentSceneInfo.scene.cameraMovement ||
       (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.movement : undefined) ||
       currentSceneInfo.scene.motionDirective
@@ -2349,7 +2430,11 @@ export const TwoLayerEpisode: React.FC<{
             durationSec={durationSec}
             layoutVariant={resolvedLayoutVariant}
             sceneIndex={idx}
-            cameraMovement={s.cameraMovement || (s.camera ? s.camera.movement : undefined)}
+            cameraMovement={
+              Boolean(bgSrc && /\.(mp4|webm)($|\?)/i.test(bgSrc))
+                ? "locked"
+                : s.cameraMovement || (s.camera ? s.camera.movement : undefined)
+            }
             chartProps={s.chartProps || s.chart_props}
             presetId={s.motionPresetId || s.presetId || ((idx % 6) + 1)}
             steppedPunches={s.steppedPunches || s.stepped_punches}
@@ -2414,8 +2499,27 @@ export const TwoLayerEpisode: React.FC<{
   );
   const slamTargetRelFrame = 15;
   const relSlamDelta = currentSceneInfo ? currentSceneInfo.relFrame - slamTargetRelFrame : 999;
-  const isSlamDucking = hasStampSlam && relSlamDelta >= -6 && relSlamDelta <= 4;
-  const bgmVolume = isSlamDucking ? 0.0 : baseBgmVolume;
+  
+  // Smooth ducking envelope:
+  // -10 to -6: fade down from baseBgmVolume to 0.0 (pre-slam duck)
+  // -6 to +4: EXACT SILENCE (0.0 volume) - real silence before and during slam impact
+  // +5 to +9: fade up from 0.0 to baseBgmVolume
+  let bgmVolume = baseBgmVolume;
+  if (hasStampSlam) {
+    if (relSlamDelta >= -6 && relSlamDelta <= 4) {
+      bgmVolume = 0.0;
+    } else if (relSlamDelta >= -10 && relSlamDelta < -6) {
+      bgmVolume = interpolate(relSlamDelta, [-10, -6], [baseBgmVolume, 0.0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    } else if (relSlamDelta > 4 && relSlamDelta <= 9) {
+      bgmVolume = interpolate(relSlamDelta, [4, 9], [0.0, baseBgmVolume], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    }
+  }
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a" }}>
@@ -2434,7 +2538,9 @@ export const TwoLayerEpisode: React.FC<{
               forensicOverlay={seg.forensicOverlay}
               statValue={seg.statValue}
               statLabel={seg.statLabel}
+              sourceTag={seg.sourceTag}
               stampBadge={seg.stampBadge}
+              actionType={seg.actionType}
               isLeft={seg.isLeft}
               hasForeground={seg.hasForeground}
               durationInFrames={seg.durationInFrames}

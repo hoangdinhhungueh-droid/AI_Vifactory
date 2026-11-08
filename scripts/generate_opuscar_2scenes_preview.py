@@ -122,6 +122,42 @@ async def synthesize_scene_audio(text: str, out_mp3: Path) -> list:
     return words
 
 
+def extract_whisper_words_from_wav(wav_path: Path, language: str = "ja") -> list:
+    """Extract real word-level timestamps using faster-whisper with safe PyAV wrapper (Rule 120)."""
+    try:
+        import av
+        if hasattr(av, "open") and not getattr(av.open, "_safe_metadata_wrapped", False):
+            _real_av_open = av.open
+            def _safe_av_open(*args, **kwargs):
+                kwargs.pop("metadata_errors", None)
+                return _real_av_open(*args, **kwargs)
+            _safe_av_open._safe_metadata_wrapped = True
+            av.open = _safe_av_open
+
+        from faster_whisper import WhisperModel
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        segments, _ = model.transcribe(str(wav_path), word_timestamps=True, language=language)
+        words = []
+        last_end = 0.0
+        for seg in segments:
+            if seg.words:
+                for w in seg.words:
+                    s_val = max(float(w.start), last_end)
+                    e_val = max(float(w.end), s_val + 0.02)
+                    last_end = e_val
+                    words.append({
+                        "word": w.word.strip(),
+                        "start": round(s_val, 3),
+                        "end": round(e_val, 3),
+                        "start_ms": round(s_val * 1000.0, 1),
+                        "end_ms": round(e_val * 1000.0, 1),
+                    })
+        return words
+    except Exception as exc:
+        logger.warning(f"Whisper extraction fallback notice: {exc}")
+        return []
+
+
 def probe_audio_duration(file_path: Path) -> float:
     ffmpeg_bin = get_ffmpeg_binary()
     cmd = [ffmpeg_bin, "-i", str(file_path)]
@@ -132,7 +168,7 @@ def probe_audio_duration(file_path: Path) -> float:
     return 0.0
 
 
-def upload_file_chunked(client: FastVPSClient, local_path: Path, vps_path: str, chunk_size: int = 50_000):
+def upload_file_chunked(client: FastVPSClient, local_path: Path, vps_path: str, chunk_size: int = 150_000):
     raw_bytes = local_path.read_bytes()
     b64_str = base64.b64encode(raw_bytes).decode("ascii")
     tmp_prefix = f"/tmp/vf/up_{local_path.stem}_{int(time.time()*1000)}"
@@ -239,6 +275,27 @@ def download_file_parallel(client: FastVPSClient, vps_path: str, local_path: Pat
 
 
 def main():
+    logger.info("=== STEP 0: Anti-Destructive Safe Backup & Dry-Run ===")
+    out_root = ROOT / "out"
+    all_videos = list(out_root.glob("**/*.mp4"))
+    logger.info(f"[DRY-RUN INVENTORY] Found {len(all_videos)} existing video(s) in {out_root}:")
+    for v in all_videos:
+        try:
+            sz_mb = v.stat().st_size / (1024 * 1024)
+            logger.info(f"  - {v.relative_to(out_root)} ({sz_mb:.2f} MB, {v.stat().st_size} bytes)")
+        except Exception:
+            pass
+
+    backup_dir = OUT_DIR / "backup"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    existing_video = OUT_DIR / "opuscar_2scenes_preview.mp4"
+    if existing_video.exists():
+        backup_path = backup_dir / f"opuscar_2scenes_preview_backup_{int(time.time())}.mp4"
+        shutil.copy2(existing_video, backup_path)
+        logger.info(f"Safely backed up existing video to: {backup_path} ({existing_video.stat().st_size} bytes)")
+    else:
+        logger.info("No prior video found in output folder. Clean start.")
+
     logger.info("=== STEP 1: Synthesizing Audio Narration with Word Timestamps ===")
     ffmpeg_bin = get_ffmpeg_binary()
 
@@ -255,7 +312,11 @@ def main():
             subprocess.run([ffmpeg_bin, "-y", "-i", str(sc_mp3), "-ar", "44100", "-ac", "2", str(sc_wav)], check=True, capture_output=True)
         else:
             logger.info(f"Reusing existing synthesized voice for Scene {idx+1}")
-            words = asyncio.run(synthesize_scene_audio(sc["sentence"], sc_mp3))
+            words = []
+
+        if not words:
+            logger.info(f"Extracting real Whisper word timestamps from {sc_wav.name} (Rule 120)...")
+            words = extract_whisper_words_from_wav(sc_wav, language="ja")
 
         dur = probe_audio_duration(sc_wav)
         logger.info(f"Scene {idx+1} audio duration: {dur:.3f}s with {len(words)} words")
@@ -279,21 +340,65 @@ def main():
     master_dur = probe_audio_duration(master_wav)
     logger.info(f"Master narration combined: {master_dur:.3f}s")
 
-    # Staging Images
-    logger.info("=== STEP 2: Staging Visual Assets into Remotion Public ===")
+    logger.info("=== STEP 1B: Generating 2 Opuscar Scene Manifests & Prompts ===")
+    from app.services.kinetic_sub_director import (
+        build_cl3_paper_diorama_prompt,
+        generate_scene_sub_director_plan,
+    )
+    sub_plan_1 = generate_scene_sub_director_plan(
+        scene_id="SCENE_01",
+        sentence=SCENES_DEF[0]["sentence"],
+        hero_cutout_object="stat number card 10X and ransom negotiation agreement dossier",
+        interacting_objects=["turned-wood vermilion docket seal stamp"],
+        duration_sec=audio_scenes[0]["duration"],
+        market="JP",
+        whisper_words=audio_scenes[0]["words"] if audio_scenes[0]["words"] else None,
+        camera_directive="TOP_DOWN_TRACKING"
+    )
+    prompt_i2v_1 = build_cl3_paper_diorama_prompt(sub_plan_1, market="JP", style_mode="deep_diorama")
+
+    sub_plan_2 = generate_scene_sub_director_plan(
+        scene_id="SCENE_02",
+        sentence=SCENES_DEF[1]["sentence"],
+        hero_cutout_object="unverified market survey dossier and question mark ledger card",
+        interacting_objects=["vintage precision brass calipers"],
+        duration_sec=audio_scenes[1]["duration"],
+        market="JP",
+        whisper_words=audio_scenes[1]["words"] if audio_scenes[1]["words"] else None,
+        camera_directive="STATIC_OVERHEAD"
+    )
+    prompt_i2v_2 = build_cl3_paper_diorama_prompt(sub_plan_2, market="JP", style_mode="flat_parallax")
+
+    manifest = {
+        "scene_01": {
+            "definition": SCENES_DEF[0],
+            "sub_director_plan": sub_plan_1,
+            "canonical_i2v_prompt": prompt_i2v_1
+        },
+        "scene_02": {
+            "definition": SCENES_DEF[1],
+            "sub_director_plan": sub_plan_2,
+            "canonical_i2v_prompt": prompt_i2v_2
+        }
+    }
+    manifest_path = OUT_DIR / "opuscar_scene_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    logger.info(f"Saved Opuscar Scene Manifest to: {manifest_path}")
+
+    # Staging Real Omni Video Assets into Remotion Public
+    logger.info("=== STEP 2: Staging Real Omni Video Assets into Remotion Public ===")
     remotion_dir = ROOT / "remotion"
-    pub_images = remotion_dir / "public" / "images"
-    pub_images.mkdir(parents=True, exist_ok=True)
+    pub_videos = remotion_dir / "public" / "videos"
+    pub_videos.mkdir(parents=True, exist_ok=True)
 
-    # Resize and optimize background seeds to 1920x1080 JPEG for fast render & transfer
-    img1_src = ROOT / SCENES_DEF[0]["bg_seed"]
-    img2_src = ROOT / SCENES_DEF[1]["bg_seed"]
-    img1_dst = pub_images / "opuscar_scene_01_bg.jpg"
-    img2_dst = pub_images / "opuscar_scene_02_bg.jpg"
+    vid1_src = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos/clip_scene_01.mp4"
+    vid2_src = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos/clip_scene_02.mp4"
+    vid1_dst = pub_videos / "opuscar_scene_01_omni.mp4"
+    vid2_dst = pub_videos / "opuscar_scene_02_omni.mp4"
 
-    Image.open(img1_src).resize((1920, 1080), Image.Resampling.LANCZOS).save(img1_dst, quality=95)
-    Image.open(img2_src).resize((1920, 1080), Image.Resampling.LANCZOS).save(img2_dst, quality=95)
-    logger.info(f"Optimized {img1_dst.name} ({img1_dst.stat().st_size/1024:.1f} KB) and {img2_dst.name} ({img2_dst.stat().st_size/1024:.1f} KB)")
+    shutil.copy2(vid1_src, vid1_dst)
+    shutil.copy2(vid2_src, vid2_dst)
+    logger.info(f"Staged real Omni videos: {vid1_dst.name} ({vid1_dst.stat().st_size/1024:.1f} KB) and {vid2_dst.name} ({vid2_dst.stat().st_size/1024:.1f} KB)")
 
     # Build Remotion Scene Props adhering strictly to Opuscar
     fps = 30
@@ -322,7 +427,7 @@ def main():
                 "end_ms": w["end_ms"]
             })
 
-        bg_name = f"images/opuscar_scene_{idx+1:02d}_bg.jpg"
+        bg_name = f"videos/opuscar_scene_{idx+1:02d}_omni.mp4"
 
         remotion_scenes.append({
             "id": f"scene_{idx+1:02d}",
@@ -334,6 +439,7 @@ def main():
             "editorialHeadline": sc["editorialHeadline"],
             "statValue": sc["statValue"],
             "statLabel": sc["statLabel"],
+            "sourceTag": sc.get("sourceTag") or sc.get("sourceCredit"),
             "stampText": sc["stampText"],
             "stampBadge": sc["stampBadge"],
             "stampColor": sc["stampColor"],
@@ -341,11 +447,13 @@ def main():
             "accentColor": sc["accentColor"],
             "background": bg_name,
             "targetBackground": bg_name,
+            "backgroundSrc": bg_name,
+            "layoutVariant": "cinematic_doc",
             "narration": sc["sentence"],
             "subtitles": rel_subtitles,
             "words": rel_subtitles,
             "motionDirective": sc["motionDirective"],
-            "cameraMovement": sc["motionDirective"],
+            "cameraMovement": "locked",
             "action_type": sc["action_type"],
             "forensicOverlay": sc["forensicOverlay"],
             "hasMarkerHighlight": True,
@@ -364,6 +472,8 @@ def main():
         "height": 1080,
         "totalFrames": total_frames,
         "audioMaster": "tts_out.mp3",
+        "bgmFile": "bgm.mp3",
+        "bgmVolume": 0.12,
         "includeAudio": True,
         "scenes": remotion_scenes
     }
@@ -376,18 +486,30 @@ def main():
     pub_tts = remotion_dir / "public" / "tts_out.mp3"
     shutil.copy2(master_mp3, pub_tts)
 
+    # Ensure bgm.mp3 is staged in remotion/public
+    pub_bgm = remotion_dir / "public" / "bgm.mp3"
+    if not pub_bgm.exists():
+        src_bgm = remotion_dir / "public" / "bgm" / "vox_cinematic_pulse.mp3"
+        if src_bgm.exists():
+            shutil.copy2(src_bgm, pub_bgm)
+            logger.info(f"Staged {src_bgm.name} to {pub_bgm}")
+
     # Stage props file into remotion root
     shutil.copy2(props_file, remotion_dir / "remotion_props.json")
 
-    logger.info("=== STEP 3: Syncing to VPS for Production Render ===")
+    logger.info("=== STEP 3: Syncing Remotion Components & Code to VPS ===")
     client = FastVPSClient()
 
-    # 1. Upload background images to VPS
-    vps_images_dir = "/root/video_factory/remotion/public/images"
-    client.run_command(f"mkdir -p {vps_images_dir}")
-    for img_file in [img1_dst, img2_dst]:
-        vps_img_path = f"{vps_images_dir}/{img_file.name}"
-        upload_file_chunked(client, img_file, vps_img_path)
+    # 1. Upload background real Omni videos to VPS
+    vps_videos_dir = "/root/video_factory/remotion/public/videos"
+    client.run_command(f"mkdir -p {vps_videos_dir}")
+    for vid_file in [vid1_dst, vid2_dst]:
+        vps_vid_path = f"{vps_videos_dir}/{vid_file.name}"
+        vps_sz = int(client.run_command(f"stat -c %s '{vps_vid_path}' 2>/dev/null || echo 0").get("stdout", "0").strip() or "0")
+        if vps_sz != vid_file.stat().st_size:
+            upload_file_chunked(client, vid_file, vps_vid_path, chunk_size=150_000)
+        else:
+            logger.info(f"VPS already has {vid_file.name} ({vps_sz} bytes), skipping re-upload.")
 
     # 2. Upload tts_out.mp3 to VPS
     vps_tts_path = "/root/video_factory/remotion/public/tts_out.mp3"
@@ -398,27 +520,62 @@ def main():
     vps_props_path = "/root/video_factory/remotion/remotion_props.json"
     upload_file_chunked(client, props_file, vps_props_path)
 
-    # 4. Render preview video via Remotion on VPS
+    # 4. Upload updated Remotion source files to VPS
+    vps_remotion_src = "/root/video_factory/remotion/src"
+    upload_file_chunked(client, ROOT / "remotion/src/index.tsx", f"{vps_remotion_src}/index.tsx")
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/VoxBuildOnStage.tsx", f"{vps_remotion_src}/components/vox/VoxBuildOnStage.tsx")
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/VoxParallaxLayer.tsx", f"{vps_remotion_src}/components/vox/VoxParallaxLayer.tsx")
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/PaperStatCard.tsx", f"{vps_remotion_src}/components/vox/PaperStatCard.tsx")
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/papercraft/VoxDimensionLine.tsx", f"{vps_remotion_src}/components/vox/papercraft/VoxDimensionLine.tsx")
+    upload_file_chunked(client, ROOT / "remotion/src/components/vox/papercraft/index.ts", f"{vps_remotion_src}/components/vox/papercraft/index.ts")
+
+    # 5. Render preview video via Remotion on VPS
     logger.info(f"=== STEP 4: Executing Remotion Render on VPS ({total_frames} frames @ 30fps) ===")
     vps_out_mp4 = "/root/video_factory/out/opuscar_2scenes_preview.mp4"
     client.run_command("mkdir -p /root/video_factory/out")
+    client.run_command(f"rm -f {vps_out_mp4}")
 
-    render_cmd = (
+    vps_log = "/tmp/remotion_render.log"
+    client.run_command(f"rm -f {vps_log}")
+
+    # Launch in background with nohup to avoid Cloudflare 100s proxy timeout (HTTP 524)
+    bg_cmd = (
         f"cd /root/video_factory/remotion && "
-        f"npx remotion render src/index.tsx VoxBuildOnStage {vps_out_mp4} "
+        f"nohup npx remotion render src/index.tsx VoxBuildOnStage {vps_out_mp4} "
         f"--props=/root/video_factory/remotion/remotion_props.json "
-        f"--concurrency=2 --log=info --x264-preset=fast --crf=23"
+        f"--concurrency=2 --timeout=60000 --log=info --x264-preset=fast --crf=23 > {vps_log} 2>&1 & echo $!"
     )
-    logger.info(f"Running Remotion Render on VPS: {render_cmd}")
-    r_res = client.run_command(render_cmd, timeout=300)
-    logger.info("VPS Remotion Render completed!")
-    stdout = r_res.get("stdout", "")
-    for line in stdout.splitlines()[-15:]:
-        logger.info(f"[VPS RENDER] {line}")
+    logger.info(f"Launching Remotion Render on VPS: {bg_cmd}")
+    res = client.run_command(bg_cmd)
+    pid = res.get("stdout", "").strip()
+    logger.info(f"Remotion render started in background with PID {pid}")
+
+    # Poll until complete
+    poll_start = time.time()
+    max_poll_seconds = 900
+    while time.time() - poll_start < max_poll_seconds:
+        time.sleep(6)
+        ps_chk = client.run_command(f"ps -p {pid} -o pid=")
+        running = bool(ps_chk.get("stdout", "").strip())
+
+        tail_chk = client.run_command(f"tail -n 5 {vps_log}")
+        latest = tail_chk.get("stdout", "").strip()
+        for line in latest.splitlines()[-2:]:
+            logger.info(f"[VPS RENDER] {line}")
+
+        if not running:
+            logger.info(f"Remotion render process PID {pid} finished.")
+            break
+    else:
+        logger.warning("Render polling timed out after 600s!")
 
     # Check VPS rendered MP4
     chk_res = client.run_command(f"ls -lh {vps_out_mp4}")
     logger.info(f"VPS Output Check: {chk_res.get('stdout')}")
+    if not chk_res.get("stdout") or "No such file" in chk_res.get("stdout", ""):
+        err_log = client.run_command(f"cat {vps_log}")
+        logger.error(f"Render failed! Full log:\n{err_log.get('stdout')}")
+        raise RuntimeError("Remotion render failed on VPS: output MP4 not found.")
 
     # Download rendered video from VPS
     logger.info("=== STEP 5: Downloading Preview MP4 to Local Workspace ===")
@@ -428,6 +585,18 @@ def main():
     # Verify stream probe locally
     probe_dur = probe_audio_duration(local_final_mp4)
     logger.info(f"Local Final Video Verified: Duration={probe_dur:.2f}s, Size={local_final_mp4.stat().st_size} bytes")
+
+    # Extract forensic probe frames for inspection
+    logger.info("=== STEP 6: Extracting Forensic Probe Frames ===")
+    probe_timestamps = [1.0, 3.0, 7.0, 12.0, 15.0, 18.0, 24.0]
+    for sec in probe_timestamps:
+        frame_out = OUT_DIR / f"probe_{int(sec):02d}s.jpg"
+        subprocess.run([
+            ffmpeg_bin, "-y", "-ss", str(sec), "-i", str(local_final_mp4),
+            "-vframes", "1", "-q:v", "2", str(frame_out)
+        ], check=True, capture_output=True)
+        logger.info(f"Extracted probe frame at {sec}s -> {frame_out} ({frame_out.stat().st_size} bytes)")
+
     print(f"\nSUCCESS: Preview video rendered and ready at:\n{local_final_mp4.resolve()}\n")
 
 

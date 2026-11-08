@@ -6,6 +6,7 @@ import {
   useVideoConfig,
   Easing,
   Img,
+  OffthreadVideo,
   Video,
 } from "remotion";
 import { SPRING_PRESETS } from "./springPresets";
@@ -185,6 +186,12 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const fMid = Math.max(1, Math.round(fTotal * 0.65));
   const fEnd = Math.max(fMid + 1, fTotal);
 
+  // Check if background is a video (Omni I2V / Veo 3.1)
+  const isVideoBackground = Boolean(
+    backgroundSrc && /\.(mp4|webm)($|\?)/i.test(backgroundSrc)
+  );
+  const effectiveCameraMovement = isVideoBackground ? "locked" : cameraMovement;
+
   // Stepped Kinetic Framing resolution (Boss Opus 5.5 Masterclass & Rule 140)
   const resolvedPresetId = presetId || ((sceneIndex % 6) + 1);
   const activePreset =
@@ -193,7 +200,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const effectivePunches = steppedPunches || activePreset.steppedPunches;
   const useSteppedFraming = Boolean(effectivePunches && effectivePunches.length > 0);
 
-  const steppedPose = useSteppedFraming
+  const steppedPose = (!isVideoBackground && useSteppedFraming)
     ? computeSteppedPose(frame, effectivePunches!, fps, disableDrift)
     : null;
 
@@ -201,13 +208,15 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const camDir = sceneIndex % 4;
   const isPullOut =
     cameraMovement === "pull_out" || (!cameraMovement && camDir === 1 && !isTactileCollage);
-  const cameraScale = interpolate(
-    frame,
-    [0, fMid, fEnd],
-    isPullOut ? [1.065, 1.03, 1.0] : isTactileCollage ? [1.0, 1.015, 1.035] : [1.0, 1.03, 1.06],
-    { extrapolateRight: "clamp" }
-  );
-  const cameraPanX = isTactileCollage
+  const cameraScale = isVideoBackground
+    ? 1.0
+    : interpolate(
+        frame,
+        [0, fMid, fEnd],
+        isPullOut ? [1.065, 1.03, 1.0] : isTactileCollage ? [1.0, 1.015, 1.035] : [1.0, 1.03, 1.06],
+        { extrapolateRight: "clamp" }
+      );
+  const cameraPanX = (isVideoBackground || isTactileCollage)
     ? 0
     : interpolate(
         frame,
@@ -222,10 +231,12 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
     fps,
     config: SPRING_PRESETS.paperSlide,
   });
-  const backdropScale = isTactileCollage
-    ? interpolate(backdropSpring, [0, 1], [0.96, 1.0])
-    : 1.0;
-  const backdropOpacity = isTactileCollage
+  const backdropScale = (isVideoBackground || !isTactileCollage)
+    ? 1.0
+    : interpolate(backdropSpring, [0, 1], [0.96, 1.0]);
+  const backdropOpacity = isVideoBackground
+    ? 1.0
+    : isTactileCollage
     ? interpolate(backdropSpring, [0, 1], [0.2, 1])
     : interpolate(frame, [0, Math.min(10, fTotal)], [0.85, 1], { extrapolateRight: "clamp" });
 
@@ -312,9 +323,11 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
         style={{
           width: "100%",
           height: "100%",
-          perspective: 1400,
-          transformStyle: "preserve-3d",
-          transform: steppedPose
+          perspective: isVideoBackground ? undefined : 1400,
+          transformStyle: isVideoBackground ? undefined : "preserve-3d",
+          transform: isVideoBackground
+            ? "none"
+            : steppedPose
             ? `translate3d(${steppedPose.x.toFixed(2)}px, ${steppedPose.y.toFixed(2)}px, 0) scale(${steppedPose.scale.toFixed(4)}) rotate(${steppedPose.rotateZ.toFixed(2)}deg)`
             : `scale(${cameraScale}) translate(${cameraPanX}px, 0px)`,
           transformOrigin: opticalAnchor
@@ -323,36 +336,57 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
           position: "relative",
         }}
       >
-        {/* LAYER 0: BASE PAPER BACKDROP (PARALLAX BACKGROUND) */}
-        <VoxParallaxLayer depth="background" cameraMovement={cameraMovement} durationInFrames={fTotal}>
+        {/* LAYER 0: BASE VIDEO / PAPER BACKDROP */}
+        {isVideoBackground && backgroundSrc ? (
           <div
             style={{
               position: "absolute",
               inset: 0,
-              backgroundColor: getThemeBackground(),
-              borderRadius: 0,
-              boxShadow: "none",
-              transform: `scale(${backdropScale})`,
-              opacity: backdropOpacity,
+              width: "100%",
+              height: "100%",
               overflow: "hidden",
             }}
           >
-            {backgroundSrc && (
-              Boolean(/\.(mp4|webm)($|\?)/i.test(backgroundSrc)) ? (
-                <Video
-                  src={backgroundSrc}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    filter: "contrast(1.05) brightness(0.96)",
-                  }}
-                  muted
-                  loop
-                />
-              ) : (
+            <OffthreadVideo
+              src={backgroundSrc}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                filter: "contrast(1.05) brightness(0.96)",
+              }}
+              muted
+            />
+            {/* Paper Texture Overlay */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage:
+                  "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.015) 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
+                opacity: 0.5,
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+        ) : (
+          <VoxParallaxLayer depth="background" cameraMovement={effectiveCameraMovement} durationInFrames={fTotal}>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: getThemeBackground(),
+                borderRadius: 0,
+                boxShadow: "none",
+                transform: `scale(${backdropScale})`,
+                opacity: backdropOpacity,
+                overflow: "hidden",
+              }}
+            >
+              {backgroundSrc && (
                 <Img
                   src={backgroundSrc}
                   style={{
@@ -367,26 +401,26 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     opacity: isTactileCollage ? 0.28 : 1.0,
                   }}
                 />
-              )
-            )}
+              )}
 
-            {/* Paper Texture Overlay */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                backgroundImage:
-                  "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.02) 1px, transparent 1px)",
-                backgroundSize: "24px 24px",
-                opacity: 0.65,
-                pointerEvents: "none",
-              }}
-            />
-          </div>
-        </VoxParallaxLayer>
+              {/* Paper Texture Overlay */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage:
+                    "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.02) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                  opacity: 0.65,
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
+          </VoxParallaxLayer>
+        )}
 
         {/* MIDGROUND LAYER 1: EDITORIAL HEADLINES & EVIDENCE DOSSIER */}
-        <VoxParallaxLayer depth="midground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
+        <VoxParallaxLayer depth="midground" cameraMovement={effectiveCameraMovement} durationInFrames={fTotal}>
           {/* Archival Dossier Watermark (Rule 128 Generic Contract — only when subtitle is provided without headline) */}
           {subtitle && !headline && (
             <div
@@ -647,7 +681,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
 
         {/* LAYER 1: HERO CUTOUT SUBJECT (PARALLAX FOREGROUND) */}
         {heroSrc && (isTactileCollage || isEvidenceDossier || isCinematicDoc || !backgroundSrc) && (
-          <VoxParallaxLayer depth="foreground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
+          <VoxParallaxLayer depth="foreground" cameraMovement={effectiveCameraMovement} durationInFrames={fTotal}>
             <div
               style={{
                 position: "absolute",
@@ -662,7 +696,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             >
               <div style={{ position: "relative" }}>
                 {Boolean(/\.(mp4|webm)($|\?)/i.test(heroSrc)) ? (
-                  <Video
+                  <OffthreadVideo
                     src={heroSrc}
                     style={{
                       width: "100%",
@@ -671,7 +705,6 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                       filter: "contrast(1.08)",
                     }}
                     muted
-                    loop
                   />
                 ) : (
                   <Img
@@ -706,7 +739,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
 
         {/* LAYER 1.5: PROCEDURAL SVG DYNAMIC CHART (Vox Dynamic Data Engine) */}
         {chartProps && (
-          <VoxParallaxLayer depth="foreground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
+          <VoxParallaxLayer depth="foreground" cameraMovement={effectiveCameraMovement} durationInFrames={fTotal}>
             <div
               style={{
                 position: "absolute",
@@ -722,7 +755,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
         )}
 
         {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (PARALLAX MIDGROUND) */}
-        <VoxParallaxLayer depth="midground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
+        <VoxParallaxLayer depth="midground" cameraMovement={effectiveCameraMovement} durationInFrames={fTotal}>
           {(isTactileCollage || supportingCutouts.length > 0) && supportingCutouts.map((cutout, idx) => {
             const defaultCutSec = Math.min(dSec * 0.45, 0.4 + idx * 0.3) * (dSec < 7.0 ? speedRatio : 1.0);
             const cutDelayFrames = Math.round(

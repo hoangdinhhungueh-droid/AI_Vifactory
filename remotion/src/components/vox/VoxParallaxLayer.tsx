@@ -57,16 +57,20 @@ export const VoxParallaxLayer: React.FC<{
       ? 1.38
       : 1.70; // macro_foreground
 
-  const zPlane =
-    depth === "deep_background"
-      ? -140
-      : depth === "background"
-      ? -80
-      : depth === "midground"
-      ? 0
-      : depth === "foreground"
-      ? 70
-      : 130; // macro_foreground
+  const cam = (cameraMovement || "slow_push_in").toLowerCase().trim();
+  const isLocked = cam === "locked" || cam === "static" || cam === "none";
+
+  const zPlane = isLocked
+    ? 0
+    : depth === "deep_background"
+    ? -140
+    : depth === "background"
+    ? -80
+    : depth === "midground"
+    ? 0
+    : depth === "foreground"
+    ? 70
+    : 130; // macro_foreground
 
   // Optical Depth of Field (DoF) shallow blur
   const dofBlur = enableDepthOfField
@@ -85,8 +89,6 @@ export const VoxParallaxLayer: React.FC<{
   let rotX = 0;
   let rotY = 0;
   let scaleAdjust = 1.0;
-
-  const cam = (cameraMovement || "slow_push_in").toLowerCase().trim();
 
   if (cam === "cinematic_pan") {
     offsetX = interpolate(frame, [0, dur], [-26 * depthFactor, 26 * depthFactor], {
@@ -224,9 +226,11 @@ export const VoxParallaxLayer: React.FC<{
   return (
     <AbsoluteFill
       style={{
-        transform: `perspective(1200px) translate3d(${offsetX.toFixed(2)}px, ${offsetY.toFixed(2)}px, ${zPlane}px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) scale(${scaleAdjust.toFixed(3)})`,
+        transform: isLocked
+          ? "none"
+          : `perspective(1200px) translate3d(${offsetX.toFixed(2)}px, ${offsetY.toFixed(2)}px, ${zPlane}px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) scale(${scaleAdjust.toFixed(3)})`,
         transformOrigin: "center center",
-        transformStyle: "preserve-3d",
+        transformStyle: isLocked ? undefined : "preserve-3d",
         filter: combinedFilter || undefined,
         pointerEvents: "none",
         ...style,

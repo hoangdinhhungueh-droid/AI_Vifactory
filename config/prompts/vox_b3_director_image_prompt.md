@@ -72,13 +72,13 @@ For every micro-scene (duration 4.0 – 6.0 seconds), extract and define:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Every image prompt must be constructed with 5 explicit layered brackets:
 
-`Editorial investigative documentary frame in signature VOX paper-cut collage style. `
-`[Layer 1: <canvas_workspace>] -> `
+`Editorial investigative documentary frame in signature VOX paper-cut collage style with Opuscar core boxes (visual-investigation, archive-lighttable, swiss-motion, halftone-dossier, briefing-board). `
+`[Layer 1: <canvas_workspace>, cool backlit light table #F7F9FB with faint erased whiteboard ghost strokes (7% opacity)] -> `
 `[Layer 2: bold flat geometric color block in <color_bar>] -> `
-`[Layer 3: negative space reserved for large bold editorial typography '<headline> // <english_tag>', occupying 25-35% of frame] -> `
-`[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: <hero_cutout_object>. Interacting elements: <interacting_objects>] -> `
-`[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. `
-`Strictly locked color palette: Crimson Red #D62E1F, Mustard Gold #D9A441, Charcoal #1A1A1A, Tan Kraft #C9BB9C on Archival Cream #F4F1EA. `
+`[Layer 3: Swiss extreme scale contrast negative space reserved for large bold editorial typography and giant stat numbers (30-35% frame mass) vs precision IBM Plex Mono source tags on 6x12 chips '<headline> // <english_tag>'] -> `
+`[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge, misregistration ink shadows (+8px offset pop in crimson red #D62E1F or mustard gold #D9A441), Ben-Day halftone density fields, pitted rubber stamps, and realistic soft drop shadow: <hero_cutout_object>. Interacting elements & acrylic loupe portals: <interacting_objects>] -> `
+`[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration, matte archival finish]. `
+`Strictly locked color palette: Crimson Red #D62E1F, Mustard Gold #D9A441, Charcoal #1A1A1A, Tan Kraft #C9BB9C on Archival Cream #F4F1EA and Cool Light Table #F7F9FB. `
 `Clear object-assembly composition, strong editorial hierarchy, tactile paper craft.`
 
 **NEGATIVE PROMPT (MANDATORY SUFFIX)**:

@@ -6,3 +6,4 @@ export * from "./VoxStickerCutout";
 export * from "./VoxConnectingYarn";
 export * from "./VoxStampedLabel";
 export * from "./VoxGlobalPaperLife";
+export * from "./VoxDimensionLine";

@@ -416,11 +416,14 @@ def build_vox_scene_prompts(
         logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
         sub_plan = {}
         i2v_omni = (
-            f"[STYLE BLOCK]: Deep 3D paper diorama on archival cream newsprint #F4F1EA and kraft cardstock. Halftone B&W 60lpi cutouts with offset crimson red #D62E1F drop-shadows.\n"
-            f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk. Settle on the {hero_obj}.\n"
-            f"[ACTION PHASE (0.2s - 0.4s)]: In 0.3s (9 frames at 30fps), the {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
+            f"[STYLE BLOCK]: Deep 3D paper diorama on archival cream newsprint #F4F1EA, tan kraft #C9BB9C, and cool backlit light table #F7F9FB with faint erased whiteboard ghost strokes (7% opacity). "
+            f"Halftone B&W 60lpi cutouts with rough keylines and misregistration ink shadows (+8px offset pop in crimson red #D62E1F). "
+            f"Ben-Day halftone density fields, pitted rubber stamps, and Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips).\n"
+            f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk with smooth 24/30fps motion. Settle on the {hero_obj}.\n"
+            f"[ACTION PHASE]: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s. In 0.3s (9 frames at 30fps), the {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
             f"[PHYSICAL REACTION & RESIDUE]: {evidence.physical_reaction.capitalize()}, leaving {evidence.tactile_residue}.\n"
-            f"[HOLD & LIVING TEXTURE]: All objects lock into dead-stop hold with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.\n"
+            f"[HOLD & LIVING TEXTURE]: Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). All objects lock into dead-stop hold with dual-rate motion (smooth camera, with independent 12fps paper grain/shadow breathing on twos).\n"
+            f"[AUDIO]: Tactile paper pops, soft ink squelch stamps, ticks, and ducked silence before slams. No music, no voice-over.\n"
             f"[AVOID]: no photorealism, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no music, no voice-over."
         )
         i2v_google_flow = i2v_omni

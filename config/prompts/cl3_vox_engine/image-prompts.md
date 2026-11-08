@@ -19,7 +19,7 @@ The style block never changes. All creative variation lives in the SHOT.
 
 ## 2. The Style Block (copy verbatim)
 
-> Use the attached style sheet for materials only – aged-print collage textures, halftone black-and-white cutout people with rough keylines and offset accent strokes, giant stat numbers, print grain. Do NOT copy the sheet's layout or its flatness: every clip is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's palette. Multi-plane stereoscopic depth: 1.4x fast foreground travel, 1.0x tack-sharp focal plane, 0.3x slow background drift in shallow depth of field. Motion: springs with overshoot, staggered entrances, ticking counters. Audio: sound design only – paper pops, whooshes, stamps, ticks. No music. No voice-over.
+> Use the attached style sheet for materials only – aged-print collage textures on aged archival cream newsprint (#F4F1EA), tan kraft cardstock (#C9BB9C), and cool backlit light table (#F7F9FB) with faint erased whiteboard ghost strokes (7% opacity), halftone black-and-white cutout people with rough white keylines and misregistration ink shadows (+8px offset pop in crimson red #D62E1F or mustard gold #D9A441), Ben-Day halftone density fields, pitted rubber stamps with authentic ink bleed, Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), acrylic loupe portals with pincushion barrel distortion and edge chromatic aberration, and authentic print grain. Do NOT copy the sheet's layout or its flatness: every scene is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's muted archival palette (cream newsprint, tan kraft, cool light table, ink black, halftone gray). Multi-plane stereoscopic depth: 1.4x fast foreground tool travel, 1.0x tack-sharp focal plane, 0.3x slow background drift in shallow depth of field. Motion: mechanical spring pop-ups with slight overshoot, staggered entrances, ticking counters, tactile paper contact residue. Audio: sound design only – paper pops, whooshes, stamps, ticks, newsroom hum. No music. No voice-over. Keep bottom 20% of the surface completely empty, plain bare cream paper only. No text, no objects, no cards in the bottom fifth.
 
 ### Why each clause exists (do not delete these)
 
@@ -28,12 +28,17 @@ The style block never changes. All creative variation lives in the SHOT.
 | "style sheet for materials only" | Borrow texture, not layout |
 | "Do NOT copy the sheet's layout or its flatness" | Kills the #1 failure mode: flat 2D output |
 | "deep 3D paper diorama / physical layers in real space" | Forces parallax and depth |
-| "shallow depth of field / foreground crossing the lens" | Sells the 3D lie |
+| "cool backlit light table #F7F9FB / ghost strokes 7%" | Archives lighttable and whiteboard ghost strokes (Opuscar archive-lighttable) |
+| "misregistration ink shadows (+8px offset) / Ben-Day" | Authentic mechanical print registry (Opuscar halftone-dossier) |
+| "Swiss extreme scale contrast (30-35% mass vs IBM Plex Mono)" | Swiss scale contrast: giant hero numbers vs precision source tags (Opuscar swiss-motion) |
+| "acrylic loupe with barrel distortion and chromatic aberration" | Verification loupe optical portal (Opuscar briefing-board) |
+| "shallow depth of field / foreground crossing the lens" | Sells the 3D diorama optical depth |
 | "camera is an actor / one committed move" | Prevents mushy multi-move drift |
 | "Backgrounds change per clip" | Stops every shot looking identical |
 | "Multi-plane stereoscopic depth" | 3-tier differential velocity parallax |
-| "springs with overshoot, staggered, ticking" | Motion signature |
+| "springs with overshoot, staggered, ticking" | Snappy motion signature |
 | "sound design only, no music, no VO" | Audio lock |
+| "Keep bottom 20% empty, plain cream paper only" | Subtitle safe zone reservation |
 
 ---
 

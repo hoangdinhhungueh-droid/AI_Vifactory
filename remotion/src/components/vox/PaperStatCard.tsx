@@ -6,6 +6,7 @@ import { PaperDrop } from "./PaperDrop";
 export interface PaperStatCardProps {
   statValue: string;
   statLabel?: string;
+  sourceTag?: string;
   isLeft?: boolean;
   dropFrame?: number;
   top?: number;
@@ -13,12 +14,15 @@ export interface PaperStatCardProps {
 
 /**
  * Tactile Torn-Paper Stat Card (Zero Digital HUD / Zero Emoji)
- * Replaces dark UI boxes and emojis with physical archival paper pinned to the board,
- * hand-drawn marker underline, and typewriter label.
+ * Adheres to Swiss Extreme Scale Contrast (Opuscar swiss-motion box):
+ * - Giant stat numbers (hero character, 30-35% mass)
+ * - Precision IBM Plex Mono source tag on 6x12 chip
+ * - Physical archival paper pinned to the board with hand-drawn marker underline
  */
 export const PaperStatCard: React.FC<PaperStatCardProps> = ({
   statValue,
   statLabel,
+  sourceTag,
   isLeft = false,
   dropFrame = 12,
   top = 64,
@@ -67,7 +71,7 @@ export const PaperStatCard: React.FC<PaperStatCardProps> = ({
           border: "2px solid rgba(135, 105, 70, 0.55)",
           borderRadius: 3,
           padding: "16px 28px 18px 28px",
-          minWidth: 240,
+          minWidth: 260,
           display: "flex",
           flexDirection: "column",
           gap: 6,
@@ -108,15 +112,16 @@ export const PaperStatCard: React.FC<PaperStatCardProps> = ({
           />
         </div>
 
-        {/* Marker-Struck Quantitative Value */}
+        {/* Marker-Struck Quantitative Value (Swiss Extreme Scale Contrast) */}
         <div style={{ position: "relative", display: "inline-block" }}>
           <div
             style={{
-              color: "#991B1B",
-              fontSize: 40,
+              color: "#B91C1C",
+              fontSize: 54,
               fontWeight: 900,
-              letterSpacing: 1.2,
-              lineHeight: 1.08,
+              letterSpacing: 1.5,
+              lineHeight: 1.0,
+              fontFamily: "'Franklin Gothic Heavy', 'Arial Black', Impact, sans-serif",
             }}
           >
             {statValue}
@@ -124,11 +129,11 @@ export const PaperStatCard: React.FC<PaperStatCardProps> = ({
           {/* Hand-drawn felt-tip marker underline sweep */}
           <div
             style={{
-              height: 5,
+              height: 6,
               width: `${(markerProgress * 100).toFixed(1)}%`,
-              backgroundColor: "rgba(234, 179, 8, 0.65)",
+              backgroundColor: "rgba(234, 179, 8, 0.75)",
               borderRadius: 3,
-              marginTop: 2,
+              marginTop: 3,
               transform: "rotate(-0.8deg)",
             }}
           />
@@ -142,12 +147,32 @@ export const PaperStatCard: React.FC<PaperStatCardProps> = ({
               fontWeight: 800,
               letterSpacing: 1.6,
               textTransform: "uppercase",
-              marginTop: 2,
+              marginTop: 3,
             }}
           >
             {statLabel}
           </div>
         ) : null}
+
+        {/* Precision IBM Plex Mono source tag on 6x12 chip */}
+        <div
+          style={{
+            fontFamily: "'IBM Plex Mono', 'Courier Prime', Courier, monospace",
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: 1.4,
+            color: "#475569",
+            backgroundColor: "#E2E8F0",
+            padding: "2px 8px",
+            borderRadius: 2,
+            alignSelf: "flex-start",
+            marginTop: 6,
+            border: "1px solid #CBD5E1",
+            textTransform: "uppercase",
+          }}
+        >
+          {sourceTag || "SOURCE: VERIFIED FORENSIC DOSSIER"}
+        </div>
       </div>
     </PaperDrop>
   );
