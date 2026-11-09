@@ -387,14 +387,17 @@ def main():
     pub_videos.mkdir(parents=True, exist_ok=True)
 
     staged_videos = []
-    base_vids = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos"
+    fresh_vids = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/video_clips"
+    legacy_vids = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos"
     for idx in range(len(SCENES_DEF)):
-        vid_src = base_vids / f"clip_scene_{idx+1:02d}.mp4"
+        vid_src = fresh_vids / f"clip_scene_{idx+1:02d}.mp4"
+        if not vid_src.exists():
+            vid_src = legacy_vids / f"clip_scene_{idx+1:02d}.mp4"
         vid_dst = pub_videos / f"opuscar_scene_{idx+1:02d}_omni.mp4"
         if vid_src.exists():
             shutil.copy2(vid_src, vid_dst)
             staged_videos.append(vid_dst)
-            logger.info(f"Staged {vid_dst.name} ({vid_dst.stat().st_size/1024:.1f} KB)")
+            logger.info(f"Staged {vid_dst.name} from {vid_src} ({vid_dst.stat().st_size/1024:.1f} KB)")
         else:
             logger.warning(f"Video source not found: {vid_src}")
 
