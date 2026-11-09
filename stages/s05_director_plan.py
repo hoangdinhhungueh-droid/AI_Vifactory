@@ -404,7 +404,12 @@ def build_vox_scene_prompts(
             whisper_words=getattr(scene, "whisper_words", None),
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
             object_roles=getattr(scene, "object_roles", None),
-            camera_directive=camera_directive
+            camera_directive=camera_directive,
+            action_type=getattr(scene, "action_type", None) or (scene.get("action_type") if isinstance(scene, dict) else None) or resolved_h_family,
+            action_verb=getattr(scene, "action_verb", None) or (scene.get("action_verb") if isinstance(scene, dict) else None),
+            interacting_tool=tool_prop,
+            physical_reaction=getattr(scene, "physical_reaction", None) or (scene.get("physical_reaction") if isinstance(scene, dict) else None),
+            tactile_residue=getattr(scene, "tactile_residue", None) or (scene.get("tactile_residue") if isinstance(scene, dict) else None),
         )
         i2v_google_flow = build_cl3_paper_diorama_prompt(
             sub_plan,

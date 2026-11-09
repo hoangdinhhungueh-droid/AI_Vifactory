@@ -1180,16 +1180,20 @@ def generate_scene_sub_director_plan(
     fam1_key = fam1.value if fam1.value in k1_templates else "DEFAULT"
     t1 = k1_templates.get(fam1_key, k1_templates["DEFAULT"])
 
+    resolved_verb = action_verb or (t1["action_verb"].format(**fmt_kwargs) if 't1' in locals() and "action_verb" in t1 else evidence.tactile_action_verb)
+    resolved_reaction = physical_reaction or (t1["physical_reaction"].format(**fmt_kwargs) if 't1' in locals() and "physical_reaction" in t1 else evidence.physical_reaction)
+    resolved_residue = tactile_residue or (t1.get("residue", "") if 't1' in locals() else evidence.tactile_residue)
+
     c1 = KineticCoupling(
         id="K1",
         family=fam1,
         source_obj_id="obj_tool1",
         target_obj_id="obj_anchor",
-        action_verb=t1["action_verb"].format(**fmt_kwargs),
+        action_verb=resolved_verb,
         contact_point=t1["contact_point"].format(**fmt_kwargs),
-        physical_reaction=t1["physical_reaction"].format(**fmt_kwargs),
+        physical_reaction=resolved_reaction,
         secondary_reaction=t1.get("secondary_reaction"),
-        residue=t1.get("residue", "")
+        residue=resolved_residue
     )
     couplings.append(c1)
 
@@ -1209,7 +1213,7 @@ def generate_scene_sub_director_plan(
     )
     couplings.append(c2)
 
-    # 5. Phân Rã Dãy Micro-Beats Linh Hoạt
+    # 5. Phân Rã Dãy Micro-Beats Linh Hoạt (3-Phase Kinematics & Seed State Invariant)
     micro_beats = []
     cam_move_desc = _derive_camera_micro_move(camera_directive)
 
@@ -1225,7 +1229,7 @@ def generate_scene_sub_director_plan(
                 phase="P1_SETUP",
                 time_window=win_b1,
                 coupling_id=None,
-                action_description=f"The {anchor_label} and {actor1_label} rest flat at initial coordinates {layout.initial_pos}, holding dead still with subtle 12fps paper jitter",
+                action_description=f"The {anchor_label} rests flat at initial coordinates {layout.initial_pos} with subtle 12fps paper jitter, while {actor1_label} is poised off-screen",
                 handoff_to="B2",
                 vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
@@ -1234,7 +1238,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in {burst1:.1f}s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
+                action_description=f"Phase 1 (Entry): High-velocity snap burst in {burst1:.1f}s (steep acceleration on twos / 12fps) — The {actor1_label} enters from off-screen and {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
                 camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -1244,7 +1248,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b3,
                 coupling_id="K2",
-                action_description=f"Direct kinetic trigger in {burst2:.1f}s: The {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
+                action_description=f"Phase 2 (Contact): Direct kinetic trigger in {burst2:.1f}s — The {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
                 handoff_to="B4",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
@@ -1253,7 +1257,7 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b4,
                 coupling_id=None,
-                action_description=f"Living hold on twos: All objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for the remaining {round(dur - b4_start, 3):.3f}s to cut, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
+                action_description=f"Phase 3 (Retract & Living Hold): Living hold on twos — {actor1_label} lifts and retracts off-screen along exit vector, leaving {c1.residue}; all objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for remaining {round(dur - b4_start, 3):.3f}s to cut, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
             )
@@ -1271,7 +1275,7 @@ def generate_scene_sub_director_plan(
                 phase="P1_SETUP",
                 time_window=win_b1,
                 coupling_id=None,
-                action_description=f"The {anchor_label} drops onto newsprint desk with subtle tactile bounce",
+                action_description=f"The {anchor_label} drops onto newsprint desk with subtle tactile bounce, while {actor1_label} is poised off-screen",
                 handoff_to="B2",
                 vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
@@ -1280,7 +1284,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
+                action_description=f"Phase 1 (Entry): High-velocity snap burst in {burst1:.1f}s — The {actor1_label} enters from off-screen and {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
                 camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -1290,7 +1294,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b3,
                 coupling_id="K1",
-                action_description=f"Pressure from {actor1_label} holds completely motionless in dead stop, causing {c1.physical_reaction}, leaving {c1.residue}",
+                action_description=f"Phase 2 (Contact): Pressure from {actor1_label} holds completely motionless in dead stop, causing {c1.physical_reaction}, leaving {c1.residue}",
                 handoff_to="B4",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
@@ -1308,7 +1312,7 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b5,
                 coupling_id=None,
-                action_description=f"Living hold on twos: All objects permanently locked in spatial anchor for remaining {round(dur - b5_start, 3):.3f}s, 12fps paper stop-motion texture, zero digital freeze to cut",
+                action_description=f"Phase 3 (Retract & Living Hold): {actor1_label} lifts and retracts off-screen along exit vector, leaving {c1.residue}; all objects permanently locked in spatial anchor for remaining {round(dur - b5_start, 3):.3f}s, 12fps paper stop-motion texture, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[4][2] if whisper_windows else None
             )
@@ -1327,7 +1331,7 @@ def generate_scene_sub_director_plan(
                 phase="P1_SETUP",
                 time_window=win_b1,
                 coupling_id=None,
-                action_description=f"{anchor_label} snap-drops onto aged newsprint desk, edges vibrating with stop-motion jitter",
+                action_description=f"{anchor_label} snap-drops onto aged newsprint desk with stop-motion jitter, while {actor1_label} is poised off-screen",
                 handoff_to="B2",
                 vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
@@ -1336,7 +1340,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id=None,
-                action_description=f"{actor1_label} enters frame with crisp paper deceleration and aligns with {anchor_label}",
+                action_description=f"Phase 1 (Entry): {actor1_label} enters frame from off-screen with crisp paper deceleration and aligns with {anchor_label}",
                 handoff_to="B3",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
@@ -1345,7 +1349,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b3,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s, leaving {c1.residue}",
+                action_description=f"Phase 2 (Contact): High-velocity snap burst in {burst1:.1f}s — The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s, leaving {c1.residue}",
                 handoff_to="B4",
                 camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
@@ -1373,7 +1377,7 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b6,
                 coupling_id=None,
-                action_description=f"Living hold on twos: All objects locked in spatial anchor for remaining {round(dur - b6_start, 3):.3f}s, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
+                action_description=f"Phase 3 (Retract & Living Hold): {actor1_label} lifts and retracts off-screen along exit vector, leaving {c1.residue}; all objects locked in spatial anchor for remaining {round(dur - b6_start, 3):.3f}s, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[5][2] if whisper_windows else None
             )
@@ -1393,7 +1397,7 @@ def generate_scene_sub_director_plan(
                 phase="P1_SETUP",
                 time_window=win_b1,
                 coupling_id=None,
-                action_description=f"{anchor_label} snap-drops onto aged newsprint desk, edges vibrating with stop-motion jitter",
+                action_description=f"{anchor_label} snap-drops onto aged newsprint desk with stop-motion jitter, while {actor1_label} is poised off-screen",
                 handoff_to="B2",
                 vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
@@ -1402,7 +1406,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id=None,
-                action_description=f"{actor1_label} enters frame with crisp paper deceleration and aligns with {anchor_label}",
+                action_description=f"Phase 1 (Entry): {actor1_label} enters frame from off-screen with crisp paper deceleration and aligns with {anchor_label}",
                 handoff_to="B3",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
@@ -1411,7 +1415,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b3,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
+                action_description=f"Phase 2 (Contact): High-velocity snap burst in {burst1:.1f}s — The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B4",
                 camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
@@ -1448,7 +1452,7 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b7,
                 coupling_id=None,
-                action_description=f"Living hold on twos: All objects locked in spatial anchor for remaining {round(dur - b7_start, 3):.3f}s, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
+                action_description=f"Phase 3 (Retract & Living Hold): {actor1_label} lifts and retracts off-screen along exit vector, leaving {c1.residue}; all objects locked in spatial anchor for remaining {round(dur - b7_start, 3):.3f}s, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[6][2] if whisper_windows else None
             )
@@ -1592,9 +1596,9 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
     chain_str = " ".join(steps_text)
 
     prompt = (
-        f"Forensic documentary motion graphics with Opuscar core boxes architecture, tactile stop-motion editorial layout on aged newsprint desk (#F4F1EA), "
-        f"tan kraft (#C9BB9C), and cool backlit light table (#F7F9FB) with whiteboard erased ghost strokes (7% opacity). "
-        f"Halftone B&W 60lpi cutouts with misregistration ink shadows (+8px offset pop in crimson red #D62E1F), Ben-Day halftone density fields, pitted rubber stamps, "
+        f"Forensic documentary motion graphics with Opuscar core boxes architecture, tactile stop-motion editorial layout on aged cream newsprint desk, "
+        f"tan kraft cardstock, and cool backlit light table with whiteboard erased ghost strokes (7% opacity). "
+        f"Halftone B&W 60lpi cutouts with misregistration ink shadows (+8px offset pop in crimson red), Ben-Day halftone density fields, pitted rubber stamps, "
         f"Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), and acrylic loupe portals with pincushion barrel distortion. "
         f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
         f"[Style: Rigid documentary motion design, zero cartoon puppet motion, zero organic wobbling]. "
@@ -1603,15 +1607,19 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
         f"Dual-rate motion: smooth 24/30fps camera, with independent 12fps paper grain and drop-shadow breathing on twos. "
         f"Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). Audio: sound design only with two real silences ducking BGM before slams. "
         f"Zero slow drifting, zero floaty linear glide, zero continuous cruise]. "
-        f"[Focal Hierarchy: Strict Single Primary Hero Object focus. Exactly ONE primary evidentiary subject commands the scene focal hierarchy. Clean archival diorama paper surface (#F4F1EA) with zero competing decorative clutter, zero gratuitous stacked props, zero ungrounded embellishments]. "
+        f"[Focal Hierarchy: Strict Single Primary Hero Object focus. Exactly ONE primary evidentiary subject commands the scene focal hierarchy. Clean archival diorama paper surface with zero competing decorative clutter, zero gratuitous stacked props, zero ungrounded embellishments]. "
         f"[Camera: {cam_directive_detected}]. "
         f"[Timeline Kinematics: [KINETIC CAUSAL CHAIN]: {chain_str}]. "
         f"[Motion Design: Snappy 2D graphic reveals, rigid planar cutouts with crisp deckle torn paper edges, linear slides, mechanical snap-down]. "
         f"[Constraints: [PHYSICAL CONSTRAINTS]: Every element is a rigid 2D planar cutout with crisp deckle torn paper edges and clean cast shadows. "
-        f"Strict single hero focal hierarchy on clean newsprint base (#F4F1EA). Zero independent drifting, zero 3D fluid morphing, zero competing decorative clutter, all graphics sustained in 12fps paper stop-motion texture to the cut]."
+        f"Strict single hero focal hierarchy on clean newsprint base. Zero independent drifting, zero 3D fluid morphing, zero competing decorative clutter, all graphics sustained in 12fps paper stop-motion texture to the cut]."
     )
 
-    return prompt.strip()
+    # Strip any remaining hex code tokens (Rule 122 & Rule 140 Anti-Token-Leak)
+    prompt = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', prompt)
+    prompt = re.sub(r'\(\s*\)', '', prompt)
+    prompt = re.sub(r'\s{2,}', ' ', prompt).strip()
+    return prompt
 
 
 # Canonical alias for universal compatibility across callers and test suites
@@ -1627,44 +1635,64 @@ def build_natural_kinetic_i2v_prompt(
 ) -> str:
     """Builds a 100% Cartesian-Free, Natural Kinetic I2V Prompt conforming to Vox Engine v3 and CL3 Paper Diorama standard (Rule 140).
 
-    Synthesizes CL3 Vox Video System with Vox Engine v3:
-    [STYLE SYSTEM]: CL3 Paper Diorama (Deep Diorama / Flat Parallax) with aged-newsprint (#F4F1EA), halftone cutouts, print grain.
-    [CAMERA & ENVIRONMENT]: Top-down or cinematic perspective with committed camera actor and mandatory Settle on out-point.
-    [ACTION PHASE (0.2s - 0.4s)]: Snappy mechanical strike (H1->H7) with overshoot.
-    [PHYSICAL REACTION & RESIDUE]: Contact dynamics leaving tactile residue (crimp, stamp ink, tear, caliper dent).
-    [HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.
-    [AUDIO]: Tactile sound design mirroring action, no music, no narration.
-    [AVOID]: Strict negative constraints killing flat 2D and glossy 3D CG.
+    Enforces 3-Phase Kinematic Interaction Syntax (Entry -> Contact -> Retract) and developer definition precedence.
     """
     sentence = ""
     resolved_market = market
     sc_id = scene_id
     cam = camera_directive
+    plan_hero = None
+    plan_tool = None
+    plan_action = None
+    plan_verb = None
+    plan_reaction = None
+    plan_residue = None
+
     if isinstance(sub_plan_or_sentence, dict):
         sentence = sub_plan_or_sentence.get("sentence") or sub_plan_or_sentence.get("headline") or ""
         sc_id = sub_plan_or_sentence.get("scene_id") or scene_id
         resolved_market = sub_plan_or_sentence.get("market") or market
-        if not cam:
-            cam = sub_plan_or_sentence.get("camera_directive")
+        cam = cam or sub_plan_or_sentence.get("camera_directive") or sub_plan_or_sentence.get("camera_movement")
+        plan_hero = sub_plan_or_sentence.get("hero_cutout_object")
+        plan_tool = sub_plan_or_sentence.get("interacting_tool") or sub_plan_or_sentence.get("interacting_objects")
+        plan_action = sub_plan_or_sentence.get("action_type") or sub_plan_or_sentence.get("tactile_action")
+        plan_verb = sub_plan_or_sentence.get("tactile_action_verb")
+        plan_reaction = sub_plan_or_sentence.get("physical_reaction")
+        plan_residue = sub_plan_or_sentence.get("tactile_residue")
     else:
         sentence = str(sub_plan_or_sentence)
 
+    # Keyword argument overrides take precedence
+    plan_hero = kwargs.get("hero_cutout_object") or plan_hero
+    plan_tool = kwargs.get("interacting_tool") or plan_tool
+    plan_action = kwargs.get("action_type") or plan_action
+    plan_verb = kwargs.get("tactile_action_verb") or plan_verb
+    plan_reaction = kwargs.get("physical_reaction") or plan_reaction
+    plan_residue = kwargs.get("tactile_residue") or plan_residue
+
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
-    base_cam = cam or ev.camera_directive
 
-    # Ensure mandatory CL3 out-point 'Settle on...' is present
-    settle_target = ev.hero_anchor_prop
+    # Hierarchy of Precedence (Boss Opus 5.5 Phase 2): Developer-specified definitions take absolute precedence
+    raw_hero = plan_hero or ev.hero_anchor_prop
+    raw_tool = plan_tool or ev.interacting_tool_prop
+    clean_hero = sanitize_prompt_for_imagen3(raw_hero)
+    clean_tool = sanitize_prompt_for_imagen3(raw_tool)
+    action_verb = plan_verb or ev.tactile_action_verb
+    phys_react = (plan_reaction or ev.physical_reaction).strip().rstrip('.')
+    tac_res = (plan_residue or ev.tactile_residue).strip().rstrip('.')
+
+    base_cam = cam or ev.camera_directive
     if "settle" not in base_cam.lower():
-        resolved_camera = f"{base_cam.rstrip('.')}. Settle on the {settle_target} in sharp focus"
+        resolved_camera = f"{base_cam.rstrip('.')}. Settle on the {clean_hero} in sharp focus"
     else:
         resolved_camera = base_cam
 
     style_mode = kwargs.get("style_mode", "deep_diorama")
     if style_mode == "flat_parallax":
         style_header = (
-            "[STYLE SYSTEM - FLAT PARALLAX]: Aged-newsprint paper collage on cream archival paper (#F4F1EA), cool backlit light table (#F7F9FB) with whiteboard erased ghost strokes (7% opacity), "
-            "desaturated archival palette with one hot crimson accent (#D62E1F), Swiss extreme scale contrast (condensed headline typography with giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), "
+            "[STYLE SYSTEM - FLAT PARALLAX]: Aged-newsprint paper collage on cream archival paper, cool backlit light table with whiteboard erased ghost strokes (7% opacity), "
+            "desaturated archival palette with one hot crimson accent, Swiss extreme scale contrast (condensed headline typography with giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), "
             "halftone black-and-white cutout people with rough white keylines and misregistration ink shadows (+8px offset pop), Ben-Day halftone density fields, pitted rubber stamps, and authentic print-grain finish. "
             "True paper diorama parallax, never glossy 3D."
         )
@@ -1674,9 +1702,9 @@ def build_natural_kinetic_i2v_prompt(
         )
     else:
         style_header = (
-            "[STYLE SYSTEM - DEEP DIORAMA]: Deep 3D paper diorama with aged-print collage textures on aged cream newsprint (#F4F1EA), "
-            "tan kraft cardstock (#C9BB9C), and cool backlit light table (#F7F9FB) with faint erased whiteboard ghost strokes (7% opacity). "
-            "Halftone black-and-white cutouts (60lpi) with rough white keylines and misregistration ink shadows (+8px offset pop in crimson red #D62E1F or mustard gold #D9A441), "
+            "[STYLE SYSTEM - DEEP DIORAMA]: Deep 3D paper diorama with aged-print collage textures on aged cream newsprint, "
+            "tan kraft cardstock, and cool backlit light table with faint erased whiteboard ghost strokes (7% opacity). "
+            "Halftone black-and-white cutouts (60lpi) with rough white keylines and misregistration ink shadows (+8px offset pop in crimson red or mustard gold), "
             "Ben-Day halftone density fields, pitted rubber stamps with authentic ink bleed, Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), "
             "acrylic loupe portals with pincushion barrel distortion and edge chromatic aberration, and authentic print grain. "
             "Physical layers separated in real space, shallow depth of field, foreground elements crossing close to lens."
@@ -1687,27 +1715,66 @@ def build_natural_kinetic_i2v_prompt(
         )
 
     # Tactile sound design matching the interacting tool
-    tool_lower = ev.interacting_tool_prop.lower()
-    if "caliper" in tool_lower or "vernier" in tool_lower:
+    tool_lower = clean_tool.lower()
+    if any(k in tool_lower for k in ["caliper", "vernier"]):
         audio_sfx = "vernier metal slide, crisp cardstock crimp, ratchet clicks, low newsroom hum"
-    elif "seal" in tool_lower or "stamp" in tool_lower:
+    elif any(k in tool_lower for k in ["seal", "stamp", "hanko"]):
         audio_sfx = "heavy wooden thud, paper compression crack, oily ink squelch, room tone"
-    elif "shear" in tool_lower or "scissor" in tool_lower or "cut" in tool_lower:
+    elif any(k in tool_lower for k in ["shear", "scissor", "cut", "knife", "blade"]):
         audio_sfx = "clean shear slice, fiber tearing rip, paper flutter, quiet room tone"
-    elif "yarn" in tool_lower or "thread" in tool_lower or "string" in tool_lower:
+    elif any(k in tool_lower for k in ["yarn", "thread", "string"]):
         audio_sfx = "pushpin wooden tap, string tension twang, taut hum, room tone"
-    elif "clip" in tool_lower or "clamp" in tool_lower:
+    elif any(k in tool_lower for k in ["clip", "clamp"]):
         audio_sfx = "steel spring snap, cardstock crimp crunch, placement click, low hum"
+    elif any(k in tool_lower for k in ["marker", "highlighter", "pen", "pencil"]):
+        audio_sfx = "crisp paper friction glide, felt-tip marker sweep, archival newsroom hum"
     else:
         audio_sfx = "crisp paper snap, mechanical placement click, low archival newsroom hum"
 
-    focal_mandate = f"Strict single hero focal hierarchy on clean newsprint base (#F4F1EA). Exactly ONE primary evidentiary subject commands the composition, zero competing decorative clutter, zero ungrounded embellishments."
+    focal_mandate = f"Strict single hero focal hierarchy on clean archival cream newsprint base. Exactly ONE primary evidentiary subject ({clean_hero}) commands the composition, zero competing decorative clutter, zero ungrounded embellishments."
 
-    is_stamp = any(k in ev.interacting_tool_prop.lower() for k in ["stamp", "seal"])
-    if is_stamp:
-        action_phase = f"[ACTION PHASE (0.2s - 0.4s)]: Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, the {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}."
+    is_tool_stamp = any(k in (str(clean_tool) + " " + str(plan_action or "")).lower() for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion", "h1_impact"])
+    is_hero_stamp = any(k in clean_hero.lower() for k in ["stamp", "seal", "hanko"]) and not any(k in clean_hero.lower() for k in ["ledger", "cardstock", "document", "paper", "report", "card", "sheet"])
+
+    hero_target = clean_hero if clean_hero.lower().startswith(("the ", "a ", "an ")) else f"the {clean_hero}"
+
+    if is_hero_stamp or is_tool_stamp:
+        stamp_obj = clean_hero if is_hero_stamp else clean_tool
+        stamp_target = "the archival ledger paper" if is_hero_stamp else hero_target
+        action_phase = (
+            f"[ACTION PHASE — 3-Phase Kinematics]: "
+            f"Phase 1 (Entry): The {stamp_obj} descends swiftly from off-screen overhead along vertical entry vector in 0.09s ease-in drop from 2.6x to 1x scale directly towards target zone on {stamp_target}. "
+            f"Phase 2 (Contact): At exact target coordinate, stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, "
+            f"the {stamp_obj} strikes firmly down onto {stamp_target} with crisp mechanical compression, "
+            f"causing an indelible vermilion official seal impression to imprint into the paper fibers, "
+            f"leaving a distressed circular seal impression with tactile paper indentation. "
+            f"Phase 3 (Retract): The {stamp_obj} lifts vertically and retracts off-screen along exit vector, leaving {stamp_target} and permanent vermilion seal impression locked in spatial anchor with living 12fps paper grain vibration on twos, zero frozen frames to cut."
+        )
     else:
-        action_phase = f"[ACTION PHASE (0.2s - 0.4s)]: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s, the {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}."
+        clean_verb = sanitize_tactile_action_verb(action_verb, clean_tool, clean_hero).strip()
+        if re.search(r"\b(on|onto|against|across|beside|into|with|over|around|through|of)\s*$", clean_verb, flags=re.IGNORECASE):
+            connective = " "
+        else:
+            connective = " against " if any(w in clean_verb.lower() for w in ["stamp", "strike", "press", "slam"]) else " "
+        causing_clause = format_causal_reaction_clause(phys_react, hero_target)
+        leaving_clause = f", leaving {tac_res}" if tac_res and "leaving" not in causing_clause.lower() else ""
+
+        clean_verb_lower = clean_verb.lower()
+        snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices", "sweeps", "highlights"]
+        if any(clean_verb_lower.startswith(w) for w in snappy_verbs):
+            action_phase = (
+                f"[ACTION PHASE — 3-Phase Kinematics]: "
+                f"Phase 1 (Entry): The {clean_tool} enters smoothly from off-screen margin along lateral entry vector in snappy cubic-bezier(.7, 0, .2, 1) ease-in settling in 0.2s-0.3s with mechanical back-overshoot towards target coordinate. "
+                f"Phase 2 (Contact): At target coordinate, the {clean_tool} {clean_verb}{connective}{hero_target}" + (f", {causing_clause}" if causing_clause else "") + f"{leaving_clause}. "
+                f"Phase 3 (Retract): The {clean_tool} lifts and retracts off-screen along exit vector, leaving {hero_target} locked in spatial anchor with living 12fps paper grain vibration on twos, zero frozen frames to cut."
+            )
+        else:
+            action_phase = (
+                f"[ACTION PHASE — 3-Phase Kinematics]: "
+                f"Phase 1 (Entry): The {clean_tool} snaps briskly into frame from off-screen in cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s towards target coordinate. "
+                f"Phase 2 (Contact): At target coordinate, the {clean_tool} {clean_verb}{connective}{hero_target}" + (f", {causing_clause}" if causing_clause else "") + f"{leaving_clause}. "
+                f"Phase 3 (Retract): The {clean_tool} retracts off-screen along exit trajectory, leaving {hero_target} settled in spatial anchor with living 12fps paper grain vibration on twos, zero frozen frames to cut."
+            )
 
     hold_block = (
         "[HOLD & LIVING MOMENTUM]: Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). "
@@ -1719,12 +1786,17 @@ def build_natural_kinetic_i2v_prompt(
         f"[CAMERA & ENVIRONMENT]: {resolved_camera}.\n"
         f"[FOCAL HIERARCHY]: {focal_mandate}\n"
         f"{action_phase}\n"
-        f"[PHYSICAL REACTION & RESIDUE]: {ev.physical_reaction.capitalize()}, leaving {ev.tactile_residue}.\n"
+        f"[PHYSICAL REACTION & RESIDUE]: {phys_react.capitalize() if phys_react else 'Crisp mechanical contact'}, leaving {tac_res if tac_res else 'permanent tactile indentation'}.\n"
         f"{hold_block}\n"
         f"[AUDIO]: {audio_sfx}, with two real silences ducking BGM before slams — sound design only, no music, no narration.\n"
         f"{avoid_block}"
     )
-    return prompt.strip()
+
+    # Strip any remaining hex code tokens (Rule 122 & Rule 140 Anti-Token-Leak)
+    prompt = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', prompt)
+    prompt = re.sub(r'\(\s*\)', '', prompt)
+    prompt = re.sub(r'\s{2,}', ' ', prompt).strip()
+    return prompt
 
 
 def _get_canonical_backgrounds() -> list[str]:
@@ -2060,8 +2132,13 @@ def build_cl3_paper_diorama_image_prompt(
     bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)]
     bg_field = f"Background: {bg_choice}."
     mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
-    if ev.extracted_metric:
-        fg_data = f"FG: Swiss extreme scale contrast giant tactile paper cutout number '{ev.extracted_metric}' (30-35% mass) with precision IBM Plex Mono source tag on 6x12 chip crossing close to the lens. ZERO interactive tools drawn on seed."
+    extracted_metric = (
+        (sub_plan_or_sentence.get("statValue") if isinstance(sub_plan_or_sentence, dict) else None)
+        or kwargs.get("extracted_metric")
+        or ev.extracted_metric
+    )
+    if extracted_metric:
+        fg_data = f"FG: Swiss extreme scale contrast giant tactile paper cutout number '{extracted_metric}' (30-35% mass) with precision IBM Plex Mono source tag on 6x12 chip crossing close to the lens. ZERO interactive tools drawn on seed."
     elif getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
         fg_data = f"FG: Swiss extreme scale contrast tactile accounting figures embossed onto cardstock (30-35% mass) with precision IBM Plex Mono source tags on 6x12 chips crossing close to the lens. ZERO interactive tools drawn on seed."
     else:
@@ -2070,7 +2147,10 @@ def build_cl3_paper_diorama_image_prompt(
     focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival cream diorama paper, with zero competing decorative clutter or stacked ungrounded props."
     
     # Target substrate enrichment: Eliminate blank voids in documents and stamp areas
-    is_stamp_action = any(k in (str(raw_hero) + " " + str(clean_hero) + " " + str(plan_action or "")).lower() for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion", "h1_impact"])
+    raw_tool = interacting_tool_override or plan_tool or ev.interacting_tool_prop
+    clean_tool = sanitize_prompt_for_imagen3(raw_tool)
+    check_stamp_context = f"{raw_hero} {clean_hero} {raw_tool} {clean_tool} {plan_action or ''} {getattr(ev, 'dominant_family', '')}".lower()
+    is_stamp_action = any(k in check_stamp_context for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion", "h1_impact"])
     script_mkt = "Japanese kanji" if resolved_market in ("JA", "JP") else ("Vietnamese" if resolved_market == "VN" else "archival")
     if is_stamp_action:
         target_substrate = (
