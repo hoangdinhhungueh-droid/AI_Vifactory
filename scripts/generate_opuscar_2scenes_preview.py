@@ -251,8 +251,8 @@ def get_ffmpeg_binary() -> str:
     try:
         import imageio_ffmpeg
         candidates.insert(0, imageio_ffmpeg.get_ffmpeg_exe())
-    except Exception:
-        pass
+    except (ImportError, AttributeError) as _ffmpeg_imp_err:
+        logger.debug(f"[get_ffmpeg_binary] imageio_ffmpeg unavailable: {_ffmpeg_imp_err}")
     for c in candidates:
         if c and Path(c).is_file():
             return str(c)
