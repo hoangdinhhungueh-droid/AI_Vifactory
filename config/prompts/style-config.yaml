@@ -43,7 +43,7 @@ presets:
       clean 2D stylized graphic novel comic ink outlines, bold linework, crosshatching, flat cel-shading, tabletop paper craft setting
     motion_behavior: >
       12fps tactile stop-motion documentary motion, mechanical paper folding and snappy impact (<= 0.4s),
-      rigid dead-stop hold with subtle paper grain vibration and micro shadow breathing <= 2px at 12fps (on twos),
+      continuous tactile momentum with subtle paper grain vibration and micro shadow breathing <= 2px at 12fps (on twos), zero frozen frames,
       crisp document table drop with subtle paper flutter, steady tripod camera drift,
       zero warping or morphing of text, staggered discrete frame steps
     negative: >

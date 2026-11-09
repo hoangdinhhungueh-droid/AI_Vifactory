@@ -373,6 +373,14 @@ def verify_final_video_gates(
                     f"sampled frames (content Laplacian variance < 5.0, Rule 122 Axis 3 breach)"
                 )
 
+    # 5b. Quantitative Motion Energy & Anti-Slideshow Gate (Rule 140 & ForensicVisualInspector)
+    from app.services.forensic_visual_inspector import ForensicVisualInspector
+    motion_report = ForensicVisualInspector.audit_video_motion_energy(final_mp4)
+    if motion_report.verdict == "FAIL_FROZEN_SLIDESHOW":
+        raise ValueError(
+            f"Quality Gate FAIL: Rule 140 Kinematic Vitality breach: {motion_report.diagnosis}"
+        )
+
     # 6. EBUR128 / AES TD1004 broadcast loudness compliance
     # Standard: EBU R128 / AES TD1004 / EBU Tech 3343 Online Streaming Standard:
     # Target: -16.0 LUFS ± 1.0 LU tolerance (range [-17.0, -15.0] LUFS)
@@ -500,6 +508,10 @@ def verify_final_video_gates(
         "axis_2_alpha_edge": "PASS",
         "axis_3_style_conformance": axis_3,
         "axis_4_ethnic_context": axis_4,
+        "motion_verdict": motion_report.verdict,
+        "mean_motion_energy_pct": round(motion_report.mean_motion_energy_pct, 2),
+        "peak_motion_energy_pct": round(motion_report.peak_motion_energy_pct, 2),
+        "max_freeze_duration_sec": round(motion_report.max_freeze_duration_sec, 2),
     }
 
 

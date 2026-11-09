@@ -327,6 +327,59 @@ def run(ctx: RunContext) -> StageArtifact:
 
     payload = decision.model_dump()
 
+    # 3. Quantitative Forensic Prompt & Kinematics Linter (Rule 122 & Rule 140)
+    try:
+        from app.services.forensic_visual_inspector import ForensicVisualInspector
+        lint_reports = []
+        for i, sc in enumerate(scenes):
+            sc_id = sc.get("scene_id", f"SCENE_{i+1:02d}")
+            t2i = sc.get("image_prompt", "") or sc.get("t2i_prompt", "")
+            i2v = sc.get("i2v_prompt_omni", "") or sc.get("i2v_prompt", "") or sc.get("i2v_google_flow", "")
+            cam = sc.get("camera_directive", "") or sc.get("camera_movement", "")
+            hero = sc.get("hero_cutout_object", "")
+            tool = sc.get("interacting_tool", "") or sc.get("tool", "")
+            action = sc.get("tactile_action", "") or sc.get("action_type", "")
+            rep = ForensicVisualInspector.lint_scene_prompts(
+                scene_id=sc_id,
+                t2i_prompt=t2i,
+                i2v_prompt=i2v,
+                action_type=action,
+                camera_directive=cam,
+                hero_object=hero,
+                interacting_tool=tool,
+            )
+            lint_reports.append(rep)
+
+        critical_violations = [v for r in lint_reports for v in r.violations if v.severity in ("CRITICAL", "HIGH")]
+        payload["forensic_prompt_lint"] = {
+            "total_scenes": len(lint_reports),
+            "passed_scenes": sum(1 for r in lint_reports if r.passed),
+            "critical_violations_count": len(critical_violations),
+            "reports": [r.to_dict() for r in lint_reports],
+        }
+
+        # Write visual health card summary to stage artifact directory
+        health_card_md = ctx.paths.root / "visual_forensic_health_card.md"
+        health_card_json = ctx.paths.root / "visual_forensic_health_card.json"
+        ForensicVisualInspector.generate_visual_health_card(
+            episode_id=ctx.run_id,
+            lint_reports=lint_reports,
+            motion_reports=[],
+            output_markdown_path=health_card_md,
+            output_json_path=health_card_json,
+        )
+
+        if critical_violations and not is_fast_test:
+            raise GateError(
+                STAGE,
+                f"Stage S06 Forensic Visual Gate rejected prompts with {len(critical_violations)} critical/high violation(s).",
+                details={"violations": [asdict(v) for v in critical_violations]}
+            )
+    except GateError:
+        raise
+    except Exception as lint_err:
+        logger.warning(f"[s06_critic_visual] Notice during forensic prompt lint: {lint_err}")
+
     # Verify Master Scene Sheet availability from S05 (Rule 121 & 140)
     ms_dir = ctx.paths.root / "master_sheets"
     ms_manifest = ms_dir / "master_sheet_manifest.json"

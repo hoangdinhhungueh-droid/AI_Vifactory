@@ -1667,8 +1667,8 @@ def build_natural_kinetic_i2v_prompt(
         action_phase = f"[ACTION PHASE (0.2s - 0.4s)]: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s, the {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}."
 
     hold_block = (
-        "[HOLD & LIVING TEXTURE]: Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). "
-        "All objects lock into dead-stop hold with dual-rate motion (smooth 24/30fps camera, with independent 12fps paper grain and micro shadow breathing at 12fps (on twos)). Zero 3D camera drift, zero static freeze."
+        "[HOLD & LIVING MOMENTUM]: Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). "
+        "Continuous tactile momentum with dual-rate motion (smooth 24/30fps camera, with independent 12fps paper grain and micro shadow breathing at 12fps (on twos)). Zero 3D camera drift, zero static freeze."
     )
 
     prompt = (
@@ -1832,7 +1832,14 @@ def build_cl3_paper_diorama_prompt(
         mg_cutout = "MG: authentic archival accounting ledger paper anchored solidly on the diorama plane with crisp 3px white deckle border and soft drop shadow."
         fg_data = f"FG: {clean_hero} poised at foreground depth directly above the document."
         clean_tool = clean_hero
-        action_text = f"Action: Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, the {clean_hero} strikes firmly down onto the archival ledger paper with crisp mechanical compression, causing an indelible vermilion official seal impression to imprint into the paper fibers, leaving a distressed circular seal impression with tactile paper indentation. Objects lock into dead-stop hold with dual-rate motion (smooth camera with 12fps paper grain vibration on twos) adhering to readcheck formula."
+        action_text = (
+            f"Action: Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, "
+            f"the {clean_hero} strikes firmly down onto the archival ledger paper with crisp mechanical compression, "
+            f"causing an indelible vermilion official seal impression to imprint into the paper fibers, "
+            f"leaving a distressed circular seal impression with tactile paper indentation. "
+            f"Continuous tactile momentum with dual-rate motion: sustained kinetic micro-dynamics (continuous camera tracking, "
+            f"ink fiber absorption, living 12fps paper grain vibration on twos, zero frozen frames) adhering to readcheck formula."
+        )
     else:
         mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout exhibit of {clean_hero} anchored solidly on the archival diorama plane with crisp 3px white deckle border, offset ink stroke, and soft drop shadow."
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
@@ -1852,9 +1859,19 @@ def build_cl3_paper_diorama_prompt(
         clean_verb_lower = clean_verb.lower()
         snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices"]
         if any(clean_verb_lower.startswith(w) for w in snappy_verbs):
-            action_text = f"Action: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s, the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with dual-rate motion (smooth camera with 12fps paper grain vibration on twos) adhering to readcheck formula."
+            action_text = (
+                f"Action: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s, "
+                f"the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. "
+                f"Continuous tactile momentum with dual-rate motion: sustained kinetic micro-dynamics, "
+                f"continuous camera tracking with 12fps paper grain vibration on twos, zero frozen frames, adhering to readcheck formula."
+            )
         else:
-            action_text = f"Action: The {clean_tool} snaps briskly in cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with dual-rate motion (smooth camera with 12fps paper grain vibration on twos) adhering to readcheck formula."
+            action_text = (
+                f"Action: The {clean_tool} snaps briskly in cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s "
+                f"and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. "
+                f"Continuous tactile momentum with dual-rate motion: sustained kinetic micro-dynamics, "
+                f"continuous camera tracking with 12fps paper grain vibration on twos, zero frozen frames, adhering to readcheck formula."
+            )
 
     camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
@@ -1869,7 +1886,23 @@ def build_cl3_paper_diorama_prompt(
         f"the primary exhibit ({clean_hero}) rests tack-sharp at 1.0x focal plane; "
         "the background archival plane recedes with 0.3x differential tracking, producing authentic stereoscopic Vox papercraft depth."
     )
-    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{parallax_cue}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
+    
+    # Target substrate enrichment in I2V: Ensure the base document has pre-printed evidence
+    is_stamp_action = any(k in (str(clean_tool) + " " + str(clean_hero)).lower() for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion"])
+    script_mkt = "Japanese kanji" if resolved_market in ("JA", "JP") else ("Vietnamese" if resolved_market == "VN" else "archival")
+    if is_stamp_action:
+        target_substrate = (
+            f"Target Substrate: The document surface is dense with pre-printed forensic evidence—never a blank void. "
+            f"It features dense micro-tabular financial ledger rows with authentic illegible {script_mkt} fine-print audit rows, "
+            f"a designated circular target stamp zone with dotted red perimeter ring, and faint pre-printed watermark security patterns awaiting the stamp."
+        )
+    else:
+        target_substrate = (
+            f"Target Substrate: Documents and paper surfaces feature dense authentic {script_mkt} fine-print texture, coordinate grid lines, "
+            f"and archival diagram markings, never blank empty paper."
+        )
+
+    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{target_substrate}\n{parallax_cue}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
 
     # Semantic Compatibility check
     effective_action_type = plan_action or getattr(ev.archetype, 'value', str(ev.archetype))

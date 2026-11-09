@@ -136,11 +136,11 @@ class TemplateRegistry:
             if "STATIC_OVERHEAD" in cam_str:
                 replacement_cam = "The camera remains locked in a disciplined overhead perspective: perfectly static — all dynamic motion comes strictly from tactile physical papercraft elements snapping and sliding across the tabletop diorama."
             elif "TOP_DOWN" in cam_str:
-                replacement_cam = "The camera maintains a stable overhead diorama plate with clean paper texture and 12fps stop-motion vibration, easing into a dead-stop landing hold — zero unprompted zooming or camera rolls."
+                replacement_cam = "The camera maintains a stable overhead diorama plate with clean paper texture and 12fps stop-motion vibration, easing into a disciplined settle with continuous paper breathing — zero unprompted zooming or camera rolls."
             elif "RAKE" in cam_str:
-                replacement_cam = "The camera holds a stable 30-degree low-angle rake diorama plate with clean paper texture and crisp drop shadows, settling into a dead-stop resting hold."
+                replacement_cam = "The camera holds a stable 30-degree low-angle rake diorama plate with clean paper texture and crisp drop shadows, settling into a focused resting hold with sustained micro-dynamics."
             elif "WHIP" in cam_str or "LATERAL" in cam_str:
-                replacement_cam = "The camera tracks smoothly along the tension line across the stable diorama plate, locking into a motionless dead-stop hold."
+                replacement_cam = "The camera tracks smoothly along the tension line across the stable diorama plate, settling with continuous tactile follow-through."
             elif "DUTCH" in cam_str:
                 replacement_cam = "The camera remains in a disciplined static overhead view tilted at a subtle fixed 5-degree angle without in-shot rotation, easing gently into a steady resting hold."
             elif "SLOW_PUSH_IN" in cam_str:
@@ -150,9 +150,9 @@ class TemplateRegistry:
             elif "SUBTLE_TILT_DOWN" in cam_str:
                 replacement_cam = "The camera performs one disciplined, deliberate move: a subtle continuous tilt down from the headline banner onto the newsprint text without sudden whips or orbits."
             elif "ORBIT" in cam_str:
-                replacement_cam = "The camera maintains a stable tactile diorama plate with a subtle 8-degree pivot arc centered on the prop, settling into a dead-stop hold."
+                replacement_cam = "The camera maintains a stable tactile diorama plate with a subtle 8-degree pivot arc centered on the prop, settling with continuous living texture."
             elif "MACRO" in cam_str or "GLIDE" in cam_str:
-                replacement_cam = "The camera maintains a stable macro diorama plate with clean paper texture, skimming along paper grain into a dead-stop resting hold."
+                replacement_cam = "The camera maintains a stable macro diorama plate with clean paper texture, skimming along paper grain with sustained kinetic follow-through."
 
             if replacement_cam:
                 replaced = False

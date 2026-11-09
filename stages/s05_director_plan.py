@@ -423,7 +423,7 @@ def build_vox_scene_prompts(
             f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk with smooth 24/30fps motion. Settle on the {hero_obj}.\n"
             f"[ACTION PHASE]: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s. In 0.3s (9 frames at 30fps), the {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
             f"[PHYSICAL REACTION & RESIDUE]: {evidence.physical_reaction.capitalize()}, leaving {evidence.tactile_residue}.\n"
-            f"[HOLD & LIVING TEXTURE]: Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). All objects lock into dead-stop hold with dual-rate motion (smooth camera, with independent 12fps paper grain/shadow breathing on twos).\n"
+            f"[HOLD & LIVING MOMENTUM]: Hold duration conforms to readcheck formula max(1.8s, chars/4.5 + 1.5s, VO + 0.6s). Continuous tactile momentum with dual-rate motion: smooth camera, with independent 12fps paper grain/shadow breathing on twos, zero frozen frames.\n"
             f"[AUDIO]: Tactile paper pops, soft ink squelch stamps, ticks, and ducked silence before slams. No music, no voice-over.\n"
             f"[AVOID]: no photorealism, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no music, no voice-over."
         )
