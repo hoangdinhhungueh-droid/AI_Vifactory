@@ -403,7 +403,9 @@ def main():
             duration_sec=audio_scenes[idx]["duration"],
             market="JP",
             whisper_words=audio_scenes[idx]["words"] if audio_scenes[idx]["words"] else None,
-            camera_directive=sc.get("camera_directive", "SLOW_PUSH_IN_0_1X")
+            camera_directive=sc.get("camera_directive", "SLOW_PUSH_IN_0_1X"),
+            action_type=sc.get("action_type"),
+            interacting_tool=sc.get("interacting_tool")
         )
         prompt_i2v = build_cl3_paper_diorama_prompt(sub_plan, market="JP", style_mode="deep_diorama")
         manifest[sc_id.lower()] = {

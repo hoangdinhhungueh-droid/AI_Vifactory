@@ -796,7 +796,13 @@ def generate_scene_sub_director_plan(
     object_roles: Optional[Dict[str, str]] = None,
     layout_type: Optional[str] = None,
     config_path: Optional[str] = None,
-    camera_directive: Optional[str] = None
+    camera_directive: Optional[str] = None,
+    action_type: Optional[str] = None,
+    action_verb: Optional[str] = None,
+    interacting_tool: Optional[str] = None,
+    physical_reaction: Optional[str] = None,
+    tactile_residue: Optional[str] = None,
+    **kwargs: Any
 ) -> Dict[str, Any]:
     """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode.
 
@@ -805,6 +811,7 @@ def generate_scene_sub_director_plan(
     - Rule 128: Generic Contract Architecture across all markets.
     - Rule 132: Pure Transmission Engine (presets in config/kinetic_layout_presets.json).
     - Rule 134: Single Canonical Truth.
+    - Rule 140: Tactile Kinetic Coupling (H1 -> H7) with developer definition precedence.
     """
     if not scene_id or not isinstance(scene_id, str) or not scene_id.strip():
         raise ValueError("generate_scene_sub_director_plan fail-closed (Rule 118/139): scene_id cannot be empty")
@@ -857,13 +864,42 @@ def generate_scene_sub_director_plan(
     # Dynamic Claim-to-Evidence Binding via SemanticEvidenceExtractor (Rule 128, Rule 141)
     evidence = extract_evidence_for_sentence(sentence, market=market, scene_id=scene_id)
     fam_attr = getattr(KineticFamily, evidence.dominant_family, None)
-    dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
-    if not dominant_families and fam_attr:
-        dominant_families = [fam_attr]
+
+    # Hierarchy of Precedence (Boss Opus 5.5 Phase 2): Developer-specified action_type takes precedence
+    fam_override = None
+    if action_type:
+        if isinstance(action_type, KineticFamily):
+            fam_override = action_type
+        elif hasattr(KineticFamily, str(action_type)):
+            fam_override = getattr(KineticFamily, str(action_type))
+        else:
+            for kf in KineticFamily:
+                if kf.value == str(action_type):
+                    fam_override = kf
+                    break
+
+    if fam_override:
+        dominant_families = [fam_override]
+    else:
+        dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
+        if not dominant_families and fam_attr:
+            dominant_families = [fam_attr]
 
     resolved_layout_type = layout_type
-    if not hero_cutout_object or "forensic document" in str(hero_cutout_object).lower():
-        hero_cutout_object = evidence.hero_anchor_prop
+    # Hierarchy of Precedence: Developer-specified hero object takes absolute precedence
+    resolved_hero = hero_cutout_object
+    if not resolved_hero or str(resolved_hero).strip().lower() in ("forensic document", "document", "archival document"):
+        resolved_hero = evidence.hero_anchor_prop
+    hero_cutout_object = resolved_hero
+
+    # Hierarchy of Precedence: Developer-specified interacting_tool takes absolute precedence
+    if interacting_tool and (not interacting_objects or len(interacting_objects) == 0):
+        interacting_objects = [interacting_tool]
+    elif interacting_objects and not interacting_tool:
+        interacting_tool = interacting_objects[0]
+    elif not interacting_tool and not interacting_objects:
+        interacting_tool = evidence.interacting_tool_prop
+        interacting_objects = [interacting_tool]
 
     layout = compute_kinetic_spatial_layout(
         scene_id=scene_id,
@@ -899,6 +935,8 @@ def generate_scene_sub_director_plan(
         not interacting_objects
         or all(any(bl in str(o).lower() for bl in _GENERIC_INTERACTING_BLACKLIST) for o in interacting_objects)
     )
+    if action_type or (interacting_tool and interacting_tool not in _GENERIC_INTERACTING_BLACKLIST):
+        is_generic_interacting = False
 
     fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
     fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
@@ -921,13 +959,13 @@ def generate_scene_sub_director_plan(
         inter2_material = "cotton_thread" if any(k in inter2.lower() for k in ["thread", "yarn"]) else ("crimson_graphite" if any(k in inter2.lower() for k in ["pencil", "graphite", "mark", "lead", "line", "stamp", "seal"]) else "aged_newsprint_paper")
         inter2_mass = "feather" if any(k in inter2.lower() for k in ["thread", "marker", "stroke", "pencil"]) else "light"
 
-    tool_keywords = ["caliper", "scissors", "stamp", "pencil", "marker", "loupe", "glass", "pen", "knife", "pin", "ruler", "shears", "scalpel", "gavel", "stylus"]
+    tool_keywords = ["caliper", "scissors", "stamp", "pencil", "marker", "loupe", "glass", "pen", "knife", "pin", "ruler", "shears", "scalpel", "gavel", "stylus", "highlighter"]
     doc_keywords = ["ledger", "sheet", "document", "paper", "contract", "dossier", "card", "report", "photo", "chart", "page", "envelope", "file", "exhibit"]
 
     is_hero_tool = any(k in hero_clean.lower() for k in tool_keywords)
     is_inter1_doc = any(k in inter1.lower() for k in doc_keywords)
 
-    if is_hero_tool:
+    if is_hero_tool and not any(k in hero_clean.lower() for k in doc_keywords):
         actor1_label = hero_clean
         actor1_material = "solid_metal" if any(k in hero_clean.lower() for k in ["caliper", "scissors", "scalpel"]) else "wood_rubber"
         anchor_label = inter1 if is_inter1_doc else "forensic accounting ledger document"
@@ -1289,7 +1327,7 @@ def generate_scene_sub_director_plan(
                 phase="P1_SETUP",
                 time_window=win_b1,
                 coupling_id=None,
-                action_description=f"{anchor_label} snap-drops onto desk #F4F1EA, edges vibrating with stop-motion jitter",
+                action_description=f"{anchor_label} snap-drops onto aged newsprint desk, edges vibrating with stop-motion jitter",
                 handoff_to="B2",
                 vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
@@ -1355,7 +1393,7 @@ def generate_scene_sub_director_plan(
                 phase="P1_SETUP",
                 time_window=win_b1,
                 coupling_id=None,
-                action_description=f"{anchor_label} snap-drops onto desk #F4F1EA, edges vibrating with stop-motion jitter",
+                action_description=f"{anchor_label} snap-drops onto aged newsprint desk, edges vibrating with stop-motion jitter",
                 handoff_to="B2",
                 vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
@@ -1416,17 +1454,22 @@ def generate_scene_sub_director_plan(
             )
         ]
 
+    resolved_verb = action_verb or (t1["action_verb"].format(**fmt_kwargs) if 't1' in locals() and "action_verb" in t1 else evidence.tactile_action_verb)
+    resolved_reaction = physical_reaction or (t1["physical_reaction"].format(**fmt_kwargs) if 't1' in locals() and "physical_reaction" in t1 else evidence.physical_reaction)
+    resolved_residue = tactile_residue or (t1.get("residue", "") if 't1' in locals() else evidence.tactile_residue)
+
     plan = {
         "schema_version": "scene_sub_director_plan.v3",
         "scene_id": scene_id,
         "sentence": sentence,
         "market": market,
         "hero_cutout_object": hero_cutout_object,
-        "interacting_tool": evidence.interacting_tool_prop,
-        "tactile_action_verb": evidence.tactile_action_verb,
-        "physical_reaction": evidence.physical_reaction,
-        "tactile_residue": evidence.tactile_residue,
-        "action_type": dominant_families[0].value if dominant_families else "H1_IMPACT",
+        "interacting_tool": interacting_tool or inter1,
+        "interacting_objects": interacting_objects or [inter1],
+        "tactile_action_verb": resolved_verb,
+        "physical_reaction": resolved_reaction,
+        "tactile_residue": resolved_residue,
+        "action_type": action_type or (dominant_families[0].value if dominant_families else "H1_IMPACT"),
         "archetype": evidence.archetype.value,
         "camera_directive": camera_directive or "TOP_DOWN_TRACKING",
         "scene_duration_sec": dur,
@@ -1824,29 +1867,48 @@ def build_cl3_paper_diorama_prompt(
     raw_tool = plan_tool or ev.interacting_tool_prop
     clean_hero = sanitize_prompt_for_imagen3(raw_hero)
     clean_tool = sanitize_prompt_for_imagen3(raw_tool)
+    action_verb = plan_verb or ev.tactile_action_verb
+    phys_react = (plan_reaction or ev.physical_reaction).strip().rstrip('.')
+    tac_res = (plan_residue or ev.tactile_residue).strip().rstrip('.')
 
-    is_stamp_tool = any(k in clean_hero.lower() for k in ["stamp", "seal"])
+    is_tool_stamp = any(k in clean_tool.lower() for k in ["stamp", "seal", "hanko"])
+    is_hero_stamp = any(k in clean_hero.lower() for k in ["stamp", "seal", "hanko"]) and not any(k in clean_hero.lower() for k in ["ledger", "cardstock", "document", "paper", "report", "card", "sheet"])
 
-    if is_stamp_tool:
-        # The primary hero is a stamp/seal striking onto an anchored accounting ledger (downward mechanical compression)
+    if is_hero_stamp:
+        # The primary hero is a stamp/seal striking onto an anchored accounting ledger
         mg_cutout = "MG: authentic archival accounting ledger paper anchored solidly on the diorama plane with crisp 3px white deckle border and soft drop shadow."
-        fg_data = f"FG: {clean_hero} poised at foreground depth directly above the document."
+        fg_data = f"FG: {clean_hero} poised at foreground depth directly above the document, entering dynamically."
         clean_tool = clean_hero
         action_text = (
-            f"Action: Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, "
+            f"Action: 3-Phase Kinematics — "
+            f"Phase 1 (Entry): The {clean_hero} descends from overhead along vertical entry vector in 0.09s ease-in drop from 2.6x to 1x towards the target document. "
+            f"Phase 2 (Contact): Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, "
             f"the {clean_hero} strikes firmly down onto the archival ledger paper with crisp mechanical compression, "
             f"causing an indelible vermilion official seal impression to imprint into the paper fibers, "
             f"leaving a distressed circular seal impression with tactile paper indentation. "
+            f"Phase 3 (Retract): The {clean_hero} lifts off-screen along exit vector, leaving the archival ledger paper permanently marked. "
+            f"Continuous tactile momentum with dual-rate motion: sustained kinetic micro-dynamics (continuous camera tracking, "
+            f"ink fiber absorption, living 12fps paper grain vibration on twos, zero frozen frames) adhering to readcheck formula."
+        )
+    elif is_tool_stamp:
+        hero_target = clean_hero if clean_hero.lower().startswith(("the ", "a ", "an ")) else f"the {clean_hero}"
+        mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout exhibit of {clean_hero} anchored solidly on the archival diorama plane with crisp 3px white deckle border, offset ink stroke, and soft drop shadow."
+        fg_data = f"FG: {clean_tool} descends from overhead depth during dynamic motion trajectory."
+        action_text = (
+            f"Action: 3-Phase Kinematics — "
+            f"Phase 1 (Entry): The {clean_tool} descends from off-screen overhead along vertical entry vector in 0.09s ease-in drop from 2.6x to 1x scale towards {hero_target}. "
+            f"Phase 2 (Contact): Stamp slam in 0.09s ease-in drop from 2.6x to 1x with damped micro-bounce and soft ink squelch, "
+            f"the {clean_tool} strikes firmly down onto {hero_target} with crisp mechanical compression, "
+            f"causing an indelible vermilion official seal impression to imprint into the paper fibers, "
+            f"leaving a distressed circular seal impression with tactile paper indentation. "
+            f"Phase 3 (Retract): The {clean_tool} lifts vertically off-screen along exit vector, leaving {hero_target} and permanent vermilion seal impression locked in spatial anchor. "
             f"Continuous tactile momentum with dual-rate motion: sustained kinetic micro-dynamics (continuous camera tracking, "
             f"ink fiber absorption, living 12fps paper grain vibration on twos, zero frozen frames) adhering to readcheck formula."
         )
     else:
         mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout exhibit of {clean_hero} anchored solidly on the archival diorama plane with crisp 3px white deckle border, offset ink stroke, and soft drop shadow."
-        fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
+        fg_data = f"FG: {clean_tool} enters dynamically from off-screen."
 
-        action_verb = plan_verb or ev.tactile_action_verb
-        phys_react = (plan_reaction or ev.physical_reaction).strip().rstrip('.')
-        tac_res = (plan_residue or ev.tactile_residue).strip().rstrip('.')
         clean_verb = sanitize_tactile_action_verb(action_verb, clean_tool, clean_hero).strip()
         if re.search(r"\b(on|onto|against|across|beside|into|with|over|around|through|of)\s*$", clean_verb, flags=re.IGNORECASE):
             connective = " "
@@ -1857,18 +1919,22 @@ def build_cl3_paper_diorama_prompt(
         leaving_clause = f", leaving {tac_res}" if tac_res and "leaving" not in causing_clause.lower() else ""
 
         clean_verb_lower = clean_verb.lower()
-        snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices"]
+        snappy_verbs = ["snaps", "slides", "scores", "strikes", "slams", "glides", "drops", "cuts", "clamps", "unrolls", "pop-up", "draws", "fans", "enters", "slices", "sweeps", "highlights"]
         if any(clean_verb_lower.startswith(w) for w in snappy_verbs):
             action_text = (
-                f"Action: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s, "
-                f"the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. "
+                f"Action: 3-Phase Kinematics — "
+                f"Phase 1 (Entry): The {clean_tool} enters smoothly from off-screen margin along lateral entry vector in snappy cubic-bezier(.7, 0, .2, 1) ease-in settling in 0.2s-0.3s with mechanical back-overshoot towards target coordinate. "
+                f"Phase 2 (Contact): At target coordinate, the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. "
+                f"Phase 3 (Retract): The {clean_tool} lifts and retracts off-screen along exit vector, leaving {hero_target} locked in spatial anchor. "
                 f"Continuous tactile momentum with dual-rate motion: sustained kinetic micro-dynamics, "
                 f"continuous camera tracking with 12fps paper grain vibration on twos, zero frozen frames, adhering to readcheck formula."
             )
         else:
             action_text = (
-                f"Action: The {clean_tool} snaps briskly in cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s "
-                f"and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. "
+                f"Action: 3-Phase Kinematics — "
+                f"Phase 1 (Entry): The {clean_tool} snaps briskly into frame from off-screen in cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot settling in 0.2s-0.3s towards target coordinate. "
+                f"Phase 2 (Contact): At target coordinate, the {clean_tool} {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. "
+                f"Phase 3 (Retract): The {clean_tool} retracts off-screen along exit trajectory, leaving {hero_target} settled in spatial anchor. "
                 f"Continuous tactile momentum with dual-rate motion: sustained kinetic micro-dynamics, "
                 f"continuous camera tracking with 12fps paper grain vibration on twos, zero frozen frames, adhering to readcheck formula."
             )
@@ -1879,7 +1945,7 @@ def build_cl3_paper_diorama_prompt(
     for f_term in forbidden_in_shot:
         action_text = re.sub(r'\b' + re.escape(f_term) + r'\b', 'moves', action_text, flags=re.IGNORECASE)
 
-    focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival diorama paper (#F4F1EA), with zero competing decorative clutter or stacked ungrounded props."
+    focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival diorama paper, with zero competing decorative clutter or stacked ungrounded props."
     parallax_cue = (
         "3D Multi-Plane Parallax: Layered paper diorama in shallow depth of field. "
         "Foreground interactive tool crosses close to the lens with 1.4x relative velocity and subtle motion blur; "
@@ -1935,6 +2001,9 @@ def build_cl3_paper_diorama_prompt(
         f"{audio_block}\n\n"
         f"{avoid_block}"
     )
+    full_prompt = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', full_prompt)
+    full_prompt = re.sub(r'\(\s*\)', '', full_prompt)
+    full_prompt = re.sub(r'\s{2,}', ' ', full_prompt)
     return full_prompt.strip()
 
 
@@ -1952,12 +2021,14 @@ def build_cl3_paper_diorama_image_prompt(
     Conforms 100% to CL3 Vox Videos specification & Rule 132 Decoupled Engine for still seed generation:
     - Block 1: STYLE BLOCK (loaded dynamically via TemplateRegistry from t2i_style.md)
     - Block 2: SHOT: Background -> MG -> FG (clean props, zero trademark refusal)
+    - Seed State Invariant: ZERO tools pre-rendered on seed; tools enter dynamically during video generation.
     """
     sentence = ""
     resolved_market = market
     sc_id = scene_id
     plan_hero = None
     plan_tool = None
+    plan_action = None
 
     if isinstance(sub_plan_or_sentence, dict):
         sentence = sub_plan_or_sentence.get("sentence") or sub_plan_or_sentence.get("headline") or ""
@@ -1965,6 +2036,7 @@ def build_cl3_paper_diorama_image_prompt(
         resolved_market = sub_plan_or_sentence.get("market") or market
         plan_hero = sub_plan_or_sentence.get("hero_cutout_object")
         plan_tool = sub_plan_or_sentence.get("interacting_tool") or sub_plan_or_sentence.get("interacting_objects")
+        plan_action = sub_plan_or_sentence.get("action_type")
     else:
         sentence = str(sub_plan_or_sentence)
 
@@ -1978,9 +2050,7 @@ def build_cl3_paper_diorama_image_prompt(
     canonical_bgs = reg.get_canonical_backgrounds(trace=trace)
 
     raw_hero = hero_object_override or plan_hero or ev.hero_anchor_prop
-    raw_tool = interacting_tool_override or plan_tool or ev.interacting_tool_prop
     clean_hero = sanitize_prompt_for_imagen3(raw_hero)
-    clean_tool = sanitize_prompt_for_imagen3(raw_tool)
 
     sc_idx = 0
     if sc_id:
@@ -1991,36 +2061,40 @@ def build_cl3_paper_diorama_image_prompt(
     bg_field = f"Background: {bg_choice}."
     mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
     if ev.extracted_metric:
-        fg_data = f"FG: {clean_tool} and Swiss extreme scale contrast giant tactile paper cutout number '{ev.extracted_metric}' (30-35% mass) with precision IBM Plex Mono source tag on 6x12 chip crossing close to the lens."
+        fg_data = f"FG: Swiss extreme scale contrast giant tactile paper cutout number '{ev.extracted_metric}' (30-35% mass) with precision IBM Plex Mono source tag on 6x12 chip crossing close to the lens. ZERO interactive tools drawn on seed."
     elif getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
-        fg_data = f"FG: {clean_tool} and Swiss extreme scale contrast tactile accounting figures embossed onto cardstock (30-35% mass) with precision IBM Plex Mono source tags on 6x12 chips crossing close to the lens."
+        fg_data = f"FG: Swiss extreme scale contrast tactile accounting figures embossed onto cardstock (30-35% mass) with precision IBM Plex Mono source tags on 6x12 chips crossing close to the lens. ZERO interactive tools drawn on seed."
     else:
-        fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
+        fg_data = "FG: Clean diorama negative space with zero interactive tools on the seed image; tools enter dynamically during video motion."
 
     focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival cream diorama paper, with zero competing decorative clutter or stacked ungrounded props."
     
     # Target substrate enrichment: Eliminate blank voids in documents and stamp areas
-    is_stamp_action = any(k in (str(clean_tool) + " " + str(clean_hero)).lower() for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion"])
+    is_stamp_action = any(k in (str(raw_hero) + " " + str(clean_hero) + " " + str(plan_action or "")).lower() for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion", "h1_impact"])
     script_mkt = "Japanese kanji" if resolved_market in ("JA", "JP") else ("Vietnamese" if resolved_market == "VN" else "archival")
     if is_stamp_action:
         target_substrate = (
             f"Target Substrate: The document surface is dense with pre-printed forensic evidence—never a blank void. "
             f"It features dense micro-tabular financial ledger rows with authentic illegible {script_mkt} fine-print audit rows, "
-            f"a designated circular target stamp zone with dotted red perimeter ring, and faint pre-printed watermark security patterns awaiting the stamp."
+            f"a designated circular target stamp zone with dotted red perimeter ring, and faint pre-printed watermark security patterns awaiting the stamp. ZERO stamp tool drawn on document."
         )
     else:
         target_substrate = (
             f"Target Substrate: Documents and paper surfaces feature dense authentic {script_mkt} fine-print texture, coordinate grid lines, "
-            f"and archival diagram markings, never blank empty paper."
+            f"and archival diagram markings, never blank empty paper. ZERO interactive tools drawn on seed."
         )
 
     shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}\n{target_substrate}"
-    text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only."
+    text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only. ZERO hex code text, ZERO color labels printed on paper."
     avoid_block = reg.resolve_avoid_block("STATIC_OVERHEAD", trace=trace)
     res = f"{style_block}\n\n{shot_block}\n\n{text_control}\n\n{avoid_block}".strip()
+
     # Strip any remaining hex code tokens to prevent Imagen literal text hallucination
-    res = re.sub(r'#[0-9a-fA-F]{6}\b', '', res)
+    res = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', res)
     res = re.sub(r'\(\s*\)', '', res)
-    # Strip any lingering "safe zone" or "subtitles" to prevent Imagen from drawing subtitle words
-    res = re.sub(r'Preserves?\s+bottom\s+\d+%\s+(?:vertical\s+)?safe\s+zone(\s+for\s+subtitles)?\.?', 'Keep bottom 20% of the surface completely empty, plain bare cream paper only. No text, no objects, no cards in the bottom fifth.', res, flags=re.IGNORECASE)
-    return re.sub(r'\s+', ' ', res).strip()
+    # Strip any artificial safe zone directives that cause solid blocks
+    res = re.sub(r'(?:Keep\s+)?bottom\s+\d+%\s+(?:of\s+the\s+surface\s+)?(?:completely\s+empty|safe\s+zone|plain\s+bare\s+cream\s+paper\s+only)[^.]*\.?', 'Composed cleanly within 16:9 widescreen diorama with natural breathing room.', res, flags=re.IGNORECASE)
+    res = re.sub(r'No\s+text,\s+no\s+objects,\s+no\s+cards\s+in\s+the\s+bottom\s+fifth\.?', '', res, flags=re.IGNORECASE)
+    res = re.sub(r'Preserves?\s+bottom\s+\d+%\s+(?:vertical\s+)?safe\s+zone(\s+for\s+subtitles)?\.?', '', res, flags=re.IGNORECASE)
+    res = re.sub(r'\s{2,}', ' ', res)
+    return res.strip()

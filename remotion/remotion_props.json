@@ -69,7 +69,7 @@
           "end_ms": 1600.0
         },
         {
-          "word": "9",
+          "word": "5",
           "start": 1.6,
           "end": 1.74,
           "start_ms": 1600.0,
@@ -78,15 +78,15 @@
         {
           "word": "日、",
           "start": 1.74,
-          "end": 2.12,
+          "end": 2.1,
           "start_ms": 1740.0,
-          "end_ms": 2120.0
+          "end_ms": 2100.0
         },
         {
           "word": "テ",
-          "start": 2.68,
+          "start": 2.7,
           "end": 2.78,
-          "start_ms": 2680.0,
+          "start_ms": 2700.0,
           "end_ms": 2780.0
         },
         {
@@ -176,9 +176,23 @@
         {
           "word": "告。",
           "start": 4.68,
-          "end": 4.92,
+          "end": 4.9,
           "start_ms": 4680.0,
-          "end_ms": 4920.0
+          "end_ms": 4900.0
+        },
+        {
+          "word": "も",
+          "start": 4.9,
+          "end": 5.8,
+          "start_ms": 4900.0,
+          "end_ms": 5800.0
+        },
+        {
+          "word": "っ",
+          "start": 5.8,
+          "end": 5.8,
+          "start_ms": 5800.0,
+          "end_ms": 5800.0
         }
       ],
       "words": [
@@ -218,7 +232,7 @@
           "end_ms": 1600.0
         },
         {
-          "word": "9",
+          "word": "5",
           "start": 1.6,
           "end": 1.74,
           "start_ms": 1600.0,
@@ -227,15 +241,15 @@
         {
           "word": "日、",
           "start": 1.74,
-          "end": 2.12,
+          "end": 2.1,
           "start_ms": 1740.0,
-          "end_ms": 2120.0
+          "end_ms": 2100.0
         },
         {
           "word": "テ",
-          "start": 2.68,
+          "start": 2.7,
           "end": 2.78,
-          "start_ms": 2680.0,
+          "start_ms": 2700.0,
           "end_ms": 2780.0
         },
         {
@@ -325,9 +339,23 @@
         {
           "word": "告。",
           "start": 4.68,
-          "end": 4.92,
+          "end": 4.9,
           "start_ms": 4680.0,
-          "end_ms": 4920.0
+          "end_ms": 4900.0
+        },
+        {
+          "word": "も",
+          "start": 4.9,
+          "end": 5.8,
+          "start_ms": 4900.0,
+          "end_ms": 5800.0
+        },
+        {
+          "word": "っ",
+          "start": 5.8,
+          "end": 5.8,
+          "start_ms": 5800.0,
+          "end_ms": 5800.0
         }
       ],
       "motionDirective": "opuscar_snappy",
