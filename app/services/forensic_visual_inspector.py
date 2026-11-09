@@ -249,6 +249,7 @@ class ForensicVisualInspector:
         sample_fps: float = 4.0,
         min_motion_pct: float = 0.8,
         max_freeze_sec: float = 1.2,
+        effective_duration_sec: Optional[float] = None,
     ) -> MotionAuditReport:
         """Quantitatively inspects physical MP4 video for frozen slideshow sections."""
         v_path = Path(video_path)
@@ -264,6 +265,12 @@ class ForensicVisualInspector:
             )
 
         frames_with_ts = cls._extract_grayscale_frames(v_path, sample_fps=sample_fps)
+        if effective_duration_sec is not None and effective_duration_sec > 0:
+            cutoff_ts = effective_duration_sec + (1.0 / sample_fps)
+            filtered = [item for item in frames_with_ts if item[0] <= cutoff_ts]
+            if len(filtered) >= 2:
+                frames_with_ts = filtered
+
         if len(frames_with_ts) < 2:
             return MotionAuditReport(
                 video_path=str(v_path),

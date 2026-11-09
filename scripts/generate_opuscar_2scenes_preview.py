@@ -318,8 +318,31 @@ def download_file_parallel(client: FastVPSClient, remote_path: str, local_path: 
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate Opuscar preview with Remotion")
+    parser.add_argument("--scenes", default="", help="Comma-separated scene IDs (e.g. SCENE_01,SCENE_02)")
+    parser.add_argument("--limit", type=int, default=0, help="Limit number of scenes")
+    args = parser.parse_args()
+
+    fresh_vids = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/video_clips"
+    if args.scenes:
+        target_sids = set(s.strip().upper() for s in args.scenes.split(",") if s.strip())
+        active_scenes = [sc for sc in SCENES_DEF if sc["scene_id"].upper() in target_sids]
+    elif args.limit > 0:
+        active_scenes = SCENES_DEF[:args.limit]
+    else:
+        # Auto-detect available fresh clips
+        available = []
+        for idx, sc in enumerate(SCENES_DEF):
+            sc_file = fresh_vids / f"clip_scene_{idx+1:02d}.mp4"
+            if sc_file.exists() and sc_file.stat().st_size > 50000:
+                available.append(sc)
+            else:
+                break
+        active_scenes = available if available else SCENES_DEF[:2]
+
     logger.info("=================================================================")
-    logger.info("   OPUSCAR 4-SCENE MICRO-BEAT PREVIEW PIPELINE (Rule 140 / v3)  ")
+    logger.info(f"   OPUSCAR {len(active_scenes)}-SCENE MICRO-BEAT PREVIEW PIPELINE (Rule 140 / v3)  ")
     logger.info("=================================================================")
 
     ffmpeg_bin = get_ffmpeg_binary()
@@ -328,7 +351,7 @@ def main():
     total_audio_dur = 0.0
 
     logger.info("=== STEP 1A: Synthesizing Edge TTS & Extracting Whisper Word Timestamps ===")
-    for idx, sc in enumerate(SCENES_DEF):
+    for idx, sc in enumerate(active_scenes):
         sc_mp3 = OUT_DIR / f"scene_{idx+1:02d}_voice.mp3"
         sc_wav = OUT_DIR / f"scene_{idx+1:02d}_voice.wav"
 
@@ -370,7 +393,7 @@ def main():
     )
 
     manifest = {}
-    for idx, sc in enumerate(SCENES_DEF):
+    for idx, sc in enumerate(active_scenes):
         sc_id = sc["scene_id"]
         sub_plan = generate_scene_sub_director_plan(
             scene_id=sc_id,
@@ -401,25 +424,33 @@ def main():
 
     staged_videos = []
     fresh_vids = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/video_clips"
-    legacy_vids = ROOT / "episodes/JP_EP0003_japan_ai_ransom_economy/blocks/block_01_the_10x_catalyst_&_the_shock_metric/videos"
-    for idx in range(len(SCENES_DEF)):
+    for idx, sc in enumerate(active_scenes):
         vid_src = fresh_vids / f"clip_scene_{idx+1:02d}.mp4"
-        if not vid_src.exists():
-            vid_src = legacy_vids / f"clip_scene_{idx+1:02d}.mp4"
         vid_dst = pub_videos / f"opuscar_scene_{idx+1:02d}_omni.mp4"
-        if vid_src.exists():
+        if vid_src.exists() and vid_src.stat().st_size > 50000:
+            # Audit motion energy on fresh clip before staging over effective cut duration
+            from app.services.forensic_visual_inspector import ForensicVisualInspector
+            effective_dur = audio_scenes[idx]["duration"] + 0.6
+            motion_rep = ForensicVisualInspector.audit_video_motion_energy(
+                vid_src, effective_duration_sec=effective_dur
+            )
+            if motion_rep.verdict == "FAIL_FROZEN_SLIDESHOW":
+                raise ValueError(f"Fresh video clip {vid_src.name} failed motion audit: {motion_rep.diagnosis}")
             shutil.copy2(vid_src, vid_dst)
             staged_videos.append(vid_dst)
-            logger.info(f"Staged {vid_dst.name} from {vid_src} ({vid_dst.stat().st_size/1024:.1f} KB)")
+            logger.info(f"Staged fresh clip {vid_dst.name} from {vid_src} ({vid_dst.stat().st_size/1024:.1f} KB, mean motion {motion_rep.mean_motion_energy_pct:.2f}%)")
         else:
-            logger.warning(f"Video source not found: {vid_src}")
+            raise FileNotFoundError(
+                f"Fresh video clip not found or empty: {vid_src}. "
+                f"Refusing to fallback to stale legacy assets (Rule 118, 121 & Rule 125 Single Pipeline Truth)."
+            )
 
     # Build Remotion Scene Props adhering strictly to Opuscar
     fps = 30
     remotion_scenes = []
     cur_time_sec = 0.0
 
-    for idx, sc in enumerate(SCENES_DEF):
+    for idx, sc in enumerate(active_scenes):
         aud_info = audio_scenes[idx]
         vo_dur = aud_info["duration"]
 
@@ -524,7 +555,9 @@ def main():
         subprocess.run(render_cmd, cwd=str(remotion_dir), check=True)
 
         logger.info("=== STEP 6: Extracting Forensic Probe Frames on VPS ===")
-        probe_timestamps = [1.0, 3.0, 5.0, 8.0, 11.0, 14.0]
+        probe_timestamps = [t for t in [1.0, 2.5, 4.0, 5.5, 7.0, 9.0, 11.0] if t < cur_time_sec - 0.5]
+        if not probe_timestamps:
+            probe_timestamps = [1.0, 2.5]
         for sec in probe_timestamps:
             frame_out = OUT_DIR / f"probe_{int(sec):02d}s.jpg"
             subprocess.run([
@@ -620,7 +653,9 @@ def main():
     logger.info(f"Local Final Video Verified: Duration={probe_dur:.2f}s, Size={local_final_mp4.stat().st_size} bytes")
 
     logger.info("=== STEP 6: Extracting Forensic Probe Frames ===")
-    probe_timestamps = [1.0, 3.0, 5.0, 8.0, 11.0, 14.0]
+    probe_timestamps = [t for t in [1.0, 2.5, 4.0, 5.5, 7.0, 9.0, 11.0] if t < cur_time_sec - 0.5]
+    if not probe_timestamps:
+        probe_timestamps = [1.0, 2.5]
     for sec in probe_timestamps:
         frame_out = OUT_DIR / f"probe_{int(sec):02d}s.jpg"
         subprocess.run([
