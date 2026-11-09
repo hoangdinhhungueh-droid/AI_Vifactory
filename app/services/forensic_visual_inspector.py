@@ -22,9 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-import os
-import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -290,8 +287,6 @@ class ForensicVisualInspector:
         for i in range(1, len(frames_with_ts)):
             t_curr, gray_curr = frames_with_ts[i]
             t_prev, gray_prev = frames_with_ts[i - 1]
-            dt = t_curr - t_prev
-
             # Compute normalized Mean Absolute Difference (MAD) percentage: [0.0% .. 100.0%]
             diff = np.abs(gray_curr.astype(np.float32) - gray_prev.astype(np.float32))
             energy_pct = (float(np.mean(diff)) / 255.0) * 100.0

@@ -373,7 +373,7 @@ def run(ctx: RunContext) -> StageArtifact:
             raise GateError(
                 STAGE,
                 f"Stage S06 Forensic Visual Gate rejected prompts with {len(critical_violations)} critical/high violation(s).",
-                details={"violations": [asdict(v) for v in critical_violations]}
+                details={"violations": [{"rule_id": v.rule_id, "severity": v.severity, "message": v.message} for v in critical_violations]}
             )
     except GateError:
         raise

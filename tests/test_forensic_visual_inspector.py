@@ -2,17 +2,13 @@
 # -*- coding: utf-8 -*-
 """tests/test_forensic_visual_inspector.py — Test suite for Forensic Visual & Kinematic Gate."""
 
-import json
 from pathlib import Path
-import numpy as np
-import pytest
 
 from app.services.forensic_visual_inspector import (
     ForensicVisualInspector,
     MotionAuditReport,
     MotionTimelineSample,
     PromptLintReport,
-    SubstrateAuditReport,
 )
 
 
