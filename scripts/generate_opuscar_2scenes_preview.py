@@ -23,7 +23,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -178,7 +178,7 @@ async def synthesize_scene_audio(text: str, out_mp3: Path) -> list:
     return words
 
 
-def extract_whisper_words_from_wav(wav_path: Path, language: str = "ja") -> list:
+def extract_whisper_words_from_wav(wav_path: Path, language: str = "ja", prompt_text: Optional[str] = None) -> list:
     """Extract real word-level timestamps using faster-whisper with safe PyAV wrapper (Rule 120)."""
     try:
         import av
@@ -192,20 +192,49 @@ def extract_whisper_words_from_wav(wav_path: Path, language: str = "ja") -> list
             av.open = _safe_av_open
         from faster_whisper import WhisperModel
         model = WhisperModel("base", device="cpu", compute_type="int8")
-        segments, _ = model.transcribe(str(wav_path), language=language, word_timestamps=True)
-        words = []
+        transcribe_kwargs: Dict[str, Any] = {
+            "language": language,
+            "word_timestamps": True,
+            "condition_on_previous_text": False,
+            "vad_filter": True
+        }
+        if prompt_text:
+            transcribe_kwargs["initial_prompt"] = prompt_text
+
+        segments, _ = model.transcribe(str(wav_path), **transcribe_kwargs)
+        raw_words = []
         for segment in segments:
             if segment.words:
                 for w in segment.words:
-                    words.append({
-                        "word": w.word.strip(),
+                    word_clean = w.word.strip()
+                    if not word_clean or (word_clean.startswith("【") and word_clean.endswith("】")):
+                        continue
+                    raw_words.append({
+                        "word": word_clean,
                         "start": round(w.start, 3),
                         "end": round(w.end, 3),
                         "start_ms": round(w.start * 1000.0, 1),
                         "end_ms": round(w.end * 1000.0, 1),
                         "confidence": round(w.probability, 3)
                     })
-        return words
+
+        # Prune trailing silence hallucinations if prompt_text is supplied
+        if prompt_text and raw_words:
+            clean_target = "".join(c for c in prompt_text if c.isalnum())
+            filtered_words = []
+            accum = ""
+            for item in raw_words:
+                w_alnum = "".join(c for c in item["word"] if c.isalnum())
+                if not w_alnum:
+                    filtered_words.append(item)
+                    continue
+                filtered_words.append(item)
+                accum += w_alnum
+                if accum == clean_target:
+                    break
+            return filtered_words
+
+        return raw_words
     except Exception as e:
         logger.warning(f"Whisper extraction failed: {e}. Falling back to TTS boundary words.")
         return []
@@ -219,6 +248,11 @@ def get_ffmpeg_binary() -> str:
         "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
         "C:\\Users\\hunghd2\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe",
     ]
+    try:
+        import imageio_ffmpeg
+        candidates.insert(0, imageio_ffmpeg.get_ffmpeg_exe())
+    except Exception:
+        pass
     for c in candidates:
         if c and Path(c).is_file():
             return str(c)
@@ -249,59 +283,38 @@ def probe_audio_duration(file_path: Path) -> float:
         return 4.0
 
 
-def upload_file_chunked(client: FastVPSClient, local_path: Path, remote_path: Path, chunk_size: int = 32_000):
+def upload_file_chunked(client: FastVPSClient, local_path: Path, remote_path: Union[Path, str], chunk_size: int = 32_000):
     content = local_path.read_bytes()
     total_sz = len(content)
-    logger.info(f"Uploading {local_path.name} ({total_sz/1024:.1f} KB) to {remote_path} via hex...")
+    posix_path = str(remote_path).replace("\\", "/")
+    parent_dir = posix_path.rsplit("/", 1)[0]
+    logger.info(f"Uploading {local_path.name} ({total_sz/1024:.1f} KB) to {posix_path} via hex...")
 
-    client.run_command(f"rm -f '{remote_path}' '{remote_path}.tmp'")
-    client.run_command(f"mkdir -p '{Path(remote_path).parent}'")
+    client.run_command(f"rm -f '{posix_path}' '{posix_path}.tmp'")
+    client.run_command(f"mkdir -p '{parent_dir}'")
 
     for i in range(0, total_sz, chunk_size):
         chunk = content[i : i + chunk_size]
         hex_str = chunk.hex()
-        cmd = f"python3 -c \"open('{remote_path}.tmp', 'ab').write(bytes.fromhex('{hex_str}'))\""
+        cmd = f"python3 -c \"open('{posix_path}.tmp', 'ab').write(bytes.fromhex('{hex_str}'))\""
         res = client.run_command(cmd)
         if isinstance(res, str) or res.get("exit_code") != 0 or res.get("status") == "denied":
             raise RuntimeError(f"Failed to append hex chunk: {res}")
 
-    mv_res = client.run_command(f"mv '{remote_path}.tmp' '{remote_path}'")
+    mv_res = client.run_command(f"mv '{posix_path}.tmp' '{posix_path}'")
     if isinstance(mv_res, str) or mv_res.get("exit_code") != 0:
         raise RuntimeError(f"Failed to finalize upload: {mv_res}")
 
-    stat_res = client.run_command(f"stat -c %s '{remote_path}'")
+    stat_res = client.run_command(f"stat -c %s '{posix_path}'")
     vps_sz = int(stat_res.get("stdout", "0").strip() if isinstance(stat_res, dict) else "0")
     if vps_sz != total_sz:
         raise ValueError(f"Size mismatch: local={total_sz}, VPS={vps_sz}")
     logger.info(f"Uploaded {local_path.name} verified: {vps_sz} bytes matches local.")
 
 
-def download_file_parallel(client: FastVPSClient, remote_path: str, local_path: Path, max_workers: int = 4):
-    stat_res = client.run_command(f"stat -c %s '{remote_path}'")
-    total_bytes = int(stat_res.get("stdout", "0").strip() if isinstance(stat_res, dict) else "0")
-    if total_bytes == 0:
-        raise RuntimeError(f"Remote file {remote_path} is missing or 0 bytes.")
-
-    chunk_size = 100_000
-    chunks = []
-    for off in range(0, total_bytes, chunk_size):
-        chunks.append((off, min(chunk_size, total_bytes - off)))
-
-    out_bytes = bytearray(total_bytes)
-    logger.info(f"Downloading {remote_path} ({total_bytes/1024/1024:.2f} MB) in {len(chunks)} chunks...")
-
-    for off, sz in chunks:
-        cmd = f"python3 -c \"f=open('{remote_path}','rb'); f.seek({off}); print(f.read({sz}).hex())\""
-        r = client.run_command(cmd)
-        hex_str = r.get("stdout", "").strip() if isinstance(r, dict) else ""
-        data = bytes.fromhex(hex_str)
-        out_bytes[off : off + len(data)] = data
-
-    local_path.write_bytes(out_bytes)
-    sz_local = local_path.stat().st_size
-    if sz_local != total_bytes:
-        raise ValueError(f"Download size mismatch: remote={total_bytes}, local={sz_local}")
-    logger.info(f"Downloaded {local_path.name} verified ({sz_local} bytes).")
+def download_file_parallel(client: FastVPSClient, remote_path: str, local_path: Path, max_workers: int = 8):
+    from scripts.monitor_render_and_download import download_file_parallel as _robust_download
+    _robust_download(client, remote_path, local_path, max_workers=max_workers)
 
 
 def main():
@@ -325,7 +338,7 @@ def main():
 
         if not words:
             logger.info(f"Extracting real Whisper word timestamps from {sc_wav.name} (Rule 120)...")
-            words = extract_whisper_words_from_wav(sc_wav, language="ja")
+            words = extract_whisper_words_from_wav(sc_wav, language="ja", prompt_text=sc["sentence"])
 
         dur = probe_audio_duration(sc_wav)
         logger.info(f"Scene {idx+1} audio duration: {dur:.3f}s with {len(words)} words")

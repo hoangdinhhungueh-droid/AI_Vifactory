@@ -1,11 +1,11 @@
 {
   "episodeId": "JP_EP0003_OPUSCAR_PREVIEW",
-  "title": "Japan AI Ransom Economy: Opuscar Upgraded Preview",
+  "title": "Japan AI Ransom Economy: Opuscar 4-Beat Upgraded Preview",
   "theme": "newsprint-editorial",
   "fps": 30,
   "width": 1920,
   "height": 1080,
-  "totalFrames": 830,
+  "totalFrames": 680,
   "audioMaster": "tts_out.mp3",
   "bgmFile": "bgm.mp3",
   "bgmVolume": 0.12,
@@ -15,973 +15,371 @@
       "id": "scene_01",
       "scene_id": "SCENE_01",
       "component": "VoxBuildOnStage",
-      "durationInFrames": 618,
-      "durationSec": 20.61111111111111,
-      "headline": "THE 10X MULTIPLIER",
-      "editorialHeadline": "THE 10X MULTIPLIER",
-      "statValue": "10X",
-      "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
-      "sourceTag": "TEREBI ASAHI NEWS // UK FORENSIC REPORT // 2026.10.09",
-      "stampText": "10X LEVERAGE // VERIFIED",
+      "durationInFrames": 193,
+      "durationSec": 6.43,
+      "headline": "BREAKING INVESTIGATION",
+      "editorialHeadline": "OCTOBER 9 SPECIAL DISPATCH",
+      "statValue": "2026.10.09",
+      "statLabel": "SPECIAL INVESTIGATIVE DISPATCH",
+      "sourceTag": "TEREBI ASAHI NEWS // BROADCAST DISPATCH // 2026.10.09",
+      "stampText": "TEREBI ASAHI // DISPATCHED",
       "stampBadge": "CONFIDENTIAL EXHIBIT",
       "stampColor": "#dc2626",
-      "sourceCredit": "TEREBI ASAHI NEWS // UK FORENSIC REPORT // 2026.10.09",
+      "sourceCredit": "TEREBI ASAHI NEWS // BROADCAST DISPATCH // 2026.10.09",
       "accentColor": "#C85A32",
       "background": "videos/opuscar_scene_01_omni.mp4",
       "targetBackground": "videos/opuscar_scene_01_omni.mp4",
       "backgroundSrc": "videos/opuscar_scene_01_omni.mp4",
       "layoutVariant": "cinematic_doc",
-      "narration": "2026年10月9日、テレ朝NEWSが英国の専門家の見方として伝えた「身代金交渉の効率が10倍になり得る」という衝撃の数字は、日本語の壁が崩れたことを意味するのでしょうか？",
+      "narration": "2026年10月9日、テレ朝NEWSが伝えた衝撃の報告。",
       "subtitles": [
         {
-          "word": "2020",
+          "word": "20",
           "start": 0.0,
-          "end": 0.7,
+          "end": 0.32,
           "start_ms": 0.0,
-          "end_ms": 700.0
+          "end_ms": 320.0,
+          "confidence": 0.466
+        },
+        {
+          "word": "26",
+          "start": 0.32,
+          "end": 0.92,
+          "start_ms": 320.0,
+          "end_ms": 920.0,
+          "confidence": 0.993
         },
         {
           "word": "年",
-          "start": 0.7,
-          "end": 1.22,
-          "start_ms": 700.0,
-          "end_ms": 1220.0
+          "start": 0.92,
+          "end": 1.14,
+          "start_ms": 920.0,
+          "end_ms": 1140.0,
+          "confidence": 0.963
         },
         {
           "word": "10",
-          "start": 1.22,
-          "end": 1.46,
-          "start_ms": 1220.0,
-          "end_ms": 1460.0
+          "start": 1.14,
+          "end": 1.36,
+          "start_ms": 1140.0,
+          "end_ms": 1360.0,
+          "confidence": 0.94
         },
         {
           "word": "月",
-          "start": 1.46,
-          "end": 1.64,
-          "start_ms": 1460.0,
-          "end_ms": 1640.0
+          "start": 1.36,
+          "end": 1.6,
+          "start_ms": 1360.0,
+          "end_ms": 1600.0,
+          "confidence": 0.997
         },
         {
-          "word": "6",
-          "start": 1.64,
-          "end": 1.92,
-          "start_ms": 1640.0,
-          "end_ms": 1920.0
+          "word": "9",
+          "start": 1.6,
+          "end": 1.76,
+          "start_ms": 1600.0,
+          "end_ms": 1760.0,
+          "confidence": 0.433
         },
         {
           "word": "日、",
-          "start": 1.92,
-          "end": 2.52,
-          "start_ms": 1920.0,
-          "end_ms": 2520.0
+          "start": 1.76,
+          "end": 2.12,
+          "start_ms": 1760.0,
+          "end_ms": 2120.0,
+          "confidence": 0.967
         },
         {
           "word": "テ",
-          "start": 2.82,
-          "end": 2.94,
-          "start_ms": 2820.0,
-          "end_ms": 2940.0
+          "start": 2.68,
+          "end": 2.78,
+          "start_ms": 2680.0,
+          "end_ms": 2780.0,
+          "confidence": 0.884
         },
         {
           "word": "レ",
-          "start": 2.94,
-          "end": 2.96,
-          "start_ms": 2940.0,
-          "end_ms": 2960.0
+          "start": 2.78,
+          "end": 2.84,
+          "start_ms": 2780.0,
+          "end_ms": 2840.0,
+          "confidence": 0.967
         },
         {
-          "word": "ア",
-          "start": 2.96,
-          "end": 3.02,
-          "start_ms": 2960.0,
-          "end_ms": 3020.0
+          "word": "朝",
+          "start": 2.84,
+          "end": 3.04,
+          "start_ms": 2840.0,
+          "end_ms": 3040.0,
+          "confidence": 0.002
         },
         {
-          "word": "さん",
-          "start": 3.02,
+          "word": "NE",
+          "start": 3.04,
           "end": 3.18,
-          "start_ms": 3020.0,
-          "end_ms": 3180.0
+          "start_ms": 3040.0,
+          "end_ms": 3180.0,
+          "confidence": 0.0
         },
         {
-          "word": "ニ",
+          "word": "WS",
           "start": 3.18,
-          "end": 3.4,
+          "end": 3.34,
           "start_ms": 3180.0,
-          "end_ms": 3400.0
-        },
-        {
-          "word": "ュ",
-          "start": 3.4,
-          "end": 3.42,
-          "start_ms": 3400.0,
-          "end_ms": 3420.0
-        },
-        {
-          "word": "ー",
-          "start": 3.42,
-          "end": 3.44,
-          "start_ms": 3420.0,
-          "end_ms": 3440.0
-        },
-        {
-          "word": "ス",
-          "start": 3.44,
-          "end": 3.46,
-          "start_ms": 3440.0,
-          "end_ms": 3460.0
+          "end_ms": 3340.0,
+          "confidence": 0.719
         },
         {
           "word": "が",
-          "start": 3.46,
-          "end": 3.62,
-          "start_ms": 3460.0,
-          "end_ms": 3620.0
-        },
-        {
-          "word": "英",
-          "start": 3.62,
-          "end": 3.8,
-          "start_ms": 3620.0,
-          "end_ms": 3800.0
-        },
-        {
-          "word": "国",
-          "start": 3.8,
-          "end": 3.92,
-          "start_ms": 3800.0,
-          "end_ms": 3920.0
-        },
-        {
-          "word": "の",
-          "start": 3.92,
-          "end": 4.16,
-          "start_ms": 3920.0,
-          "end_ms": 4160.0
-        },
-        {
-          "word": "専",
-          "start": 4.16,
-          "end": 4.34,
-          "start_ms": 4160.0,
-          "end_ms": 4340.0
-        },
-        {
-          "word": "門",
-          "start": 4.34,
-          "end": 4.5,
-          "start_ms": 4340.0,
-          "end_ms": 4500.0
-        },
-        {
-          "word": "家",
-          "start": 4.5,
-          "end": 4.64,
-          "start_ms": 4500.0,
-          "end_ms": 4640.0
-        },
-        {
-          "word": "の",
-          "start": 4.64,
-          "end": 4.78,
-          "start_ms": 4640.0,
-          "end_ms": 4780.0
-        },
-        {
-          "word": "見",
-          "start": 4.78,
-          "end": 4.92,
-          "start_ms": 4780.0,
-          "end_ms": 4920.0
-        },
-        {
-          "word": "方",
-          "start": 4.92,
-          "end": 5.1,
-          "start_ms": 4920.0,
-          "end_ms": 5100.0
-        },
-        {
-          "word": "と",
-          "start": 5.1,
-          "end": 5.32,
-          "start_ms": 5100.0,
-          "end_ms": 5320.0
-        },
-        {
-          "word": "して",
-          "start": 5.32,
-          "end": 5.44,
-          "start_ms": 5320.0,
-          "end_ms": 5440.0
+          "start": 3.34,
+          "end": 3.46,
+          "start_ms": 3340.0,
+          "end_ms": 3460.0,
+          "confidence": 0.97
         },
         {
           "word": "伝",
-          "start": 5.44,
-          "end": 5.66,
-          "start_ms": 5440.0,
-          "end_ms": 5660.0
+          "start": 3.46,
+          "end": 3.66,
+          "start_ms": 3460.0,
+          "end_ms": 3660.0,
+          "confidence": 0.99
         },
         {
           "word": "え",
-          "start": 5.66,
-          "end": 5.74,
-          "start_ms": 5660.0,
-          "end_ms": 5740.0
+          "start": 3.66,
+          "end": 3.78,
+          "start_ms": 3660.0,
+          "end_ms": 3780.0,
+          "confidence": 0.99
         },
         {
-          "word": "た、",
-          "start": 5.74,
-          "end": 6.24,
-          "start_ms": 5740.0,
-          "end_ms": 6240.0
+          "word": "た",
+          "start": 3.78,
+          "end": 3.92,
+          "start_ms": 3780.0,
+          "end_ms": 3920.0,
+          "confidence": 0.988
         },
         {
-          "word": "み",
-          "start": 6.48,
-          "end": 6.54,
-          "start_ms": 6480.0,
-          "end_ms": 6540.0
+          "word": "衝",
+          "start": 3.92,
+          "end": 4.18,
+          "start_ms": 3920.0,
+          "end_ms": 4180.0,
+          "confidence": 0.593
         },
         {
-          "word": "の",
-          "start": 6.54,
-          "end": 6.66,
-          "start_ms": 6540.0,
-          "end_ms": 6660.0
-        },
-        {
-          "word": "白",
-          "start": 6.66,
-          "end": 6.84,
-          "start_ms": 6660.0,
-          "end_ms": 6840.0
-        },
-        {
-          "word": "金",
-          "start": 6.84,
-          "end": 7.08,
-          "start_ms": 6840.0,
-          "end_ms": 7080.0
-        },
-        {
-          "word": "抗",
-          "start": 7.08,
-          "end": 7.28,
-          "start_ms": 7080.0,
-          "end_ms": 7280.0
-        },
-        {
-          "word": "症",
-          "start": 7.28,
-          "end": 7.4,
-          "start_ms": 7280.0,
-          "end_ms": 7400.0
+          "word": "撃",
+          "start": 4.18,
+          "end": 4.3,
+          "start_ms": 4180.0,
+          "end_ms": 4300.0,
+          "confidence": 0.99
         },
         {
           "word": "の",
-          "start": 7.4,
-          "end": 7.66,
-          "start_ms": 7400.0,
-          "end_ms": 7660.0
+          "start": 4.3,
+          "end": 4.48,
+          "start_ms": 4300.0,
+          "end_ms": 4480.0,
+          "confidence": 0.982
         },
         {
-          "word": "効",
-          "start": 7.66,
-          "end": 7.8,
-          "start_ms": 7660.0,
-          "end_ms": 7800.0
+          "word": "報",
+          "start": 4.48,
+          "end": 4.68,
+          "start_ms": 4480.0,
+          "end_ms": 4680.0,
+          "confidence": 0.84
         },
         {
-          "word": "率",
-          "start": 7.8,
-          "end": 7.94,
-          "start_ms": 7800.0,
-          "end_ms": 7940.0
-        },
-        {
-          "word": "が",
-          "start": 7.94,
-          "end": 8.2,
-          "start_ms": 7940.0,
-          "end_ms": 8200.0
-        },
-        {
-          "word": "10",
-          "start": 8.2,
-          "end": 8.38,
-          "start_ms": 8200.0,
-          "end_ms": 8380.0
-        },
-        {
-          "word": "倍",
-          "start": 8.38,
-          "end": 8.54,
-          "start_ms": 8380.0,
-          "end_ms": 8540.0
-        },
-        {
-          "word": "にな",
-          "start": 8.54,
-          "end": 8.8,
-          "start_ms": 8540.0,
-          "end_ms": 8800.0
-        },
-        {
-          "word": "り",
-          "start": 8.8,
-          "end": 8.92,
-          "start_ms": 8800.0,
-          "end_ms": 8920.0
-        },
-        {
-          "word": "う",
-          "start": 8.92,
-          "end": 9.0,
-          "start_ms": 8920.0,
-          "end_ms": 9000.0
-        },
-        {
-          "word": "る、",
-          "start": 9.0,
-          "end": 9.24,
-          "start_ms": 9000.0,
-          "end_ms": 9240.0
-        },
-        {
-          "word": "という",
-          "start": 9.26,
-          "end": 9.52,
-          "start_ms": 9260.0,
-          "end_ms": 9520.0
-        },
-        {
-          "word": "正",
-          "start": 9.52,
-          "end": 9.76,
-          "start_ms": 9520.0,
-          "end_ms": 9760.0
-        },
-        {
-          "word": "月",
-          "start": 9.76,
-          "end": 9.9,
-          "start_ms": 9760.0,
-          "end_ms": 9900.0
-        },
-        {
-          "word": "の",
-          "start": 9.9,
-          "end": 10.18,
-          "start_ms": 9900.0,
-          "end_ms": 10180.0
-        },
-        {
-          "word": "数",
-          "start": 10.18,
-          "end": 10.34,
-          "start_ms": 10180.0,
-          "end_ms": 10340.0
-        },
-        {
-          "word": "字",
-          "start": 10.34,
-          "end": 10.46,
-          "start_ms": 10340.0,
-          "end_ms": 10460.0
-        },
-        {
-          "word": "は、",
-          "start": 10.46,
-          "end": 10.94,
-          "start_ms": 10460.0,
-          "end_ms": 10940.0
-        },
-        {
-          "word": "日本",
-          "start": 11.2,
-          "end": 11.4,
-          "start_ms": 11200.0,
-          "end_ms": 11400.0
-        },
-        {
-          "word": "語",
-          "start": 11.4,
-          "end": 11.56,
-          "start_ms": 11400.0,
-          "end_ms": 11560.0
-        },
-        {
-          "word": "の",
-          "start": 11.56,
-          "end": 11.72,
-          "start_ms": 11560.0,
-          "end_ms": 11720.0
-        },
-        {
-          "word": "壁",
-          "start": 11.72,
-          "end": 11.86,
-          "start_ms": 11720.0,
-          "end_ms": 11860.0
-        },
-        {
-          "word": "が",
-          "start": 11.86,
-          "end": 12.04,
-          "start_ms": 11860.0,
-          "end_ms": 12040.0
-        },
-        {
-          "word": "崩",
-          "start": 12.04,
-          "end": 12.22,
-          "start_ms": 12040.0,
-          "end_ms": 12220.0
-        },
-        {
-          "word": "れた",
-          "start": 12.22,
-          "end": 12.44,
-          "start_ms": 12220.0,
-          "end_ms": 12440.0
-        },
-        {
-          "word": "こと",
-          "start": 12.44,
-          "end": 12.68,
-          "start_ms": 12440.0,
-          "end_ms": 12680.0
-        },
-        {
-          "word": "を",
-          "start": 12.68,
-          "end": 12.88,
-          "start_ms": 12680.0,
-          "end_ms": 12880.0
-        },
-        {
-          "word": "意",
-          "start": 12.88,
-          "end": 13.04,
-          "start_ms": 12880.0,
-          "end_ms": 13040.0
-        },
-        {
-          "word": "味",
-          "start": 13.04,
-          "end": 13.06,
-          "start_ms": 13040.0,
-          "end_ms": 13060.0
-        },
-        {
-          "word": "する",
-          "start": 13.06,
-          "end": 13.24,
-          "start_ms": 13060.0,
-          "end_ms": 13240.0
-        },
-        {
-          "word": "ので",
-          "start": 13.24,
-          "end": 13.48,
-          "start_ms": 13240.0,
-          "end_ms": 13480.0
-        },
-        {
-          "word": "しょう",
-          "start": 13.48,
-          "end": 13.68,
-          "start_ms": 13480.0,
-          "end_ms": 13680.0
-        },
-        {
-          "word": "か。",
-          "start": 13.68,
-          "end": 13.88,
-          "start_ms": 13680.0,
-          "end_ms": 13880.0
+          "word": "告。",
+          "start": 4.68,
+          "end": 4.92,
+          "start_ms": 4680.0,
+          "end_ms": 4920.0,
+          "confidence": 0.995
         }
       ],
       "words": [
         {
-          "word": "2020",
+          "word": "20",
           "start": 0.0,
-          "end": 0.7,
+          "end": 0.32,
           "start_ms": 0.0,
-          "end_ms": 700.0
+          "end_ms": 320.0,
+          "confidence": 0.466
+        },
+        {
+          "word": "26",
+          "start": 0.32,
+          "end": 0.92,
+          "start_ms": 320.0,
+          "end_ms": 920.0,
+          "confidence": 0.993
         },
         {
           "word": "年",
-          "start": 0.7,
-          "end": 1.22,
-          "start_ms": 700.0,
-          "end_ms": 1220.0
+          "start": 0.92,
+          "end": 1.14,
+          "start_ms": 920.0,
+          "end_ms": 1140.0,
+          "confidence": 0.963
         },
         {
           "word": "10",
-          "start": 1.22,
-          "end": 1.46,
-          "start_ms": 1220.0,
-          "end_ms": 1460.0
+          "start": 1.14,
+          "end": 1.36,
+          "start_ms": 1140.0,
+          "end_ms": 1360.0,
+          "confidence": 0.94
         },
         {
           "word": "月",
-          "start": 1.46,
-          "end": 1.64,
-          "start_ms": 1460.0,
-          "end_ms": 1640.0
+          "start": 1.36,
+          "end": 1.6,
+          "start_ms": 1360.0,
+          "end_ms": 1600.0,
+          "confidence": 0.997
         },
         {
-          "word": "6",
-          "start": 1.64,
-          "end": 1.92,
-          "start_ms": 1640.0,
-          "end_ms": 1920.0
+          "word": "9",
+          "start": 1.6,
+          "end": 1.76,
+          "start_ms": 1600.0,
+          "end_ms": 1760.0,
+          "confidence": 0.433
         },
         {
           "word": "日、",
-          "start": 1.92,
-          "end": 2.52,
-          "start_ms": 1920.0,
-          "end_ms": 2520.0
+          "start": 1.76,
+          "end": 2.12,
+          "start_ms": 1760.0,
+          "end_ms": 2120.0,
+          "confidence": 0.967
         },
         {
           "word": "テ",
-          "start": 2.82,
-          "end": 2.94,
-          "start_ms": 2820.0,
-          "end_ms": 2940.0
+          "start": 2.68,
+          "end": 2.78,
+          "start_ms": 2680.0,
+          "end_ms": 2780.0,
+          "confidence": 0.884
         },
         {
           "word": "レ",
-          "start": 2.94,
-          "end": 2.96,
-          "start_ms": 2940.0,
-          "end_ms": 2960.0
+          "start": 2.78,
+          "end": 2.84,
+          "start_ms": 2780.0,
+          "end_ms": 2840.0,
+          "confidence": 0.967
         },
         {
-          "word": "ア",
-          "start": 2.96,
-          "end": 3.02,
-          "start_ms": 2960.0,
-          "end_ms": 3020.0
+          "word": "朝",
+          "start": 2.84,
+          "end": 3.04,
+          "start_ms": 2840.0,
+          "end_ms": 3040.0,
+          "confidence": 0.002
         },
         {
-          "word": "さん",
-          "start": 3.02,
+          "word": "NE",
+          "start": 3.04,
           "end": 3.18,
-          "start_ms": 3020.0,
-          "end_ms": 3180.0
+          "start_ms": 3040.0,
+          "end_ms": 3180.0,
+          "confidence": 0.0
         },
         {
-          "word": "ニ",
+          "word": "WS",
           "start": 3.18,
-          "end": 3.4,
+          "end": 3.34,
           "start_ms": 3180.0,
-          "end_ms": 3400.0
-        },
-        {
-          "word": "ュ",
-          "start": 3.4,
-          "end": 3.42,
-          "start_ms": 3400.0,
-          "end_ms": 3420.0
-        },
-        {
-          "word": "ー",
-          "start": 3.42,
-          "end": 3.44,
-          "start_ms": 3420.0,
-          "end_ms": 3440.0
-        },
-        {
-          "word": "ス",
-          "start": 3.44,
-          "end": 3.46,
-          "start_ms": 3440.0,
-          "end_ms": 3460.0
+          "end_ms": 3340.0,
+          "confidence": 0.719
         },
         {
           "word": "が",
-          "start": 3.46,
-          "end": 3.62,
-          "start_ms": 3460.0,
-          "end_ms": 3620.0
-        },
-        {
-          "word": "英",
-          "start": 3.62,
-          "end": 3.8,
-          "start_ms": 3620.0,
-          "end_ms": 3800.0
-        },
-        {
-          "word": "国",
-          "start": 3.8,
-          "end": 3.92,
-          "start_ms": 3800.0,
-          "end_ms": 3920.0
-        },
-        {
-          "word": "の",
-          "start": 3.92,
-          "end": 4.16,
-          "start_ms": 3920.0,
-          "end_ms": 4160.0
-        },
-        {
-          "word": "専",
-          "start": 4.16,
-          "end": 4.34,
-          "start_ms": 4160.0,
-          "end_ms": 4340.0
-        },
-        {
-          "word": "門",
-          "start": 4.34,
-          "end": 4.5,
-          "start_ms": 4340.0,
-          "end_ms": 4500.0
-        },
-        {
-          "word": "家",
-          "start": 4.5,
-          "end": 4.64,
-          "start_ms": 4500.0,
-          "end_ms": 4640.0
-        },
-        {
-          "word": "の",
-          "start": 4.64,
-          "end": 4.78,
-          "start_ms": 4640.0,
-          "end_ms": 4780.0
-        },
-        {
-          "word": "見",
-          "start": 4.78,
-          "end": 4.92,
-          "start_ms": 4780.0,
-          "end_ms": 4920.0
-        },
-        {
-          "word": "方",
-          "start": 4.92,
-          "end": 5.1,
-          "start_ms": 4920.0,
-          "end_ms": 5100.0
-        },
-        {
-          "word": "と",
-          "start": 5.1,
-          "end": 5.32,
-          "start_ms": 5100.0,
-          "end_ms": 5320.0
-        },
-        {
-          "word": "して",
-          "start": 5.32,
-          "end": 5.44,
-          "start_ms": 5320.0,
-          "end_ms": 5440.0
+          "start": 3.34,
+          "end": 3.46,
+          "start_ms": 3340.0,
+          "end_ms": 3460.0,
+          "confidence": 0.97
         },
         {
           "word": "伝",
-          "start": 5.44,
-          "end": 5.66,
-          "start_ms": 5440.0,
-          "end_ms": 5660.0
+          "start": 3.46,
+          "end": 3.66,
+          "start_ms": 3460.0,
+          "end_ms": 3660.0,
+          "confidence": 0.99
         },
         {
           "word": "え",
-          "start": 5.66,
-          "end": 5.74,
-          "start_ms": 5660.0,
-          "end_ms": 5740.0
+          "start": 3.66,
+          "end": 3.78,
+          "start_ms": 3660.0,
+          "end_ms": 3780.0,
+          "confidence": 0.99
         },
         {
-          "word": "た、",
-          "start": 5.74,
-          "end": 6.24,
-          "start_ms": 5740.0,
-          "end_ms": 6240.0
+          "word": "た",
+          "start": 3.78,
+          "end": 3.92,
+          "start_ms": 3780.0,
+          "end_ms": 3920.0,
+          "confidence": 0.988
         },
         {
-          "word": "み",
-          "start": 6.48,
-          "end": 6.54,
-          "start_ms": 6480.0,
-          "end_ms": 6540.0
+          "word": "衝",
+          "start": 3.92,
+          "end": 4.18,
+          "start_ms": 3920.0,
+          "end_ms": 4180.0,
+          "confidence": 0.593
         },
         {
-          "word": "の",
-          "start": 6.54,
-          "end": 6.66,
-          "start_ms": 6540.0,
-          "end_ms": 6660.0
-        },
-        {
-          "word": "白",
-          "start": 6.66,
-          "end": 6.84,
-          "start_ms": 6660.0,
-          "end_ms": 6840.0
-        },
-        {
-          "word": "金",
-          "start": 6.84,
-          "end": 7.08,
-          "start_ms": 6840.0,
-          "end_ms": 7080.0
-        },
-        {
-          "word": "抗",
-          "start": 7.08,
-          "end": 7.28,
-          "start_ms": 7080.0,
-          "end_ms": 7280.0
-        },
-        {
-          "word": "症",
-          "start": 7.28,
-          "end": 7.4,
-          "start_ms": 7280.0,
-          "end_ms": 7400.0
+          "word": "撃",
+          "start": 4.18,
+          "end": 4.3,
+          "start_ms": 4180.0,
+          "end_ms": 4300.0,
+          "confidence": 0.99
         },
         {
           "word": "の",
-          "start": 7.4,
-          "end": 7.66,
-          "start_ms": 7400.0,
-          "end_ms": 7660.0
+          "start": 4.3,
+          "end": 4.48,
+          "start_ms": 4300.0,
+          "end_ms": 4480.0,
+          "confidence": 0.982
         },
         {
-          "word": "効",
-          "start": 7.66,
-          "end": 7.8,
-          "start_ms": 7660.0,
-          "end_ms": 7800.0
+          "word": "報",
+          "start": 4.48,
+          "end": 4.68,
+          "start_ms": 4480.0,
+          "end_ms": 4680.0,
+          "confidence": 0.84
         },
         {
-          "word": "率",
-          "start": 7.8,
-          "end": 7.94,
-          "start_ms": 7800.0,
-          "end_ms": 7940.0
-        },
-        {
-          "word": "が",
-          "start": 7.94,
-          "end": 8.2,
-          "start_ms": 7940.0,
-          "end_ms": 8200.0
-        },
-        {
-          "word": "10",
-          "start": 8.2,
-          "end": 8.38,
-          "start_ms": 8200.0,
-          "end_ms": 8380.0
-        },
-        {
-          "word": "倍",
-          "start": 8.38,
-          "end": 8.54,
-          "start_ms": 8380.0,
-          "end_ms": 8540.0
-        },
-        {
-          "word": "にな",
-          "start": 8.54,
-          "end": 8.8,
-          "start_ms": 8540.0,
-          "end_ms": 8800.0
-        },
-        {
-          "word": "り",
-          "start": 8.8,
-          "end": 8.92,
-          "start_ms": 8800.0,
-          "end_ms": 8920.0
-        },
-        {
-          "word": "う",
-          "start": 8.92,
-          "end": 9.0,
-          "start_ms": 8920.0,
-          "end_ms": 9000.0
-        },
-        {
-          "word": "る、",
-          "start": 9.0,
-          "end": 9.24,
-          "start_ms": 9000.0,
-          "end_ms": 9240.0
-        },
-        {
-          "word": "という",
-          "start": 9.26,
-          "end": 9.52,
-          "start_ms": 9260.0,
-          "end_ms": 9520.0
-        },
-        {
-          "word": "正",
-          "start": 9.52,
-          "end": 9.76,
-          "start_ms": 9520.0,
-          "end_ms": 9760.0
-        },
-        {
-          "word": "月",
-          "start": 9.76,
-          "end": 9.9,
-          "start_ms": 9760.0,
-          "end_ms": 9900.0
-        },
-        {
-          "word": "の",
-          "start": 9.9,
-          "end": 10.18,
-          "start_ms": 9900.0,
-          "end_ms": 10180.0
-        },
-        {
-          "word": "数",
-          "start": 10.18,
-          "end": 10.34,
-          "start_ms": 10180.0,
-          "end_ms": 10340.0
-        },
-        {
-          "word": "字",
-          "start": 10.34,
-          "end": 10.46,
-          "start_ms": 10340.0,
-          "end_ms": 10460.0
-        },
-        {
-          "word": "は、",
-          "start": 10.46,
-          "end": 10.94,
-          "start_ms": 10460.0,
-          "end_ms": 10940.0
-        },
-        {
-          "word": "日本",
-          "start": 11.2,
-          "end": 11.4,
-          "start_ms": 11200.0,
-          "end_ms": 11400.0
-        },
-        {
-          "word": "語",
-          "start": 11.4,
-          "end": 11.56,
-          "start_ms": 11400.0,
-          "end_ms": 11560.0
-        },
-        {
-          "word": "の",
-          "start": 11.56,
-          "end": 11.72,
-          "start_ms": 11560.0,
-          "end_ms": 11720.0
-        },
-        {
-          "word": "壁",
-          "start": 11.72,
-          "end": 11.86,
-          "start_ms": 11720.0,
-          "end_ms": 11860.0
-        },
-        {
-          "word": "が",
-          "start": 11.86,
-          "end": 12.04,
-          "start_ms": 11860.0,
-          "end_ms": 12040.0
-        },
-        {
-          "word": "崩",
-          "start": 12.04,
-          "end": 12.22,
-          "start_ms": 12040.0,
-          "end_ms": 12220.0
-        },
-        {
-          "word": "れた",
-          "start": 12.22,
-          "end": 12.44,
-          "start_ms": 12220.0,
-          "end_ms": 12440.0
-        },
-        {
-          "word": "こと",
-          "start": 12.44,
-          "end": 12.68,
-          "start_ms": 12440.0,
-          "end_ms": 12680.0
-        },
-        {
-          "word": "を",
-          "start": 12.68,
-          "end": 12.88,
-          "start_ms": 12680.0,
-          "end_ms": 12880.0
-        },
-        {
-          "word": "意",
-          "start": 12.88,
-          "end": 13.04,
-          "start_ms": 12880.0,
-          "end_ms": 13040.0
-        },
-        {
-          "word": "味",
-          "start": 13.04,
-          "end": 13.06,
-          "start_ms": 13040.0,
-          "end_ms": 13060.0
-        },
-        {
-          "word": "する",
-          "start": 13.06,
-          "end": 13.24,
-          "start_ms": 13060.0,
-          "end_ms": 13240.0
-        },
-        {
-          "word": "ので",
-          "start": 13.24,
-          "end": 13.48,
-          "start_ms": 13240.0,
-          "end_ms": 13480.0
-        },
-        {
-          "word": "しょう",
-          "start": 13.48,
-          "end": 13.68,
-          "start_ms": 13480.0,
-          "end_ms": 13680.0
-        },
-        {
-          "word": "か。",
-          "start": 13.68,
-          "end": 13.88,
-          "start_ms": 13680.0,
-          "end_ms": 13880.0
+          "word": "告。",
+          "start": 4.68,
+          "end": 4.92,
+          "start_ms": 4680.0,
+          "end_ms": 4920.0,
+          "confidence": 0.995
         }
       ],
       "motionDirective": "opuscar_snappy",
       "cameraMovement": "locked",
-      "action_type": "H1_IMPACT",
+      "action_type": "H6_MARK",
       "forensicOverlay": {
         "type": "stat_card",
-        "statValue": "10X",
-        "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
-        "sourceTag": "TEREBI ASAHI NEWS // UK FORENSIC REPORT",
+        "statValue": "2026.10.09",
+        "statLabel": "SPECIAL INVESTIGATIVE DISPATCH",
+        "sourceTag": "TEREBI ASAHI NEWS // 2026.10.09",
         "theme": "vox_paper"
       },
       "hasMarkerHighlight": true,
@@ -991,268 +389,970 @@
       "id": "scene_02",
       "scene_id": "SCENE_02",
       "component": "VoxBuildOnStage",
-      "durationInFrames": 212,
-      "durationSec": 7.055555555555555,
+      "durationInFrames": 179,
+      "durationSec": 5.9799999999999995,
+      "headline": "THE 10X MULTIPLIER",
+      "editorialHeadline": "RANSOM NEGOTIATION EFFICIENCY",
+      "statValue": "10X",
+      "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
+      "sourceTag": "UK FORENSIC EXPERT TESTIMONY // 2026.10.09",
+      "stampText": "10X LEVERAGE // VERIFIED",
+      "stampBadge": "CONFIDENTIAL EXHIBIT",
+      "stampColor": "#dc2626",
+      "sourceCredit": "UK FORENSIC EXPERT TESTIMONY // 2026.10.09",
+      "accentColor": "#C85A32",
+      "background": "videos/opuscar_scene_02_omni.mp4",
+      "targetBackground": "videos/opuscar_scene_02_omni.mp4",
+      "backgroundSrc": "videos/opuscar_scene_02_omni.mp4",
+      "layoutVariant": "cinematic_doc",
+      "narration": "英国の専門家が警告する「身代金交渉の効率10倍」。",
+      "subtitles": [
+        {
+          "word": "英",
+          "start": 0.0,
+          "end": 0.32,
+          "start_ms": 0.0,
+          "end_ms": 320.0,
+          "confidence": 0.807
+        },
+        {
+          "word": "国",
+          "start": 0.32,
+          "end": 0.46,
+          "start_ms": 320.0,
+          "end_ms": 460.0,
+          "confidence": 0.955
+        },
+        {
+          "word": "の",
+          "start": 0.46,
+          "end": 0.68,
+          "start_ms": 460.0,
+          "end_ms": 680.0,
+          "confidence": 0.985
+        },
+        {
+          "word": "専",
+          "start": 0.68,
+          "end": 0.86,
+          "start_ms": 680.0,
+          "end_ms": 860.0,
+          "confidence": 0.891
+        },
+        {
+          "word": "門",
+          "start": 0.86,
+          "end": 1.0,
+          "start_ms": 860.0,
+          "end_ms": 1000.0,
+          "confidence": 0.987
+        },
+        {
+          "word": "家",
+          "start": 1.0,
+          "end": 1.18,
+          "start_ms": 1000.0,
+          "end_ms": 1180.0,
+          "confidence": 0.923
+        },
+        {
+          "word": "が",
+          "start": 1.18,
+          "end": 1.32,
+          "start_ms": 1180.0,
+          "end_ms": 1320.0,
+          "confidence": 0.991
+        },
+        {
+          "word": "警",
+          "start": 1.32,
+          "end": 1.5,
+          "start_ms": 1320.0,
+          "end_ms": 1500.0,
+          "confidence": 0.092
+        },
+        {
+          "word": "告",
+          "start": 1.5,
+          "end": 1.62,
+          "start_ms": 1500.0,
+          "end_ms": 1620.0,
+          "confidence": 0.951
+        },
+        {
+          "word": "する。",
+          "start": 1.62,
+          "end": 1.98,
+          "start_ms": 1620.0,
+          "end_ms": 1980.0,
+          "confidence": 0.997
+        },
+        {
+          "word": "身",
+          "start": 2.54,
+          "end": 2.56,
+          "start_ms": 2540.0,
+          "end_ms": 2560.0,
+          "confidence": 0.193
+        },
+        {
+          "word": "代",
+          "start": 2.56,
+          "end": 2.68,
+          "start_ms": 2560.0,
+          "end_ms": 2680.0,
+          "confidence": 0.0
+        },
+        {
+          "word": "金",
+          "start": 2.68,
+          "end": 3.04,
+          "start_ms": 2680.0,
+          "end_ms": 3040.0,
+          "confidence": 0.03
+        },
+        {
+          "word": "交",
+          "start": 3.04,
+          "end": 3.28,
+          "start_ms": 3040.0,
+          "end_ms": 3280.0,
+          "confidence": 0.226
+        },
+        {
+          "word": "渉",
+          "start": 3.28,
+          "end": 3.46,
+          "start_ms": 3280.0,
+          "end_ms": 3460.0,
+          "confidence": 0.495
+        },
+        {
+          "word": "の",
+          "start": 3.46,
+          "end": 3.64,
+          "start_ms": 3460.0,
+          "end_ms": 3640.0,
+          "confidence": 0.988
+        },
+        {
+          "word": "効",
+          "start": 3.64,
+          "end": 3.84,
+          "start_ms": 3640.0,
+          "end_ms": 3840.0,
+          "confidence": 0.819
+        },
+        {
+          "word": "率",
+          "start": 3.84,
+          "end": 4.02,
+          "start_ms": 3840.0,
+          "end_ms": 4020.0,
+          "confidence": 0.996
+        },
+        {
+          "word": "10",
+          "start": 4.02,
+          "end": 4.28,
+          "start_ms": 4020.0,
+          "end_ms": 4280.0,
+          "confidence": 0.854
+        },
+        {
+          "word": "倍。",
+          "start": 4.28,
+          "end": 4.5,
+          "start_ms": 4280.0,
+          "end_ms": 4500.0,
+          "confidence": 0.973
+        }
+      ],
+      "words": [
+        {
+          "word": "英",
+          "start": 0.0,
+          "end": 0.32,
+          "start_ms": 0.0,
+          "end_ms": 320.0,
+          "confidence": 0.807
+        },
+        {
+          "word": "国",
+          "start": 0.32,
+          "end": 0.46,
+          "start_ms": 320.0,
+          "end_ms": 460.0,
+          "confidence": 0.955
+        },
+        {
+          "word": "の",
+          "start": 0.46,
+          "end": 0.68,
+          "start_ms": 460.0,
+          "end_ms": 680.0,
+          "confidence": 0.985
+        },
+        {
+          "word": "専",
+          "start": 0.68,
+          "end": 0.86,
+          "start_ms": 680.0,
+          "end_ms": 860.0,
+          "confidence": 0.891
+        },
+        {
+          "word": "門",
+          "start": 0.86,
+          "end": 1.0,
+          "start_ms": 860.0,
+          "end_ms": 1000.0,
+          "confidence": 0.987
+        },
+        {
+          "word": "家",
+          "start": 1.0,
+          "end": 1.18,
+          "start_ms": 1000.0,
+          "end_ms": 1180.0,
+          "confidence": 0.923
+        },
+        {
+          "word": "が",
+          "start": 1.18,
+          "end": 1.32,
+          "start_ms": 1180.0,
+          "end_ms": 1320.0,
+          "confidence": 0.991
+        },
+        {
+          "word": "警",
+          "start": 1.32,
+          "end": 1.5,
+          "start_ms": 1320.0,
+          "end_ms": 1500.0,
+          "confidence": 0.092
+        },
+        {
+          "word": "告",
+          "start": 1.5,
+          "end": 1.62,
+          "start_ms": 1500.0,
+          "end_ms": 1620.0,
+          "confidence": 0.951
+        },
+        {
+          "word": "する。",
+          "start": 1.62,
+          "end": 1.98,
+          "start_ms": 1620.0,
+          "end_ms": 1980.0,
+          "confidence": 0.997
+        },
+        {
+          "word": "身",
+          "start": 2.54,
+          "end": 2.56,
+          "start_ms": 2540.0,
+          "end_ms": 2560.0,
+          "confidence": 0.193
+        },
+        {
+          "word": "代",
+          "start": 2.56,
+          "end": 2.68,
+          "start_ms": 2560.0,
+          "end_ms": 2680.0,
+          "confidence": 0.0
+        },
+        {
+          "word": "金",
+          "start": 2.68,
+          "end": 3.04,
+          "start_ms": 2680.0,
+          "end_ms": 3040.0,
+          "confidence": 0.03
+        },
+        {
+          "word": "交",
+          "start": 3.04,
+          "end": 3.28,
+          "start_ms": 3040.0,
+          "end_ms": 3280.0,
+          "confidence": 0.226
+        },
+        {
+          "word": "渉",
+          "start": 3.28,
+          "end": 3.46,
+          "start_ms": 3280.0,
+          "end_ms": 3460.0,
+          "confidence": 0.495
+        },
+        {
+          "word": "の",
+          "start": 3.46,
+          "end": 3.64,
+          "start_ms": 3460.0,
+          "end_ms": 3640.0,
+          "confidence": 0.988
+        },
+        {
+          "word": "効",
+          "start": 3.64,
+          "end": 3.84,
+          "start_ms": 3640.0,
+          "end_ms": 3840.0,
+          "confidence": 0.819
+        },
+        {
+          "word": "率",
+          "start": 3.84,
+          "end": 4.02,
+          "start_ms": 3840.0,
+          "end_ms": 4020.0,
+          "confidence": 0.996
+        },
+        {
+          "word": "10",
+          "start": 4.02,
+          "end": 4.28,
+          "start_ms": 4020.0,
+          "end_ms": 4280.0,
+          "confidence": 0.854
+        },
+        {
+          "word": "倍。",
+          "start": 4.28,
+          "end": 4.5,
+          "start_ms": 4280.0,
+          "end_ms": 4500.0,
+          "confidence": 0.973
+        }
+      ],
+      "motionDirective": "opuscar_snappy",
+      "cameraMovement": "locked",
+      "action_type": "H1_IMPACT",
+      "forensicOverlay": {
+        "type": "stat_card",
+        "statValue": "10X",
+        "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
+        "sourceTag": "UK FORENSIC REPORT // 2026.10.09",
+        "theme": "vox_paper"
+      },
+      "hasMarkerHighlight": true,
+      "theme": "newsprint-editorial"
+    },
+    {
+      "id": "scene_03",
+      "scene_id": "SCENE_03",
+      "component": "VoxBuildOnStage",
+      "durationInFrames": 163,
+      "durationSec": 5.449999999999999,
+      "headline": "DEFENSE PERIMETER BREACH",
+      "editorialHeadline": "JAPANESE LANGUAGE WALL COLLAPSE",
+      "statValue": "BREACH",
+      "statLabel": "LANGUAGE DEFENSE BARRIER BREACHED",
+      "sourceTag": "CYBERSECURITY INCIDENT ARCHIVE // 2026",
+      "stampText": "PERIMETER FAILURE // CONFIRMED",
+      "stampBadge": "SECURITY ADVISORY",
+      "stampColor": "#b91c1c",
+      "sourceCredit": "CYBERSECURITY INCIDENT ARCHIVE // 2026",
+      "accentColor": "#C85A32",
+      "background": "videos/opuscar_scene_03_omni.mp4",
+      "targetBackground": "videos/opuscar_scene_03_omni.mp4",
+      "backgroundSrc": "videos/opuscar_scene_03_omni.mp4",
+      "layoutVariant": "cinematic_doc",
+      "narration": "それは、日本語という最後の壁が崩れたことを意味するのか。",
+      "subtitles": [
+        {
+          "word": "それは、",
+          "start": 0.0,
+          "end": 0.52,
+          "start_ms": 0.0,
+          "end_ms": 520.0,
+          "confidence": 0.935
+        },
+        {
+          "word": "日本",
+          "start": 0.94,
+          "end": 1.18,
+          "start_ms": 940.0,
+          "end_ms": 1180.0,
+          "confidence": 0.961
+        },
+        {
+          "word": "語",
+          "start": 1.18,
+          "end": 1.4,
+          "start_ms": 1180.0,
+          "end_ms": 1400.0,
+          "confidence": 0.993
+        },
+        {
+          "word": "という",
+          "start": 1.4,
+          "end": 1.62,
+          "start_ms": 1400.0,
+          "end_ms": 1620.0,
+          "confidence": 0.97
+        },
+        {
+          "word": "最後",
+          "start": 1.62,
+          "end": 1.96,
+          "start_ms": 1620.0,
+          "end_ms": 1960.0,
+          "confidence": 0.935
+        },
+        {
+          "word": "の",
+          "start": 1.96,
+          "end": 2.12,
+          "start_ms": 1960.0,
+          "end_ms": 2120.0,
+          "confidence": 0.999
+        },
+        {
+          "word": "壁",
+          "start": 2.12,
+          "end": 2.34,
+          "start_ms": 2120.0,
+          "end_ms": 2340.0,
+          "confidence": 0.938
+        },
+        {
+          "word": "が",
+          "start": 2.34,
+          "end": 2.48,
+          "start_ms": 2340.0,
+          "end_ms": 2480.0,
+          "confidence": 0.997
+        },
+        {
+          "word": "崩",
+          "start": 2.48,
+          "end": 2.68,
+          "start_ms": 2480.0,
+          "end_ms": 2680.0,
+          "confidence": 0.947
+        },
+        {
+          "word": "れた",
+          "start": 2.68,
+          "end": 2.9,
+          "start_ms": 2680.0,
+          "end_ms": 2900.0,
+          "confidence": 0.992
+        },
+        {
+          "word": "こと",
+          "start": 2.9,
+          "end": 3.08,
+          "start_ms": 2900.0,
+          "end_ms": 3080.0,
+          "confidence": 0.935
+        },
+        {
+          "word": "を",
+          "start": 3.08,
+          "end": 3.28,
+          "start_ms": 3080.0,
+          "end_ms": 3280.0,
+          "confidence": 0.998
+        },
+        {
+          "word": "意",
+          "start": 3.28,
+          "end": 3.42,
+          "start_ms": 3280.0,
+          "end_ms": 3420.0,
+          "confidence": 0.975
+        },
+        {
+          "word": "味",
+          "start": 3.42,
+          "end": 3.46,
+          "start_ms": 3420.0,
+          "end_ms": 3460.0,
+          "confidence": 0.983
+        },
+        {
+          "word": "する",
+          "start": 3.46,
+          "end": 3.68,
+          "start_ms": 3460.0,
+          "end_ms": 3680.0,
+          "confidence": 0.995
+        },
+        {
+          "word": "の",
+          "start": 3.68,
+          "end": 3.8,
+          "start_ms": 3680.0,
+          "end_ms": 3800.0,
+          "confidence": 0.994
+        },
+        {
+          "word": "か。",
+          "start": 3.8,
+          "end": 3.94,
+          "start_ms": 3800.0,
+          "end_ms": 3940.0,
+          "confidence": 0.998
+        }
+      ],
+      "words": [
+        {
+          "word": "それは、",
+          "start": 0.0,
+          "end": 0.52,
+          "start_ms": 0.0,
+          "end_ms": 520.0,
+          "confidence": 0.935
+        },
+        {
+          "word": "日本",
+          "start": 0.94,
+          "end": 1.18,
+          "start_ms": 940.0,
+          "end_ms": 1180.0,
+          "confidence": 0.961
+        },
+        {
+          "word": "語",
+          "start": 1.18,
+          "end": 1.4,
+          "start_ms": 1180.0,
+          "end_ms": 1400.0,
+          "confidence": 0.993
+        },
+        {
+          "word": "という",
+          "start": 1.4,
+          "end": 1.62,
+          "start_ms": 1400.0,
+          "end_ms": 1620.0,
+          "confidence": 0.97
+        },
+        {
+          "word": "最後",
+          "start": 1.62,
+          "end": 1.96,
+          "start_ms": 1620.0,
+          "end_ms": 1960.0,
+          "confidence": 0.935
+        },
+        {
+          "word": "の",
+          "start": 1.96,
+          "end": 2.12,
+          "start_ms": 1960.0,
+          "end_ms": 2120.0,
+          "confidence": 0.999
+        },
+        {
+          "word": "壁",
+          "start": 2.12,
+          "end": 2.34,
+          "start_ms": 2120.0,
+          "end_ms": 2340.0,
+          "confidence": 0.938
+        },
+        {
+          "word": "が",
+          "start": 2.34,
+          "end": 2.48,
+          "start_ms": 2340.0,
+          "end_ms": 2480.0,
+          "confidence": 0.997
+        },
+        {
+          "word": "崩",
+          "start": 2.48,
+          "end": 2.68,
+          "start_ms": 2480.0,
+          "end_ms": 2680.0,
+          "confidence": 0.947
+        },
+        {
+          "word": "れた",
+          "start": 2.68,
+          "end": 2.9,
+          "start_ms": 2680.0,
+          "end_ms": 2900.0,
+          "confidence": 0.992
+        },
+        {
+          "word": "こと",
+          "start": 2.9,
+          "end": 3.08,
+          "start_ms": 2900.0,
+          "end_ms": 3080.0,
+          "confidence": 0.935
+        },
+        {
+          "word": "を",
+          "start": 3.08,
+          "end": 3.28,
+          "start_ms": 3080.0,
+          "end_ms": 3280.0,
+          "confidence": 0.998
+        },
+        {
+          "word": "意",
+          "start": 3.28,
+          "end": 3.42,
+          "start_ms": 3280.0,
+          "end_ms": 3420.0,
+          "confidence": 0.975
+        },
+        {
+          "word": "味",
+          "start": 3.42,
+          "end": 3.46,
+          "start_ms": 3420.0,
+          "end_ms": 3460.0,
+          "confidence": 0.983
+        },
+        {
+          "word": "する",
+          "start": 3.46,
+          "end": 3.68,
+          "start_ms": 3460.0,
+          "end_ms": 3680.0,
+          "confidence": 0.995
+        },
+        {
+          "word": "の",
+          "start": 3.68,
+          "end": 3.8,
+          "start_ms": 3680.0,
+          "end_ms": 3800.0,
+          "confidence": 0.994
+        },
+        {
+          "word": "か。",
+          "start": 3.8,
+          "end": 3.94,
+          "start_ms": 3800.0,
+          "end_ms": 3940.0,
+          "confidence": 0.998
+        }
+      ],
+      "motionDirective": "opuscar_snappy",
+      "cameraMovement": "locked",
+      "action_type": "H2_CONSTRAINT",
+      "forensicOverlay": {
+        "type": "stat_card",
+        "statValue": "BREACH",
+        "statLabel": "LANGUAGE BARRIER COLLAPSE",
+        "sourceTag": "CYBERSECURITY ARCHIVE // 2026",
+        "theme": "vox_paper"
+      },
+      "hasMarkerHighlight": true,
+      "theme": "newsprint-editorial"
+    },
+    {
+      "id": "scene_04",
+      "scene_id": "SCENE_04",
+      "component": "VoxBuildOnStage",
+      "durationInFrames": 145,
+      "durationSec": 4.819999999999999,
       "headline": "THE MISSING BASELINE",
-      "editorialHeadline": "THE MISSING BASELINE",
+      "editorialHeadline": "MARKET-WIDE MEASUREMENT BASELINE",
       "statValue": "0.0%",
-      "statLabel": "MARKET-WIDE MEASUREMENT BASELINE",
+      "statLabel": "UNVERIFIED AGGREGATE BASELINE",
       "sourceTag": "MARKET EVIDENCE DOSSIER // RECTIFIED SURVEY",
       "stampText": "UNVERIFIED AGGREGATE // MISSING",
       "stampBadge": "UNVERIFIED",
       "stampColor": "#b91c1c",
       "sourceCredit": "MARKET EVIDENCE DOSSIER // RECTIFIED SURVEY",
       "accentColor": "#C85A32",
-      "background": "videos/opuscar_scene_02_omni.mp4",
-      "targetBackground": "videos/opuscar_scene_02_omni.mp4",
-      "backgroundSrc": "videos/opuscar_scene_02_omni.mp4",
+      "background": "videos/opuscar_scene_04_omni.mp4",
+      "targetBackground": "videos/opuscar_scene_04_omni.mp4",
+      "backgroundSrc": "videos/opuscar_scene_04_omni.mp4",
       "layoutVariant": "cinematic_doc",
       "narration": "この数字は市場全体で測定されたものではありません。",
       "subtitles": [
         {
           "word": "この",
           "start": 0.0,
-          "end": 0.46,
+          "end": 0.36,
           "start_ms": 0.0,
-          "end_ms": 460.0
+          "end_ms": 360.0,
+          "confidence": 0.975
         },
         {
           "word": "数",
-          "start": 0.46,
-          "end": 0.64,
-          "start_ms": 460.0,
-          "end_ms": 640.0
+          "start": 0.36,
+          "end": 0.54,
+          "start_ms": 360.0,
+          "end_ms": 540.0,
+          "confidence": 0.946
         },
         {
           "word": "字",
-          "start": 0.64,
-          "end": 0.78,
-          "start_ms": 640.0,
-          "end_ms": 780.0
+          "start": 0.54,
+          "end": 0.7,
+          "start_ms": 540.0,
+          "end_ms": 700.0,
+          "confidence": 0.993
         },
         {
           "word": "は",
-          "start": 0.78,
-          "end": 0.94,
-          "start_ms": 780.0,
-          "end_ms": 940.0
+          "start": 0.7,
+          "end": 0.84,
+          "start_ms": 700.0,
+          "end_ms": 840.0,
+          "confidence": 0.995
         },
         {
-          "word": "資",
-          "start": 0.94,
-          "end": 1.08,
-          "start_ms": 940.0,
-          "end_ms": 1080.0
+          "word": "市",
+          "start": 0.84,
+          "end": 1.0,
+          "start_ms": 840.0,
+          "end_ms": 1000.0,
+          "confidence": 0.59
         },
         {
-          "word": "料",
-          "start": 1.08,
-          "end": 1.22,
-          "start_ms": 1080.0,
-          "end_ms": 1220.0
+          "word": "場",
+          "start": 1.0,
+          "end": 1.12,
+          "start_ms": 1000.0,
+          "end_ms": 1120.0,
+          "confidence": 0.872
         },
         {
           "word": "全",
-          "start": 1.22,
-          "end": 1.48,
-          "start_ms": 1220.0,
-          "end_ms": 1480.0
+          "start": 1.12,
+          "end": 1.36,
+          "start_ms": 1120.0,
+          "end_ms": 1360.0,
+          "confidence": 0.939
         },
         {
           "word": "体",
-          "start": 1.48,
-          "end": 1.64,
-          "start_ms": 1480.0,
-          "end_ms": 1640.0
+          "start": 1.36,
+          "end": 1.58,
+          "start_ms": 1360.0,
+          "end_ms": 1580.0,
+          "confidence": 0.994
         },
         {
           "word": "で",
-          "start": 1.64,
-          "end": 1.9,
-          "start_ms": 1640.0,
-          "end_ms": 1900.0
+          "start": 1.58,
+          "end": 1.76,
+          "start_ms": 1580.0,
+          "end_ms": 1760.0,
+          "confidence": 0.992
         },
         {
           "word": "測",
-          "start": 1.9,
-          "end": 2.04,
-          "start_ms": 1900.0,
-          "end_ms": 2040.0
+          "start": 1.76,
+          "end": 1.94,
+          "start_ms": 1760.0,
+          "end_ms": 1940.0,
+          "confidence": 0.676
         },
         {
           "word": "定",
-          "start": 2.04,
-          "end": 2.24,
-          "start_ms": 2040.0,
-          "end_ms": 2240.0
+          "start": 1.94,
+          "end": 2.1,
+          "start_ms": 1940.0,
+          "end_ms": 2100.0,
+          "confidence": 1.0
         },
         {
           "word": "さ",
-          "start": 2.24,
-          "end": 2.34,
-          "start_ms": 2240.0,
-          "end_ms": 2340.0
+          "start": 2.1,
+          "end": 2.3,
+          "start_ms": 2100.0,
+          "end_ms": 2300.0,
+          "confidence": 0.997
         },
         {
           "word": "れた",
-          "start": 2.34,
-          "end": 2.52,
-          "start_ms": 2340.0,
-          "end_ms": 2520.0
+          "start": 2.3,
+          "end": 2.44,
+          "start_ms": 2300.0,
+          "end_ms": 2440.0,
+          "confidence": 0.996
         },
         {
           "word": "もの",
-          "start": 2.52,
-          "end": 2.72,
-          "start_ms": 2520.0,
-          "end_ms": 2720.0
+          "start": 2.44,
+          "end": 2.62,
+          "start_ms": 2440.0,
+          "end_ms": 2620.0,
+          "confidence": 0.49
         },
         {
           "word": "では",
-          "start": 2.72,
-          "end": 2.96,
-          "start_ms": 2720.0,
-          "end_ms": 2960.0
+          "start": 2.62,
+          "end": 2.86,
+          "start_ms": 2620.0,
+          "end_ms": 2860.0,
+          "confidence": 0.998
         },
         {
           "word": "あり",
-          "start": 2.96,
-          "end": 3.12,
-          "start_ms": 2960.0,
-          "end_ms": 3120.0
+          "start": 2.86,
+          "end": 3.04,
+          "start_ms": 2860.0,
+          "end_ms": 3040.0,
+          "confidence": 0.995
         },
         {
-          "word": "ません",
-          "start": 3.12,
-          "end": 3.7,
-          "start_ms": 3120.0,
-          "end_ms": 3700.0
+          "word": "ません。",
+          "start": 3.04,
+          "end": 3.3,
+          "start_ms": 3040.0,
+          "end_ms": 3300.0,
+          "confidence": 0.997
         }
       ],
       "words": [
         {
           "word": "この",
           "start": 0.0,
-          "end": 0.46,
+          "end": 0.36,
           "start_ms": 0.0,
-          "end_ms": 460.0
+          "end_ms": 360.0,
+          "confidence": 0.975
         },
         {
           "word": "数",
-          "start": 0.46,
-          "end": 0.64,
-          "start_ms": 460.0,
-          "end_ms": 640.0
+          "start": 0.36,
+          "end": 0.54,
+          "start_ms": 360.0,
+          "end_ms": 540.0,
+          "confidence": 0.946
         },
         {
           "word": "字",
-          "start": 0.64,
-          "end": 0.78,
-          "start_ms": 640.0,
-          "end_ms": 780.0
+          "start": 0.54,
+          "end": 0.7,
+          "start_ms": 540.0,
+          "end_ms": 700.0,
+          "confidence": 0.993
         },
         {
           "word": "は",
-          "start": 0.78,
-          "end": 0.94,
-          "start_ms": 780.0,
-          "end_ms": 940.0
+          "start": 0.7,
+          "end": 0.84,
+          "start_ms": 700.0,
+          "end_ms": 840.0,
+          "confidence": 0.995
         },
         {
-          "word": "資",
-          "start": 0.94,
-          "end": 1.08,
-          "start_ms": 940.0,
-          "end_ms": 1080.0
+          "word": "市",
+          "start": 0.84,
+          "end": 1.0,
+          "start_ms": 840.0,
+          "end_ms": 1000.0,
+          "confidence": 0.59
         },
         {
-          "word": "料",
-          "start": 1.08,
-          "end": 1.22,
-          "start_ms": 1080.0,
-          "end_ms": 1220.0
+          "word": "場",
+          "start": 1.0,
+          "end": 1.12,
+          "start_ms": 1000.0,
+          "end_ms": 1120.0,
+          "confidence": 0.872
         },
         {
           "word": "全",
-          "start": 1.22,
-          "end": 1.48,
-          "start_ms": 1220.0,
-          "end_ms": 1480.0
+          "start": 1.12,
+          "end": 1.36,
+          "start_ms": 1120.0,
+          "end_ms": 1360.0,
+          "confidence": 0.939
         },
         {
           "word": "体",
-          "start": 1.48,
-          "end": 1.64,
-          "start_ms": 1480.0,
-          "end_ms": 1640.0
+          "start": 1.36,
+          "end": 1.58,
+          "start_ms": 1360.0,
+          "end_ms": 1580.0,
+          "confidence": 0.994
         },
         {
           "word": "で",
-          "start": 1.64,
-          "end": 1.9,
-          "start_ms": 1640.0,
-          "end_ms": 1900.0
+          "start": 1.58,
+          "end": 1.76,
+          "start_ms": 1580.0,
+          "end_ms": 1760.0,
+          "confidence": 0.992
         },
         {
           "word": "測",
-          "start": 1.9,
-          "end": 2.04,
-          "start_ms": 1900.0,
-          "end_ms": 2040.0
+          "start": 1.76,
+          "end": 1.94,
+          "start_ms": 1760.0,
+          "end_ms": 1940.0,
+          "confidence": 0.676
         },
         {
           "word": "定",
-          "start": 2.04,
-          "end": 2.24,
-          "start_ms": 2040.0,
-          "end_ms": 2240.0
+          "start": 1.94,
+          "end": 2.1,
+          "start_ms": 1940.0,
+          "end_ms": 2100.0,
+          "confidence": 1.0
         },
         {
           "word": "さ",
-          "start": 2.24,
-          "end": 2.34,
-          "start_ms": 2240.0,
-          "end_ms": 2340.0
+          "start": 2.1,
+          "end": 2.3,
+          "start_ms": 2100.0,
+          "end_ms": 2300.0,
+          "confidence": 0.997
         },
         {
           "word": "れた",
-          "start": 2.34,
-          "end": 2.52,
-          "start_ms": 2340.0,
-          "end_ms": 2520.0
+          "start": 2.3,
+          "end": 2.44,
+          "start_ms": 2300.0,
+          "end_ms": 2440.0,
+          "confidence": 0.996
         },
         {
           "word": "もの",
-          "start": 2.52,
-          "end": 2.72,
-          "start_ms": 2520.0,
-          "end_ms": 2720.0
+          "start": 2.44,
+          "end": 2.62,
+          "start_ms": 2440.0,
+          "end_ms": 2620.0,
+          "confidence": 0.49
         },
         {
           "word": "では",
-          "start": 2.72,
-          "end": 2.96,
-          "start_ms": 2720.0,
-          "end_ms": 2960.0
+          "start": 2.62,
+          "end": 2.86,
+          "start_ms": 2620.0,
+          "end_ms": 2860.0,
+          "confidence": 0.998
         },
         {
           "word": "あり",
-          "start": 2.96,
-          "end": 3.12,
-          "start_ms": 2960.0,
-          "end_ms": 3120.0
+          "start": 2.86,
+          "end": 3.04,
+          "start_ms": 2860.0,
+          "end_ms": 3040.0,
+          "confidence": 0.995
         },
         {
-          "word": "ません",
-          "start": 3.12,
-          "end": 3.7,
-          "start_ms": 3120.0,
-          "end_ms": 3700.0
+          "word": "ません。",
+          "start": 3.04,
+          "end": 3.3,
+          "start_ms": 3040.0,
+          "end_ms": 3300.0,
+          "confidence": 0.997
         }
       ],
       "motionDirective": "opuscar_snappy",
       "cameraMovement": "locked",
-      "action_type": "H2_CONSTRAINT",
+      "action_type": "H7_DISPLACE",
       "forensicOverlay": {
         "type": "stat_card",
         "statValue": "0.0%",

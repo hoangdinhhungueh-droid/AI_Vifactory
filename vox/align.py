@@ -115,7 +115,15 @@ def align_script_with_audio(
 
         from faster_whisper import WhisperModel
         model = WhisperModel(resolved_model, device="cpu", compute_type="int8")
-        segments, _ = model.transcribe(str(wav_path), word_timestamps=True, language=target_lang)
+        initial_prompt = " ".join(w[0] for w in script_words[:100])
+        segments, _ = model.transcribe(
+            str(wav_path),
+            word_timestamps=True,
+            language=target_lang,
+            initial_prompt=initial_prompt,
+            condition_on_previous_text=False,
+            vad_filter=True
+        )
         for seg in segments:
             if seg.words:
                 for w_obj in seg.words:

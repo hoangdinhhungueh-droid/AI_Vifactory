@@ -1965,7 +1965,23 @@ def build_cl3_paper_diorama_image_prompt(
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
     focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival cream diorama paper, with zero competing decorative clutter or stacked ungrounded props."
-    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}"
+    
+    # Target substrate enrichment: Eliminate blank voids in documents and stamp areas
+    is_stamp_action = any(k in (str(clean_tool) + " " + str(clean_hero)).lower() for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion"])
+    script_mkt = "Japanese kanji" if resolved_market in ("JA", "JP") else ("Vietnamese" if resolved_market == "VN" else "archival")
+    if is_stamp_action:
+        target_substrate = (
+            f"Target Substrate: The document surface is dense with pre-printed forensic evidence—never a blank void. "
+            f"It features dense micro-tabular financial ledger rows with authentic illegible {script_mkt} fine-print audit rows, "
+            f"a designated circular target stamp zone with dotted red perimeter ring, and faint pre-printed watermark security patterns awaiting the stamp."
+        )
+    else:
+        target_substrate = (
+            f"Target Substrate: Documents and paper surfaces feature dense authentic {script_mkt} fine-print texture, coordinate grid lines, "
+            f"and archival diagram markings, never blank empty paper."
+        )
+
+    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}\n{target_substrate}"
     text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only."
     avoid_block = reg.resolve_avoid_block("STATIC_OVERHEAD", trace=trace)
     res = f"{style_block}\n\n{shot_block}\n\n{text_control}\n\n{avoid_block}".strip()
