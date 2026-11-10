@@ -116,8 +116,8 @@ class RunManifest(BaseModel):
                     art_file = paths.artifact_file(s.value)
                     if art_file.exists():
                         art_file.unlink()
-                except Exception:
-                    pass
+                except OSError as _unlink_err:
+                    logger.debug(f"[invalidate_downstream] Notice unlinking artifact for {s.value}: {_unlink_err}")
 
     def save_atomic(self, paths: RunPaths) -> Path:
         """Atomically saves manifest to run root."""

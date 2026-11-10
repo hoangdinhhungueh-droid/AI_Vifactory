@@ -256,7 +256,6 @@ def run(ctx: RunContext) -> StageArtifact:
                     TimelineEvent(date="2025-06-30", event="Final enforcement decrees, settlements, and institutional reforms concluded.", claim_ids=["C007"]),
                 ]
             return claims, events
-            return claims, events
 
         ledger = []
         timeline = []
