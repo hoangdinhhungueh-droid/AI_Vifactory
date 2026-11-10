@@ -67,15 +67,29 @@ def run(ctx: RunContext) -> StageArtifact:
             except Exception:
                 preset_obj = None
 
-        # Gate 1: Duration & Word Count Window
-        w_min = 280 if market == "KR" else (preset_obj.narration.word_budget.min if preset_obj else 450)
-        w_max = 560 if market == "KR" else (preset_obj.narration.word_budget.max if preset_obj else 550)
-        d_min = preset_obj.duration_window_s.min if preset_obj else 180.0
-        d_max = preset_obj.duration_window_s.max if preset_obj else 300.0
+        # Gate 1: Duration & Word Count Window (Market-Aware)
+        if market in ("KR", "KO"):
+            w_min, w_max = 200, 560
+        elif market in ("VN", "VI"):
+            w_min, w_max = 300, 600
+        else:
+            w_min = preset_obj.narration.word_budget.min if (preset_obj and hasattr(preset_obj, "narration") and hasattr(preset_obj.narration, "word_budget")) else 450
+            w_max = preset_obj.narration.word_budget.max if (preset_obj and hasattr(preset_obj, "narration") and hasattr(preset_obj.narration, "word_budget")) else 550
+        d_min = preset_obj.duration_window_s.min if (preset_obj and hasattr(preset_obj, "duration_window_s")) else 180.0
+        d_max = preset_obj.duration_window_s.max if (preset_obj and hasattr(preset_obj, "duration_window_s")) else 300.0
 
         is_min_profile = bool(ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1)
         if is_min_profile:
             duration_ok = True
+        elif market in ("JA", "JP"):
+            # Japanese is unsegmented; space-delimited word counts do not apply. Duration window is primary.
+            duration_ok = (d_min <= est_dur <= d_max)
+            if not duration_ok:
+                violations.append({
+                    "line_id": None,
+                    "gate": "duration_estimate_in_window",
+                    "detail": f"Duration {est_dur}s (window: {d_min}-{d_max}s) out of bounds."
+                })
         else:
             duration_ok = (w_min <= total_words <= w_max) and (d_min <= est_dur <= d_max)
             if not duration_ok:

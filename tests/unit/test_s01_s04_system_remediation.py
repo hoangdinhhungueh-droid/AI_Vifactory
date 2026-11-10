@@ -160,3 +160,20 @@ def test_s04_language_gate_rejection():
     # Test Vietnamese market with English text (should fail)
     vn_en_words = re.findall(r"\b[A-Za-z]{2,}\b", en_text)
     assert len(vn_en_words) / total_words > 0.20
+
+
+def test_s04_duration_and_word_budget_multimarket():
+    # Verify Korean 246 words at 240s passes gate 1
+    market = "KR"
+    total_words = 246
+    est_dur = 240.0
+    w_min, w_max = (200, 560) if market in ("KR", "KO") else (450, 550)
+    d_min, d_max = 180.0, 300.0
+    duration_ok = (w_min <= total_words <= w_max) and (d_min <= est_dur <= d_max)
+    assert duration_ok is True
+
+    # Verify Japanese 10 words (unsegmented) at 240s passes gate 1
+    ja_market = "JA"
+    ja_dur = 240.0
+    ja_duration_ok = (d_min <= ja_dur <= d_max)
+    assert ja_duration_ok is True

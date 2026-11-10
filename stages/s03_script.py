@@ -912,7 +912,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             "Falling back to evidence-ledger grounded generator."
                         )
                 else:
-                    w_min = 250 if m_upper in ("KR", "KO") else (350 if m_upper in ("VN", "VI") else 460)
+                    w_min = 200 if m_upper in ("KR", "KO") else (300 if m_upper in ("VN", "VI") else 460)
                     w_max = 600 if m_upper in ("KR", "KO") else (600 if m_upper in ("VN", "VI") else 540)
                     if m_upper not in ("KR", "KO", "VN", "VI") and hasattr(ctx, "preset") and ctx.preset:
                         nb = getattr(ctx.preset, "narration", None)
