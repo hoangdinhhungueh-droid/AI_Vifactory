@@ -361,6 +361,54 @@ def run(ctx: RunContext) -> StageArtifact:
         antagonist_data = s1_art.payload.get("antagonist") or {}
         antagonist_name = (antagonist_data.get("name") if isinstance(antagonist_data, dict) else getattr(antagonist_data, "name", None)) or (topic.split()[0] if topic else "Corporate Target")
 
+        # Extract dynamic key entities from claims, grounding intel, and antagonist
+        extracted_entities = [antagonist_name] if antagonist_name else []
+        if grounding_intel:
+            for c in grounding_intel.get("claims", []):
+                s_name = c.get("source")
+                if s_name and s_name not in extracted_entities and len(extracted_entities) < 4:
+                    extracted_entities.append(s_name)
+        if len(extracted_entities) < 3:
+            if market == "KR":
+                extracted_entities.extend(["감독 당국", "시장 거래 상대방"])
+            elif market == "JA":
+                extracted_entities.extend(["監督当局", "取引相手方"])
+            elif market == "VN":
+                extracted_entities.extend(["Cơ quan giám sát", "Đối tác thị trường"])
+            else:
+                extracted_entities.extend(["Regulatory Authorities", "Market Counterparties"])
+        extracted_entities = list(dict.fromkeys(extracted_entities))[:4]
+
+        # Market-aware verified anchor, metric, and competitor vacuums
+        if market == "KR":
+            v_anchor = f"{topic} 공식 검증 실증 분석 자료"
+            g_metric = f"{len(ledger)}건의 공공 기록 및 언론 검증 팩트체크 완료"
+            comp_vacs = [
+                f"기존 언론은 단순 표면적 갈등만 다루며 {topic}의 본질적 메커니즘 분석 부재.",
+                f"핵심 모순을 해결하는 심층적인 제도적·금융적 실증 분석 부재: {central_q}"
+            ]
+        elif market == "JA":
+            v_anchor = f"{topic} 公式検証実証分析資料"
+            g_metric = f"{len(ledger)}件の公式記録および報道検証ファクトチェック完了"
+            comp_vacs = [
+                f"既存メディアは表面的な対立のみを報じ、{topic}の本質的メカニズムの分析が欠落。",
+                f"根本的矛盾を解明する制度的・金融的実証分析の不在：{central_q}"
+            ]
+        elif market == "VN":
+            v_anchor = f"Hồ sơ phân tích thực chứng đã xác minh về {topic}"
+            g_metric = f"{len(ledger)} tuyên bố chứng cứ được xác thực từ hồ sơ công khai và báo chí."
+            comp_vacs = [
+                f"Truyền thông truyền thống chỉ đưa tin bề nổi mà thiếu phân tích bản chất cơ chế của {topic}.",
+                f"Thiếu vắng phân tích pháp lý và tài chính giải mã nghịch lý cốt lõi: {central_q}"
+            ]
+        else:
+            v_anchor = f"Forensic Evidence Ledger Audit on {topic}"
+            g_metric = f"{len(ledger)} corroborated evidentiary claims from public records and investigative press."
+            comp_vacs = [
+                f"Competitors cover superficial headlines without mechanical analysis of {topic}.",
+                f"Zero forensic breakdown resolving the core paradox: {central_q}"
+            ]
+
         story_research = StoryResearchPayload(
             preset=preset_raw if preset_raw in ("story_forensic", "vox_narrative") else "story_forensic",
             topic=topic,
@@ -368,48 +416,13 @@ def run(ctx: RunContext) -> StageArtifact:
             timeline=timeline,
             task_id=ctx.run_id,
             market=market,
-            factsheet=(
-                {
-                    "verified_anchor": "국토교통부 2026년 11월 전세사기 최소보장제 시행 실증 자료",
-                    "key_entities": [antagonist_name, "국토교통부 (MOLIT)", "HUG (주택도시보증공사)", "전세사기 피해자 대책위원회"],
-                    "core_mechanism": s1_scheme or "22조 원 규모 전세보증금 미반환 그림자 금융 붕괴 및 정부의 보증금 3분의 1 국가 보전 메커니즘",
-                    "ground_truth_metric": f"{len(ledger)}건의 국토교통부 및 주요 언론 검증 팩트체크 완료 (전국 22조 원 피해 규모)"
-                }
-                if (grounding_intel and any("MOLIT" in str(c) or "전세" in str(c) or "국토" in str(c) for c in grounding_intel.get("claims", [])))
-                else (
-                    {
-                        "verified_anchor": f"{topic} 실증 분석 자료",
-                        "key_entities": [antagonist_name, "감독 당국", "시장 거래 상대방"],
-                        "core_mechanism": s1_scheme,
-                        "ground_truth_metric": f"{len(ledger)}건의 검증된 팩트체크 증거 항목"
-                    }
-                    if market == "KR"
-                    else {
-                        "verified_anchor": "Forensic Evidence Ledger Audit",
-                        "key_entities": [antagonist_name, "Regulatory Authorities", "Market Counterparties"],
-                        "core_mechanism": s1_scheme,
-                        "ground_truth_metric": f"{len(ledger)} corroborated evidentiary claims."
-                    }
-                )
-            ),
-            competitor_vacuums=(
-                [
-                    "기존 언론은 단순 피해 호소나 3분의 1 보전 정책 발표만 피상적으로 전달함.",
-                    f"HUG 보증보험과 갭투자 구조가 결합된 그림자 금융의 구조적 붕괴 메커니즘에 대한 심층 분석 부재: {central_q}"
-                ]
-                if (grounding_intel and any("MOLIT" in str(c) or "전세" in str(c) or "국토" in str(c) for c in grounding_intel.get("claims", [])))
-                else (
-                    [
-                        f"기존 언론은 단순 표면적 갈등만 다루며 {topic}의 본질적 메커니즘 분석 부재.",
-                        f"핵심 모순을 해결하는 심층적인 제도적·금융적 실증 분석 부재: {central_q}"
-                    ]
-                    if market == "KR"
-                    else [
-                        f"Competitors cover superficial headlines without mechanical analysis of {topic}.",
-                        f"Zero forensic breakdown resolving the core paradox: {central_q}"
-                    ]
-                )
-            ),
+            factsheet={
+                "verified_anchor": v_anchor,
+                "key_entities": extracted_entities,
+                "core_mechanism": s1_scheme,
+                "ground_truth_metric": g_metric,
+            },
+            competitor_vacuums=comp_vacs,
             status="APPROVED",
         )
         payload = story_research.model_dump()

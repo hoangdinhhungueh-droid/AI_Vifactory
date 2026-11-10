@@ -60,6 +60,25 @@ def test_s03_market_legal_qualifiers():
     ja_charged = _apply_legal_qualifier("組織的な資金流用が行われた。", "charged", "JA")
     assert "起訴状の指摘によれば、" in ja_charged
     assert "According to" not in ja_charged
+    # Re-applying should not duplicate
+    ja_charged_repeat = _apply_legal_qualifier(ja_charged, "charged", "JA")
+    assert ja_charged_repeat.count("起訴状の指摘によれば、") == 1
+
+    ja_alleged = _apply_legal_qualifier("未公開の取引枠組みが存在した。", "alleged", "JA")
+    assert "当局の調査によれば、" in ja_alleged
+    ja_alleged_repeat = _apply_legal_qualifier(ja_alleged, "alleged", "JA")
+    assert ja_alleged_repeat.count("当局の調査によれば、") == 1
+
+    # Vietnamese market tests
+    vn_charged = _apply_legal_qualifier("Doanh nghiệp đã tiến hành chiếm đoạt tài sản.", "charged", "VN")
+    assert "Theo cáo trạng của cơ quan công tố," in vn_charged
+    vn_charged_repeat = _apply_legal_qualifier(vn_charged, "charged", "VN")
+    assert vn_charged_repeat.count("Theo cáo trạng của cơ quan công tố,") == 1
+
+    vn_alleged = _apply_legal_qualifier("Cơ cấu tài chính bị phát hiện có dấu hiệu bất thường.", "alleged", "VN")
+    assert "Theo cơ quan chức năng," in vn_alleged
+    vn_alleged_repeat = _apply_legal_qualifier(vn_alleged, "alleged", "VN")
+    assert vn_alleged_repeat.count("Theo cơ quan chức năng,") == 1
 
     # English market tests
     en_charged = _apply_legal_qualifier("The entity acquired housing units without capital.", "charged", "EN")
@@ -67,6 +86,40 @@ def test_s03_market_legal_qualifiers():
 
     en_settled = _apply_legal_qualifier("The enforcement inquiry was finalized.", "settled", "EN")
     assert "(settled without admitting wrongdoing)" in en_settled
+
+
+def test_s03_grounded_story_beats_resilience_and_multimarket():
+    from app.schemas.story_contracts import EvidenceClaim
+    from stages.s03_script import _build_grounded_story_beats
+
+    # 1. Zero crash with empty claims across all canonical markets
+    for m in ["KR", "JA", "VN", "EN"]:
+        beats = _build_grounded_story_beats("Market Failure Test", [], {}, market=m)
+        assert len(beats) == 5
+        assert len(beats[0][2]) >= 3  # B1 has at least 3 micro-scenes
+
+    # 2. Resilient multi-claim handling with no duplicate stacked prefixes
+    c1 = EvidenceClaim(claim_id="C001", claim="Indictment claim", source_url="http://a", source_type="court", date="2026-01-01", legal_status="charged")
+    c2 = EvidenceClaim(claim_id="C002", claim="Regulatory inquiry", source_url="http://b", source_type="regulator", date="2026-01-01", legal_status="alleged")
+    claims_map = {"C001": c1, "C002": c2}
+
+    kr_beats = _build_grounded_story_beats("전세 보증금 리스크", [c1, c2], claims_map, market="KR")
+    first_kr_line = kr_beats[0][2][0].text
+    # Charged takes precedence over alleged; must not stack both prefixes
+    assert "검찰 공소장에 따르면," in first_kr_line
+    assert "규제 당국에 따르면," not in first_kr_line
+
+    ja_beats = _build_grounded_story_beats("金融危機分析", [c1, c2], claims_map, market="JA")
+    first_ja_line = ja_beats[0][2][0].text
+    assert "起訴状の指摘によれば、" in first_ja_line
+    assert first_ja_line.count("起訴状の指摘によれば、") == 1
+    assert "急激な市場の危機" in first_ja_line
+
+    vn_beats = _build_grounded_story_beats("Khủng hoảng đòn bẩy", [c1, c2], claims_map, market="VN")
+    first_vn_line = vn_beats[0][2][0].text
+    assert "Theo cáo trạng của cơ quan công tố," in first_vn_line
+    assert first_vn_line.count("Theo cáo trạng của cơ quan công tố,") == 1
+    assert "Trong cuộc khủng hoảng" in first_vn_line
 
 
 def test_s04_language_gate_rejection():
@@ -95,8 +148,15 @@ def test_s04_language_gate_rejection():
     kr_en_ratio = len(kr_en_words) / kr_total
     kr_hangul = len(re.findall(r"[\uac00-\ud7a3]", kr_text))
 
-    language_ok_kr = True
-    if market == "KR":
-        if kr_hangul < 80 or kr_en_ratio > 0.15:
-            language_ok_kr = False
-    assert language_ok_kr is True
+    # Test Japanese market with English text (should fail)
+    ja_fail_cjk = len(re.findall(r"[\u3040-\u30ff\u4e00-\u9fff]", en_text))
+    assert ja_fail_cjk < 80
+
+    # Test Japanese market with authentic Japanese text (should pass)
+    ja_text = "急激な市場の危機の中で関係当局による公式な調査が実施され構造的欠陥が暴露された。" * 4
+    ja_cjk = len(re.findall(r"[\u3040-\u30ff\u4e00-\u9fff]", ja_text))
+    assert ja_cjk >= 80
+
+    # Test Vietnamese market with English text (should fail)
+    vn_en_words = re.findall(r"\b[A-Za-z]{2,}\b", en_text)
+    assert len(vn_en_words) / total_words > 0.20

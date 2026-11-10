@@ -119,6 +119,27 @@ class RunManifest(BaseModel):
                 except OSError as _unlink_err:
                     logger.debug(f"[invalidate_downstream] Notice unlinking artifact for {s.value}: {_unlink_err}")
 
+                # Purge root-level secondary exports for invalidated stages to prevent split-brain reads
+                secondary_files = []
+                if s == StageID.S3_SCRIPT:
+                    secondary_files.append(paths.root / "spoken_script.txt")
+                elif s == StageID.S5_DIRECTOR_PLAN:
+                    secondary_files.extend([
+                        paths.root / "director_plan.json",
+                        paths.root / "dp_plan.json",
+                        paths.root / "flow_video_manifest.json",
+                        paths.root / "bulk_image_prompts.txt",
+                    ])
+                elif s == StageID.S7_IMAGE_GEN:
+                    secondary_files.append(paths.root / "images_manifest.json")
+
+                for sec_f in secondary_files:
+                    try:
+                        if sec_f.exists():
+                            sec_f.unlink()
+                    except OSError as _sec_err:
+                        logger.debug(f"[invalidate_downstream] Notice unlinking secondary file {sec_f.name}: {_sec_err}")
+
     def save_atomic(self, paths: RunPaths) -> Path:
         """Atomically saves manifest to run root."""
         manifest_path = paths.manifest_file

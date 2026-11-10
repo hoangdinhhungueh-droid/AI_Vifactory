@@ -207,7 +207,12 @@ def run(ctx: RunContext) -> StageArtifact:
             else:
                 angle_brief = f"Investigative forensic breakdown examining the structural dynamics and institutional fallout of {topic_name}."
 
-            money_val = 16_000_000_000.0 if ("22조" in str(scheme_sum) or "전세" in str(topic_name)) else 10_000_000_000.0
+            money_val = 10_000_000_000.0
+            if grounding_intel and grounding_intel.get("money_at_stake_usd"):
+                try:
+                    money_val = float(grounding_intel["money_at_stake_usd"])
+                except (ValueError, TypeError) as _num_err:
+                    logger.debug(f"[s01_ideation] Notice parsing money_at_stake_usd: {_num_err}")
             return StoryIdeationPayload(
                 preset=preset_raw if preset_raw in ("story_forensic", "vox_narrative") else "story_forensic",
                 niche="business_heist" if market == "KR" else "corporate_scandal",
