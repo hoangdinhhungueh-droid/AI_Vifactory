@@ -120,27 +120,27 @@ def _build_dynamic_chapters(
 
     if m == "JP":
         return [
-            f"{_fmt(t_act1)} - {topic_clean}の発端と疑惑",
-            f"{_fmt(t_act2)} - 偽りの安全性となぜ起きたのか｜構造の歪み",
-            f"{_fmt(t_act3)} - 流通と検査の死角｜隠された痕跡",
-            f"{_fmt(t_act4)} - 動かぬ物証と基準超過の衝撃",
+            f"{_fmt(t_act1)} - {topic_clean}の発端と初期の疑惑",
+            f"{_fmt(t_act2)} - なぜ起きたのか｜隠蔽された構造と歪み",
+            f"{_fmt(t_act3)} - 制度の死角と追跡された痕跡",
+            f"{_fmt(t_act4)} - 動かぬ物証と暴かれた真相",
             f"{_fmt(t_act5)} - 越境する波紋と現代への警鐘",
         ]
     elif m == "KR":
         return [
-            f"{_fmt(t_act1)} - {kw[:30]}: 사건의 발단과 의혹",
+            f"{_fmt(t_act1)} - {kw[:30]}: 사건의 발단과 초기 의혹",
             f"{_fmt(t_act2)} - 왜 발생했는가｜은폐된 구조와 왜곡",
-            f"{_fmt(t_act3)} - 유통과 검역의 사각지대｜추적된 기록",
-            f"{_fmt(t_act4)} - 결정적 물증과 기준 초과의 충격",
-            f"{_fmt(t_act5)} - 국경을 넘은 파문과 현대적 경고",
+            f"{_fmt(t_act3)} - 제도적 맹점과 추적된 기록",
+            f"{_fmt(t_act4)} - 결정적 물증과 진실의 폭로",
+            f"{_fmt(t_act5)} - 사회적 파문과 현대적 경고",
         ]
     else:  # Default EN and others
         return [
             f"{_fmt(t_act1)} - {kw[:35]}: The Catalyst & Initial Suspicions",
             f"{_fmt(t_act2)} - Why It Happened: The Architecture of Concealment",
-            f"{_fmt(t_act3)} - Blind Spots in Inspection: The Paper Trail",
-            f"{_fmt(t_act4)} - Incontrovertible Evidence: The Shock of Standard Violation",
-            f"{_fmt(t_act5)} - Cross-Border Repercussions & Modern Warning",
+            f"{_fmt(t_act3)} - Institutional Blind Spots: The Paper Trail",
+            f"{_fmt(t_act4)} - Incontrovertible Evidence: The Revelation",
+            f"{_fmt(t_act5)} - Systemic Repercussions & Modern Warning",
         ]
 
 

@@ -200,7 +200,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const effectivePunches = steppedPunches || activePreset.steppedPunches;
   const useSteppedFraming = Boolean(effectivePunches && effectivePunches.length > 0);
 
-  const steppedPose = (!isVideoBackground && useSteppedFraming)
+  const steppedPose = useSteppedFraming
     ? computeSteppedPose(frame, effectivePunches!, fps, disableDrift)
     : null;
 
@@ -325,10 +325,10 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
           height: "100%",
           perspective: isVideoBackground ? undefined : 1400,
           transformStyle: isVideoBackground ? undefined : "preserve-3d",
-          transform: isVideoBackground
-            ? "none"
-            : steppedPose
+          transform: steppedPose
             ? `translate3d(${steppedPose.x.toFixed(2)}px, ${steppedPose.y.toFixed(2)}px, 0) scale(${steppedPose.scale.toFixed(4)}) rotate(${steppedPose.rotateZ.toFixed(2)}deg)`
+            : isVideoBackground
+            ? "none"
             : `scale(${cameraScale}) translate(${cameraPanX}px, 0px)`,
           transformOrigin: opticalAnchor
             ? `${(opticalAnchor.x * 100).toFixed(1)}% ${(opticalAnchor.y * 100).toFixed(1)}%`

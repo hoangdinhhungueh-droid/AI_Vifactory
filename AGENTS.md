@@ -8,13 +8,11 @@
 
 ## 🏛️ I. THAM CHIẾU GLOBAL RULES (NẠP TỰ ĐỘNG MỖI PHIÊN)
 
-Các hiến pháp phổ quát nạp tự động từ `~/.gemini/config/rules/` — AGENTS.md tuyệt đối không lặp lại nội dung:
+Các hiến pháp phổ quát nạp tự động từ `~/.gemini/config/rules/` — `AGENTS.md` tuyệt đối không lặp lại nội dung:
 - 🛡️ **R137 (Anti-Destructive Action & Zero-Drive-Wipe Iron Law)** (`anti_destructive_action_iron_law.md`): Bảo vệ dữ liệu Local & VPS. Phân tách Disconnect != Wipe; Blacklist lệnh tử thần (`Remove-Item -Recurse -Force`, `rm -rf`, `rmdir /s /q`); Cấm xóa đệ quy xuyên Symlink/Junction (`cmd /c rmdir`, `unlink`); Quy trình xóa 2 bước (Dry-run -> Phê duyệt).
 - 🧠 **R129 (Autonomous Deep Reasoning & Crisp Inquiry Protocol)** (`autonomous_deep_inquiry.md`): Tự động bật suy luận First-Principles 3 bước (Intent & Blind-Spots -> Trade-Offs -> Clarification Threshold). Cổng phản vấn gọn gẽ 4 phần (Tóm tắt nhận định -> Trade-offs -> Khuyến nghị -> Câu hỏi trực diện). Kỷ luật chốt là code ngay (Atomic Commit on Agreement).
 - 📊 **Truthful Reporting & Zero-Mock-Hallucination Iron Law** (`truthful_reporting_and_real_data_iron_law.md`): Áp dụng phổ quát (Universal Domain Scope). Cấm 100% số liệu mock (YouTube Views/CTR/RPM, Balance ví sàn, Telemetry máy chủ); chưa có credentials/dữ liệu thực bắt buộc để `null` + báo cáo trung thực.
-- 📈 **Hệ Thống Phân Tích Định Lượng & Giao Dịch (Tham Chiếu Global)**:
-  - 🚫 **Anti-Sycophancy, Independent Quant Logic & Clean Thinking** (`anti_sycophancy_and_clean_thinking_iron_law.md`): Kỷ luật SMC/ICT, Range/Chop, bảo vệ vốn tối cao, chống thiên kiến nhìn lại Hindsight.
-  - 📈 **TradingView Pine Script v6 Standard** (`pine_script_v6_standard.md`): Bắt buộc `//@version=6`, cấm gọi hàm hiển thị/cảnh báo trong local scope, chuẩn màu built-in, quản lý bộ nhớ Box/Label/Line/Table.
+- 🎨 **UI/UX Design & Mandatory Impeccable Polish Gate** (`ui_ux_impeccable_polish_gate.md`): Zero AI Slop; bắt buộc kiểm tra cơ học anti-patterns và trau chuốt giao diện trước khi xuất xưởng.
 
 ---
 
@@ -92,23 +90,21 @@ Các hiến pháp phổ quát nạp tự động từ `~/.gemini/config/rules/` 
   + **Chuẩn Hóa Thẻ Định Danh Phân Cảnh Phổ Quát**: Thẻ phụ đề chỉ được phép hiển thị 2 trường hợp: (1) Nhân vật đối thoại/phát biểu: `TÊN // VAI TRÒ`; (2) Thẻ nhịp Beat định danh: `BEAT <X>: <TIÊU ĐỀ BEAT>`. Áp dụng generic phổ quát cho mọi thị trường (EN, JP, KR, VN...).
 - **R140 (Object-to-Object Kinetic Coupling & Narrative Sub-Director Mandate - Vox Engine v3)**:
   + **Cấm Khái Niệm Trừu Tượng & Slideshow Vô Hồn Vào Prompt**: CẤM TUYỆT ĐỐI viết prompt cho tầng sinh ảnh và video bằng câu chuyện trừu tượng hoặc liệt kê các object xuất hiện rời rạc độc lập (Layer 1 rơi, Layer 2 trượt vào, camera đứng yên) gây cảm giác slideshow vô hồn.
-  + **Phân Loại 7 Họ Tương Tác Nhân Quả Xúc Giác ($H_1 
-ightarrow H_7$)**: Mọi ý niệm kịch bản bắt buộc chuyển thể thành tương tác cơ học vật lý có điểm chạm (Contact Dynamics) và để lại tồn dư (Residue) trên mặt bàn giấy báo cũ (#F4F1EA):
+  + **Phân Loại 7 Họ Tương Tác Nhân Quả Xúc Giác ($H_1 \to H_7$)**: Mọi ý niệm kịch bản bắt buộc chuyển thể thành tương tác cơ học vật lý có điểm chạm (Contact Dynamics) và để lại tồn dư (Residue) trên mặt bàn giấy báo cũ (`#F4F1EA`) hoặc kraft (`#C9BB9C`):
     * $H_1$ (Impact / Percussion): Con dấu mộc đỏ / khối chì dập mạnh -> giấy lún, mực loang, tài liệu nảy 1-2 frame, camera giật nhẹ.
     * $H_2$ (Constraint / Clamp): Thước cặp caliper / compa / kẹp giấy kẹp siết mục tiêu -> mép giấy nhăn, vạch vernier giật quá đà rồi khóa số đo.
     * $H_3$ (Sever / Cut / Tear): Kéo kim loại / dao trổ cắt xé -> mảnh giấy nhỏ tách rời rơi xoay có độ nảy, để lộ lớp chứng cứ tầng dưới.
     * $H_4$ (Tether / Tension): Ghim đồng cắm phập, sợi chỉ đỏ (red evidence yarn) kéo căng -> hai đối tượng bị kéo nghiêng về nhau, chỉ rung dao động tắt dần.
-    * $H_5$ (Optical / Refraction): Kính lúp trượt qua -> vùng chữ bên dưới phóng to $1.4	imes$, méo cong rìa (barrel distortion), lộ chữ in nhỏ li ti.
+    * $H_5$ (Optical / Refraction): Kính lúp trượt qua -> vùng chữ bên dưới phóng to 1.4x, méo cong rìa (barrel distortion), lộ chữ in nhỏ li ti.
     * $H_6$ (Mark / Ink Transfer): Bút dạ quang neon quét -> thớ giấy thấm mực và bừng sáng phát quang neon, kích hoạt xung sáng chạy dọc đường dẫn.
     * $H_7$ (Displace / Unfold): Lực xô đẩy ma sát -> chồng ảnh xòe quạt, bản đồ bung mở nếp gấp (pop-up unfold).
   + **Khung Scene Sub-Director Plan Nở Từ 4 Thì Gốc Ra 4..7 Micro-Beats Linh Hoạt**:
     * 4 Thì Gốc: $P_1$: Setup -> $P_2$: Mechanical Tension -> $P_3$: Causal Escalation -> $P_4$: Living Hold 12fps. Nở câu đơn giản: 4 - 5 beats; câu phức hợp (2-3 vế, từ nối "nhưng", "tuy nhiên", con số): 6 - 7 beats.
     * **Luật Chuyển Giao Nhân Quả (Causal Handoff Law)**: Target hoặc Tồn dư của Beat $n$ BẮT BUỘC phải là Source hoặc Target của Beat $n+1$. Chuỗi chuyển động là một dây xích khép kín.
-  + **Tốc Độ Stop-Motion Bứt Tốc (Snappy Stop-Motion Physics $\le 0.4s$ & Anti-Slowdown Invariant)**: Cử động xuất hiện, va chạm, dập dấu, kéo thước, cắt xé BẮT BUỘC bứt tốc dứt khoát trong $0.2s - 0.4s$ ($6 - 12	ext{ frames}$ ở 30fps) với gia tốc nhảy cóc (step motion curve). Khóa Cứng Bất Động (Dead-Stop Hold): Ngay sau va chạm, vật thể BẮT BUỘC đứng im bất động 100% tại chỗ cho đến hết thì hoặc cut chuyển cảnh, CHỈ duy trì vi rung bóng đổ/thớ giấy $\le 2	ext{px}$ ở 12fps ("on twos"). CẤM TUYỆT ĐỐI kéo dãn chuyển động chậm chạp dàn trải đều qua suốt 5–8s (Anti-Slowdown).
-  + **Đồng Bộ Tuyệt Đối Với Whisper Word Timestamps ($0	ext{ms}$ Drift Invariant)**: Mốc thời gian của từng Micro-Beat và Layer Remotion BẮT BUỘC neo cứng vào từ phát âm thực tế trong Voiceover (`whisper_word_timestamps`). CẤM nén, giãn, scale hoặc clamp giả tạo làm sai lệch phụ đề, âm thanh và chuyển động thị giác. Độ trôi lệch (drift) tối đa cho phép là $0	ext{ms}$.
-  + **Cú Pháp Động Từ Liên Hợp Nhân Quả Trong Prompt I2V (Causal Compound Verb Syntax)**: BẮT BUỘC dùng cú pháp: `[SOURCE] + [contact_verb] + [TARGET], causing [TARGET] to [physical_reaction], leaving [residue].` Tuyệt đối không liệt kê rời rạc. Duy trì vi rung stop-motion 12fps (on twos) và nhịp thở bóng đổ $\le 2	ext{px}$ đến tận cut chuyển cảnh. CẤM ĐÓNG BĂNG KHUNG HÌNH (freeze frame).
-  + **Kỷ Luật Triển Khai Toàn Diện Trên Luồng Gốc (Root Pipeline Deployment Mandate)**: Phân rã động học $H_1 
-ightarrow H_7$, 4..7 micro-beats và cú pháp prompt liên hợp BẮT BUỘC nạp và thực thi trực tiếp trên:
+  + **Tốc Độ Stop-Motion Bứt Tốc (Snappy Stop-Motion Physics $\le 0.4s$ & Anti-Slowdown Invariant)**: Cử động xuất hiện, va chạm, dập dấu, kéo thước, cắt xé BẮT BUỘC bứt tốc dứt khoát trong $0.2s - 0.4s$ ($6 - 12\text{ frames}$ ở 30fps) với gia tốc nhảy cóc (step motion curve). Khóa Cứng Bất Động (Dead-Stop Hold): Ngay sau va chạm, vật thể BẮT BUỘC đứng im bất động 100% tại chỗ cho đến hết thì hoặc cut chuyển cảnh, CHỈ duy trì vi rung bóng đổ/thớ giấy $\le 2\text{px}$ ở 12fps ("on twos"). CẤM TUYỆT ĐỐI kéo dãn chuyển động chậm chạp dàn trải đều qua suốt 5–8s (Anti-Slowdown).
+  + **Đồng Bộ Tuyệt Đối Với Whisper Word Timestamps ($0\text{ms}$ Drift Invariant)**: Mốc thời gian của từng Micro-Beat và Layer Remotion BẮT BUỘC neo cứng vào từ phát âm thực tế trong Voiceover (`whisper_word_timestamps`). CẤM nén, giãn, scale hoặc clamp giả tạo làm sai lệch phụ đề, âm thanh và chuyển động thị giác. Độ trôi lệch (drift) tối đa cho phép là $0\text{ms}$.
+  + **Cú Pháp Động Từ Liên Hợp Nhân Quả Trong Prompt I2V (Causal Compound Verb Syntax)**: BẮT BUỘC dùng cú pháp: `[SOURCE] + [contact_verb] + [TARGET], causing [TARGET] to [physical_reaction], leaving [residue].` Tuyệt đối không liệt kê rời rạc. Duy trì vi rung stop-motion 12fps (on twos) và nhịp thở bóng đổ $\le 2\text{px}$ đến tận cut chuyển cảnh. CẤM ĐÓNG BĂNG KHUNG HÌNH (freeze frame).
+  + **Kỷ Luật Triển Khai Toàn Diện Trên Luồng Gốc (Root Pipeline Deployment Mandate)**: Phân rã động học $H_1 \to H_7$, 4..7 micro-beats và cú pháp prompt liên hợp BẮT BUỘC nạp và thực thi trực tiếp trên:
     * `stages/s05_director_plan.py`
     * `app/services/unified_vox_director.py`
     * `app/services/director_planner_b3.py`
@@ -121,13 +117,12 @@ ightarrow H_7$, 4..7 micro-beats và cú pháp prompt liên hợp BẮT BUỘC n
     1. *Scene ID & Stage* (ví dụ: `SCENE_01` · `S07_IMAGE`).
     2. *Clickable File Link*: Markdown link chuẩn file:// (`[composite_SCENE_XX.png](file:///...)`) mở xem ảnh thật full resolution.
     3. *Vật Thể Xúc Giác & Đạo Cụ (Rule 140 Objects)*: Hồ sơ gấp mép, triện đỏ Hanko, thước cặp caliper, kéo kim loại, USB khóa cứng, cọc tiền giấy...
-    4. *Phân Rã Động Học 4 Thì ($S_1 
-ightarrow S_4$)*: Entry/Drop -> Impact/Stamp -> Vector/Growth -> Hold $\le 2	ext{px}$.
+    4. *Phân Rã Động Học 4 Thì ($P_1 \to P_4$)*: Setup -> Tension -> Escalation -> Hold $\le 2\text{px}$.
     5. *Điểm Thẩm Định Visual Audit*: Phân giải 2560x1440, HSV clean, black frame %, text-free %, Điểm visual audit (e.g., 9.8/10), trạng thái APPROVED.
   + **Bảo Chứng Thư Viện HTML**: Bắt buộc đính kèm link mở trực tiếp file `review_gallery.html` (`[review_gallery.html](file:///...)`).
 - **R142 (Anti-Generic-AI-Visual & Forensic Journalistic Decomposition Mandate)**:
   + **Cấm Hình Tượng AI Mockup Vô Hồn (Zero-Generic-AI Mandate)**: CẤM TUYỆT ĐỐI tầng đạo diễn S5 và prompt sinh ra hình tượng AI sáo rỗng vô hồn: thanh tìm kiếm mockup trắng trơn, thẻ đánh số rỗng `01`/`02`, bàn họp stock photo, biểu đồ mũi tên bay lơ lửng, phòng 3D CGI bóng bẩy.
-  + **Quy Chuẩn Chuyển Thể Pháp Y Báo Chí Điều Tra Vox (Forensic Evidence Dossier Desk)**: Mọi ý niệm kịch bản bắt buộc chuyển thể dưới lăng kính Bàn Giám Định Chứng Cứ Pháp Y Của Cơ Quan Điều Tra đặt trên nền giấy báo cũ ngả vàng `#F4F1EA`: Tấn công mạng/Phishing (văn bản Keigo dán nhãn Trojan, ổ cứng kim loại khóa đồng, sao kê bôi đen redacted ledger, tin nhắn tống tiền Dark Web kèm thẻ đếm ngược); Xu hướng bùng nổ (console an ninh JPCERT, vệt bút dạ quang neon, thẻ xu hướng đỏ, văn bản khuyến cáo mộc đỏ); Xúc tác thể chế/Nhân vật (hồ sơ rò rỉ đài truyền hình, ảnh halftone đen trắng, con dấu mộc đỏ, triện cá nhân Hanko gạch chéo vô hiệu). Chi tiết minh họa quản trị tập trung tại Notion SoT và `config/prompts/vox_b3_*.md`.
+  + **Quy Chuẩn Chuyển Thể Pháp Y Báo Chí Điều Tra Vox (Forensic Evidence Dossier Desk)**: Mọi ý niệm kịch bản bắt buộc chuyển thể dưới lăng kính Bàn Giám Định Chứng Cứ Pháp Y Của Cơ Quan Điều Tra đặt trên nền giấy báo cũ ngả vàng `#F4F1EA` / `#C9BB9C`: Hồ sơ tài liệu rò rỉ, sao kê bôi đen redacted ledger, thiết bị khóa bảo mật, thẻ cảnh báo thời gian, vệt bút dạ quang neon, ảnh tư liệu halftone đen trắng, và con dấu mộc đỏ/triện niêm phong. CẤM hardcode chi tiết riêng lẻ của một episode vào hiến pháp chung (R128, R132, R133). Toàn bộ prompt templates và narrative patterns quản trị tập trung tại Notion SoT và `config/prompts/`.
 - **R143 (Mandatory Clickable Video Demo Audit Table & Anti-Duplicate Dispatch Gate)**:
   + **Cấm Báo Cáo Video Bằng Miệng (Zero-Verbal-Video-Reporting Mandate)**: Sau khi hoàn thành sinh video demo hoặc full luồng: BẮT BUỘC xuất bảng nghiệm thu pháp y trực quan gồm: Scene ID, Clickable Video Link file:// (`[clip_scene_XX.mp4](file:///...)`), Clickable Mid-frame Preview (`[clip_scene_XX_mid.png](file:///...)`), Đạo cụ xúc giác thực tế, Động học 4 thì I2V, Thời lượng thực tế (s), Dung lượng file (KB), và Điểm thẩm định thị giác.
   + **Chốt Chặn Chống Trùng Lặp Video (Anti-Duplicate Dispatch Gate)**: Bắt buộc kiểm tra hash SHA-256 và visual fingerprint giữa các Shot clips. Nếu 2 clip có kích thước giống nhau hoặc visual frame trùng khớp -> VETO lập tức, cấm báo cáo PASS và tự động chạy lại Scene bị thiếu.
@@ -179,55 +174,44 @@ Toàn bộ các tác vụ vận hành, lập kế hoạch, kiểm thử và depl
 
 ---
 
-## 🎯 IV. NGUYÊN TẮC QUẢN TRỊ TÁC VỤ (TASK DISCIPLINE)
+## 🎯 IV. QUY CHUẨN HARNESS & TASK GOVERNANCE (5 PRIMITIVES - CODEX STANDARD)
 
-1. **Task-Level Contract**: Mọi nhiệm vụ lớn / Sprint bắt buộc neo theo file `ORIGINAL_REQUEST.md` (chứa User Request gốc, Requirements R1..Rn và Acceptance Criteria `[ ]`).
-2. **Interface Contracts**: Khế ước dữ liệu JSON IN/OUT giữa các stage và danh mục file trên VPS tra cứu tại `PIPELINE_CONTRACTS.md` và `docs/PIPELINE_CANONICAL.md`.
-3. **Autonomous Clarification Protocol**: Mọi tác vụ có tính đa chiều, rẽ nhánh kỹ thuật hoặc mơ hồ bắt buộc kích hoạt Cổng Phản Vấn Chủ Động (Global Rule R129), suy luận sâu và làm rõ với User trước khi triển khai sâu.
-4. **Vibe Coding Memory & Specification Traceability**:
-   - Mọi thay đổi kiến trúc/tính năng bắt buộc tuân theo quy trình 2 bản vẽ: `specs/business_flow_template.md` (Business Flow) và `specs/design_spec_template.md` (Design Spec).
-   - Bộ nhớ dự án bắt buộc neo vào `ROADMAP.md` (tiến độ pha, task checklists `[x]`) và `CHANGELOG.md` (chuẩn Keep a Changelog: `Added`, `Changed`, `Fixed`).
-   - Trước khi kết thúc phiên hoặc commit, chạy `make memory` hoặc `python scripts/orchestrator/memory_governor.py --strict` để bảo chứng không mất ngữ cảnh (Anti-Amnesia).
-
----
-
-## 🏗️ V. QUY CHUẨN HARNESS SYSTEM NGUYÊN TỬ (5 SUBSYSTEMS PRIMITIVES)
-
-> **Kế thừa tinh hoa từ WalkingLabs (Learn Harness Engineering), Codex, Claude Code & DeepSeek:**
+> **Kế thừa tinh hoa từ Harness Engineering (Codex, Claude Code & DeepSeek):**
 > *"Độ tin cậy đến từ Harness, không phải từ Model. Harness xây chiếc vòng kim cô bảo đảm AI làm việc chuẩn xác, không còn hên xui."*
 
-### 1. Phân Hệ 1: Instructions Subsystem (Directory Page & Progressive Disclosure)
-- **Directory Page Invariant (Codex Standard)**: `AGENTS.md` là mục lục điều hướng và khế ước bất biến, KHÔNG PHẢI bách khoa toàn thư. Kiến thức chuyên sâu đặt trong `docs/`, `config/prompts/` hoặc Notion SoT để nạp theo nhu cầu (JIT).
+### 1. Phân Hệ 1: Instructions & Progressive Disclosure
+- **Directory Page Invariant (Codex Standard)**: `AGENTS.md` là mục lục điều hướng và khế ước bất biến, KHÔNG PHẢI bách khoa toàn thư. Mọi chi tiết nghiệp vụ prompt, kịch bản, và cấu trúc sâu nằm tại `config/prompts/`, `docs/`, hoặc Notion SoT để nạp theo nhu cầu (JIT - Rule 133).
 - **Startup Workflow 6 Bước Bắt Buộc (Trước khi code)**:
-  1. `pwd`: Xác nhận đúng thư mục làm việc (Local hoặc `/root/video_factory`).
-  2. `read`: Đọc `AGENTS.md` nắm vững các Kỷ luật Thép và định tuyến.
+  1. `pwd`: Xác nhận đúng thư mục làm việc (Local Workspace hoặc `/root/video_factory`).
+  2. `read`: Đọc `AGENTS.md` nắm vững các Kỷ luật Thép và bảng định tuyến.
   3. `state`: Đọc `feature_list.json` hoặc `task_manifest.json` xem trạng thái tính năng hiện tại.
-  4. `verify baseline`: Chạy kiểm tra nền tảng (`./init.sh` hoặc `python scripts/orchestrator/runner.py --mode ci --baseline`) xem hệ thống có đang xanh không. Nếu baseline đỏ -> Phải fix baseline trước khi thêm tính năng mới!
-  5. `git log`: Kiểm tra 5 commit gần nhất (`git log --oneline -5`) để nắm ngữ cảnh kỹ thuật.
+  4. `verify baseline`: Chạy kiểm tra nền tảng (`python scripts/orchestrator/runner.py --mode ci --baseline` hoặc `pytest`) xác nhận baseline xanh. Nếu baseline đỏ -> BẮT BUỘC fix baseline trước khi thêm tính năng mới!
+  5. `git log`: Kiểm tra ngữ cảnh qua 5 commit gần nhất (`git log --oneline -5`).
   6. `pick one`: Chỉ chọn ĐÚNG 1 feature chưa hoàn thành để thực thi.
 
-### 2. Phân Hệ 2: State Subsystem (Persistent Disk-Backed Source of Truth)
-- **Cấm Nhớ Mồm Trong Chat**: Toàn bộ tiến độ, phân nhánh, và kết quả thực thi bắt buộc lưu xuống đĩa cứng vật lý bằng cấu trúc JSON/Markdown (`feature_list.json`, `progress.md`, `runs/<run_id>/run_manifest.json`).
-- **Two-Step Save Invariant**: Mọi ghi nhận trạng thái phải ghi chi tiết vào topic file/report trước, sau đó mới cập nhật pointer vào index/manifest. Nếu phiên chat bị ngắt đột ngột, trạng thái vẫn toàn vẹn và có thể khôi phục 100% trong phiên sau.
-- **Model-Visible Means Logged (DeepSeek Invariant)**: Bất kỳ prompt, ngữ cảnh, hoặc output quan trọng nào model đọc/ghi đều phải được log vào session history (`logs/*.jsonl`) để có thể tái hiện lại quá trình suy luận.
+### 2. Phân Hệ 2: Task Contract & Interface Alignment
+- **Task-Level Contract**: Mọi nhiệm vụ lớn / Sprint bắt buộc neo theo file `ORIGINAL_REQUEST.md` (chứa User Request gốc, Requirements R1..Rn và Acceptance Criteria `[ ]`).
+- **Interface Contracts**: Khế ước dữ liệu JSON IN/OUT giữa các stage và danh mục file tra cứu tại `PIPELINE_CONTRACTS.md` và `docs/PIPELINE_CANONICAL.md`.
+- **Nguyên Tắc 1 Tính Năng Mỗi Lần (One-Feature-At-A-Time)**: Mỗi phiên chỉ tập trung vào 1 feature/stage duy nhất. Tuân thủ nghiêm ngặt Dependency DAG (`dependencies: [...]`), không sửa lan man ngoài Blast Radius (Rule 138).
 
-### 3. Phân Hệ 3: Verification Subsystem (Fail-Fast & Anti-Premature Victory Gate)
-- **Chống Tuyên Bố Chiến Thắng Sớm (Lecture 9 Law)**: CẤM TUYỆT ĐỐI agent tự đánh giá công việc của mình bằng lời nói chủ quan ("tôi nghĩ là ổn rồi", "chắc chắn đã xong").
+### 3. Phân Hệ 3: Persistent State & Memory Governor
+- **Cấm Nhớ Mồm Trong Chat**: Toàn bộ tiến độ, phân nhánh và kết quả thực thi bắt buộc lưu xuống đĩa cứng vật lý (`feature_list.json`, `progress.md`, `ROADMAP.md`, `CHANGELOG.md`).
+- **Two-Step Save Invariant**: Ghi nhận chi tiết vào topic file/report trước, sau đó mới cập nhật pointer vào index/manifest. Đảm bảo khôi phục 100% ngữ cảnh sau compaction hoặc ngắt phiên.
+- **Specification & Memory Traceability**: Thay đổi kiến trúc tuân theo quy trình 2 bản vẽ (`specs/business_flow_template.md`, `specs/design_spec_template.md`). Duy trì `ROADMAP.md` và `CHANGELOG.md` chuẩn Keep a Changelog. Chạy `python scripts/orchestrator/memory_governor.py --strict` trước khi kết thúc phiên để bảo chứng không mất ngữ cảnh (Anti-Amnesia - Rule 124).
+- **Model-Visible Means Logged (DeepSeek Invariant)**: Mọi prompt, ngữ cảnh hoặc output quan trọng model đọc/ghi đều phải được log vào session history (`logs/*.jsonl`) để có thể tái hiện chuỗi suy luận.
+
+### 4. Phân Hệ 4: Verification Subsystem (Fail-Fast & Anti-Premature Victory Gate)
+- **Chống Tuyên Bố Chiến Thắng Sớm (Zero-Subjective-Claim)**: CẤM TUYỆT ĐỐI agent tự đánh giá công việc bằng lời nói chủ quan ("tôi nghĩ là ổn rồi", "chắc chắn đã xong").
 - **Evidence-Based Completion (Definition of Done - DoD 4 Tiêu Chí)**:
-  1. Đã triển khai xong đúng hành vi mục tiêu (Behavior Implemented).
-  2. Đã chạy lệnh kiểm thử thực tế với chế độ Fail-Fast (`set -e` hoặc exit code `0`).
-  3. In và ghi nhận bằng chứng pháp y (`evidence`: stdout, diff lines, HTTP 200, test passes) vào `feature_list.json` hoặc báo cáo nghiệm thu.
-  4. Hệ thống vẫn khởi động lại sạch sẽ được (Restartable Clean State).
+  1. *Behavior Implemented*: Đã triển khai xong đúng hành vi mục tiêu theo khế ước.
+  2. *Fail-Fast Runtime*: Đã chạy lệnh kiểm thử thực tế với exit code `0` (Rule 121, Rule 127).
+  3. *Forensic Evidence Recorded*: Ghi nhận bằng chứng pháp y (stdout, diff lines, HTTP 200, test passes) vào `feature_list.json` hoặc báo cáo nghiệm thu.
+  4. *Restartable Clean State*: Hệ thống khởi động lại sạch sẽ, không còn dependency rác.
 
-### 4. Phân Hệ 4: Scope Subsystem (One-Feature-At-A-Time & Blast Radius Control)
-- **Nguyên Tắc 1 Tính Năng Mỗi Lần (One-Feature-At-A-Time)**: Mỗi phiên làm việc chỉ tập trung vào 1 feature/stage duy nhất. Cấm ôm đồm sửa lan man nhiều file không liên quan.
-- **Dependency DAG**: Tuân thủ nghiêm ngặt quan hệ phụ thuộc (`dependencies: [...]`). Không triển khai tính năng khi các tính năng tiền đề chưa hoàn thành và chưa có verification evidence.
-- **Blast Radius Enforcer**: Tuyệt đối không can thiệp vào các module ngoài phạm vi của task hiện tại trừ khi có sự phê duyệt rõ ràng từ User.
-
-### 5. Phân Hệ 5: Session Lifecycle & Handoff Subsystem (Clean State & Cross-Session Continuity)
-- **Quy Trình Kết Thúc Phiên (End-of-Session Routine)**:
+### 5. Phân Hệ 5: Session Lifecycle & Clean Handoff Subsystem
+- **Quy Trình Kết Thúc Phiên 5 Bước (End-of-Session Routine)**:
   1. Cập nhật `progress.md` (What's Done, What's In Progress, What's Next, Blockers/Risks).
   2. Cập nhật `feature_list.json` với trạng thái mới (`completed`, `in-progress`) kèm `evidence`.
-  3. Tạo commit Git mô tả chuẩn Conventional Commits.
-  4. Thực hiện Two-Phase Eviction: Dọn sạch file scratch/tạm tại `/tmp/`, thu hồi zombie processes qua `resource_recycler.py`.
-  5. Đảm bảo phiên tiếp theo (hoặc Agent khác) có thể khởi chạy ngay lập tức mà không cần hỏi lại từ đầu.
+  3. Tạo commit Git mô tả chuẩn Conventional Commits (`feat:`, `fix:`, `refactor:`).
+  4. Thực hiện Two-Phase Eviction: Dọn sạch file scratch/tạm tại `/tmp/`, thu hồi zombie processes qua `resource_recycler.py` (Rule 119).
+  5. Bảo đảm phiên tiếp theo (hoặc subagent khác) có thể tiếp quản ngay lập tức mà không cần hỏi lại từ đầu.

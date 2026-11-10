@@ -2032,7 +2032,8 @@ def build_cl3_paper_diorama_prompt(
         target_substrate = (
             f"Target Substrate: The document surface is dense with pre-printed forensic evidence—never a blank void. "
             f"It features dense micro-tabular financial ledger rows with authentic illegible {script_mkt} fine-print audit rows, "
-            f"a designated circular target stamp zone with dotted red perimeter ring, and faint pre-printed watermark security patterns awaiting the stamp."
+            f"a designated circular target stamp zone with dotted red perimeter ring, carved relief matrix and wet ink bleed seal matrix textures, "
+            f"and faint pre-printed watermark security patterns awaiting the stamp. Never an empty blank circle outline."
         )
     else:
         target_substrate = (
@@ -2156,7 +2157,8 @@ def build_cl3_paper_diorama_image_prompt(
         target_substrate = (
             f"Target Substrate: The document surface is dense with pre-printed forensic evidence—never a blank void. "
             f"It features dense micro-tabular financial ledger rows with authentic illegible {script_mkt} fine-print audit rows, "
-            f"a designated circular target stamp zone with dotted red perimeter ring, and faint pre-printed watermark security patterns awaiting the stamp. ZERO stamp tool drawn on document."
+            f"a designated circular target stamp zone with dotted red perimeter ring, carved relief matrix and wet ink bleed seal matrix textures, "
+            f"and faint pre-printed watermark security patterns awaiting the stamp. Never an empty blank circle outline. ZERO stamp tool drawn on document."
         )
     else:
         target_substrate = (
@@ -2165,8 +2167,19 @@ def build_cl3_paper_diorama_image_prompt(
         )
 
     shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}\n{target_substrate}"
-    text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only. ZERO hex code text, ZERO color labels printed on paper."
+    if resolved_market not in ("EN", "US", "GB"):
+        text_control = (
+            f"TEXT CONTROL: Strict {script_mkt} vernacular context only. "
+            f"Strictly NO English text, NO Latin letters, NO English words, NO English labels, NO floating English typography, "
+            f"NO Western alphabet on non-English documents, NO garbled letters, NO romanized words. "
+            f"Paper documents feature soft, authentic, illegible printed {script_mkt} texture only. "
+            f"ZERO hex code text, ZERO color labels printed on paper."
+        )
+    else:
+        text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only. ZERO hex code text, ZERO color labels printed on paper."
     avoid_block = reg.resolve_avoid_block("STATIC_OVERHEAD", trace=trace)
+    if resolved_market not in ("EN", "US", "GB"):
+        avoid_block = f"{avoid_block}, no English words, no Latin alphabet, no English labels, no floating English text, no romanized letters"
     res = f"{style_block}\n\n{shot_block}\n\n{text_control}\n\n{avoid_block}".strip()
 
     # Strip any remaining hex code tokens to prevent Imagen literal text hallucination

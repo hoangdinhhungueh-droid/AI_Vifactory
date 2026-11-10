@@ -159,6 +159,7 @@ class StoryScriptCriticGates(BaseModel):
     legal_language_matches_status: bool = True
     hook_within_20s: bool = True
     pattern_interrupt_gap_ok: bool = True
+    target_market_language_compliance: bool = True
 
 
 class StoryCriticViolation(BaseModel):

@@ -1,0 +1,240 @@
+{
+  "scenes": [
+    {
+      "id": "opt1_scene_02",
+      "scene_id": "SCENE_02",
+      "component": "VoxBuildOnStage",
+      "durationInFrames": 179,
+      "durationSec": 5.98,
+      "headline": "THE 10X MULTIPLIER",
+      "editorialHeadline": "RANSOM NEGOTIATION EFFICIENCY",
+      "statValue": "10X",
+      "statLabel": "RANSOM NEGOTIATION EFFICIENCY",
+      "sourceTag": "UK FORENSIC EXPERT TESTIMONY // 2026.10.09",
+      "sourceCredit": "UK FORENSIC EXPERT TESTIMONY // 2026.10.09",
+      "accentColor": "#C85A32",
+      "background": "videos/opuscar_scene_02_omni.mp4",
+      "backgroundSrc": "videos/opuscar_scene_02_omni.mp4",
+      "layoutVariant": "paper_collage",
+      "narration": "英国の専門家が警告する、「身代金交渉の効率10倍」。",
+      "subtitles": [
+        {
+          "word": "英国",
+          "start": 0.0,
+          "end": 0.46,
+          "start_ms": 0.0,
+          "end_ms": 460.0
+        },
+        {
+          "word": "の",
+          "start": 0.46,
+          "end": 0.68,
+          "start_ms": 460.0,
+          "end_ms": 680.0
+        },
+        {
+          "word": "専門家",
+          "start": 0.68,
+          "end": 1.42,
+          "start_ms": 680.0,
+          "end_ms": 1420.0
+        },
+        {
+          "word": "が",
+          "start": 1.42,
+          "end": 1.62,
+          "start_ms": 1420.0,
+          "end_ms": 1620.0
+        },
+        {
+          "word": "警告",
+          "start": 1.62,
+          "end": 2.24,
+          "start_ms": 1620.0,
+          "end_ms": 2240.0
+        },
+        {
+          "word": "する、",
+          "start": 2.24,
+          "end": 2.78,
+          "start_ms": 2240.0,
+          "end_ms": 2780.0
+        },
+        {
+          "word": "身代金",
+          "start": 2.78,
+          "end": 3.42,
+          "start_ms": 2780.0,
+          "end_ms": 3420.0
+        },
+        {
+          "word": "交渉",
+          "start": 3.42,
+          "end": 3.96,
+          "start_ms": 3420.0,
+          "end_ms": 3960.0
+        },
+        {
+          "word": "の",
+          "start": 3.96,
+          "end": 4.14,
+          "start_ms": 3960.0,
+          "end_ms": 4140.0
+        },
+        {
+          "word": "効率",
+          "start": 4.14,
+          "end": 4.58,
+          "start_ms": 4140.0,
+          "end_ms": 4580.0
+        },
+        {
+          "word": "10倍。",
+          "start": 4.58,
+          "end": 5.38,
+          "start_ms": 4580.0,
+          "end_ms": 5380.0
+        }
+      ],
+      "words": [
+        {
+          "word": "英国",
+          "start": 0.0,
+          "end": 0.46,
+          "start_ms": 0.0,
+          "end_ms": 460.0
+        },
+        {
+          "word": "の",
+          "start": 0.46,
+          "end": 0.68,
+          "start_ms": 460.0,
+          "end_ms": 680.0
+        },
+        {
+          "word": "専門家",
+          "start": 0.68,
+          "end": 1.42,
+          "start_ms": 680.0,
+          "end_ms": 1420.0
+        },
+        {
+          "word": "が",
+          "start": 1.42,
+          "end": 1.62,
+          "start_ms": 1420.0,
+          "end_ms": 1620.0
+        },
+        {
+          "word": "警告",
+          "start": 1.62,
+          "end": 2.24,
+          "start_ms": 1620.0,
+          "end_ms": 2240.0
+        },
+        {
+          "word": "する、",
+          "start": 2.24,
+          "end": 2.78,
+          "start_ms": 2240.0,
+          "end_ms": 2780.0
+        },
+        {
+          "word": "身代金",
+          "start": 2.78,
+          "end": 3.42,
+          "start_ms": 2780.0,
+          "end_ms": 3420.0
+        },
+        {
+          "word": "交渉",
+          "start": 3.42,
+          "end": 3.96,
+          "start_ms": 3420.0,
+          "end_ms": 3960.0
+        },
+        {
+          "word": "の",
+          "start": 3.96,
+          "end": 4.14,
+          "start_ms": 3960.0,
+          "end_ms": 4140.0
+        },
+        {
+          "word": "効率",
+          "start": 4.14,
+          "end": 4.58,
+          "start_ms": 4140.0,
+          "end_ms": 4580.0
+        },
+        {
+          "word": "10倍。",
+          "start": 4.58,
+          "end": 5.38,
+          "start_ms": 4580.0,
+          "end_ms": 5380.0
+        }
+      ],
+      "theme": "newsprint-editorial",
+      "steppedPunches": [
+        {
+          "frame": 0,
+          "scale": 1.0,
+          "rotateZ": 0,
+          "x": 0,
+          "y": 0,
+          "hold": 50
+        },
+        {
+          "frame": 50,
+          "scale": 1.25,
+          "rotateZ": -1.5,
+          "x": 40,
+          "y": -20,
+          "hold": 60,
+          "whipFrames": 7,
+          "curve": "whip"
+        },
+        {
+          "frame": 120,
+          "scale": 1.15,
+          "rotateZ": 0,
+          "x": 20,
+          "y": -10,
+          "hold": 59,
+          "whipFrames": 8,
+          "curve": "whip"
+        }
+      ],
+      "supportingCutouts": [
+        {
+          "id": "cutout_uk_memo",
+          "label": "UK EXPERT DOSSIER",
+          "role": "EXHIBIT // CRIME ARCHIVE",
+          "xPct": 22,
+          "yPct": 50,
+          "widthPct": 24,
+          "rotation": -3.5,
+          "delaySec": 0.8,
+          "entranceType": "slide_in_deal",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "英国専門家警告 // 10倍"
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 25,
+          "fromY": 54,
+          "toX": 68,
+          "toY": 48,
+          "color": "#dc2626",
+          "delaySec": 1.8
+        }
+      ],
+      "stampText": "10X LEVERAGE // VERIFIED",
+      "stampColor": "#dc2626",
+      "hasMarkerHighlight": true
+    }
+  ]
+}

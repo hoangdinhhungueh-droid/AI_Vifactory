@@ -57,30 +57,30 @@
         {
           "word": "10",
           "start": 1.14,
-          "end": 1.34,
+          "end": 1.36,
           "start_ms": 1140.0,
-          "end_ms": 1340.0
+          "end_ms": 1360.0
         },
         {
           "word": "月",
-          "start": 1.34,
+          "start": 1.36,
           "end": 1.6,
-          "start_ms": 1340.0,
+          "start_ms": 1360.0,
           "end_ms": 1600.0
         },
         {
-          "word": "5",
+          "word": "9",
           "start": 1.6,
-          "end": 1.74,
+          "end": 1.76,
           "start_ms": 1600.0,
-          "end_ms": 1740.0
+          "end_ms": 1760.0
         },
         {
           "word": "日、",
-          "start": 1.74,
-          "end": 2.1,
-          "start_ms": 1740.0,
-          "end_ms": 2100.0
+          "start": 1.76,
+          "end": 2.12,
+          "start_ms": 1760.0,
+          "end_ms": 2120.0
         },
         {
           "word": "テ",
@@ -134,15 +134,15 @@
         {
           "word": "え",
           "start": 3.66,
-          "end": 3.78,
+          "end": 3.8,
           "start_ms": 3660.0,
-          "end_ms": 3780.0
+          "end_ms": 3800.0
         },
         {
           "word": "た",
-          "start": 3.78,
+          "start": 3.8,
           "end": 3.92,
-          "start_ms": 3780.0,
+          "start_ms": 3800.0,
           "end_ms": 3920.0
         },
         {
@@ -176,23 +176,9 @@
         {
           "word": "告。",
           "start": 4.68,
-          "end": 4.9,
+          "end": 4.92,
           "start_ms": 4680.0,
-          "end_ms": 4900.0
-        },
-        {
-          "word": "も",
-          "start": 4.9,
-          "end": 5.8,
-          "start_ms": 4900.0,
-          "end_ms": 5800.0
-        },
-        {
-          "word": "っ",
-          "start": 5.8,
-          "end": 5.8,
-          "start_ms": 5800.0,
-          "end_ms": 5800.0
+          "end_ms": 4920.0
         }
       ],
       "words": [
@@ -220,30 +206,30 @@
         {
           "word": "10",
           "start": 1.14,
-          "end": 1.34,
+          "end": 1.36,
           "start_ms": 1140.0,
-          "end_ms": 1340.0
+          "end_ms": 1360.0
         },
         {
           "word": "月",
-          "start": 1.34,
+          "start": 1.36,
           "end": 1.6,
-          "start_ms": 1340.0,
+          "start_ms": 1360.0,
           "end_ms": 1600.0
         },
         {
-          "word": "5",
+          "word": "9",
           "start": 1.6,
-          "end": 1.74,
+          "end": 1.76,
           "start_ms": 1600.0,
-          "end_ms": 1740.0
+          "end_ms": 1760.0
         },
         {
           "word": "日、",
-          "start": 1.74,
-          "end": 2.1,
-          "start_ms": 1740.0,
-          "end_ms": 2100.0
+          "start": 1.76,
+          "end": 2.12,
+          "start_ms": 1760.0,
+          "end_ms": 2120.0
         },
         {
           "word": "テ",
@@ -297,15 +283,15 @@
         {
           "word": "え",
           "start": 3.66,
-          "end": 3.78,
+          "end": 3.8,
           "start_ms": 3660.0,
-          "end_ms": 3780.0
+          "end_ms": 3800.0
         },
         {
           "word": "た",
-          "start": 3.78,
+          "start": 3.8,
           "end": 3.92,
-          "start_ms": 3780.0,
+          "start_ms": 3800.0,
           "end_ms": 3920.0
         },
         {
@@ -339,23 +325,9 @@
         {
           "word": "告。",
           "start": 4.68,
-          "end": 4.9,
+          "end": 4.92,
           "start_ms": 4680.0,
-          "end_ms": 4900.0
-        },
-        {
-          "word": "も",
-          "start": 4.9,
-          "end": 5.8,
-          "start_ms": 4900.0,
-          "end_ms": 5800.0
-        },
-        {
-          "word": "っ",
-          "start": 5.8,
-          "end": 5.8,
-          "start_ms": 5800.0,
-          "end_ms": 5800.0
+          "end_ms": 4920.0
         }
       ],
       "motionDirective": "opuscar_snappy",
@@ -522,15 +494,15 @@
         {
           "word": "10",
           "start": 4.04,
-          "end": 4.3,
+          "end": 4.28,
           "start_ms": 4040.0,
-          "end_ms": 4300.0
+          "end_ms": 4280.0
         },
         {
           "word": "倍。",
-          "start": 4.3,
+          "start": 4.28,
           "end": 4.5,
-          "start_ms": 4300.0,
+          "start_ms": 4280.0,
           "end_ms": 4500.0
         }
       ],
@@ -664,15 +636,15 @@
         {
           "word": "10",
           "start": 4.04,
-          "end": 4.3,
+          "end": 4.28,
           "start_ms": 4040.0,
-          "end_ms": 4300.0
+          "end_ms": 4280.0
         },
         {
           "word": "倍。",
-          "start": 4.3,
+          "start": 4.28,
           "end": 4.5,
-          "start_ms": 4300.0,
+          "start_ms": 4280.0,
           "end_ms": 4500.0
         }
       ],

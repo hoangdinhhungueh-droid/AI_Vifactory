@@ -86,11 +86,38 @@ class RunManifest(BaseModel):
             st.error = None
             if artifact_sha256:
                 st.artifact_sha256 = artifact_sha256
-        elif status == "failed":
-            st.finished_at = now
-            st.error = error
+        elif status == "pending":
+            st.artifact_sha256 = None
+            st.finished_at = None
+            st.error = None
 
         self.updated_at = now
+
+    def invalidate_downstream(
+        self,
+        from_stage: StageID,
+        inclusive: bool = True,
+        paths: Optional[RunPaths] = None
+    ) -> None:
+        """Resets status to 'pending' and clears artifact_sha256 for all stages from from_stage onwards.
+        If paths is provided, purges stale artifact files on disk to prevent split-brain reads.
+        """
+        all_stages = list(StageID)
+        try:
+            start_idx = all_stages.index(from_stage)
+        except ValueError:
+            return
+        if not inclusive:
+            start_idx += 1
+        for s in all_stages[start_idx:]:
+            self.mark(s, "pending", artifact_sha256=None)
+            if paths:
+                try:
+                    art_file = paths.artifact_file(s.value)
+                    if art_file.exists():
+                        art_file.unlink()
+                except Exception:
+                    pass
 
     def save_atomic(self, paths: RunPaths) -> Path:
         """Atomically saves manifest to run root."""

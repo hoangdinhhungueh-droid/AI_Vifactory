@@ -39,7 +39,10 @@ FILES_TO_SYNC = [
     "config/prompts/cl3_vox_engine/video_prompts_system.md",
     "config/prompts/cl3_vox_engine/canonical_backgrounds.json",
     "config/prompts/cl3_vox_engine/MANIFEST.json",
+    "core/run_manifest.py",
+    "app/schemas/story_contracts.py",
     "config/prompts/story_forensic/s03_script.md",
+    "config/prompts/story_forensic/s04_critic_script.md",
     "config/prompts/story_forensic/s05_director_plan.md",
     "config/prompts/story_forensic/s07_image_gen.md",
     "config/prompts/story_forensic/s07_image_style_prefix.md",
@@ -88,6 +91,7 @@ FILES_TO_SYNC = [
     "stages/s08_video_gen.py",
     "scripts/flow_video_dispatcher.py",
     "scripts/sync_to_vps.py",
+    "scripts/vps_runner.py",
     "scripts/run_vox_media_pipeline.py",
     "scripts/build_pilot_3min_and_evaluate.py",
     "scripts/render_episode_parameterized.py",
@@ -102,6 +106,8 @@ FILES_TO_SYNC = [
     "tests/test_instinct_manager.py",
     "tests/test_caller_integration_and_drift.py",
     "tests/test_prompt_forge.py",
+    "app/services/seo_package_forge.py",
+    "tests/unit/test_s01_s04_system_remediation.py",
     "docs/plans/2026-10-30-vox-v3-systemic-reform-plan.md",
 ]
 

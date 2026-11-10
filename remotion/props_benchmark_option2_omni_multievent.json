@@ -1,0 +1,182 @@
+{
+  "scenes": [
+    {
+      "id": "opt2_scene_02",
+      "scene_id": "SCENE_02",
+      "component": "VoxBuildOnStage",
+      "durationInFrames": 179,
+      "durationSec": 5.98,
+      "headline": "THE DIVISION OF LABOR",
+      "editorialHeadline": "INTERNATIONAL INFRASTRUCTURE SEVER",
+      "statValue": "10X",
+      "statLabel": "CRITICAL ATTACK MULTIPLIER",
+      "sourceTag": "FORENSIC JURISDICTION ANALYSIS // 2026",
+      "sourceCredit": "FORENSIC JURISDICTION ANALYSIS // 2026",
+      "accentColor": "#C85A32",
+      "background": "videos/benchmark_opt2_omni.mp4",
+      "backgroundSrc": "videos/benchmark_opt2_omni.mp4",
+      "layoutVariant": "cinematic_doc",
+      "narration": "英国の専門家が警告する、「身代金交渉の効率10倍」。",
+      "subtitles": [
+        {
+          "word": "英国",
+          "start": 0.0,
+          "end": 0.46,
+          "start_ms": 0.0,
+          "end_ms": 460.0
+        },
+        {
+          "word": "の",
+          "start": 0.46,
+          "end": 0.68,
+          "start_ms": 460.0,
+          "end_ms": 680.0
+        },
+        {
+          "word": "専門家",
+          "start": 0.68,
+          "end": 1.42,
+          "start_ms": 680.0,
+          "end_ms": 1420.0
+        },
+        {
+          "word": "が",
+          "start": 1.42,
+          "end": 1.62,
+          "start_ms": 1420.0,
+          "end_ms": 1620.0
+        },
+        {
+          "word": "警告",
+          "start": 1.62,
+          "end": 2.24,
+          "start_ms": 1620.0,
+          "end_ms": 2240.0
+        },
+        {
+          "word": "する、",
+          "start": 2.24,
+          "end": 2.78,
+          "start_ms": 2240.0,
+          "end_ms": 2780.0
+        },
+        {
+          "word": "身代金",
+          "start": 2.78,
+          "end": 3.42,
+          "start_ms": 2780.0,
+          "end_ms": 3420.0
+        },
+        {
+          "word": "交渉",
+          "start": 3.42,
+          "end": 3.96,
+          "start_ms": 3420.0,
+          "end_ms": 3960.0
+        },
+        {
+          "word": "の",
+          "start": 3.96,
+          "end": 4.14,
+          "start_ms": 3960.0,
+          "end_ms": 4140.0
+        },
+        {
+          "word": "効率",
+          "start": 4.14,
+          "end": 4.58,
+          "start_ms": 4140.0,
+          "end_ms": 4580.0
+        },
+        {
+          "word": "10倍。",
+          "start": 4.58,
+          "end": 5.38,
+          "start_ms": 4580.0,
+          "end_ms": 5380.0
+        }
+      ],
+      "words": [
+        {
+          "word": "英国",
+          "start": 0.0,
+          "end": 0.46,
+          "start_ms": 0.0,
+          "end_ms": 460.0
+        },
+        {
+          "word": "の",
+          "start": 0.46,
+          "end": 0.68,
+          "start_ms": 460.0,
+          "end_ms": 680.0
+        },
+        {
+          "word": "専門家",
+          "start": 0.68,
+          "end": 1.42,
+          "start_ms": 680.0,
+          "end_ms": 1420.0
+        },
+        {
+          "word": "が",
+          "start": 1.42,
+          "end": 1.62,
+          "start_ms": 1420.0,
+          "end_ms": 1620.0
+        },
+        {
+          "word": "警告",
+          "start": 1.62,
+          "end": 2.24,
+          "start_ms": 1620.0,
+          "end_ms": 2240.0
+        },
+        {
+          "word": "する、",
+          "start": 2.24,
+          "end": 2.78,
+          "start_ms": 2240.0,
+          "end_ms": 2780.0
+        },
+        {
+          "word": "身代金",
+          "start": 2.78,
+          "end": 3.42,
+          "start_ms": 2780.0,
+          "end_ms": 3420.0
+        },
+        {
+          "word": "交渉",
+          "start": 3.42,
+          "end": 3.96,
+          "start_ms": 3420.0,
+          "end_ms": 3960.0
+        },
+        {
+          "word": "の",
+          "start": 3.96,
+          "end": 4.14,
+          "start_ms": 3960.0,
+          "end_ms": 4140.0
+        },
+        {
+          "word": "効率",
+          "start": 4.14,
+          "end": 4.58,
+          "start_ms": 4140.0,
+          "end_ms": 4580.0
+        },
+        {
+          "word": "10倍。",
+          "start": 4.58,
+          "end": 5.38,
+          "start_ms": 4580.0,
+          "end_ms": 5380.0
+        }
+      ],
+      "theme": "newsprint-editorial",
+      "cameraMovement": "locked"
+    }
+  ]
+}

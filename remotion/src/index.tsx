@@ -2319,6 +2319,8 @@ export const TwoLayerEpisode: React.FC<{
           /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.backgroundSrc)) ||
         (currentSceneInfo.scene.targetBackground &&
           /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.targetBackground)) ||
+        (currentSceneInfo.scene.video_clip_path &&
+          /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.video_clip_path)) ||
         (currentSceneInfo.scene.video &&
           /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.video)))
   );
@@ -2344,7 +2346,7 @@ export const TwoLayerEpisode: React.FC<{
       cursor += dur;
 
       const durationSec = dur / (cfg.fps || 30);
-      const bgRaw = s.background || s.backgroundSrc || s.targetBackground;
+      const bgRaw = s.background || s.backgroundSrc || s.targetBackground || s.video_clip_path || s.video;
       const bgSrc = bgRaw ? resolveSrc(bgRaw) : undefined;
 
       const heroRaw = (s.foreground !== undefined && s.foreground !== null) ? (s.foreground || undefined) : (s.heroSrc || s.primary_hero?.src || s.targetHeroSrc);
@@ -2424,8 +2426,8 @@ export const TwoLayerEpisode: React.FC<{
             heroPosition={resolvedHeroPosition}
             supportingCutouts={resolvedCutouts}
             yarns={rawYarns}
-            stampText={s.stampText}
-            stampColor={s.stampColor || "#dc2626"}
+            stampText={s.stampText || s.stamp_text || (Array.isArray(s.tactile_props) && s.tactile_props.length > 0 ? s.tactile_props[0] : undefined)}
+            stampColor={s.stampColor || s.stamp_color || s.color_accent || "#D62E1F"}
             hasMarkerHighlight={s.hasMarkerHighlight !== false}
             durationSec={durationSec}
             layoutVariant={resolvedLayoutVariant}

@@ -283,7 +283,7 @@ def execute_pipeline(
     print("-" * 75)
     from core.market_resolver import resolve_canonical_market
 
-    raw_m = market or os.getenv("VF_MARKET") or os.getenv("MARKET") or getattr(loaded_preset, "market", "EN") or "EN"
+    raw_m = market or getattr(manifest, "market", None) or os.getenv("VF_MARKET") or os.getenv("MARKET") or getattr(loaded_preset, "market", "EN") or "EN"
     canonical_m = resolve_canonical_market(raw_m)
     manifest.market = canonical_m
     if config is not None:
@@ -388,6 +388,8 @@ def execute_pipeline(
             print(f"❌ [CONFIGURATION ERROR]: Unknown --from stage '{from_stage}'. Available: {[s.value for s in stage_list]}")
             return 1
         start_idx = resolved_from
+        manifest.invalidate_downstream(stage_list[start_idx], inclusive=True, paths=paths)
+        manifest.save_atomic(paths)
 
     end_idx = len(stage_list) - 1
     if effective_to:
@@ -451,6 +453,8 @@ def execute_pipeline(
 
             sha_new = compute_file_sha256(art_path) if art_path.exists() else "none"
             manifest.mark(stage, "done", artifact_sha256=sha_new)
+            # Upstream stage produced a new artifact -> invalidate downstream stages to prevent split-brain
+            manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
             manifest.save_atomic(paths)
             try:
                 print(f"   ✅ PASS (Artifact emitted: {art_path.name})")
