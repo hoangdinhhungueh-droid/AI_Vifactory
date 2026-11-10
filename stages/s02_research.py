@@ -7,6 +7,7 @@ Implements Stage Shape Standard. Extracts factual grounding factsheet and narrat
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -14,6 +15,8 @@ from core.config import RunContext
 from core.contracts.stages import Provenance, StageArtifact, StageID
 from core.gates import emit_artifact, require_input
 from tools.codemap.runtime import pipeline_stage
+
+logger = logging.getLogger(__name__)
 
 STAGE: StageID = StageID.S2_RESEARCH
 
@@ -173,7 +176,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     TimelineEvent(date="2024-03-01", event=f"{antagonist_name} 관련 주요 상업 계약 및 금융 약정 체결.", claim_ids=["C002"]),
                     TimelineEvent(date="2024-05-20", event=f"시장 유동성 축소와 함께 {topic_name} 관련 재무적 압박 가시화.", claim_ids=["C003"]),
                     TimelineEvent(date="2024-08-10", event=f"감독 당국, {topic_name}에 대한 정밀 회계 및 구조적 리스크 조사 착수.", claim_ids=["C004"]),
-                    TimelineEvent(date="2024-11-15", event=f"계약 불이행 및 이해상충 관련 민원 제기 및 법적 분쟁 확산.", claim_ids=["C005"]),
+                    TimelineEvent(date="2024-11-15", event="계약 불이행 및 이해상충 관련 민원 제기 및 법적 분쟁 확산.", claim_ids=["C005"]),
                     TimelineEvent(date="2025-01-20", event=f"사법 기관, {topic_name} 관련 혐의로 정식 수사 및 기소.", claim_ids=["C006"]),
                     TimelineEvent(date="2025-06-30", event=f"감독 당국 공식 제재 및 제도 개선안 확정: {s1_outcome}", claim_ids=["C007"]),
                 ]

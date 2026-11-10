@@ -7,12 +7,15 @@ Implements Stage Shape Standard. Discovers live high-potential editorial topics.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, StageArtifact, StageID
 from core.gates import emit_artifact
 from tools.codemap.runtime import pipeline_stage
+
+logger = logging.getLogger(__name__)
 
 STAGE: StageID = StageID.S1_IDEATION
 

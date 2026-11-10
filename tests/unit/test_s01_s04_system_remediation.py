@@ -8,11 +8,9 @@ Tests:
 4. S03 multi-market legal qualifiers (localized prefixes for KR, JA, VN, EN; zero hardcoded English leaks).
 5. S04 language gate & critic scoring (English in KR market fails immediately, dynamic scoring).
 """
-import pytest
-from core.run_manifest import RunManifest, StageState
 from core.contracts.stages import StageID
-from app.schemas.story_contracts import EvidenceClaim
-from stages.s03_script import _apply_legal_qualifier, _get_market_legal_qualifiers
+from core.run_manifest import RunManifest
+from stages.s03_script import _apply_legal_qualifier
 
 
 def test_manifest_invalidate_downstream():

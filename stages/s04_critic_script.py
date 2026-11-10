@@ -9,14 +9,14 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+from core.config import RunContext
+from core.contracts.stages import CouncilDecision, CriticVerdict, Provenance, StageArtifact, StageID
+from core.gates import emit_artifact, require_input
+from tools.codemap.runtime import pipeline_stage
 
 logger = logging.getLogger(__name__)
-
-from core.contracts.stages import StageID, StageArtifact, Provenance, CouncilDecision, CriticVerdict
-from core.config import RunContext
-from core.gates import require_input, emit_artifact
-from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S4_CRITIC_SCRIPT
 
@@ -43,7 +43,7 @@ def run(ctx: RunContext) -> StageArtifact:
     is_story = bool(preset_raw in ("story_forensic", "vox_narrative"))
 
     if is_story:
-        from app.schemas.story_contracts import StoryScriptCriticPayload, StoryScriptCriticGates, StoryCriticViolation
+        from app.schemas.story_contracts import StoryCriticViolation, StoryScriptCriticGates, StoryScriptCriticPayload
 
         beats = s3_art.payload.get("beats", [])
         evidence_raw = s3_art.payload.get("evidence_ledger", [])
@@ -228,6 +228,7 @@ def run(ctx: RunContext) -> StageArtifact:
         if not ctx.dry_run:
             try:
                 import json
+
                 from app.services.model_gateway import get_global_gateway
                 from core.llm_json import parse_llm_json
                 gateway = get_global_gateway()
