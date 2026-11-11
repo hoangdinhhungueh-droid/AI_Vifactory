@@ -160,6 +160,8 @@ class StoryScriptCriticGates(BaseModel):
     hook_within_20s: bool = True
     pattern_interrupt_gap_ok: bool = True
     target_market_language_compliance: bool = True
+    topic_specificity_gate: bool = True
+    claim_coverage_gate: bool = True
 
 
 class StoryCriticViolation(BaseModel):
