@@ -1186,6 +1186,12 @@ def run(ctx: RunContext) -> StageArtifact:
                     "- Do NOT merely state neutral factual announcements in Beat 1. The hook must grab the viewer by exposing the shocking systemic paradox within the first 20 seconds.\n\n"
                 )
                 user_prompt += (
+                    "CRITICAL CITATION INTEGRITY & FACTUAL ACCURACY MANDATE:\n"
+                    "- Every line that cites a claim_id (e.g. ['C001']) MUST strictly ground its factual assertions in that specific claim from the evidence ledger.\n"
+                    "- DO NOT cite claims on lines that contain unverified quantitative figures or ratios not supported by those claims.\n"
+                    "- When posing the Beat 1 central paradox or question in B1_L03/B1_L04, ensure any cited claims directly substantiate the premises or institutional paradox described.\n\n"
+                )
+                user_prompt += (
                     "Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'grease_pencil'.\n\n"
                     "CRITICAL FORMAT MANDATE:\n"
                     "Start response immediately with { and end with }. Output ONLY valid JSON adhering to schema with NO conversational preamble or thinking."
