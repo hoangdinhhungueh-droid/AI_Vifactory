@@ -62,7 +62,7 @@ def run(ctx: RunContext) -> StageArtifact:
         preset_obj = ctx.preset if hasattr(ctx.preset, "duration_window_s") else None
         if not preset_obj:
             try:
-                from core.preset_loader import load_preset
+                from app.services.preset_loader import load_preset
                 preset_obj = load_preset(preset_raw)
             except Exception:
                 preset_obj = None
@@ -262,6 +262,14 @@ def run(ctx: RunContext) -> StageArtifact:
                 if len(cleaned_p) >= 2:
                     evidence_entities.add(cleaned_p.lower())
 
+            # Hangul phrases (>= 2 chars)
+            for h in re.findall(r"[\uac00-\ud7a3]{2,}", c_text):
+                evidence_entities.add(h.lower())
+
+            # CJK / Japanese phrases (>= 2 chars)
+            for j in re.findall(r"[\u3040-\u30ff\u4e00-\u9fff]{2,}", c_text):
+                evidence_entities.add(j.lower())
+
             # Acronyms & proper nouns in English
             cap_words = re.findall(r"\b[A-Z][a-zA-Z0-9_]{2,}\b", c_text)
             for cw in cap_words:
@@ -277,11 +285,11 @@ def run(ctx: RunContext) -> StageArtifact:
             if "jeonse" in t_lower or "전세" in c_text:
                 evidence_entities.update(["jeonse", "전세", "チョンセ", "tiền cọc"])
             if "villa king" in t_lower or "빌라왕" in c_text:
-                evidence_entities.update(["villa king", "빌라왕", "ヴィラ王", "vua biệt thự"])
+                evidence_entities.update(["villa king", "villa kings", "빌라왕", "ヴィラ王", "vua biệt thự"])
             if "proxy landlord" in t_lower or "strawmen" in t_lower or "바지임대인" in c_text:
-                evidence_entities.update(["proxy landlord", "바지임대인", "名義貸し", "chủ nhà bù nhìn"])
-            if "gap investment" in t_lower or "zero capital" in t_lower or "무자본" in c_text:
-                evidence_entities.update(["gap investment", "무자본", "갭투자", "ギャップ投資", "không vốn"])
+                evidence_entities.update(["proxy landlord", "proxy landlords", "strawmen", "바지임대인", "名義貸し", "chủ nhà bù nhìn"])
+            if "gap investment" in t_lower or "zero capital" in t_lower or "무자본" in c_text or "갭투자" in c_text:
+                evidence_entities.update(["gap investment", "무자본", "갭투자", "ギャップ投資", "không vốn", "chênh lệch"])
             if "minimum guarantee" in t_lower or "최소보장제" in c_text:
                 evidence_entities.update(["minimum guarantee", "최소보장제", "最低保証", "bảo lãnh tối thiểu"])
             if "gyeonggi" in t_lower or "경기" in c_text:
@@ -289,29 +297,32 @@ def run(ctx: RunContext) -> StageArtifact:
             if "gangwon" in t_lower or "강원" in c_text:
                 evidence_entities.update(["gangwon", "강원", "江原道"])
             if "22 trillion" in t_lower or "22조" in c_text:
-                evidence_metrics.update(["22 trillion", "22조", "22兆", "22 nghìn tỷ"])
+                evidence_metrics.update(["22 trillion", "22조", "22兆", "22 nghìn tỷ", "22.000 tỷ"])
             if "9,317" in c_text or "9317" in c_text:
-                evidence_metrics.update(["9,317", "9317"])
+                evidence_metrics.update(["9,317", "9317", "9.317"])
             if "one-third" in t_lower or "1/3" in t_lower or "3분의 1" in c_text:
-                evidence_metrics.update(["one-third", "1/3", "3분의 1", "3분의1"])
+                evidence_metrics.update(["one-third", "1/3", "3분의 1", "3분의1", "3分の1", "1/3"])
 
         all_text_lower = all_text.lower()
         matched_entities = [e for e in evidence_entities if e in all_text_lower]
         matched_metrics = [m for m in evidence_metrics if m in all_text_lower]
 
-        if len(matched_entities) < 3:
+        min_req_entities = min(3, len(evidence_entities)) if evidence_entities else 0
+        min_req_metrics = min(1, len(evidence_metrics)) if evidence_metrics else 0
+
+        if len(matched_entities) < min_req_entities or (len(evidence_entities) >= 3 and len(matched_entities) < 3):
             topic_specificity_ok = False
             violations.append({
                 "line_id": None,
                 "gate": "topic_specificity_gate",
-                "detail": f"Script failed topic specificity: found {len(matched_entities)} concrete entities/mechanisms from evidence ledger (minimum 3 required). Narration must not be generic abstract boilerplate."
+                "detail": f"Script failed topic specificity: found {len(matched_entities)} concrete entities/mechanisms from evidence ledger (minimum {max(min_req_entities, 3 if len(evidence_entities) >= 3 else len(evidence_entities))} required). Narration must not be generic abstract boilerplate."
             })
-        if len(matched_metrics) < 1:
+        if len(matched_metrics) < min_req_metrics:
             topic_specificity_ok = False
             violations.append({
                 "line_id": None,
                 "gate": "topic_specificity_gate",
-                "detail": f"Script failed topic specificity: found {len(matched_metrics)} quantitative metrics/dates from evidence ledger (minimum 1 required)."
+                "detail": f"Script failed topic specificity: found {len(matched_metrics)} quantitative metrics/dates from evidence ledger (minimum {min_req_metrics} required)."
             })
 
         # Gate 8: Claim Coverage & Substantive Citations Gate
@@ -331,6 +342,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 clean_p = p.strip("'\" ")
                 if len(clean_p) >= 2 and clean_p.lower() in line_text.lower():
                     return True
+            # Check CJK / Hangul terms directly from claim
+            for cjk in re.findall(r"[\uac00-\ud7a3\u3040-\u30ff\u4e00-\u9fff]{2,}", c_text):
+                if cjk in line_text:
+                    return True
             # Check significant keywords
             stop_words = {"that", "with", "from", "this", "have", "were", "been", "which", "their", "after", "before", "about", "into"}
             words = [w.strip(".,;:\"'()[]").lower() for w in c_text.split() if len(w.strip(".,;:\"'()[]")) >= 4]
@@ -338,20 +353,36 @@ def run(ctx: RunContext) -> StageArtifact:
             for w in words:
                 if w in line_text.lower():
                     return True
-            # Cross-lingual keywords
+            # Cross-lingual multi-market keywords
             cross_terms = [
-                ("molit", "국토교통부"), ("hug", "주택도시보증공사"), ("jeonse", "전세"),
-                ("villa", "빌라왕"), ("king", "빌라왕"), ("deposit", "보증금"),
-                ("guarantee", "보증"), ("victim", "피해자"), ("relief", "구제"),
-                ("minimum", "최소보장제"), ("proxy", "바지임대인"), ("landlord", "임대인"),
-                ("gap", "갭투자"), ("zero", "무자본"), ("fraud", "사기"),
-                ("appraisal", "감정평가"), ("foreclosure", "경매"), ("auction", "경매"),
-                ("gyeonggi", "경기"), ("gangwon", "강원"), ("trillion", "조")
+                ("molit", ["국토교통부", "国土交通部", "bộ đất đai", "molit"]),
+                ("hug", ["주택도시보증공사", "住宅都市保証公社", "hug"]),
+                ("jeonse", ["전세", "チョンセ", "伝貰", "tiền cọc", "cọc"]),
+                ("villa", ["빌라왕", "빌라", "ヴィラ王", "ヴィラ", "biệt thự", "villa"]),
+                ("king", ["빌라왕", "ヴィラ王", "vua"]),
+                ("deposit", ["보증금", "保証金", "tiền cọc", "khoản cọc", "deposit"]),
+                ("guarantee", ["보증", "保証", "bảo lãnh", "guarantee"]),
+                ("victim", ["피해자", "被害者", "nạn nhân", "victim"]),
+                ("relief", ["구제", "救済", "cứu trợ", "hỗ trợ", "relief"]),
+                ("minimum", ["최소보장제", "최소보장", "최소", "最低保証", "tối thiểu", "minimum"]),
+                ("proxy", ["바지임대인", "바지", "명의대여", "名義貸し", "bù nhìn", "proxy"]),
+                ("landlord", ["임대인", "집주인", "家主", "chủ nhà", "landlord"]),
+                ("gap", ["갭투자", "ギャップ投資", "chênh lệch", "gap"]),
+                ("zero", ["무자본", "無資本", "không vốn", "zero"]),
+                ("fraud", ["사기", "詐欺", "gian lận", "lừa đảo", "fraud"]),
+                ("appraisal", ["감정평가", "鑑定評価", "định giá", "appraisal"]),
+                ("foreclosure", ["경매", "압류", "競売", "差し押さえ", "phát mãi", "tịch thu", "foreclosure"]),
+                ("auction", ["경매", "競売", "đấu giá", "auction"]),
+                ("gyeonggi", ["경기", "京畿道", "gyeonggi"]),
+                ("gangwon", ["강원", "江原道", "gangwon"]),
+                ("trillion", ["조", "兆", "nghìn tỷ", "ngàn tỷ", "trillion"]),
             ]
             c_lower = c_text.lower()
-            for en_t, ko_t in cross_terms:
-                if en_t in c_lower and ko_t in line_text:
-                    return True
+            ln_lower = line_text.lower()
+            for en_t, aliases in cross_terms:
+                if en_t in c_lower:
+                    if any(alias in ln_lower or alias in line_text for alias in aliases):
+                        return True
             return False
 
         for b in beats:
@@ -375,13 +406,13 @@ def run(ctx: RunContext) -> StageArtifact:
                 "detail": f"Claim coverage insufficient: cited {len(cited_cids)}/{total_claims_in_ledger} claims (required at least {min_required_claims} unique claims)."
             })
 
-        total_cited_lines = sum(1 for b in beats for ln in b.get("lines", []) if ln.get("claim_ids"))
-        if total_cited_lines > 0 and (len(hollow_citation_lines) / total_cited_lines) > 0.40:
+        total_citations = sum(len([cid for cid in ln.get("claim_ids", []) if cid in evidence_map]) for b in beats for ln in b.get("lines", []))
+        if total_citations > 0 and (len(hollow_citation_lines) / total_citations) > 0.40:
             claim_coverage_ok = False
             violations.append({
                 "line_id": hollow_citation_lines[0][0] if hollow_citation_lines else None,
                 "gate": "claim_coverage_gate",
-                "detail": f"Excessive hollow citations: {len(hollow_citation_lines)}/{total_cited_lines} lines cite claim_ids without substantive keywords from the evidence claim."
+                "detail": f"Excessive hollow citations: {len(hollow_citation_lines)}/{total_citations} citations cite claim_ids without substantive keywords from the evidence claim."
             })
 
         # Active LLM Critic Evaluation via model_gateway

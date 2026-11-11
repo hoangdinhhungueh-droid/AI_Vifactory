@@ -26,29 +26,29 @@ def _get_market_legal_qualifiers(market: str) -> dict:
     m = (market or "EN").upper()
     if m in ("KR", "KO"):
         return {
-            "req_charged": ["검찰 공소장에 따르면", "검찰 공소장", "공소장", "기소", "검찰", "수사", "고발", "혐의", "charged", "indictment"],
+            "req_charged": ["검찰 공소장에 따르면", "검찰 공소장", "공소장", "기소", "검찰", "수사", "고발", "혐의"],
             "prefix_charged": "검찰 공소장에 따르면,",
-            "req_alleged": ["규제 당국에 따르면", "규제 당국", "당국에 따르면", "주장", "의혹", "조사", "alleged", "claimed"],
+            "req_alleged": ["규제 당국에 따르면", "규제 당국", "당국에 따르면", "주장", "의혹", "조사"],
             "prefix_alleged": "규제 당국에 따르면,",
-            "req_settled": ["공식적인 잘못을 인정하지 않고 합의", "잘못을 인정하지 않고", "합의", "공식적인 잘못", "settled"],
+            "req_settled": ["공식적인 잘못을 인정하지 않고 합의", "잘못을 인정하지 않고", "합의", "공식적인 잘못"],
             "suffix_settled": "(공식적인 잘못을 인정하지 않고 합의됨)",
         }
     elif m in ("JA", "JP"):
         return {
-            "req_charged": ["起訴状の指摘によれば", "起訴状によれば", "起訴状", "当局の指摘によれば", "疑惑", "起訴", "charged", "indictment"],
+            "req_charged": ["起訴状の指摘によれば", "起訴状によれば", "起訴状", "当局の指摘によれば", "疑惑", "起訴"],
             "prefix_charged": "起訴状の指摘によれば、",
-            "req_alleged": ["当局の調査によれば", "当局によれば", "指摘によれば", "調査によれば", "主張", "疑惑", "alleged", "claimed"],
+            "req_alleged": ["当局の調査によれば", "当局によれば", "指摘によれば", "調査によれば", "主張", "疑惑"],
             "prefix_alleged": "当局の調査によれば、",
-            "req_settled": ["違法性を認めることなく和解", "和解", "settled"],
+            "req_settled": ["違法性を認めることなく和解", "和解"],
             "suffix_settled": "(違法性を認めることなく和解)",
         }
     elif m in ("VN", "VI"):
         return {
-            "req_charged": ["theo cáo trạng của cơ quan công tố", "theo cáo trạng", "cáo trạng", "viện kiểm sát", "bị khởi tố", "cáo buộc", "charged", "indictment"],
+            "req_charged": ["theo cáo trạng của cơ quan công tố", "theo cáo trạng", "cáo trạng", "viện kiểm sát", "bị khởi tố", "cáo buộc"],
             "prefix_charged": "Theo cáo trạng của cơ quan công tố,",
-            "req_alleged": ["theo cơ quan chức năng", "theo cơ quan điều tra", "cơ quan chức năng", "bị nghi vấn", "cáo buộc", "alleged"],
+            "req_alleged": ["theo cơ quan chức năng", "theo cơ quan điều tra", "cơ quan chức năng", "bị nghi vấn"],
             "prefix_alleged": "Theo cơ quan chức năng,",
-            "req_settled": ["dàn xếp mà không thừa nhận hành vi sai trái", "dàn xếp mà không thừa nhận", "dàn xếp", "settled"],
+            "req_settled": ["dàn xếp mà không thừa nhận hành vi sai trái", "dàn xếp mà không thừa nhận", "dàn xếp"],
             "suffix_settled": "(dàn xếp mà không thừa nhận hành vi sai trái)",
         }
     else:
@@ -272,15 +272,16 @@ def _format_claim_fact(c: Any, market: str, topic: str) -> str:
         }
         return fallbacks.get(market, f"verified evidentiary records regarding {topic}")
 
-    text = str(getattr(c, "claim", "") or (c.get("claim", "") if isinstance(c, dict) else "")).strip()
+    elements = _extract_claim_elements(c)
+    text = elements["text"]
     t_lower = text.lower()
     m = (market or "EN").upper()
 
     has_nov10 = "november 10" in t_lower or "11월 10일" in text
     has_nov13 = "november 13" in t_lower or "11월 13일" in text
     has_third = "one-third" in t_lower or "1/3" in t_lower or "3분의 1" in text or "3분의1" in text
-    has_9317 = "9,317" in text or "9317" in text
-    has_22t = "22 trillion" in t_lower or "22조" in text or "22兆" in text
+    has_9317 = "9,317" in text or "9317" in text or "9.317" in text
+    has_22t = "22 trillion" in t_lower or "22조" in text or "22兆" in text or "22 nghìn tỷ" in t_lower
     has_molit = "molit" in t_lower or "ministry of land" in t_lower or "국토교통부" in text
     has_guarantee = "minimum guarantee" in t_lower or "최소보장제" in text
     has_villa = "villa king" in t_lower or "빌라왕" in text
@@ -313,12 +314,15 @@ def _format_claim_fact(c: Any, market: str, topic: str) -> str:
         if has_guarantee:
             return "전세사기 피해자 최소보장제 지원책"
 
-        num_matches = re.findall(r"\b\d+[,\d]*(?:\.\d+)?\s*(?:%|조\s*원|억\s*원|만\s*원|명|채|건|KRW|USD)?\b", text)
-        if num_matches and len(num_matches[0]) >= 2:
-            return f"{num_matches[0]} 관련 공식 확인 사실"
+        if elements["ko_terms"]:
+            return " ".join(elements["ko_terms"][:2])
+        if elements["numbers"]:
+            return f"{elements['numbers'][0]} 관련 공식 확인 사실"
         hangul_match = re.findall(r"[\uac00-\ud7a3]{2,}", text)
         if hangul_match:
             return " ".join(hangul_match[:3])
+        if elements["entities"]:
+            return f"{elements['entities'][0]} 관련 공식 확인 사실"
         return f"{topic} 관련 공식 확인 사실"
 
     elif m in ("JA", "JP"):
@@ -341,9 +345,15 @@ def _format_claim_fact(c: Any, market: str, topic: str) -> str:
         if has_appraisal:
             return "不動産鑑定評価の操作と100%超の融資保証"
 
+        if elements["ja_terms"]:
+            return " ".join(elements["ja_terms"][:2])
+        if elements["numbers"]:
+            return f"{elements['numbers'][0]}に関する公式確認事実"
         cjk_match = re.findall(r"[\u3040-\u30ff\u4e00-\u9fff]{2,}", text)
         if cjk_match:
             return " ".join(cjk_match[:3])
+        if elements["entities"]:
+            return f"{elements['entities'][0]}に関する公式確認事実"
         return f"{topic}に関する公式確認事実"
 
     elif m in ("VN", "VI"):
@@ -365,7 +375,15 @@ def _format_claim_fact(c: Any, market: str, topic: str) -> str:
             return "mô hình đầu tư chênh lệch không vốn (gap investment)"
         if has_appraisal:
             return "thổi phồng định giá bất động sản và bảo lãnh trên 100% LTV"
-        return f"thông tin xác thực về {topic}"
+
+        if elements["vn_terms"]:
+            return " ".join(elements["vn_terms"][:2])
+        if elements["numbers"]:
+            return f"số liệu {elements['numbers'][0]} liên quan đến sự việc"
+        if elements["entities"]:
+            return f"hồ sơ xác thực về {elements['entities'][0]}"
+        words = text.split()
+        return " ".join(words[:8]) if words else f"thông tin xác thực về {topic}"
 
     else:
         if has_molit:
@@ -386,6 +404,13 @@ def _format_claim_fact(c: Any, market: str, topic: str) -> str:
             return "zero-capital gap investment acquisitions"
         if has_appraisal:
             return "rogue appraisal inflation and 100%+ loan-to-value guarantee coverage"
+
+        if elements["en_terms"]:
+            return elements["en_terms"][0]
+        if elements["numbers"]:
+            return f"verified metric {elements['numbers'][0]} regarding {topic}"
+        if elements["entities"]:
+            return f"verified records concerning {elements['entities'][0]}"
         words = text.split()
         return " ".join(words[:8]) if words else f"verified evidentiary records regarding {topic}"
 
@@ -406,26 +431,26 @@ def _build_grounded_story_beats(
     def _cid(idx: int) -> str:
         if not c_ids:
             return "C001"
-        return c_ids[min(max(0, idx), len(c_ids) - 1)]
+        return c_ids[idx % len(c_ids)]
 
     def _fact_kr(idx: int) -> str:
-        if 0 <= idx < len(claims):
-            return _format_claim_fact(claims[idx], "KR", topic)
+        if claims:
+            return _format_claim_fact(claims[idx % len(claims)], "KR", topic)
         return f"{topic} 관련 공식 확인 사실"
 
     def _fact_ja(idx: int) -> str:
-        if 0 <= idx < len(claims):
-            return _format_claim_fact(claims[idx], "JA", topic)
+        if claims:
+            return _format_claim_fact(claims[idx % len(claims)], "JA", topic)
         return f"{topic}に関する公式確認事実"
 
     def _fact_vn(idx: int) -> str:
-        if 0 <= idx < len(claims):
-            return _format_claim_fact(claims[idx], "VN", topic)
+        if claims:
+            return _format_claim_fact(claims[idx % len(claims)], "VN", topic)
         return f"thông tin xác thực về {topic}"
 
     def _fact_en(idx: int) -> str:
-        if 0 <= idx < len(claims):
-            return _format_claim_fact(claims[idx], "EN", topic)
+        if claims:
+            return _format_claim_fact(claims[idx % len(claims)], "EN", topic)
         return f"verified evidentiary records regarding {topic}"
 
     m_code = (market or "EN").upper()
@@ -439,7 +464,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B1_L01",
                 text=f"급격한 시장 위기 속에서, {_with_particle(_fact_kr(0), 'topic')} {topic} 사태의 직접적인 도화선이 되었습니다.",
-                claim_ids=[_cid(0), _cid(1)],
+                claim_ids=[_cid(0)],
                 visual_hook="stat_hero",
             ),
             StorySceneLine(
@@ -457,7 +482,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B1_L04",
                 text=b1_paradox_kr,
-                claim_ids=[_cid(0), _cid(3)],
+                claim_ids=[_cid(3)],
                 visual_hook="red_thread",
             ),
         ]
@@ -483,7 +508,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B2_L04",
                 text=f"그러나 내부 데이터는 {_with_particle(_fact_kr(5), 'obj')} 가리키며 통제 불능의 파탄을 경고하고 있었습니다.",
-                claim_ids=[_cid(0), _cid(5)],
+                claim_ids=[_cid(5)],
                 visual_hook="red_thread",
             ),
         ]
@@ -502,57 +527,57 @@ def _build_grounded_story_beats(
             ),
             StorySceneLine(
                 line_id="B3_L03",
-                text=f"거래 데이터는 핵심 거래처 전반에서 {_with_particle(_fact_kr(6), 'subj')} 구조적으로 확산되었음을 증명했습니다.",
+                text=f"거래 내역 데이터는 공급망 전반에 걸쳐 {_with_particle(_fact_kr(6), 'subj')} 연쇄적인 타격을 입혔음을 확증했습니다.",
                 claim_ids=[_cid(6)],
                 visual_hook="magnifier",
             ),
             StorySceneLine(
                 line_id="B3_L04",
-                text=f"이로 인해 {_with_particle(_fact_kr(7), 'topic')} 가속화되며, 회수 불능의 잠재적 부실이 눈덩이처럼 불어났습니다.",
-                claim_ids=[_cid(3), _cid(7)],
+                text=f"이로 인해 {_with_particle(_fact_kr(7), 'subj')} 가속화되었고, 막대한 부실 채권이 축적되었습니다.",
+                claim_ids=[_cid(7)],
                 visual_hook="ruler_measure",
             ),
             StorySceneLine(
                 line_id="B3_L05",
-                text=f"내부 경고가 잇따랐지만, 주도 세력들은 불법적 수법을 고수하며 피해 규모를 키웠습니다.",
-                claim_ids=[_cid(4), _cid(7)],
+                text=f"내부 고발과 데이터 경고가 잇따랐지만, 책임자들은 {_with_particle(_fact_kr(7), 'obj')} 은폐하는 수법을 유지했습니다.",
+                claim_ids=[_cid(7)],
                 visual_hook="grease_pencil",
             ),
             StorySceneLine(
                 line_id="B3_L06",
-                text=f"결국 시장 환경 변화와 맞물려, {_with_particle(_fact_kr(7), 'subj')} 동시다발적인 연쇄 붕괴를 촉발했습니다.",
-                claim_ids=[_cid(5), _cid(7)],
+                text=f"결국 시장 환경의 급변과 함께, {_with_particle(_fact_kr(7), 'topic')} 돌이킬 수 없는 붕괴의 뇌관이 되었습니다.",
+                claim_ids=[_cid(7)],
                 visual_hook="compass_arc",
             ),
         ]
         b4_lines = [
             StorySceneLine(
                 line_id="B4_L01",
-                text=f"결정적 증거가 포착되고, {_with_particle(_fact_kr(8), 'subj')} 발생하자 은폐되었던 거래 메커니즘이 완전히 해체되었습니다.",
+                text=f"스모킹 건이 발견되며, {_with_particle(_fact_kr(8), 'subj')} 발생시킨 위장 거래 구조는 완전히 해체되었습니다.",
                 claim_ids=[_cid(8)],
                 visual_hook="scissors_cut",
             ),
             StorySceneLine(
                 line_id="B4_L02",
-                text=f"공식 조사 결과, {_with_particle(_fact_kr(8), 'with')} 연계된 자산 가치가 허구였음이 명백히 드러났습니다.",
+                text=f"공식 조사 결과는, {_with_particle(_fact_kr(8), 'with')} 관련된 자산 가치가 허위였음을 명백히 입증했습니다.",
                 claim_ids=[_cid(8)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
                 line_id="B4_L03",
-                text=f"시장 신뢰가 무너지자, {_with_particle(_fact_kr(9), 'topic')} 가시화되며 단 며칠 만에 유동성이 증발했습니다.",
-                claim_ids=[_cid(0), _cid(9)],
+                text=f"신뢰가 무너지자 {_with_particle(_fact_kr(9), 'topic')} 눈앞의 현실이 되었고, 유동성은 순식간에 증발했습니다.",
+                claim_ids=[_cid(9)],
                 visual_hook="magnifier",
             ),
             StorySceneLine(
                 line_id="B4_L04",
-                text=f"핵심 책임자들은 책임을 회피하려 했으나, 구체적인 물증과 수사망 앞에 덜미를 잡혔습니다.",
-                claim_ids=[_cid(8), _cid(9)],
+                text=f"주모자들은 책임을 회피하려 했으나, {_with_particle(_fact_kr(9), 'obj')} 규명한 증거의 포위망을 벗어날 수 없었습니다.",
+                claim_ids=[_cid(9)],
                 visual_hook="red_thread",
             ),
             StorySceneLine(
                 line_id="B4_L05",
-                text=f"사태의 파장이 걷잡을 수 없이 커지자, 금융 당국과 사법 기관이 전면 개입을 선언했습니다.",
+                text=f"파국을 숨길 수 없게 되자, 금융 당국은 {_with_particle(_fact_kr(9), 'obj')} 겨냥한 전면 개입을 선언했습니다.",
                 claim_ids=[_cid(9)],
                 visual_hook="ruler_measure",
             ),
@@ -560,26 +585,26 @@ def _build_grounded_story_beats(
         b5_lines = [
             StorySceneLine(
                 line_id="B5_L01",
-                text=f"당국은 긴급 대책을 통해, {_with_particle(_fact_kr(0), 'with')} 맞물린 공적 구제 조치를 단행했습니다.",
-                claim_ids=[_cid(0), _cid(9)],
+                text=f"사법 당국은 엄정한 수사를 통해, {_with_particle(_fact_kr(0), 'with')} 관련된 핵심 주동자들을 전격 기소했습니다.",
+                claim_ids=[_cid(0)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
                 line_id="B5_L02",
-                text=f"동시에 {_with_particle(_fact_kr(2), 'obj')} 골자로 하는 긴급 구제 대책과 특별법이 본격 시행되었습니다.",
+                text=f"시장 질서를 정상화하기 위해, {_with_particle(_fact_kr(2), 'obj')} 주축으로 한 긴급 구제책과 법률 개정이 단행되었습니다.",
                 claim_ids=[_cid(2)],
                 visual_hook="stat_hero",
             ),
             StorySceneLine(
                 line_id="B5_L03",
-                text=f"{topic} 사태가 남긴 명백한 교훈: 규제의 사각지대에서 은폐된 불법 레버리지는 결국 참혹한 사회적 대가를 치른다는 점입니다.",
-                claim_ids=[_cid(0), _cid(len(claims) - 1)],
+                text=f"{topic} 사태가 남긴 교훈: {_with_particle(_fact_kr(len(claims) - 1), 'topic')} 둘러싼 감시의 공백은 반드시 막대한 대가를 치르게 됩니다.",
+                claim_ids=[_cid(len(claims) - 1)],
                 visual_hook="red_thread",
             ),
         ]
     elif m_code in ("JA", "JP"):
         b1_paradox_ja = (
-            f"調査報道が核心的逆説を突きつけます：{central_question}"
+            f"調査官たちは核心的逆説を提起します：{central_question}"
             if central_question
             else f"調査官たちは根本的矛盾を追及します：なぜ{_fact_ja(3)}のリスクが危機に至るまで放置されたのか？"
         )
@@ -587,7 +612,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B1_L01",
                 text=f"急激な市場の危機の中で、{_fact_ja(0)}は{topic}における広範な構造的衝撃を引き起こしました。",
-                claim_ids=[_cid(0), _cid(1)],
+                claim_ids=[_cid(0)],
                 visual_hook="stat_hero",
             ),
             StorySceneLine(
@@ -605,7 +630,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B1_L04",
                 text=b1_paradox_ja,
-                claim_ids=[_cid(0), _cid(3)],
+                claim_ids=[_cid(3)],
                 visual_hook="red_thread",
             ),
         ]
@@ -631,7 +656,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B2_L04",
                 text=f"しかし内部データは{_fact_ja(5)}を示し、制御不能な破綻の兆候を警告していました。",
-                claim_ids=[_cid(0), _cid(5)],
+                claim_ids=[_cid(5)],
                 visual_hook="red_thread",
             ),
         ]
@@ -657,19 +682,19 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B3_L04",
                 text=f"これにより{_fact_ja(7)}が加速し、巨額の回収不能リスクが積み上がりました。",
-                claim_ids=[_cid(3), _cid(7)],
+                claim_ids=[_cid(7)],
                 visual_hook="ruler_measure",
             ),
             StorySceneLine(
                 line_id="B3_L05",
-                text=f"内部告発が相次いだにもかかわらず、責任者たちは不法な手口を維持し続けました。",
-                claim_ids=[_cid(4), _cid(7)],
+                text=f"内部告発が相次いだにもかかわらず、責任者たちは{_fact_ja(7)}を悪用する不法な手口を維持し続けました。",
+                claim_ids=[_cid(7)],
                 visual_hook="grease_pencil",
             ),
             StorySceneLine(
                 line_id="B3_L06",
                 text=f"最終的に市場環境の変動とともに、{_fact_ja(7)}は連鎖的な破綻を引き起こしました。",
-                claim_ids=[_cid(5), _cid(7)],
+                claim_ids=[_cid(7)],
                 visual_hook="compass_arc",
             ),
         ]
@@ -689,18 +714,18 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B4_L03",
                 text=f"市場の信頼が崩壊すると、{_fact_ja(9)}が現実味を帯び、瞬く間に流動性が蒸発しました。",
-                claim_ids=[_cid(0), _cid(9)],
+                claim_ids=[_cid(9)],
                 visual_hook="magnifier",
             ),
             StorySceneLine(
                 line_id="B4_L04",
-                text=f"主謀者たちは責任逃れを図りましたが、証拠の包囲網によって不正の実態が暴かれました。",
-                claim_ids=[_cid(8), _cid(9)],
+                text=f"主謀者たちは責任逃れを図りましたが、{_fact_ja(9)}を包囲する証拠によって不正の実態が暴かれました。",
+                claim_ids=[_cid(9)],
                 visual_hook="red_thread",
             ),
             StorySceneLine(
                 line_id="B4_L05",
-                text=f"破局を隠しきれなくなったことで、金融当局と司法機関が全面介入を宣言しました。",
+                text=f"破局を隠しきれなくなったことで、金融当局は{_fact_ja(9)}に関する全面介入を宣言しました。",
                 claim_ids=[_cid(9)],
                 visual_hook="ruler_measure",
             ),
@@ -709,7 +734,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B5_L01",
                 text=f"司法当局は厳正な捜査を通じて、{_fact_ja(0)}に関わる責任者を起訴しました。",
-                claim_ids=[_cid(0), _cid(9)],
+                claim_ids=[_cid(0)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
@@ -720,8 +745,8 @@ def _build_grounded_story_beats(
             ),
             StorySceneLine(
                 line_id="B5_L03",
-                text=f"{topic}が遺した教訓：監視の死角で放置されたリスクは、必ず莫大な社会的コストとして跳ね返るということです。",
-                claim_ids=[_cid(0), _cid(len(claims) - 1)],
+                text=f"{topic}が遺した教訓：{_fact_ja(len(claims) - 1)}を巡る監視の死角で放置されたリスクは、必ず莫大な社会的コストとして跳ね返るということです。",
+                claim_ids=[_cid(len(claims) - 1)],
                 visual_hook="red_thread",
             ),
         ]
@@ -735,7 +760,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B1_L01",
                 text=f"Trong cuộc khủng hoảng thị trường cấp tính, {_fact_vn(0)} đã trở thành ngòi nổ trực tiếp của vụ việc {topic}.",
-                claim_ids=[_cid(0), _cid(1)],
+                claim_ids=[_cid(0)],
                 visual_hook="stat_hero",
             ),
             StorySceneLine(
@@ -753,7 +778,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B1_L04",
                 text=b1_paradox_vn,
-                claim_ids=[_cid(0), _cid(3)],
+                claim_ids=[_cid(3)],
                 visual_hook="red_thread",
             ),
         ]
@@ -779,7 +804,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B2_L04",
                 text=f"Tuy nhiên, các dữ liệu nội bộ đã ghi nhận {_fact_vn(5)}, báo hiệu sự sụp đổ không thể tránh khỏi.",
-                claim_ids=[_cid(0), _cid(5)],
+                claim_ids=[_cid(5)],
                 visual_hook="red_thread",
             ),
         ]
@@ -805,50 +830,50 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B3_L04",
                 text=f"Hậu quả là {_fact_vn(7)} tăng tốc, tích tụ khối nợ xấu khổng lồ không có khả năng thu hồi.",
-                claim_ids=[_cid(3), _cid(7)],
+                claim_ids=[_cid(7)],
                 visual_hook="ruler_measure",
             ),
             StorySceneLine(
                 line_id="B3_L05",
-                text=f"Bất chấp nhiều cảnh báo, những kẻ chủ mưu vẫn ngoan cố duy trì các thủ đoạn phi pháp.",
-                claim_ids=[_cid(4), _cid(7)],
+                text=f"Bất chấp nhiều cảnh báo, những kẻ chủ mưu vẫn ngoan cố lợi dụng {_fact_vn(7)} duy trì thủ đoạn phi pháp.",
+                claim_ids=[_cid(7)],
                 visual_hook="grease_pencil",
             ),
             StorySceneLine(
                 line_id="B3_L06",
                 text=f"Cuối cùng, trước biến động vĩ mô, {_fact_vn(7)} đã kích hoạt chuỗi sụp đổ dây chuyền.",
-                claim_ids=[_cid(5), _cid(7)],
+                claim_ids=[_cid(7)],
                 visual_hook="compass_arc",
             ),
         ]
         b4_lines = [
             StorySceneLine(
                 line_id="B4_L01",
-                text=f"Bằng chứng thép xuất hiện cùng sự cố {_fact_vn(8)} khiến cơ chế che đậy sụp đổ hoàn toàn.",
+                text=f"Bằng chứng then chốt xuất hiện, phơi bày cơ chế {_fact_vn(8)} và xóa bỏ lớp vỏ bọc tinh vi.",
                 claim_ids=[_cid(8)],
                 visual_hook="scissors_cut",
             ),
             StorySceneLine(
                 line_id="B4_L02",
-                text=f"Kết quả điều tra cho thấy giá trị tài sản gắn với {_fact_vn(8)} hoàn toàn là ảo.",
+                text=f"Kết quả điều tra chính thức xác nhận giá trị tài sản gắn với {_fact_vn(8)} hoàn toàn là hư cấu.",
                 claim_ids=[_cid(8)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
                 line_id="B4_L03",
-                text=f"Khi niềm tin bốc hơi, {_fact_vn(9)} trở thành hiện thực và thanh khoản biến mất chỉ sau vài ngày.",
-                claim_ids=[_cid(0), _cid(9)],
+                text=f"Khi niềm tin tan vỡ, hiểm họa từ {_fact_vn(9)} lập tức kéo thanh khoản bốc hơi trong chớp mắt.",
+                claim_ids=[_cid(9)],
                 visual_hook="magnifier",
             ),
             StorySceneLine(
                 line_id="B4_L04",
-                text=f"Những kẻ chịu trách nhiệm tìm cách thoái thác nhưng đã bị chuỗi bằng chứng pháp lý khóa chặt.",
-                claim_ids=[_cid(8), _cid(9)],
+                text=f"Những kẻ chủ mưu tìm cách thoái thác nhưng mạng lưới chứng cứ về {_fact_vn(9)} đã siết chặt.",
+                claim_ids=[_cid(9)],
                 visual_hook="red_thread",
             ),
             StorySceneLine(
                 line_id="B4_L05",
-                text=f"Khủng hoảng vượt tầm kiểm soát, buộc các cơ quan điều tra và quản lý nhà nước phải vào cuộc.",
+                text=f"Không thể che đậy thêm, các cơ quan chức năng đã vào cuộc phong tỏa {_fact_vn(9)}.",
                 claim_ids=[_cid(9)],
                 visual_hook="ruler_measure",
             ),
@@ -856,147 +881,147 @@ def _build_grounded_story_beats(
         b5_lines = [
             StorySceneLine(
                 line_id="B5_L01",
-                text=f"Cơ quan tư pháp đã mở rộng truy cứu trách nhiệm hình sự liên quan đến {_fact_vn(0)}.",
-                claim_ids=[_cid(0), _cid(9)],
+                text=f"Cơ quan tư pháp nhanh chóng khởi tố các đối tượng liên quan trực tiếp đến {_fact_vn(0)}.",
+                claim_ids=[_cid(0)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
                 line_id="B5_L02",
-                text=f"Nhằm tái lập trật tự, gói cứu trợ khẩn cấp với trọng tâm là {_fact_vn(2)} đã chính thức được ban hành.",
+                text=f"Để ổn định tình hình, các gói giải cứu khẩn cấp cùng cơ chế {_fact_vn(2)} đã được ban hành.",
                 claim_ids=[_cid(2)],
                 visual_hook="stat_hero",
             ),
             StorySceneLine(
                 line_id="B5_L03",
-                text=f"Bài học đắt giá từ {topic}: Mọi hành vi trục lợi trong bóng tối của thể chế đều phải trả giá bằng sự đổ vỡ toàn diện.",
-                claim_ids=[_cid(0), _cid(len(claims) - 1)],
+                text=f"Đối với thị trường tài chính, bài học từ {topic} là không thể chối bỏ: buông lỏng kiểm soát {_fact_vn(len(claims) - 1)} sẽ luôn để lại hậu quả khôn lường.",
+                claim_ids=[_cid(len(claims) - 1)],
                 visual_hook="red_thread",
             ),
         ]
     else:
         b1_paradox_en = (
-            f"Investigators confront the central systemic paradox: {central_question}"
+            f"Investigators posed the central paradox: {central_question}"
             if central_question
-            else f"Investigators confronted the central paradox: how did the mounting risks of {_fact_en(3)} compound before authorities intervened?"
+            else f"Investigators confronted the central paradox: why was the compounding exposure of {_fact_en(3)} allowed to metastasize unchecked?"
         )
         b1_lines = [
             StorySceneLine(
                 line_id="B1_L01",
-                text=f"In an acute market crisis, {_fact_en(0)} triggered immediate structural tremors across {topic}.",
-                claim_ids=[_cid(0), _cid(1)],
+                text=f"Amid acute institutional distress, {_fact_en(0)} became the immediate catalyst for {topic}.",
+                claim_ids=[_cid(0)],
                 visual_hook="stat_hero",
             ),
             StorySceneLine(
                 line_id="B1_L02",
-                text=f"Official records documented that alongside {_fact_en(1)}, an unprecedented scale of liabilities came to light.",
+                text=f"Official investigative filings established that {_fact_en(1)} revealed catastrophic systemic vulnerabilities.",
                 claim_ids=[_cid(1)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
                 line_id="B1_L03",
-                text=f"The core documented finding exposed critical systemic vulnerabilities surrounding {_fact_en(2)}.",
+                text=f"Forensic analysis demonstrated that {_fact_en(2)} exposed deep regulatory voids.",
                 claim_ids=[_cid(2)],
                 visual_hook="ruler_measure",
             ),
             StorySceneLine(
                 line_id="B1_L04",
                 text=b1_paradox_en,
-                claim_ids=[_cid(0), _cid(3)],
+                claim_ids=[_cid(3)],
                 visual_hook="red_thread",
             ),
         ]
         b2_lines = [
             StorySceneLine(
                 line_id="B2_L01",
-                text=f"Prior to the collapse, syndicates actively exploited {_fact_en(3)} while projecting an illusion of commercial strength.",
+                text=f"Prior to the collapse, operators systematically exploited {_fact_en(3)} to drive aggressive expansion.",
                 claim_ids=[_cid(3)],
                 visual_hook="cutout",
             ),
             StorySceneLine(
                 line_id="B2_L02",
-                text=f"Regulatory disclosures and contracts concealed {_fact_en(4)}, masking dangerous exposure behind routine paperwork.",
+                text=f"Corporate disclosures and formal agreements concealed {_fact_en(4)}, disguising material risks.",
                 claim_ids=[_cid(4)],
                 visual_hook="compass_arc",
             ),
             StorySceneLine(
                 line_id="B2_L03",
-                text=f"Market participants chased aggressive short-term yields, dismissing internal red flags tied to {_fact_en(4)}.",
+                text=f"Counterparties prioritized short-term yields, disregarding urgent warnings regarding {_fact_en(4)}.",
                 claim_ids=[_cid(4)],
                 visual_hook="cutout",
             ),
             StorySceneLine(
                 line_id="B2_L04",
-                text=f"Yet forensic records documented {_fact_en(5)}, signaling uncontrollable structural fractures behind closed doors.",
-                claim_ids=[_cid(0), _cid(5)],
+                text=f"Yet internal operational ledgers flagged {_fact_en(5)}, signaling imminent structural insolvency.",
+                claim_ids=[_cid(5)],
                 visual_hook="red_thread",
             ),
         ]
         b3_lines = [
             StorySceneLine(
                 line_id="B3_L01",
-                text=f"As inquiry deepened, forensic examiners unraveled the full transmission mechanism of {_fact_en(5)}.",
+                text=f"As the forensic paper trail deepened, the mechanics behind {_fact_en(5)} were unmasked.",
                 claim_ids=[_cid(5)],
                 visual_hook="red_thread",
             ),
             StorySceneLine(
                 line_id="B3_L02",
-                text=f"Audited accounting books confirmed deliberate misrepresentations carried out through {_fact_en(6)}.",
+                text=f"Subpoenaed bank records and audit workpapers proved pervasive deception driven by {_fact_en(6)}.",
                 claim_ids=[_cid(6)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
                 line_id="B3_L03",
-                text=f"Operational data proved that {_fact_en(6)} created systemic contagion across major counterparties.",
+                text=f"Transactional data confirmed that {_fact_en(6)} inflicted severe contagion across the entire network.",
                 claim_ids=[_cid(6)],
                 visual_hook="magnifier",
             ),
             StorySceneLine(
                 line_id="B3_L04",
-                text=f"This dynamic accelerated {_fact_en(7)}, locking institutional reserves into irrecoverable shortfalls.",
-                claim_ids=[_cid(3), _cid(7)],
+                text=f"Mounting defaults linked to {_fact_en(7)} triggered severe institutional liquidity impasses.",
+                claim_ids=[_cid(7)],
                 visual_hook="ruler_measure",
             ),
             StorySceneLine(
                 line_id="B3_L05",
-                text=f"Despite mounting internal alarms, decision-makers doubled down on leveraged commitments.",
-                claim_ids=[_cid(4), _cid(7)],
+                text=f"Despite repeated whistleblower alerts, leadership persistently doubled down on {_fact_en(7)}.",
+                claim_ids=[_cid(7)],
                 visual_hook="grease_pencil",
             ),
             StorySceneLine(
                 line_id="B3_L06",
-                text=f"When economic winds shifted, {_fact_en(7)} ignited widespread simultaneous defaults across the platform.",
-                claim_ids=[_cid(5), _cid(7)],
+                text=f"Ultimately, shifting macroeconomic tides transformed {_fact_en(7)} into an unavoidable catastrophe.",
+                claim_ids=[_cid(7)],
                 visual_hook="compass_arc",
             ),
         ]
         b4_lines = [
             StorySceneLine(
                 line_id="B4_L01",
-                text=f"Smoking-gun evidence erupted when {_fact_en(8)} caused the entire commercial facade to dismantle.",
+                text=f"Decisive whistleblower disclosures and forensic evidence around {_fact_en(8)} dismantled the scheme.",
                 claim_ids=[_cid(8)],
                 visual_hook="scissors_cut",
             ),
             StorySceneLine(
                 line_id="B4_L02",
-                text=f"Insolvency audits established that underlying collateral linked to {_fact_en(8)} had evaporated into technical default.",
+                text=f"Official inquiries confirmed that collateral valuations tied to {_fact_en(8)} were fabricated.",
                 claim_ids=[_cid(8)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
                 line_id="B4_L03",
-                text=f"As market confidence disintegrated, {_fact_en(9)} materialized and liquidity vanished within days.",
-                claim_ids=[_cid(0), _cid(9)],
+                text=f"When institutional confidence ruptured, contagion from {_fact_en(9)} evaporated liquidity overnight.",
+                claim_ids=[_cid(9)],
                 visual_hook="magnifier",
             ),
             StorySceneLine(
                 line_id="B4_L04",
-                text=f"Key operatives attempted to disclaim liability, but a watertight chain of custody established criminal intent.",
-                claim_ids=[_cid(8), _cid(9)],
+                text=f"Senior executives attempted to deflect culpability, but evidence on {_fact_en(9)} sealed the case.",
+                claim_ids=[_cid(9)],
                 visual_hook="red_thread",
             ),
             StorySceneLine(
                 line_id="B4_L05",
-                text=f"With the contagion threatening wider credit markets, regulatory tribunals and prosecutors launched emergency enforcement.",
+                text=f"With the contagion impossible to contain, regulatory bodies stepped in to address {_fact_en(9)}.",
                 claim_ids=[_cid(9)],
                 visual_hook="ruler_measure",
             ),
@@ -1005,7 +1030,7 @@ def _build_grounded_story_beats(
             StorySceneLine(
                 line_id="B5_L01",
                 text=f"Supervisory agencies executed formal sanctions and criminal indictments directly stemming from {_fact_en(0)}.",
-                claim_ids=[_cid(0), _cid(9)],
+                claim_ids=[_cid(0)],
                 visual_hook="stamp",
             ),
             StorySceneLine(
@@ -1016,8 +1041,8 @@ def _build_grounded_story_beats(
             ),
             StorySceneLine(
                 line_id="B5_L03",
-                text=f"For capital markets, the enduring lesson of {topic} is undeniable: unchecked leverage in regulatory vacuums will always exact a devastating public toll.",
-                claim_ids=[_cid(0), _cid(len(claims) - 1)],
+                text=f"For capital markets, the enduring lesson of {topic} is undeniable: unchecked leverage in {_fact_en(len(claims) - 1)} will always exact a devastating public toll.",
+                claim_ids=[_cid(len(claims) - 1)],
                 visual_hook="red_thread",
             ),
         ]

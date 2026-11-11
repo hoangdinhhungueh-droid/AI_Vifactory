@@ -251,13 +251,16 @@ def test_s03_dynamic_fact_ingestion_embeds_real_jeonse_claims():
     assert "22조" in full_text
 
 
-def test_s04_topic_specificity_gate_rejection_and_acceptance():
-    from core.contracts.stages import StageArtifact, StageID
-    from core.config import RunContext
+def test_s04_topic_specificity_gate_rejection_and_acceptance(tmp_path):
+    from core.contracts.stages import StageArtifact, Provenance
+    from core.paths import RunPaths
+    from core.config import RunContext, load_profile
+    from core.run_manifest import RunManifest
+    from core.gates import emit_artifact, GateError
+    from app.services.preset_loader import load_preset
     from stages.s04_critic_script import run as s04_run
     from stages.s03_script import _build_grounded_story_beats
-    from app.schemas.story_contracts import EvidenceClaim
-    from pathlib import Path
+    from app.schemas.story_contracts import EvidenceClaim, StoryScriptBeat, StorySceneLine
 
     # Real claims from Jeonse case
     claims = [
@@ -266,66 +269,232 @@ def test_s04_topic_specificity_gate_rejection_and_acceptance():
             claim="The Ministry of Land, Infrastructure and Transport (MOLIT) officially announced the implementation of the Jeonse Fraud Victim 'Minimum Guarantee Scheme' (최소보장제).",
             source_url="http://gov",
             source_type="gov",
-            legal_status="fact"
+            legal_status="alleged"
         ),
         EvidenceClaim(
             claim_id="C002",
             claim="Pre-applications began nationwide on November 10, 2026.",
             source_url="http://news",
             source_type="press",
-            legal_status="fact"
+            legal_status="alleged"
         ),
         EvidenceClaim(
             claim_id="C003",
             claim="Takes effect on November 13, 2026, guaranteeing certified victims one-third (1/3) recovery.",
             source_url="http://news",
             source_type="press",
-            legal_status="fact"
+            legal_status="alleged"
         ),
         EvidenceClaim(
             claim_id="C008",
             claim="In Gyeonggi Province, records recognized 9,317 certified victims.",
             source_url="http://press",
             source_type="press",
-            legal_status="fact"
+            legal_status="alleged"
         ),
     ]
 
-    # 1. Grounded script with real facts -> passes topic_specificity_gate
+    # 1. Grounded script with real facts -> passes topic_specificity_gate via live s04_run
+    paths_pass = RunPaths(run_id="TEST_SPEC_PASS", repo_root=tmp_path)
+    paths_pass.ensure_dirs()
     grounded_beats = _build_grounded_story_beats("보증금의 덫", claims, {c.claim_id: c for c in claims}, market="KR")
-    grounded_payload = {
-        "topic": "보증금의 덫: 전세사기 최소보장제",
+    s3_pass_payload = {
+        "topic": "보증금의 덫",
         "market": "KR",
         "total_words": 260,
         "est_duration_s": 240.0,
         "beats": [{"beat_id": b[0], "target_duration_s": b[1], "lines": [ln.model_dump() for ln in b[2]]} for b in grounded_beats],
         "evidence_ledger": [c.model_dump() for c in claims]
     }
+    s3_art_pass = StageArtifact(schema_version="1.0.0", run_id="TEST_SPEC_PASS", stage="s03_script", status="ok", payload=s3_pass_payload, provenance=Provenance(generator="test"))
+    emit_artifact(s3_art_pass, paths_pass)
 
-    # Simulate S04 logic for topic specificity
-    import re
-    full_text = " ".join(ln.text for b in grounded_beats for ln in b[2])
-    entities = ["국토교통부", "최소보장제", "경기", "molit"]
-    matched_e = [e for e in entities if e in full_text.lower() or e in full_text]
-    assert len(matched_e) >= 3
-
-    metrics = ["11월 10일", "11월 13일", "3분의 1", "9,317"]
-    matched_m = [m for m in metrics if m in full_text]
-    assert len(matched_m) >= 1
+    ctx_pass = RunContext(
+        run_id="TEST_SPEC_PASS",
+        preset=load_preset("story_forensic"),
+        paths=paths_pass,
+        manifest=RunManifest.create_new("TEST_SPEC_PASS", profile="e2e_min"),
+        config=load_profile("e2e_min"),
+        dry_run=True
+    )
+    res_pass = s04_run(ctx_pass)
+    assert res_pass.payload["verdict"] == "pass"
+    assert res_pass.payload["gates"]["topic_specificity_gate"] is True
 
     # 2. Abstract boilerplate script without entities -> fails topic_specificity_gate
-    generic_text = "급격한 시장 위기 속에서 광범위한 구조적 충격이 발생했습니다. 표면 아래 도사린 치명적인 구조적 취약성과 제도적 맹점이 드러났습니다. 시장 참가자들은 단기적 이익을 앞세워 리스크를 은폐했습니다."
-    matched_generic_e = [e for e in entities if e in generic_text]
-    assert len(matched_generic_e) == 0  # Rejection verified!
+    paths_fail = RunPaths(run_id="TEST_SPEC_FAIL", repo_root=tmp_path)
+    paths_fail.ensure_dirs()
+    generic_beats = [
+        StoryScriptBeat(
+            beat_id="B1_HOOK", target_duration_s=20.0,
+            lines=[
+                StorySceneLine(line_id=f"B1_L0{i}", text=f"규제 당국에 따르면, 급격한 시장 위기 속에서 광범위한 구조적 충격이 발생했습니다.", claim_ids=["C001"], visual_hook="stamp")
+                for i in range(1, 5)
+            ]
+        )
+    ]
+    s3_fail_payload = {
+        "topic": "보증금의 덫",
+        "market": "KR",
+        "total_words": 260,
+        "est_duration_s": 240.0,
+        "beats": [b.model_dump() for b in generic_beats],
+        "evidence_ledger": [c.model_dump() for c in claims]
+    }
+    s3_art_fail = StageArtifact(schema_version="1.0.0", run_id="TEST_SPEC_FAIL", stage="s03_script", status="ok", payload=s3_fail_payload, provenance=Provenance(generator="test"))
+    emit_artifact(s3_art_fail, paths_fail)
+
+    ctx_fail = RunContext(
+        run_id="TEST_SPEC_FAIL",
+        preset=load_preset("story_forensic"),
+        paths=paths_fail,
+        manifest=RunManifest.create_new("TEST_SPEC_FAIL", profile="e2e_min"),
+        config=load_profile("e2e_min"),
+        dry_run=True
+    )
+    rejected = False
+    try:
+        s04_run(ctx_fail)
+    except GateError:
+        rejected = True
+    assert rejected is True
 
 
-def test_s04_claim_coverage_gate_rejection_and_acceptance():
-    # Verify that citing only 1 claim out of 10 triggers failure
-    total_claims = 10
-    cited_cids_fail = {"C001"}
-    min_required = min(total_claims, max(3, int(total_claims * 0.5)))
-    assert len(cited_cids_fail) < min_required  # Should fail
+def test_s04_claim_coverage_gate_rejection_and_acceptance(tmp_path):
+    from core.contracts.stages import StageArtifact, Provenance
+    from core.paths import RunPaths
+    from core.config import RunContext, load_profile
+    from core.run_manifest import RunManifest
+    from core.gates import emit_artifact, GateError
+    from app.services.preset_loader import load_preset
+    from stages.s04_critic_script import run as s04_run
+    from stages.s03_script import _build_grounded_story_beats
+    from app.schemas.story_contracts import EvidenceClaim, StoryScriptBeat, StorySceneLine
 
-    cited_cids_pass = {"C001", "C002", "C003", "C004", "C005", "C006"}
-    assert len(cited_cids_pass) >= min_required  # Should pass
+    claims = [
+        EvidenceClaim(claim_id="C001", claim="The Ministry of Land officially announced the Minimum Guarantee Scheme (최소보장제).", legal_status="alleged", source_type="regulator", source_url="http://gov"),
+        EvidenceClaim(claim_id="C002", claim="Pre-applications began nationwide on November 10, 2026 (11월 10일).", legal_status="alleged", source_type="press", source_url="http://news"),
+        EvidenceClaim(claim_id="C003", claim="Takes effect on November 13, 2026, guaranteeing one-third recovery (11월 13일, 3분의 1).", legal_status="alleged", source_type="press", source_url="http://news"),
+        EvidenceClaim(claim_id="C004", claim="Gyeonggi Province certified 9,317 victims (경기, 9,317명).", legal_status="alleged", source_type="gov", source_url="http://gov"),
+    ]
+
+    # 1. Acceptance: Grounded script covering all 4 claims
+    paths_pass = RunPaths(run_id="TEST_COV_PASS", repo_root=tmp_path)
+    paths_pass.ensure_dirs()
+    beats_pass = _build_grounded_story_beats("전세 사기", claims, {c.claim_id: c for c in claims}, market="KR")
+    s3_pass_payload = {
+        "topic": "전세 사기",
+        "market": "KR",
+        "total_words": 250,
+        "est_duration_s": 240.0,
+        "beats": [{"beat_id": b[0], "target_duration_s": b[1], "lines": [ln.model_dump() for ln in b[2]]} for b in beats_pass],
+        "evidence_ledger": [c.model_dump() for c in claims]
+    }
+    s3_art_pass = StageArtifact(schema_version="1.0.0", run_id="TEST_COV_PASS", stage="s03_script", status="ok", payload=s3_pass_payload, provenance=Provenance(generator="test"))
+    emit_artifact(s3_art_pass, paths_pass)
+
+    ctx_pass = RunContext(
+        run_id="TEST_COV_PASS",
+        preset=load_preset("story_forensic"),
+        paths=paths_pass,
+        manifest=RunManifest.create_new("TEST_COV_PASS", profile="e2e_min"),
+        config=load_profile("e2e_min"),
+        dry_run=True
+    )
+    res_pass = s04_run(ctx_pass)
+    assert res_pass.payload["verdict"] == "pass"
+    assert res_pass.payload["gates"]["claim_coverage_gate"] is True
+
+    # 2. Rejection: Only 1 claim cited out of 4 (25% < 50%)
+    paths_fail = RunPaths(run_id="TEST_COV_FAIL", repo_root=tmp_path)
+    paths_fail.ensure_dirs()
+    low_cov_beats = [
+        StoryScriptBeat(
+            beat_id="B1_HOOK", target_duration_s=20.0,
+            lines=[
+                StorySceneLine(line_id=f"B1_L0{i}", text="규제 당국에 따르면, 국토교통부의 최소보장제 공식 발표가 있었습니다.", claim_ids=["C001"], visual_hook="stamp")
+                for i in range(1, 5)
+            ]
+        )
+    ]
+    s3_fail_payload = {
+        "topic": "전세 사기",
+        "market": "KR",
+        "total_words": 250,
+        "est_duration_s": 240.0,
+        "beats": [b.model_dump() for b in low_cov_beats],
+        "evidence_ledger": [c.model_dump() for c in claims]
+    }
+    s3_art_fail = StageArtifact(schema_version="1.0.0", run_id="TEST_COV_FAIL", stage="s03_script", status="ok", payload=s3_fail_payload, provenance=Provenance(generator="test"))
+    emit_artifact(s3_art_fail, paths_fail)
+
+    ctx_fail = RunContext(
+        run_id="TEST_COV_FAIL",
+        preset=load_preset("story_forensic"),
+        paths=paths_fail,
+        manifest=RunManifest.create_new("TEST_COV_FAIL", profile="e2e_min"),
+        config=load_profile("e2e_min"),
+        dry_run=True
+    )
+    rejected = False
+    try:
+        s04_run(ctx_fail)
+    except GateError:
+        rejected = True
+    assert rejected is True
+
+
+def test_s04_multimarket_end_to_end_acceptance(tmp_path):
+    """Guards multi-market resilience for KR, JA, VN, EN with 4 claims."""
+    from core.contracts.stages import StageArtifact, Provenance
+    from core.paths import RunPaths
+    from core.config import RunContext, load_profile
+    from core.run_manifest import RunManifest
+    from core.gates import emit_artifact
+    from app.services.preset_loader import load_preset
+    from stages.s04_critic_script import run as s04_run
+    from stages.s03_script import _build_grounded_story_beats
+    from app.schemas.story_contracts import EvidenceClaim
+
+    claims = [
+        EvidenceClaim(claim_id="C001", claim="The syndicate recruited insolvent strawmen as proxy landlords.", legal_status="alleged", source_type="regulator", source_url="https://example.com", confidence_score=0.9),
+        EvidenceClaim(claim_id="C002", claim="Unchecked gap investment structures were expanded.", legal_status="alleged", source_type="regulator", source_url="https://example.com", confidence_score=0.9),
+        EvidenceClaim(claim_id="C003", claim="Forged real estate appraisal documents inflated collateral values.", legal_status="alleged", source_type="court", source_url="https://example.com", confidence_score=0.9),
+        EvidenceClaim(claim_id="C004", claim="Regulatory authorities initiated forensic investigations into systemic failures.", legal_status="alleged", source_type="gov", source_url="https://example.com", confidence_score=0.9),
+    ]
+    claims_map = {c.claim_id: c for c in claims}
+
+    for mkt in ["KR", "JA", "VN", "EN"]:
+        paths = RunPaths(run_id=f"TEST_MKT_{mkt}", repo_root=tmp_path)
+        paths.ensure_dirs()
+
+        topic = "전세 사기" if mkt == "KR" else ("チョンセ詐欺" if mkt == "JA" else ("Lừa đảo Jeonse" if mkt == "VN" else "Jeonse Fraud"))
+        beats = _build_grounded_story_beats(topic, claims, claims_map, market=mkt)
+        word_count = 250 if mkt in ("KR", "KO") else (10 if mkt in ("JA", "JP") else (450 if mkt in ("VN", "VI") else 500))
+        s3_payload = {
+            "topic": topic,
+            "market": mkt,
+            "total_words": word_count,
+            "est_duration_s": 240.0,
+            "beats": [{"beat_id": b[0], "target_duration_s": b[1], "lines": [ln.model_dump() for ln in b[2]]} for b in beats],
+            "evidence_ledger": [c.model_dump() for c in claims]
+        }
+        s3_art = StageArtifact(schema_version="1.0.0", run_id=f"TEST_MKT_{mkt}", stage="s03_script", status="ok", payload=s3_payload, provenance=Provenance(generator="test"))
+        emit_artifact(s3_art, paths)
+
+        ctx = RunContext(
+            run_id=f"TEST_MKT_{mkt}",
+            preset=load_preset("story_forensic"),
+            paths=paths,
+            manifest=RunManifest.create_new(f"TEST_MKT_{mkt}", profile="e2e_min"),
+            config=load_profile("e2e_min"),
+            dry_run=True
+        )
+        res = s04_run(ctx)
+        assert res.payload["verdict"] == "pass", f"Failed for market {mkt}"
+        assert res.payload["gates"]["topic_specificity_gate"] is True
+        assert res.payload["gates"]["claim_coverage_gate"] is True
+
+
+
 
