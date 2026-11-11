@@ -137,8 +137,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         st = claim.get("legal_status", "alleged")
                         required_phrases = status_language.get(st, []) or req_lang.get(st, [])
                         if required_phrases:
-                            is_en_m = (market or "EN").upper() == "EN"
-                            has_phrase = any((p.lower() if is_en_m else p) in (text.lower() if is_en_m else text) for p in required_phrases)
+                            has_phrase = any(p.lower() in text.lower() for p in required_phrases)
                             if not has_phrase:
                                 legal_ok = False
                                 violations.append({

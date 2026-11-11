@@ -26,28 +26,48 @@ def _get_market_legal_qualifiers(market: str) -> dict:
     m = (market or "EN").upper()
     if m in ("KR", "KO"):
         return {
-            "req_charged": ["검찰 공소장에 따르면", "검찰 공소장", "공소장", "기소", "검찰", "수사", "고발", "혐의"],
+            "req_charged": ["검찰 공소장에 따르면", "검찰 공소장", "공소장", "기소", "검찰", "수사", "고발", "혐의", "기소된"],
             "prefix_charged": "검찰 공소장에 따르면,",
-            "req_alleged": ["규제 당국에 따르면", "규제 당국", "당국에 따르면", "주장", "의혹", "조사"],
+            "req_alleged": [
+                "규제 당국에 따르면", "규제 당국", "당국에 따르면", "당국", "조사",
+                "보도에 따르면", "보도 설명에 따르면", "보도 설명은", "언론 보도에 따르면", "언론에 따르면", "출처 설명에 따르면", "출처 설명은", "보도",
+                "주장", "의혹", "피해자 측", "미확인", "확인되지 않았", "확인된", "보고에 따르면", "설명에 따르면", "설명은", "설명에는", "설명도", "지적합니다", "자료"
+            ],
             "prefix_alleged": "규제 당국에 따르면,",
+            "prefix_alleged_press": "보도 설명에 따르면,",
+            "prefix_alleged_regulator": "규제 당국에 따르면,",
+            "prefix_alleged_default": "제기된 의혹에 따르면,",
             "req_settled": ["공식적인 잘못을 인정하지 않고 합의", "잘못을 인정하지 않고", "합의", "공식적인 잘못"],
             "suffix_settled": "(공식적인 잘못을 인정하지 않고 합의됨)",
         }
     elif m in ("JA", "JP"):
         return {
-            "req_charged": ["起訴状の指摘によれば", "起訴状によれば", "起訴状", "当局の指摘によれば", "疑惑", "起訴"],
+            "req_charged": ["起訴状の指摘によれば", "起訴状によれば", "起訴状", "当局の指摘によれば", "疑惑", "起訴", "捜査"],
             "prefix_charged": "起訴状の指摘によれば、",
-            "req_alleged": ["当局の調査によれば", "当局によれば", "指摘によれば", "調査によれば", "主張", "疑惑"],
+            "req_alleged": [
+                "当局の調査によれば", "当局によれば", "指摘によれば", "調査によれば",
+                "報道によれば", "報道の説明によれば", "報道", "主張", "疑惑", "未確認", "確認されていない", "説明によれば", "資料"
+            ],
             "prefix_alleged": "当局の調査によれば、",
+            "prefix_alleged_press": "報道によれば、",
+            "prefix_alleged_regulator": "当局の調査によれば、",
+            "prefix_alleged_default": "指摘によれば、",
             "req_settled": ["違法性を認めることなく和解", "和解"],
             "suffix_settled": "(違法性を認めることなく和解)",
         }
     elif m in ("VN", "VI"):
         return {
-            "req_charged": ["theo cáo trạng của cơ quan công tố", "theo cáo trạng", "cáo trạng", "viện kiểm sát", "bị khởi tố", "cáo buộc"],
+            "req_charged": ["theo cáo trạng của cơ quan công tố", "theo cáo trạng", "cáo trạng", "viện kiểm sát", "bị khởi tố", "cáo buộc", "truy tố"],
             "prefix_charged": "Theo cáo trạng của cơ quan công tố,",
-            "req_alleged": ["theo cơ quan chức năng", "theo cơ quan điều tra", "cơ quan chức năng", "bị nghi vấn"],
+            "req_alleged": [
+                "theo cơ quan chức năng", "theo cơ quan điều tra", "cơ quan chức năng", "cơ quan điều tra",
+                "theo báo cáo", "theo phản ánh", "theo thông tin báo chí", "theo phản ánh của báo chí",
+                "báo chí phản ánh", "báo đài", "thông tin báo chí", "bị nghi vấn", "nghi vấn", "cáo buộc", "chưa được kiểm chứng", "chưa xác minh", "tài liệu"
+            ],
             "prefix_alleged": "Theo cơ quan chức năng,",
+            "prefix_alleged_press": "Theo thông tin báo chí phản ánh,",
+            "prefix_alleged_regulator": "Theo cơ quan chức năng,",
+            "prefix_alleged_default": "Theo phản ánh,",
             "req_settled": ["dàn xếp mà không thừa nhận hành vi sai trái", "dàn xếp mà không thừa nhận", "dàn xếp"],
             "suffix_settled": "(dàn xếp mà không thừa nhận hành vi sai trái)",
         }
@@ -59,14 +79,21 @@ def _get_market_legal_qualifiers(market: str) -> dict:
                 "sued for", "court filing", "lawsuit"
             ],
             "prefix_charged": "According to court filings,",
-            "req_alleged": ["allegedly", "alleged", "claimed", "purported", "according to regulatory filings", "according to"],
+            "req_alleged": [
+                "allegedly", "alleged", "claimed", "purported", "according to regulatory filings",
+                "according to reports", "according to media reports", "press reports", "reports indicate",
+                "according to", "unconfirmed", "suspected", "allegation", "reported"
+            ],
             "prefix_alleged": "According to regulatory filings,",
+            "prefix_alleged_press": "According to media reports,",
+            "prefix_alleged_regulator": "According to regulatory filings,",
+            "prefix_alleged_default": "Allegedly,",
             "req_settled": ["settled without admitting wrongdoing", "settled", "agreed to pay without admitting fault"],
             "suffix_settled": "(settled without admitting wrongdoing)",
         }
 
 
-def _apply_legal_qualifier(text: str, legal_status: str, market: str) -> str:
+def _apply_legal_qualifier(text: str, legal_status: str, market: str, source_type: str = "regulator") -> str:
     qual = _get_market_legal_qualifiers(market)
     m = (market or "EN").upper()
     is_en = m == "EN"
@@ -85,7 +112,13 @@ def _apply_legal_qualifier(text: str, legal_status: str, market: str) -> str:
             return f"{prefix} {text}"
     elif legal_status == "alleged":
         if not _has_any(text, qual["req_alleged"]):
-            prefix = qual["prefix_alleged"]
+            st_clean = (source_type or "").lower()
+            if "press" in st_clean or "media" in st_clean or "news" in st_clean:
+                prefix = qual.get("prefix_alleged_press", qual["prefix_alleged"])
+            elif "regulat" in st_clean or "gov" in st_clean:
+                prefix = qual.get("prefix_alleged_regulator", qual["prefix_alleged"])
+            else:
+                prefix = qual.get("prefix_alleged_default", qual["prefix_alleged"])
             if is_en and text:
                 first_char = text[:1].lower()
                 rest = text[1:] if len(text) > 1 else ""
@@ -1084,13 +1117,16 @@ def _build_grounded_story_beats(
 
     for _, _, lines in raw_beats:
         for ln in lines:
-            statuses = [getattr(evidence_map.get(cid), "legal_status", "fact") for cid in ln.claim_ids if cid in evidence_map]
+            c_objs = [evidence_map.get(cid) for cid in ln.claim_ids if cid in evidence_map]
+            statuses = [getattr(co, "legal_status", "fact") if not isinstance(co, dict) else co.get("legal_status", "fact") for co in c_objs]
+            source_types = [getattr(co, "source_type", "") if not isinstance(co, dict) else co.get("source_type", "") for co in c_objs]
+            prim_source = source_types[0] if source_types else "press"
             if "charged" in statuses:
-                ln.text = _apply_legal_qualifier(ln.text, "charged", market)
+                ln.text = _apply_legal_qualifier(ln.text, "charged", market, prim_source)
             elif "alleged" in statuses:
-                ln.text = _apply_legal_qualifier(ln.text, "alleged", market)
+                ln.text = _apply_legal_qualifier(ln.text, "alleged", market, prim_source)
             elif "settled" in statuses:
-                ln.text = _apply_legal_qualifier(ln.text, "settled", market)
+                ln.text = _apply_legal_qualifier(ln.text, "settled", market, prim_source)
 
     return raw_beats
 
@@ -1161,7 +1197,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         "5. CRITICAL CITATION & LEGAL RULES IN KOREAN:\n"
                         "   - EVERY factual line MUST cite valid claim_ids from the evidence ledger (e.g. ['C001']).\n"
                         "   - When citing claims with legal_status 'charged', qualify with: '검찰 공소장에 따르면,' or '기소된 혐의에 따르면'.\n"
-                        "   - When citing claims with legal_status 'alleged', qualify with: '규제 당국에 따르면,' or '피해자 측 주장에 따르면'.\n"
+                        "   - When citing claims with legal_status 'alleged', qualify according to the source: if from news/media reports, use '보도 설명에 따르면,' / '언론 보도에 따르면,' or clearly state as unverified ('원문과 법령으로 확인되지 않았습니다'); if from regulatory authorities, use '당국에 따르면,'; if unconfirmed, qualify as '의혹' or '주장'. DO NOT falsely attribute media reports to regulatory authorities ('규제 당국에 따르면').\n"
                         "   - When citing claims with legal_status 'settled', state: '(공식적인 잘못을 인정하지 않고 합의됨)'.\n\n"
                     )
                 elif market == "JA":
@@ -1272,13 +1308,16 @@ def run(ctx: RunContext) -> StageArtifact:
                         text = ln.get("text", "")
                         if (market or "EN").upper() in ("KR", "KO"):
                             text = _normalize_spoken_korean_numbers(text)
-                        statuses = [getattr(evidence_map.get(cid), "legal_status", "fact") for cid in c_ids if cid in evidence_map]
+                        c_objs = [evidence_map.get(cid) for cid in c_ids if cid in evidence_map]
+                        statuses = [getattr(co, "legal_status", "fact") if not isinstance(co, dict) else co.get("legal_status", "fact") for co in c_objs]
+                        source_types = [getattr(co, "source_type", "") if not isinstance(co, dict) else co.get("source_type", "") for co in c_objs]
+                        prim_source = source_types[0] if source_types else "press"
                         if "charged" in statuses:
-                            text = _apply_legal_qualifier(text, "charged", market)
+                            text = _apply_legal_qualifier(text, "charged", market, prim_source)
                         elif "alleged" in statuses:
-                            text = _apply_legal_qualifier(text, "alleged", market)
+                            text = _apply_legal_qualifier(text, "alleged", market, prim_source)
                         elif "settled" in statuses:
-                            text = _apply_legal_qualifier(text, "settled", market)
+                            text = _apply_legal_qualifier(text, "settled", market, prim_source)
 
                         v_hook = ln.get("visual_hook")
                         if not v_hook:

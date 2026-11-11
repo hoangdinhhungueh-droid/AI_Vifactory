@@ -6,7 +6,7 @@ Audit the S03 script against the verified `evidence_ledger`.
 ## 8 Mandatory Evaluation Gates:
 1. `duration_estimate_in_window`: Estimated duration must fall between 180s and 300s (target 240s).
 2. `every_factual_line_has_claim_id`: Every single factual sentence must cite at least one valid `claim_id`.
-3. `legal_language_matches_status`: Sentences referencing unconvicted or settled claims must use strictly qualified legal terms (`allegedly`, `according to the indictment`, `settled without admitting wrongdoing`, or Korean legal qualifiers if KR market: `검찰 공소장에 따르면`, `규제 당국에 따르면`, `(공식적인 잘못을 인정하지 않고 합의됨)`).
+3. `legal_language_matches_status`: Sentences referencing unconvicted or settled claims must use strictly qualified legal terms matching their actual source (`allegedly`, `according to reports`, `according to the indictment`, `settled without admitting wrongdoing`, or Korean legal qualifiers if KR market: `검찰 공소장에 따르면`, `보도 설명에 따르면`, `언론 보도에 따르면`, `당국에 따르면`, `(공식적인 잘못을 인정하지 않고 합의됨)`). Unverified media reports must NOT be falsely attributed to regulatory authorities.
 4. `hook_within_20s`: B1 Hook must grab the viewer and pose the central paradox within the first 20 seconds.
 5. `pattern_interrupt_gap_ok`: No gap longer than 30 seconds without a dynamic tactile hook or structural pattern interrupt.
 6. `target_market_language_compliance`: Spoken lines must strictly match the assigned target market language (e.g. 100% natural Korean in Hangul for KR market; English narration is strictly forbidden).

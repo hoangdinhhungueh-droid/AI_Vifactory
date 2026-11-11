@@ -35,7 +35,7 @@ Every Beat MUST be decomposed into snappy, 3-to-5 second lines (each line repres
 1. **EVERY** line containing a factual assertion must have `claim_ids` matching the `evidence_ledger`.
 2. Legal terminology must strictly match the claim's `legal_status` in the target market's native legal language:
    - For `EN`: `charged` or `alleged` -> *"allegedly"*, *"according to the indictment"*, or *"prosecutors claimed"*; `settled` -> *"settled without admitting wrongdoing"*.
-   - For `KR`: `charged` or `alleged` -> *"검찰 공소장에 따르면,"*, *"기소된 혐의에 따르면,"*, or *"규제 당국에 따르면,"*; `settled` -> *"(공식적인 잘못을 인정하지 않고 합의됨)"*.
+   - For `KR`: `charged` -> *"검찰 공소장에 따르면,"*, *"기소된 혐의에 따르면,"*; `alleged` -> *"보도 설명에 따르면,"*, *"언론 보도에 따르면,"*, or *"당국에 따르면,"* (matching the actual source_type, never falsely attributing press reports to regulatory authorities); `settled` -> *"(공식적인 잘못을 인정하지 않고 합의됨)"*.
    - For `JA`: `charged` or `alleged` -> *"起訴状の指摘によれば、"*, *"当局の調査によれば、"*; `settled` -> *"(違法性を認めることなく和解)"*.
    - For `VN`: `charged` or `alleged` -> *"Theo cáo trạng của cơ quan công tố,"*, *"Theo cơ quan chức năng,"*; `settled` -> *"(dàn xếp mà không thừa nhận hành vi sai trái)"*.
    - `convicted`: You may state guilt directly.
