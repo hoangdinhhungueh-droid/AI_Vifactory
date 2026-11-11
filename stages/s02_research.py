@@ -307,7 +307,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 )
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
-                    model="claude-sonnet-5-5",
+                    model="gpt-6.1-sol",
                     system_prompt=system_prompt,
                     max_tokens=5000,
                     temperature=0.3,

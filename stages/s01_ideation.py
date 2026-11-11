@@ -275,10 +275,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 )
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
-                    model="claude-sonnet-5-5",
+                    model="gpt-6.1-sol",
                     system_prompt=system_prompt,
                     max_tokens=2500,
-                    temperature=0.5,
+                    temperature=0.4,
                     fallback="claude-v4.1-flash"
                 )
                 parsed_json = parse_llm_json(raw_response)

@@ -394,7 +394,8 @@ def _build_grounded_story_beats(
     topic: str,
     evidence_ledger: List[Any],
     evidence_map: Dict[str, Any],
-    market: str = "EN"
+    market: str = "EN",
+    central_question: str = ""
 ) -> List[Tuple[str, float, List[Any]]]:
     """Generates a resilient 5-beat forensic documentary script anchored directly to the claims in the evidence ledger."""
     from app.schemas.story_contracts import StorySceneLine
@@ -429,6 +430,11 @@ def _build_grounded_story_beats(
 
     m_code = (market or "EN").upper()
     if m_code in ("KR", "KO"):
+        b1_paradox_kr = (
+            f"조사관들은 핵심 역설을 묻습니다: {central_question}"
+            if central_question
+            else f"조사관들은 핵심 모순을 추적합니다: 왜 {_with_particle(_fact_kr(3), 'subj')} 위기로 번질 때까지 방치되었는가?"
+        )
         b1_lines = [
             StorySceneLine(
                 line_id="B1_L01",
@@ -450,7 +456,7 @@ def _build_grounded_story_beats(
             ),
             StorySceneLine(
                 line_id="B1_L04",
-                text=f"조사관들은 핵심 모순을 추적합니다: 왜 {_with_particle(_fact_kr(3), 'subj')} 위기로 번질 때까지 방치되었는가?",
+                text=b1_paradox_kr,
                 claim_ids=[_cid(0), _cid(3)],
                 visual_hook="red_thread",
             ),
@@ -572,6 +578,11 @@ def _build_grounded_story_beats(
             ),
         ]
     elif m_code in ("JA", "JP"):
+        b1_paradox_ja = (
+            f"調査報道が核心的逆説を突きつけます：{central_question}"
+            if central_question
+            else f"調査官たちは根本的矛盾を追及します：なぜ{_fact_ja(3)}のリスクが危機に至るまで放置されたのか？"
+        )
         b1_lines = [
             StorySceneLine(
                 line_id="B1_L01",
@@ -593,7 +604,7 @@ def _build_grounded_story_beats(
             ),
             StorySceneLine(
                 line_id="B1_L04",
-                text=f"調査官たちは根本的矛盾を追及します：なぜ{_fact_ja(3)}のリスクが危機に至るまで放置されたのか？",
+                text=b1_paradox_ja,
                 claim_ids=[_cid(0), _cid(3)],
                 visual_hook="red_thread",
             ),
@@ -715,6 +726,11 @@ def _build_grounded_story_beats(
             ),
         ]
     elif m_code in ("VN", "VI"):
+        b1_paradox_vn = (
+            f"Các nhà điều tra đặt ra nghịch lý trọng tâm: {central_question}"
+            if central_question
+            else f"Các điều tra viên đối diện với nghịch lý: tại sao rủi ro từ {_fact_vn(3)} lại bị bỏ ngỏ cho đến khi bùng nổ?"
+        )
         b1_lines = [
             StorySceneLine(
                 line_id="B1_L01",
@@ -736,7 +752,7 @@ def _build_grounded_story_beats(
             ),
             StorySceneLine(
                 line_id="B1_L04",
-                text=f"Các điều tra viên đối diện với nghịch lý: tại sao rủi ro từ {_fact_vn(3)} lại bị bỏ ngỏ cho đến khi bùng nổ?",
+                text=b1_paradox_vn,
                 claim_ids=[_cid(0), _cid(3)],
                 visual_hook="red_thread",
             ),
@@ -858,6 +874,11 @@ def _build_grounded_story_beats(
             ),
         ]
     else:
+        b1_paradox_en = (
+            f"Investigators confront the central systemic paradox: {central_question}"
+            if central_question
+            else f"Investigators confronted the central paradox: how did the mounting risks of {_fact_en(3)} compound before authorities intervened?"
+        )
         b1_lines = [
             StorySceneLine(
                 line_id="B1_L01",
@@ -879,7 +900,7 @@ def _build_grounded_story_beats(
             ),
             StorySceneLine(
                 line_id="B1_L04",
-                text=f"Investigators confronted the central paradox: how did the mounting risks of {_fact_en(3)} compound before authorities intervened?",
+                text=b1_paradox_en,
                 claim_ids=[_cid(0), _cid(3)],
                 visual_hook="red_thread",
             ),
@@ -1134,6 +1155,12 @@ def run(ctx: RunContext) -> StageArtifact:
                     "Purely abstract boilerplate without specific grounding facts is strictly forbidden.\n\n"
                 )
                 user_prompt += (
+                    f"CRITICAL BEAT 1 HOOK & CENTRAL PARADOX MANDATE (0-20s, Rule 130 / Rule 131 / Gate 4):\n"
+                    f"- In Beat 1 (lines B1_L01 to B1_L04, 0-20s), you MUST explicitly state and pose the Central Investigative Paradox and Question directly to the audience: '{c_quest}'.\n"
+                    f"- Specifically, Line B1_L03 or B1_L04 MUST explicitly formulate this central paradox/question in natural native narration (e.g. asking why the systemic failure occurred or exposing the shocking paradox of private losses being absorbed by the state/victims).\n"
+                    "- Do NOT merely state neutral factual announcements in Beat 1. The hook must grab the viewer by exposing the shocking systemic paradox within the first 20 seconds.\n\n"
+                )
+                user_prompt += (
                     "Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'grease_pencil'.\n\n"
                     "CRITICAL FORMAT MANDATE:\n"
                     "Start response immediately with { and end with }. Output ONLY valid JSON adhering to schema with NO conversational preamble or thinking."
@@ -1237,7 +1264,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 raw_beats = []
 
         if not raw_beats:
-            raw_beats = _build_grounded_story_beats(topic, evidence_ledger, evidence_map, market=market)
+            raw_beats = _build_grounded_story_beats(topic, evidence_ledger, evidence_map, market=market, central_question=c_quest)
 
 
         story_beats = []
