@@ -1220,6 +1220,10 @@ def run(ctx: RunContext) -> StageArtifact:
                     "CRITICAL NUMBER & DATE FORMATTING MANDATE:\n"
                     "- All dates, years, percentages, statutory articles, and quantities MUST be written in standard Arabic numerals (e.g. '2023년 6월 1일', '2024년 9월 10일', '11월 11일', '제1005조', '2분의 1', '3분의 1').\n"
                     "- STRICTLY FORBIDDEN: Do NOT spell out numbers as phonetic words (e.g. NEVER write '이천이십삼년 유월 일일', '이천이십사년', or '제천오조').\n\n"
+                    f"CRITICAL CLAIM COVERAGE & DISTRIBUTION MANDATE (Gate 8):\n"
+                    f"- The evidence ledger contains {len(evidence_ledger)} claims. You MUST cite at least {max(3, min(10, int(len(evidence_ledger) * 0.55)))} to {min(len(evidence_ledger), max(4, int(len(evidence_ledger) * 0.55) + 3))} distinct claims across the 18-22 lines.\n"
+                    "- Distribute different claims progressively across the beats (e.g. B1 cites early background claims; B2 cites financial/market claims; B3 cites statutory/enforcement claims; B4 cites insolvency/interest rate claims; B5 cites relief/outcome claims).\n"
+                    "- DO NOT stop after citing only the first 5-8 claims. Ensure at least 50% of the evidence ledger is actively covered.\n\n"
                 )
                 user_prompt += (
                     "Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'grease_pencil'.\n\n"

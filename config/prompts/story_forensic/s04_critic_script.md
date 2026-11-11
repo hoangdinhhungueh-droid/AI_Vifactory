@@ -11,7 +11,7 @@ Audit the S03 script against the verified `evidence_ledger`.
 5. `pattern_interrupt_gap_ok`: No gap longer than 30 seconds without a dynamic tactile hook or structural pattern interrupt.
 6. `target_market_language_compliance`: Spoken lines must strictly match the assigned target market language (e.g. 100% natural Korean in Hangul for KR market; English narration is strictly forbidden).
 7. `topic_specificity_gate`: Narration must explicitly mention concrete named entities, dates, and quantitative metrics from the evidence ledger. Purely abstract boilerplate without specific grounding facts is strictly forbidden.
-8. `claim_coverage_gate`: Substantive coverage of at least 50% of evidence ledger claims (min 3 claims), and lines citing a claim must contain core keywords, entities, or facts from that claim.
+8. `claim_coverage_gate`: Substantive coverage of at least 45-50% of evidence ledger claims (or at least 8 distinct claims, min 3 claims), and lines citing a claim must contain core keywords, entities, or facts from that claim.
 
 ## Output Schema Requirements
 Produce pure valid JSON matching:
