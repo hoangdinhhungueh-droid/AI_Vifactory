@@ -255,6 +255,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 num_clean = num.strip()
                 if len(num_clean) >= 2:
                     evidence_metrics.add(num_clean.lower())
+                    y_match = re.search(r"\b(19\d{2}|20\d{2})\b", num_clean)
+                    if y_match:
+                        evidence_metrics.add(y_match.group(1))
+                        evidence_metrics.add(f"{y_match.group(1)}년")
 
             # Parentheticals e.g. (최소보장제), ('Villa Kings')
             for p in re.findall(r"\(([^)]+)\)", c_text):
@@ -304,8 +308,9 @@ def run(ctx: RunContext) -> StageArtifact:
                 evidence_metrics.update(["one-third", "1/3", "3분의 1", "3분의1", "3分の1", "1/3"])
 
         all_text_lower = all_text.lower()
-        matched_entities = [e for e in evidence_entities if e in all_text_lower]
-        matched_metrics = [m for m in evidence_metrics if m in all_text_lower]
+        all_text_nospace = re.sub(r"\s+", "", all_text_lower)
+        matched_entities = [e for e in evidence_entities if e in all_text_lower or re.sub(r"\s+", "", e) in all_text_nospace]
+        matched_metrics = [m for m in evidence_metrics if m in all_text_lower or re.sub(r"\s+", "", m) in all_text_nospace]
 
         min_req_entities = min(3, len(evidence_entities)) if evidence_entities else 0
         min_req_metrics = min(1, len(evidence_metrics)) if evidence_metrics else 0

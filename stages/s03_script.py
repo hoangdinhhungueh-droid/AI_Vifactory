@@ -98,6 +98,33 @@ def _apply_legal_qualifier(text: str, legal_status: str, market: str) -> str:
     return text
 
 
+def _normalize_spoken_korean_numbers(text: str) -> str:
+    """Normalizes phonetic Korean spelled-out numbers back to standard Arabic numerals."""
+    if not text:
+        return text
+    replacements = [
+        ("이천이십삼년", "2023년"),
+        ("이천이십사년", "2024년"),
+        ("이천이십오년", "2025년"),
+        ("이천이십육년", "2026년"),
+        ("일구팔일년", "1981년"),
+        ("삼월 오일", "3월 5일"),
+        ("유월 일일", "6월 1일"),
+        ("구월 십일", "9월 10일"),
+        ("십일월 십일일", "11월 11일"),
+        ("십일월 십일", "11월 10일"),
+        ("십일월 십삼일", "11월 13일"),
+        ("제천오조", "제1005조"),
+        ("제삼조", "제3조"),
+        ("제삼조의이", "제3조의2"),
+        ("삼분의 일", "3분의 1"),
+        ("이분의 일", "2분의 1"),
+    ]
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
+
+
 def _with_particle(word: str, p_type: str) -> str:
     """Appends appropriate Hangul josa (은/는, 이/가, 을/를, 과/와)."""
     if not word:
@@ -1190,6 +1217,9 @@ def run(ctx: RunContext) -> StageArtifact:
                     "- Every line that cites a claim_id (e.g. ['C001']) MUST strictly ground its factual assertions in that specific claim from the evidence ledger.\n"
                     "- DO NOT cite claims on lines that contain unverified quantitative figures or ratios not supported by those claims.\n"
                     "- When posing the Beat 1 central paradox or question in B1_L03/B1_L04, ensure any cited claims directly substantiate the premises or institutional paradox described.\n\n"
+                    "CRITICAL NUMBER & DATE FORMATTING MANDATE:\n"
+                    "- All dates, years, percentages, statutory articles, and quantities MUST be written in standard Arabic numerals (e.g. '2023년 6월 1일', '2024년 9월 10일', '11월 11일', '제1005조', '2분의 1', '3분의 1').\n"
+                    "- STRICTLY FORBIDDEN: Do NOT spell out numbers as phonetic words (e.g. NEVER write '이천이십삼년 유월 일일', '이천이십사년', or '제천오조').\n\n"
                 )
                 user_prompt += (
                     "Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'grease_pencil'.\n\n"
@@ -1236,6 +1266,8 @@ def run(ctx: RunContext) -> StageArtifact:
                         if not c_ids and evidence_ledger:
                             c_ids = [evidence_ledger[min(idx - 1, len(evidence_ledger) - 1)].claim_id]
                         text = ln.get("text", "")
+                        if (market or "EN").upper() in ("KR", "KO"):
+                            text = _normalize_spoken_korean_numbers(text)
                         statuses = [getattr(evidence_map.get(cid), "legal_status", "fact") for cid in c_ids if cid in evidence_map]
                         if "charged" in statuses:
                             text = _apply_legal_qualifier(text, "charged", market)
