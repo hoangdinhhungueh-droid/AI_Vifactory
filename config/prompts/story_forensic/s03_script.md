@@ -65,18 +65,12 @@ Produce pure valid JSON matching the following contract:
         },
         {
           "line_id": "B1_L03",
-          "text": "<Documented systemic paradox or statutory contradiction sentence, 8 to 15 words>",
+          "text": "<Documented systemic paradox or ticking contradiction sentence, 8 to 14 words>",
           "claim_ids": ["C002"],
           "visual_hook": "ruler_measure"
-        },
-        {
-          "line_id": "B1_L04",
-          "text": "<Ticking calendar deadline framing the operational crisis, 8 to 15 words>",
-          "claim_ids": ["C002", "C003"],
-          "visual_hook": "red_thread"
         }
       ],
-      "word_count": 50
+      "word_count": 38
     }
   ]
 }

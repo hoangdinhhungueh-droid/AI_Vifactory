@@ -1190,3 +1190,18 @@ def test_systemic_s01_money_null_court_bucket_corroboration_and_bounds():
     assert b1_sec <= 24.0, f"Fallback Beat 1 {b1_sec}s > 24.0s"
     assert tot_info["estimated_duration_sec"] <= 300.0, tot_info
     assert tot_info["spoken_units"] <= 1550, tot_info
+
+    # 5. JA institutional report pattern & strict multi-claim qualifier alignment
+    from app.services.story_provenance_engine import line_matches_expected_qualifier
+
+    ok_ja, _ = line_matches_expected_qualifier(
+        "日本銀行の公表によれば、市場金利への影響が広がった。",
+        {
+            "legal_status": "alleged",
+            "source_type": "regulator",
+            "verification_status": "verified_primary",
+            "claim": "日本銀行が金融政策の変更を公表した。",
+        },
+        market="JA",
+    )
+    assert ok_ja is True

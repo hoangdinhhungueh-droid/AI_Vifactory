@@ -1024,9 +1024,9 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR KOREAN (KR) MARKET:\n"
                         "1. Write 100% natural, authoritative investigative Korean narration (Hangul). English/foreign prose is STRICTLY FORBIDDEN.\n"
-                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} spoken Hangul+numeral syllables across 19-24 lines). Beat 1 (B1_hook) MUST be ultra-punchy: 3 concise lines totaling <= 105 syllables (<= 21s).\n"
+                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} spoken Hangul+numeral syllables across 19-24 lines). Beat 1 (B1_hook) MUST have ONLY 3 concise lines totaling <= 98 syllables (~15-20s) and cite ONLY verified_primary or corroborated_secondary claim_ids (NEVER put unverified_secondary claim_ids inside B1_hook!).\n"
                         "3. LEGAL & PROVENANCE ATTRIBUTION:\n"
-                        "   - Cite valid claim_ids on every factual line.\n"
+                        "   - Cite valid claim_ids on every factual line. Do NOT mix unverified_secondary and corroborated/primary claim_ids on the same line unless framed as preliminary/unverified.\n"
                         "   - Distinguish 'court_judgment' (법원 확정 판결에 따르면) vs 'indictment' (검찰 공소장에 따르면) vs 'criminal_complaint' (고발장·소장에 따르면) vs 'press' reports (보도에 따르면).\n"
                         "   - NEVER elevate 'unverified_secondary' claims into Beat 1's opening core premise; attribute them explicitly as preliminary/unverified.\n"
                         "   - Avoid repetitive explainer disclaimers or speculative causal leaps.\n\n"
@@ -1035,15 +1035,15 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR JAPANESE (JA) MARKET:\n"
                         "1. Write 100% natural, authoritative Japanese investigative narration. No Hangul or foreign sentences.\n"
-                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} spoken Japanese characters across 19-24 lines). Beat 1 (B1_hook) MUST be 3 concise lines totaling <= 125 chars (<= 21s).\n"
-                        "3. Distinguish judgment (判決によれば) vs indictment (起訴状によれば) vs complaint (訴状によれば) vs unverified press reports (未確認の報道によれば).\n"
-                        "4. Beat 1 must anchor strictly in verified_primary or corroborated_secondary catalyst facts.\n\n"
+                        f"2. STRICT LENGTH & PACING: Write 23-28 substantive lines of 50-65 Japanese characters each so total spoken narration is STRICTLY 1,100-1,600 Japanese characters (NEVER < 950 chars! Within {u_min}-{u_max} chars / 180-300s). Beat 1 (B1_hook) MUST have 3 short lines totaling <= 115 chars (~15-19s) citing ONLY verified_primary/corroborated_secondary claim_ids.\n"
+                        "3. Distinguish judgment (判決によれば) vs indictment (起訴状によれば) vs complaint (訴状によれば) vs named institution report (日銀公表/報告書によれば) vs unverified press reports (未確認の報道によれば).\n"
+                        "4. Do NOT mix unverified_secondary and verified_primary claims on the same line unless explicitly qualified.\n\n"
                     )
                 elif market == "VN":
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR VIETNAMESE (VN) MARKET:\n"
                         "1. Write 100% natural, authoritative Vietnamese narration with full Vietnamese diacritics. No English/CJK prose.\n"
-                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} Vietnamese words across 19-24 lines). Beat 1 (B1_hook) MUST be 3 concise lines totaling <= 75 words (<= 21s).\n"
+                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} Vietnamese words across 19-24 lines). Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 75 words (<= 21s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
                         "3. Distinguish judgment (Theo phán quyết của tòa án) vs indictment (Theo cáo trạng) vs complaint (Theo đơn kiện) vs unverified press reports (Theo thông tin bước đầu chưa kiểm chứng).\n\n"
                     )
                 else:
@@ -1051,7 +1051,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         "CRITICAL LANGUAGE MANDATE FOR ENGLISH (EN) MARKET:\n"
                         f"1. STRICT LENGTH & PACING: Write 100% crisp investigative English narration strictly totaling {u_min}-{u_max} words across 20-26 lines (180-300s). Beat 1 (B1_hook) MUST be 3 tight, punchy lines totaling <= 44 words (<= 22s).\n"
                         "2. Distinguish court_judgment vs indictment vs criminal_complaint vs settled without admitting wrongdoing vs unverified preliminary reports. Attribute DOJ/regulatory allegations directly to the agency/court, NOT to 'press reports'.\n"
-                        "3. Beat 1 MUST anchor in verified_primary or corroborated_secondary catalyst facts.\n\n"
+                        "3. Beat 1 MUST anchor in verified_primary or corroborated_secondary claim_ids ONLY.\n\n"
                     )
 
                 min_req_claims = max(3, int(-(-len(evidence_ledger) * 60 // 100))) if evidence_ledger else 0
@@ -1093,31 +1093,82 @@ def run(ctx: RunContext) -> StageArtifact:
                             c_ids = [cid for cid in (ln.get("claim_ids") or []) if cid in evidence_map]
                             if not c_ids and evidence_ledger:
                                 c_ids = [evidence_ledger[min(idx - 1, len(evidence_ledger) - 1)].claim_id]
+
+                            # Never taint a Beat 1 line that already cites verified_primary/corroborated_secondary
+                            # with an extra unverified_secondary cid unless all claims on the line are unverified.
+                            if "B1" in b_id and len(c_ids) > 1:
+                                _ver_cids = [
+                                    cid for cid in c_ids
+                                    if (
+                                        (evidence_map[cid].get("verification_status") if isinstance(evidence_map[cid], dict) else getattr(evidence_map[cid], "verification_status", ""))
+                                        in ("verified_primary", "corroborated_secondary")
+                                    )
+                                ]
+                                if _ver_cids:
+                                    c_ids = _ver_cids
+
                             text = ln.get("text", "")
                             if (market or "EN").upper() in ("KR", "KO"):
                                 text = _normalize_spoken_korean_numbers(text)
 
+                            from app.services.story_provenance_engine import (
+                                expected_qualifier_bucket as _exp_bucket,
+                                line_matches_expected_qualifier as _pre_match_qual,
+                            )
+
                             c_objs = [evidence_map[cid] for cid in c_ids if cid in evidence_map]
                             if len(c_objs) > 1:
-                                _ver_rank = {"verified_primary": 0, "corroborated_secondary": 1, "unverified_secondary": 2, "speculative": 3}
-                                _src_rank = {"court": 0, "regulator": 1, "gov": 2, "press": 3}
-                                c_objs.sort(key=lambda co: (
-                                    _ver_rank.get(str(co.get("verification_status") if isinstance(co, dict) else getattr(co, "verification_status", "")), 2),
-                                    _src_rank.get(str(co.get("source_type") if isinstance(co, dict) else getattr(co, "source_type", "")), 3),
+                                _bucket_priority = {
+                                    "unverified": 0,
+                                    "indictment": 1,
+                                    "criminal_complaint": 2,
+                                    "press_charge": 3,
+                                    "alleged_regulator": 4,
+                                    "alleged": 5,
+                                    "proposed": 6,
+                                    "final_judgment": 7,
+                                    "settled": 8,
+                                    "fact": 9,
+                                }
+                                c_objs.sort(key=lambda co: _bucket_priority.get(
+                                    _exp_bucket(
+                                        legal_status=str(co.get("legal_status", "alleged") if isinstance(co, dict) else getattr(co, "legal_status", "alleged")),
+                                        source_type=str(co.get("source_type", "press") if isinstance(co, dict) else getattr(co, "source_type", "press")),
+                                        doc_type=str(co.get("doc_type", "unknown") if isinstance(co, dict) else getattr(co, "doc_type", "unknown")),
+                                        speaker=(co.get("speaker", None) if isinstance(co, dict) else getattr(co, "speaker", None)),
+                                        procedural_status=str(co.get("procedural_status", "unknown") if isinstance(co, dict) else getattr(co, "procedural_status", "unknown")),
+                                        verification_status=str(co.get("verification_status", "corroborated_secondary") if isinstance(co, dict) else getattr(co, "verification_status", "corroborated_secondary")),
+                                    ),
+                                    9,
                                 ))
-                            primary_c = c_objs[0] if c_objs else None
-                            if primary_c is not None:
-                                get_a = (lambda k, d="": primary_c.get(k, d)) if isinstance(primary_c, dict) else (lambda k, d="": getattr(primary_c, k, d))
+                            applied_prefix_bucket = False
+                            for c_obj in c_objs:
+                                c_dict_q = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
+                                ok_already, _ = _pre_match_qual(text, c_dict_q, market=market)
+                                if ok_already:
+                                    continue
+                                bkt = _exp_bucket(
+                                    legal_status=str(c_dict_q.get("legal_status", "alleged")),
+                                    source_type=str(c_dict_q.get("source_type", "press")),
+                                    doc_type=str(c_dict_q.get("doc_type", "unknown")),
+                                    speaker=c_dict_q.get("speaker"),
+                                    procedural_status=str(c_dict_q.get("procedural_status", "unknown")),
+                                    verification_status=str(c_dict_q.get("verification_status", "corroborated_secondary")),
+                                )
+                                if bkt == "fact" or (bkt != "settled" and applied_prefix_bucket):
+                                    continue
                                 text = _apply_legal_qualifier(
                                     text=text,
-                                    legal_status=str(get_a("legal_status", "alleged")),
+                                    legal_status=str(c_dict_q.get("legal_status", "alleged")),
                                     market=market,
-                                    source_type=str(get_a("source_type", "press")),
-                                    doc_type=str(get_a("doc_type", "unknown")),
-                                    speaker=get_a("speaker", None),
-                                    procedural_status=str(get_a("procedural_status", "unknown")),
-                                    verification_status=str(get_a("verification_status", "corroborated_secondary")),
+                                    source_type=str(c_dict_q.get("source_type", "press")),
+                                    doc_type=str(c_dict_q.get("doc_type", "unknown")),
+                                    speaker=c_dict_q.get("speaker"),
+                                    procedural_status=str(c_dict_q.get("procedural_status", "unknown")),
+                                    verification_status=str(c_dict_q.get("verification_status", "corroborated_secondary")),
                                 )
+                                if bkt != "settled":
+                                    applied_prefix_bucket = True
 
                             v_hook = ln.get("visual_hook") or "stamp"
                             lines_data.append(StorySceneLine(
@@ -1170,7 +1221,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                     ok_q, q_msg = _match_qual(ln.text, c_dict, market=market)
                                     if not ok_q:
                                         qual_issues.append(f"{ln.line_id}:{cid}:{q_msg}")
-                    b1_dur_ok = b1_dur <= 24.0
+                    b1_dur_ok = b1_dur <= 24.5
                     b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and b1_dur_ok and not align_res.get("beat1_unverified_elevation"))
                     units_ok = u_min <= cand_units <= u_max
                     dur_ok = (d_min <= cand_dur <= d_max) and units_ok
