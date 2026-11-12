@@ -1142,9 +1142,12 @@ def run(ctx: RunContext) -> StageArtifact:
                                     9,
                                 ))
                             applied_prefix_bucket = False
-                            for c_obj in c_objs:
-                                c_dict_q = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
-                                ok_already, _ = _pre_match_qual(text, c_dict_q, market=market)
+                            c_objs_dicts = [
+                                (co.model_dump() if hasattr(co, "model_dump") else dict(co))
+                                for co in c_objs
+                            ]
+                            for c_dict_q in c_objs_dicts:
+                                ok_already, _ = _pre_match_qual(text, c_dict_q, market=market, peer_claims=c_objs_dicts)
                                 if ok_already:
                                     continue
                                 bkt = _exp_bucket(
@@ -1214,11 +1217,16 @@ def run(ctx: RunContext) -> StageArtifact:
                     qual_issues: List[str] = []
                     for _, _, lns in cand_beats:
                         for ln in lns:
+                            line_peer_dicts = [
+                                (evidence_map[c].model_dump() if hasattr(evidence_map[c], "model_dump") else dict(evidence_map[c]))
+                                for c in (ln.claim_ids or [])
+                                if c in evidence_map
+                            ]
                             for cid in (ln.claim_ids or []):
                                 c_obj = evidence_map.get(cid)
                                 if c_obj is not None:
                                     c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
-                                    ok_q, q_msg = _match_qual(ln.text, c_dict, market=market)
+                                    ok_q, q_msg = _match_qual(ln.text, c_dict, market=market, peer_claims=line_peer_dicts)
                                     if not ok_q:
                                         qual_issues.append(f"{ln.line_id}:{cid}:{q_msg}")
                     b1_dur_ok = b1_dur <= 24.5
@@ -1251,10 +1259,24 @@ def run(ctx: RunContext) -> StageArtifact:
                 if not passed_pre:
                     repair_notes: List[str] = []
                     if not dur_ok or not units_ok:
-                        repair_notes.append(
-                            f"Length {cand_timing['spoken_units']} {cand_timing['unit_type']} ({cand_dur:.1f}s) is OUT OF BOUNDS: "
-                            f"MUST be strictly {u_min}-{u_max} {cand_timing['unit_type']} AND {d_min:.0f}-{d_max:.0f}s."
-                        )
+                        if cand_timing["spoken_units"] < u_min:
+                            shortfall = u_min - int(cand_timing["spoken_units"])
+                            mid_target = int((u_min + u_max) // 2)
+                            repair_notes.append(
+                                f"TOO SHORT by {shortfall} {cand_timing['unit_type']}: current is ONLY {cand_timing['spoken_units']} "
+                                f"({cand_dur:.1f}s), MUST reach {u_min}-{u_max} {cand_timing['unit_type']} (target ~{mid_target}) and {d_min:.0f}-{d_max:.0f}s. "
+                                f"ADD 4-6 new substantive lines across B2_setup, B3_scheme, and B4_crack detailing the evidence ledger claims cleanly (do NOT lengthen B1_hook)."
+                            )
+                        elif cand_timing["spoken_units"] > u_max:
+                            excess = int(cand_timing["spoken_units"]) - u_max
+                            repair_notes.append(
+                                f"TOO LONG by {excess} {cand_timing['unit_type']}: trim redundant wording across B2-B5 to strictly {u_min}-{u_max} {cand_timing['unit_type']} ({d_min:.0f}-{d_max:.0f}s)."
+                            )
+                        else:
+                            repair_notes.append(
+                                f"Duration {cand_dur:.1f}s ({cand_timing['spoken_units']} {cand_timing['unit_type']}) is OUT OF BOUNDS: "
+                                f"MUST be strictly {d_min:.0f}-{d_max:.0f}s AND {u_min}-{u_max} {cand_timing['unit_type']}."
+                            )
                     if not b1_dur_ok:
                         repair_notes.append(
                             f"Beat 1 (B1_hook) duration is {b1_dur:.1f}s (> 24.0s limit). Shorten Beat 1 lines so total Beat 1 speech is 15-21s."
@@ -1288,8 +1310,8 @@ def run(ctx: RunContext) -> StageArtifact:
                         prompt=repair_prompt,
                         model="gpt-6.1-sol",
                         system_prompt=system_prompt,
-                        max_tokens=4000,
-                        temperature=0.2,
+                        max_tokens=4500,
+                        temperature=0.35 if not units_ok else 0.2,
                         timeout=120.0,
                         fallback="claude-v4.1-flash",
                     )

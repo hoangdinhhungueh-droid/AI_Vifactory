@@ -1205,3 +1205,24 @@ def test_systemic_s01_money_null_court_bucket_corroboration_and_bounds():
         market="JA",
     )
     assert ok_ja is True
+
+    # Peer-claim authority: co-citing corroborated gov + press claims on 1 line is valid,
+    # whereas isolated press claim using regulator attribution MUST still fail.
+    gov_c = {
+        "claim_id": "C001",
+        "legal_status": "alleged",
+        "source_type": "gov",
+        "verification_status": "corroborated_secondary",
+        "claim": "국토교통부가 최소보장제를 공식 발표했다.",
+    }
+    press_c = {
+        "claim_id": "C003",
+        "legal_status": "alleged",
+        "source_type": "press",
+        "verification_status": "corroborated_secondary",
+        "claim": "경향신문 보도에 따르면 최소 3분의 1 회수가 보장된다.",
+    }
+    mixed_txt = "국토교통부 공식 발표와 언론 보도에 따르면 최소 3분의 1 회수가 추진됩니다."
+    assert line_matches_expected_qualifier(mixed_txt, gov_c, market="KR", peer_claims=[gov_c, press_c])[0] is True
+    assert line_matches_expected_qualifier(mixed_txt, press_c, market="KR", peer_claims=[gov_c, press_c])[0] is True
+    assert line_matches_expected_qualifier("규제 당국에 따르면 3분의 1 회수가 보장됩니다.", press_c, market="KR")[0] is False

@@ -607,7 +607,7 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "indictment": ["공소장에 따르면", "공소장에 의하면", "검찰 공소장", "검찰에 따르면", "검찰 조사", "기소 내용에 따르면", "기소장에 따르면"],
         "criminal_complaint": ["고발장에 따르면", "고소장에 따르면", "소장에 따르면", "고발 내용에 따르면", "소장을 통해"],
         "press_charge": ["보도된 기소 내용에 따르면", "보도에 따르면", "언론 보도에 따르면", "혐의를 받고 있"],
-        "alleged_regulator": ["규제 당국에 따르면", "당국에 따르면", "당국의 조사", "감독 당국", "정부 발표에 따르면", "발표에 따르면", "보고서에 따르면", "조사 결과"],
+        "alleged_regulator": ["규제 당국에 따르면", "당국에 따르면", "당국의 조사", "감독 당국", "정부 발표에 따르면", "발표에 따르면", "공식 발표", "발표했다", "보고서에 따르면", "조사 결과"],
         "alleged": ["언론 보도에 따르면", "보도 설명에 따르면", "보도에 따르면", "의혹이 제기", "주장에 따르면", "것으로 알려졌", "것으로 전해졌"],
         "settled": ["합의했", "합의하며", "합의로 종결", "책임을 인정하지 않", "인정하지 않고 합의", "동의의결"],
         "unverified": ["아직 최종", "아직 확인", "아직 사실관계", "미확인", "초기 보도", "확인되지 않은 보도", "초기 문건"],
@@ -864,6 +864,7 @@ def line_matches_expected_qualifier(
     line_text: str,
     claim: Dict[str, Any],
     market: str = "EN",
+    peer_claims: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[bool, str]:
     """Verify whether a script line satisfies the expected legal + verification qualifier for `claim`."""
     m = normalize_market_code(market)
@@ -894,9 +895,27 @@ def line_matches_expected_qualifier(
             if _qualifier_pattern_matches(ind_p, line_text, m) and not _qualifier_pattern_matches(ind_p, raw_claim_str, m):
                 return False, f"Elevates criminal_complaint claim using indictment phrasing '{ind_p}'"
 
+    # Determine authority buckets legitimately anchored by co-cited verified/corroborated non-press claims on this line
+    peer_auth_buckets: set[str] = set()
+    for pc in (peer_claims or []):
+        pc_st = str(pc.get("source_type", "press")).lower()
+        pc_vs = str(pc.get("verification_status", "unverified_secondary")).lower()
+        if pc_st in ("court", "regulator", "gov") and pc_vs != "unverified_secondary":
+            pc_b = expected_qualifier_bucket(
+                legal_status=str(pc.get("legal_status", "alleged")).lower(),
+                source_type=pc_st,
+                doc_type=str(pc.get("doc_type", "unknown")).lower(),
+                speaker=pc.get("speaker"),
+                procedural_status=str(pc.get("procedural_status", "unknown")).lower(),
+                verification_status=pc_vs,
+            )
+            peer_auth_buckets.add(pc_b)
+
     # Guard against authority laundering: press/unverified claims must never claim prosecutor indictment or regulator mandate
     if (st == "press" or vs in ("unverified_secondary", "speculative")) and bucket in ("press_charge", "alleged", "unverified"):
         for auth_b in ("indictment", "alleged_regulator"):
+            if auth_b in peer_auth_buckets:
+                continue
             for ap in _LEGAL_QUALIFIER_PATTERNS.get(m, {}).get(auth_b, []):
                 if _qualifier_pattern_matches(ap, line_text, m) and not _qualifier_pattern_matches(ap, raw_claim_str, m):
                     return False, f"Misattributes {st}/{bucket} claim to '{ap}'"

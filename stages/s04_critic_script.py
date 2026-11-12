@@ -232,7 +232,8 @@ def run(ctx: RunContext) -> StageArtifact:
                             "detail": f"Claim ID '{cid}' in line '{line_id}' not found in evidence_ledger.",
                         })
                     else:
-                        ok_q, reason_q = line_matches_expected_qualifier(text, claim, market=market)
+                        peer_dicts = [evidence_map[str(c)] for c in c_ids if evidence_map.get(str(c))]
+                        ok_q, reason_q = line_matches_expected_qualifier(text, claim, market=market, peer_claims=peer_dicts)
                         if not ok_q:
                             legal_ok = False
                             violations.append({
