@@ -1009,8 +1009,9 @@ def test_s04_rejects_all_unverified_rss_dossier(tmp_path):
     assert s4_art["payload"]["verdict"] in ("revise", "fail")
 
 
-def test_ja_vn_fallback_without_grounding_and_three_run_cache_hit(tmp_path, monkeypatch):
+def test_ja_vn_fallback_without_grounding_and_three_run_cache_hit(tmp_path):
     """JA/VN generic fallback without grounding_intel passes S01->S04 cleanly, and 3 consecutive runs stay cached."""
+    import orchestrator.run_pipeline as run_pipeline_mod
     from core.paths import RunPaths
     from orchestrator.run_pipeline import execute_pipeline
     from stages.s01_ideation import run as s01_run
@@ -1032,25 +1033,29 @@ def test_ja_vn_fallback_without_grounding_and_three_run_cache_hit(tmp_path, monk
 
     test_paths = RunPaths(run_id="RUN_THREE_PASS", repo_root=tmp_path)
     test_paths.ensure_dirs()
-    monkeypatch.setattr("orchestrator.run_pipeline.resolve_run_paths", lambda rid, repo_root=None: test_paths)
-    for run_no in range(1, 4):
-        rc = execute_pipeline(
-            from_stage=None,
-            to_stage="s04_critic_script",
-            run_id="RUN_THREE_PASS",
-            profile="e2e_min",
-            preset="story_forensic",
-            market="EN",
-            topic="Biotech Cold-Chain Logistics Audit",
-            dry_run=True,
-            human_gates=False,
-        )
-        assert rc == 0, f"Run {run_no} failed"
-        manifest_data = json.loads(test_paths.manifest_file.read_text(encoding="utf-8"))
-        for st in ("s01_ideation", "s02_research", "s03_script", "s04_critic_script"):
-            expected_status = "done" if run_no == 1 else "skipped"
-            assert manifest_data["stages"][st]["status"] == expected_status, (
-                f"Run {run_no} stage {st} had status {manifest_data['stages'][st]['status']}"
+    orig_resolve = run_pipeline_mod.resolve_run_paths
+    run_pipeline_mod.resolve_run_paths = lambda rid, repo_root=None: test_paths
+    try:
+        for run_no in range(1, 4):
+            rc = execute_pipeline(
+                from_stage=None,
+                to_stage="s04_critic_script",
+                run_id="RUN_THREE_PASS",
+                profile="e2e_min",
+                preset="story_forensic",
+                market="EN",
+                topic="Biotech Cold-Chain Logistics Audit",
+                dry_run=True,
+                human_gates=False,
             )
+            assert rc == 0, f"Run {run_no} failed"
+            manifest_data = json.loads(test_paths.manifest_file.read_text(encoding="utf-8"))
+            for st in ("s01_ideation", "s02_research", "s03_script", "s04_critic_script"):
+                expected_status = "done" if run_no == 1 else "skipped"
+                assert manifest_data["stages"][st]["status"] == expected_status, (
+                    f"Run {run_no} stage {st} had status {manifest_data['stages'][st]['status']}"
+                )
+    finally:
+        run_pipeline_mod.resolve_run_paths = orig_resolve
     assert not test_paths.artifact_file("s05_director_plan").exists()
     assert manifest_data["stages"]["s05_director_plan"]["status"] == "pending"
