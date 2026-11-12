@@ -43,6 +43,10 @@ class Provenance(BaseModel):
     cost_usd: float = 0.0
     latency_sec: float = 0.0
     total_tokens: int = 0
+    input_sha256: Optional[str] = None
+    config_sha256: Optional[str] = None
+    upstream_artifacts: Dict[str, str] = Field(default_factory=dict)
+    run_nonce: Optional[str] = None
 
 
 # ==============================================================================

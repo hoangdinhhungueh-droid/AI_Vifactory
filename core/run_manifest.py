@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 from pathlib import Path
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,9 +28,20 @@ class StageState(BaseModel):
     status: Literal["pending", "running", "done", "failed", "skipped"] = "pending"
     attempts: int = 0
     artifact_sha256: Optional[str] = None
+    input_sha256: Optional[str] = None
+    config_sha256: Optional[str] = None
+    upstream_artifacts: dict[str, str] = Field(default_factory=dict)
+    run_nonce: Optional[str] = None
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
     error: Optional[str] = None
+
+    def clear_provenance(self) -> None:
+        self.artifact_sha256 = None
+        self.input_sha256 = None
+        self.config_sha256 = None
+        self.upstream_artifacts = {}
+        self.run_nonce = None
 
 
 class RunManifest(BaseModel):
@@ -98,56 +109,59 @@ class RunManifest(BaseModel):
         from_stage: StageID,
         inclusive: bool = True,
         paths: Optional[RunPaths] = None
-    ) -> None:
+    ) -> List[str]:
         """Resets status to 'pending' and clears artifact_sha256 for all stages from from_stage onwards.
         If paths is provided, purges stale artifact files on disk to prevent split-brain reads.
+        Returns the ordered list of invalidated stage IDs.
         """
+        invalidated: List[str] = []
         all_stages = list(StageID)
         try:
             start_idx = all_stages.index(from_stage)
         except ValueError:
-            return
+            return invalidated
         if not inclusive:
             start_idx += 1
         for s in all_stages[start_idx:]:
             self.mark(s, "pending", artifact_sha256=None)
+            st_obj = self.stages.get(s.value) or self.stages.get(s)
+            if st_obj is not None:
+                st_obj.clear_provenance()
+            invalidated.append(s.value)
             if paths:
-                try:
-                    art_file = paths.artifact_file(s.value)
-                    if art_file.exists():
-                        art_file.unlink()
-                except OSError as _unlink_err:
-                    logger.debug(f"[invalidate_downstream] Notice unlinking artifact for {s.value}: {_unlink_err}")
+                from core.dag_provenance import purge_stage_outputs
 
-                # Purge root-level secondary exports for invalidated stages to prevent split-brain reads
-                secondary_files = []
-                if s == StageID.S3_SCRIPT:
-                    secondary_files.append(paths.root / "spoken_script.txt")
-                elif s == StageID.S5_DIRECTOR_PLAN:
-                    secondary_files.extend([
-                        paths.root / "director_plan.json",
-                        paths.root / "dp_plan.json",
-                        paths.root / "flow_video_manifest.json",
-                        paths.root / "bulk_image_prompts.txt",
-                    ])
-                elif s == StageID.S7_IMAGE_GEN:
-                    secondary_files.append(paths.root / "images_manifest.json")
+                purged = purge_stage_outputs(s, paths, include_artifact_file=True)
+                if purged:
+                    logger.debug(f"[invalidate_downstream] Purged {len(purged)} outputs for {s.value}: {purged}")
 
-                for sec_f in secondary_files:
-                    try:
-                        if sec_f.exists():
-                            sec_f.unlink()
-                    except OSError as _sec_err:
-                        logger.debug(f"[invalidate_downstream] Notice unlinking secondary file {sec_f.name}: {_sec_err}")
+        # Cross-edge invalidation: if S9_VOICE_TTS was invalidated and S8_VIDEO_GEN recorded S9 as upstream, invalidate S8 too
+        if (
+            StageID.S9_VOICE_TTS in all_stages[start_idx:]
+            and StageID.S8_VIDEO_GEN not in all_stages[start_idx:]
+        ):
+            s8_state = self.stages.get(StageID.S8_VIDEO_GEN.value) or self.stages.get(StageID.S8_VIDEO_GEN)
+            if s8_state and StageID.S9_VOICE_TTS.value in (s8_state.upstream_artifacts or {}):
+                self.mark(StageID.S8_VIDEO_GEN, "pending", artifact_sha256=None)
+                s8_state.clear_provenance()
+                invalidated.append(StageID.S8_VIDEO_GEN.value)
+                if paths:
+                    from core.dag_provenance import purge_stage_outputs
+                    purge_stage_outputs(StageID.S8_VIDEO_GEN, paths, include_artifact_file=True)
+
+        return invalidated
 
     def save_atomic(self, paths: RunPaths) -> Path:
-        """Atomically saves manifest to run root."""
+        """Atomically saves manifest to run root via lock + fsync-backed replace (no pre-unlink race)."""
+        from filelock import FileLock
+
+        from core.atomic_io import atomic_write_json
+
         manifest_path = paths.manifest_file
-        tmp_path = manifest_path.with_suffix(".tmp")
-        tmp_path.write_text(self.model_dump_json(indent=2), encoding="utf-8")
-        if manifest_path.exists():
-            manifest_path.unlink()
-        tmp_path.replace(manifest_path)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        lock = FileLock(str(manifest_path.with_name(".run_manifest.lock")), timeout=15.0)
+        with lock:
+            atomic_write_json(manifest_path, self.model_dump(mode="json"), indent=2)
         return manifest_path
 
     @classmethod

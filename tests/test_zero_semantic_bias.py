@@ -5,17 +5,18 @@ Ensures that no generic pipeline code, service prompt, or orchestrator script co
 hardcoded domain terms, episode-specific entities, or case study remnants.
 """
 
-import os
 import re
-import pytest
 from pathlib import Path
+
+import pytest
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
 # Whitelist of directories to audit
 AUDIT_DIRS = [
     ROOT_DIR / "app" / "services",
-    ROOT_DIR / "scripts"
+    ROOT_DIR / "stages",
+    ROOT_DIR / "scripts",
 ]
 
 # Files explicitly exempted (e.g. test files that explicitly test domain handling or archives)
@@ -24,6 +25,7 @@ EXEMPTED_FILES = {
     "test_b15_seo_package_forge.py",
     "test_zero_semantic_bias.py",
     "anti_bias_linter.py",
+    "supervisory_review_s01_s04.py",
 }
 
 # Forbidden episode-specific domain words that must NEVER appear in generic services/scripts
@@ -43,6 +45,12 @@ FORBIDDEN_DOMAIN_PATTERNS = [
     (r"\bnidec\b", "Nidec shareholder entity domain bleed"),
     (r"\bgimpo\s+fc\b", "Gimpo FC entity domain bleed"),
     (r"동탄문구점", "Episode-specific entity bleed (동탄문구점)"),
+    (r"\bjeonse\b", "Hardcoded EP0007 Jeonse episode domain bleed"),
+    (r"\bvilla\s+king", "Hardcoded EP0007 Villa King episode domain bleed"),
+    (r"빌라왕", "Hardcoded EP0007 Villa King Korean bleed"),
+    (r"바지임대인", "Hardcoded EP0007 proxy landlord Korean bleed"),
+    (r"최소보장제", "Hardcoded EP0007 minimum guarantee Korean bleed"),
+    (r"제천오조", "Hardcoded EP0007 Korean numeral bleed"),
 ]
 
 

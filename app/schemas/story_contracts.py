@@ -9,8 +9,8 @@ backward compatibility for existing macro_legacy payloads.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # ==============================================================================
 # S1: IDEATION CONTRACTS
@@ -72,10 +72,97 @@ class EvidenceClaim(BaseModel):
     claim_id: str = Field(description="e.g. C001, C002")
     claim: str
     source_url: str
+    source_name: str = ""
     source_type: Literal["court", "regulator", "gov", "press"] = "press"
+    doc_type: Literal[
+        "statute",
+        "court_judgment",
+        "indictment",
+        "criminal_complaint",
+        "regulatory_notice",
+        "gov_report",
+        "audit_report",
+        "news_article",
+        "rss_snippet",
+        "press_release",
+        "commentary",
+        "unknown",
+    ] = "unknown"
+    speaker: Optional[str] = None
     date: Optional[str] = None
     legal_status: Literal["convicted", "charged", "alleged", "settled", "fact"] = "alleged"
-    confidence: Literal["high", "medium", "low"] = "high"
+    procedural_status: Literal[
+        "final_judgment",
+        "indicted",
+        "investigation",
+        "legislative_enacted",
+        "bill_proposed",
+        "reported_event",
+        "speculation",
+        "unknown",
+    ] = "unknown"
+    verification_status: Literal[
+        "verified_primary",
+        "corroborated_secondary",
+        "unverified_secondary",
+        "speculative",
+    ] = "unverified_secondary"
+    evidence_tier: Literal["primary", "secondary", "tertiary"] = "secondary"
+    causal_role: Literal[
+        "primary_catalyst",
+        "transmission_mechanism",
+        "background_context",
+        "unknown",
+    ] = "unknown"
+    scope: Optional[str] = None
+    mechanism: Optional[str] = None
+    act_target: Optional[str] = None
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _infer_and_enforce_provenance(cls, data: Any) -> Any:
+        """Preserve provenance separation even when claims are constructed without
+        explicit verification_status, and prevent RSS/aggregator domain laundering.
+        """
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        from app.services.story_provenance_engine import (
+            is_primary_official_domain,
+            is_rss_or_aggregator_url,
+        )
+
+        src_url = str(out.get("source_url") or "")
+        src_type = str(out.get("source_type") or "press").lower()
+        conf_supplied = "confidence" in out and out.get("confidence") is not None
+        ver_supplied = "verification_status" in out and out.get("verification_status") is not None
+        is_rss = is_rss_or_aggregator_url(src_url)
+
+        if is_rss:
+            if not ver_supplied or out.get("verification_status") == "verified_primary":
+                out["verification_status"] = "unverified_secondary"
+            if out.get("evidence_tier") == "primary":
+                out["evidence_tier"] = "secondary"
+            if not conf_supplied or out.get("confidence") == "high":
+                out["confidence"] = "medium"
+        elif not ver_supplied:
+            if src_type in ("court", "regulator", "gov"):
+                if is_primary_official_domain(src_url):
+                    out["verification_status"] = "verified_primary"
+                    out.setdefault("evidence_tier", "primary")
+                else:
+                    out["verification_status"] = "corroborated_secondary"
+                    out.setdefault("evidence_tier", "secondary")
+                if not conf_supplied:
+                    out["confidence"] = "high"
+            else:
+                conf_val = str(out.get("confidence") or "medium").lower()
+                if conf_val == "high" and src_url.startswith("http"):
+                    out["verification_status"] = "corroborated_secondary"
+                else:
+                    out["verification_status"] = "unverified_secondary"
+        return out
 
 
 class TimelineEvent(BaseModel):
@@ -160,8 +247,10 @@ class StoryScriptCriticGates(BaseModel):
     hook_within_20s: bool = True
     pattern_interrupt_gap_ok: bool = True
     target_market_language_compliance: bool = True
+    market_entity_appropriateness: bool = True
     topic_specificity_gate: bool = True
     claim_coverage_gate: bool = True
+    statement_claim_alignment_ok: bool = True
 
 
 class StoryCriticViolation(BaseModel):

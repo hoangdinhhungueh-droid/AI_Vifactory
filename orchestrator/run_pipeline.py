@@ -425,37 +425,108 @@ def execute_pipeline(
 
         print(f"\n▶ [{idx+1}/{len(stage_list)}] Executing Stage: {stage_name.upper()}...")
 
-        # 4. Idempotency Check: if already done and artifact valid, skip!
-        state = manifest.stages.get(stage)
+        # 4. Idempotency + DAG Provenance Check: only skip if hash AND upstream/config provenance match
+        import uuid as _uuid
+
+        from core.dag_provenance import (
+            acquire_run_lock,
+            check_stage_cache_valid,
+            compute_stage_config_sha256,
+            compute_stage_input_provenance,
+            purge_stage_outputs,
+            stamp_artifact_provenance,
+        )
+
+        cfg_sha = compute_stage_config_sha256(
+            stage,
+            preset_name=preset_name,
+            extra_params={
+                "market": str(getattr(getattr(ctx, "config", None), "market", "") or ""),
+                "profile": str(config.name),
+                "dry_run": bool(getattr(ctx, "dry_run", False)),
+            },
+        )
+        expected_in_sha, upstream_map = compute_stage_input_provenance(stage, paths, config_sha256=cfg_sha)
+        stage_nonce = _uuid.uuid4().hex[:16]
+
         art_path = paths.artifact_file(stage_name)
-        if not force and state and state.status == "done" and art_path.exists():
-            sha_now = compute_file_sha256(art_path)
-            if state.artifact_sha256 and state.artifact_sha256 == sha_now:
-                print(f"   ⏩ SKIPPED (Idempotent artifact verified: {sha_now[:10]}...)")
-                manifest.mark(stage, "skipped", artifact_sha256=sha_now)
-                manifest.save_atomic(paths)
-                # Still check human gate boundaries on skipped stages if relevant
-                continue
-
-        manifest.mark(stage, "running")
-        manifest.save_atomic(paths)
-
         try:
             stage_mod = importlib.import_module(mod_name)
-            _artifact = stage_mod.run(ctx)
+            with acquire_run_lock(paths):
+                manifest = RunManifest.load_or_create(paths, profile=config.name)
+                ctx.manifest = manifest
+                state = manifest.stages.get(stage)
 
-            if isinstance(_artifact.payload, dict) and _artifact.payload.get("verdict") in ("fail", "rejected"):
-                raise GateError(
-                    stage,
-                    f"Stage '{stage_name}' critic audit rejected artifact with verdict '{_artifact.payload.get('verdict')}'",
-                    details=_artifact.payload.get("violations") or {}
+                topic_mismatch_reason = None
+                if (
+                    not force
+                    and stage == StageID.S1_IDEATION
+                    and getattr(ctx, "topic", None)
+                    and art_path.exists()
+                ):
+                    try:
+                        prev_s1 = json.loads(art_path.read_text(encoding="utf-8"))
+                        prev_term = str((prev_s1.get("payload") or {}).get("raw_term") or "").strip()
+                        if prev_term and prev_term.lower() != str(ctx.topic).strip().lower():
+                            topic_mismatch_reason = f"topic_changed:{prev_term}->{ctx.topic}"
+                    except Exception:
+                        topic_mismatch_reason = "s1_artifact_unreadable"
+
+                if not force and state and state.status in ("done", "skipped") and art_path.exists():
+                    if topic_mismatch_reason:
+                        print(f"   🔄 CACHE INVALIDATED for {stage_name} ({topic_mismatch_reason}): clearing stale exports and re-running.")
+                        manifest.invalidate_downstream(stage, inclusive=True, paths=paths)
+                        manifest.save_atomic(paths)
+                    else:
+                        sha_now = compute_file_sha256(art_path)
+                        cache_ok, cache_reason = check_stage_cache_valid(
+                            stage, paths, state, expected_in_sha, cfg_sha, sha_now
+                        )
+                        if cache_ok:
+                            print(f"   ⏩ SKIPPED (Idempotent artifact + provenance verified: {sha_now[:10]}...)")
+                            manifest.mark(stage, "skipped", artifact_sha256=sha_now)
+                            manifest.save_atomic(paths)
+                            continue
+                        print(f"   🔄 CACHE INVALIDATED for {stage_name} ({cache_reason}): clearing stale exports and re-running.")
+                        manifest.invalidate_downstream(stage, inclusive=True, paths=paths)
+                        manifest.save_atomic(paths)
+
+                manifest.mark(stage, "running")
+                manifest.save_atomic(paths)
+
+                try:
+                    _artifact = stage_mod.run(ctx)
+                except BaseException:
+                    purge_stage_outputs(stage, paths, include_artifact_file=True)
+                    manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
+                    manifest.save_atomic(paths)
+                    raise
+                stamp_artifact_provenance(
+                    art_path,
+                    input_sha256=expected_in_sha,
+                    config_sha256=cfg_sha,
+                    upstream_artifacts=upstream_map,
+                    run_nonce=stage_nonce,
                 )
 
-            sha_new = compute_file_sha256(art_path) if art_path.exists() else "none"
-            manifest.mark(stage, "done", artifact_sha256=sha_new)
-            # Upstream stage produced a new artifact -> invalidate downstream stages to prevent split-brain
-            manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
-            manifest.save_atomic(paths)
+                if isinstance(_artifact.payload, dict) and _artifact.payload.get("verdict") in ("fail", "rejected"):
+                    raise GateError(
+                        stage,
+                        f"Stage '{stage_name}' critic audit rejected artifact with verdict '{_artifact.payload.get('verdict')}'",
+                        details=_artifact.payload.get("violations") or {}
+                    )
+
+                sha_new = compute_file_sha256(art_path) if art_path.exists() else "none"
+                manifest.mark(stage, "done", artifact_sha256=sha_new)
+                st_done = manifest.stages.get(stage)
+                if st_done is not None:
+                    st_done.input_sha256 = expected_in_sha
+                    st_done.config_sha256 = cfg_sha
+                    st_done.upstream_artifacts = upstream_map
+                    st_done.run_nonce = stage_nonce
+                # Upstream stage produced a new artifact -> invalidate downstream stages to prevent split-brain
+                manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
+                manifest.save_atomic(paths)
             try:
                 print(f"   ✅ PASS (Artifact emitted: {art_path.name})")
             except (BrokenPipeError, OSError):

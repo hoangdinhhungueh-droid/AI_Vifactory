@@ -7,7 +7,9 @@ Implements Stage Shape Standard. Discovers live high-potential editorial topics.
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import time
 
 from core.config import RunContext
@@ -36,18 +38,20 @@ def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S1: Trend Discovery."""
     start_ts = time.time()
 
-    import json
-    grounding_intel = None
-    grounding_file = ctx.paths.root / "grounding_intel.json"
-    if not grounding_file.is_file():
-        cand_grounding = ctx.paths.repo_root / "active_candidate" / "grounding_intel.json"
-        if cand_grounding.is_file():
-            grounding_file = cand_grounding
-    if grounding_file.is_file():
-        try:
-            grounding_intel = json.loads(grounding_file.read_text(encoding="utf-8"))
-        except Exception as _g_err:
-            logger.warning(f"[S01_IDEATION] Failed reading grounding_intel.json: {_g_err}")
+    try:
+        from core.market_resolver import resolve_canonical_market
+        market = resolve_canonical_market(ctx=ctx)
+    except Exception:
+        market = "EN"
+
+    from app.services.story_provenance_engine import load_matching_grounding_intel
+
+    grounding_intel = load_matching_grounding_intel(
+        ctx.paths.root,
+        ctx.paths.repo_root,
+        topic_override=ctx.topic,
+        market=market,
+    )
 
     # Topic resolution
     topic_name = ctx.topic
@@ -56,12 +60,6 @@ def run(ctx: RunContext) -> StageArtifact:
     if not topic_name:
         topic_slug = ctx.run_id.lower().replace("run_", "").replace("ep_", "")
         topic_name = topic_slug.replace("_", " ").title() or "Global Antitrust Paradigm Shift"
-
-    try:
-        from core.market_resolver import resolve_canonical_market
-        market = resolve_canonical_market(ctx=ctx)
-    except Exception:
-        market = "EN"
 
     preset_raw = (getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) or "story_forensic"
     is_story = bool(preset_raw in ("story_forensic", "vox_narrative"))
@@ -75,14 +73,26 @@ def run(ctx: RunContext) -> StageArtifact:
 
         def _build_generic_story_ideation() -> StoryIdeationPayload:
             # 1. Market-aware source seeds
+            classified_g_claims = []
             g_seeds = []
             if grounding_intel:
+                from app.services.story_provenance_engine import (
+                    classify_claim_provenance,
+                    verification_priority_rank,
+                )
+
                 for c in grounding_intel.get("claims", []):
-                    u = c.get("source_url")
+                    prov_c = classify_claim_provenance(c, market=market)
+                    classified_g_claims.append(prov_c)
+                    u = prov_c.get("source_url")
                     if u and str(u).startswith("http"):
-                        s_name = c.get("source", "")
-                        s_type = "regulator" if any(k in s_name for k in ["정책", "국토", "MOLIT", "HUG", "FSA", "SEC", "정부", "당국"]) else "press"
-                        g_seeds.append(SourceSeed(url=u, type=s_type))
+                        g_seeds.append(SourceSeed(url=u, type=prov_c.get("source_type", "press")))
+                classified_g_claims.sort(
+                    key=lambda x: (
+                        verification_priority_rank(x.get("verification_status", "unverified_secondary")),
+                        0 if x.get("causal_role") == "primary_catalyst" else (1 if x.get("causal_role") == "transmission_mechanism" else 2),
+                    )
+                )
                 if not g_seeds:
                     for chk in grounding_intel.get("grounding_chunks", []):
                         u = chk.get("uri")
@@ -181,19 +191,91 @@ def run(ctx: RunContext) -> StageArtifact:
             else:
                 scheme_sum = f"Forensic breakdown of commercial agreements, structural incentives, and systemic market reactions surrounding {topic_name}."
 
-            # Dynamic Documented Outcome
+            # Dynamic Documented Outcome (never elevate unverified secondary rumors as settled facts)
+            verified_outcomes = [
+                c for c in classified_g_claims
+                if c.get("verification_status") in ("verified_primary", "corroborated_secondary")
+                and c.get("legal_status") in ("fact", "convicted", "settled")
+            ]
+            if verified_outcomes:
+                def _outcome_rank(c_item: dict) -> tuple:
+                    ls = str(c_item.get("legal_status", "")).lower()
+                    ps = str(c_item.get("procedural_status", "")).lower()
+                    dt = str(c_item.get("doc_type", "")).lower()
+                    cr = str(c_item.get("causal_role", "")).lower()
+                    tier = 0
+                    if ls in ("convicted", "settled") or ps == "final_judgment":
+                        tier = 3
+                    elif dt in ("court_judgment", "regulatory_notice", "statute") or cr == "primary_catalyst":
+                        tier = 2
+                    elif cr != "transmission_mechanism":
+                        tier = 1
+                    return (
+                        1 if c_item.get("verification_status") == "verified_primary" else 0,
+                        tier,
+                        str(c_item.get("date") or ""),
+                    )
+
+                verified_outcomes.sort(key=_outcome_rank)
             if grounding_intel and grounding_intel.get("documented_outcome"):
-                outcome_sum = grounding_intel["documented_outcome"]
+                raw_doc_out = str(grounding_intel["documented_outcome"]).strip()
+                if market in ("KR", "JA", "VN") and re.search(r"\b[a-z]{3,}\s+[a-z]{3,}", raw_doc_out):
+                    from app.services.story_provenance_engine import translate_claim_to_market_clause
+                    raw_doc_out = translate_claim_to_market_clause(raw_doc_out, market, topic_name)
+                has_ver_any = any(
+                    c.get("verification_status") in ("verified_primary", "corroborated_secondary")
+                    for c in classified_g_claims
+                )
+                if classified_g_claims and not has_ver_any:
+                    unv_prefix = {
+                        "KR": "[미확정·보도 단계] ",
+                        "JA": "[未確定・報道段階] ",
+                        "VN": "[Đang theo dõi·chưa kết luận cuối cùng] ",
+                    }.get(market, "[Developing / unverified] ")
+                    outcome_sum = raw_doc_out if raw_doc_out.startswith("[") else f"{unv_prefix}{raw_doc_out}"
+                else:
+                    outcome_sum = raw_doc_out
+            elif verified_outcomes:
+                top_v = verified_outcomes[-1]
+                dt_raw = str(top_v.get("date") or "")
+                raw_top_claim = str(top_v.get("claim", ""))
+                if market in ("KR", "JA", "VN"):
+                    from app.services.story_provenance_engine import (
+                        localize_dates_and_metrics,
+                        translate_claim_to_market_clause,
+                    )
+                    if re.search(r"\b[a-z]{3,}\s+[a-z]{3,}", raw_top_claim):
+                        raw_top_claim = translate_claim_to_market_clause(raw_top_claim, market, topic_name)
+                    else:
+                        raw_top_claim = localize_dates_and_metrics(raw_top_claim, market)
+                dt_tag = f"({dt_raw}) " if dt_raw else ""
+                outcome_sum = f"{dt_tag}{raw_top_claim}"
             elif c_epochs:
-                outcome_sum = f"{c_epochs[-1].get('event_summary', '')}: {c_epochs[-1].get('verified_claim', '')}"
+                last_ep = c_epochs[-1]
+                ep_claim = str(last_ep.get("verified_claim", ""))
+                ep_sum = str(last_ep.get("event_summary", ""))
+                if market in ("KR", "JA", "VN") and re.search(r"\b[a-z]{3,}\s+[a-z]{3,}", f"{ep_sum} {ep_claim}"):
+                    from app.services.story_provenance_engine import translate_claim_to_market_clause
+                    ep_claim = translate_claim_to_market_clause(f"{ep_sum} {ep_claim}", market, topic_name)
+                    ep_sum = topic_name
+                if any(c.get("verification_status") == "verified_primary" for c in classified_g_claims):
+                    outcome_sum = f"{ep_sum}: {ep_claim}" if ep_sum else ep_claim
+                elif market == "KR":
+                    outcome_sum = f"[미확정·보도 단계] {ep_sum}: {ep_claim}"
+                elif market == "JA":
+                    outcome_sum = f"[未確定・報道段階] {ep_sum}: {ep_claim}"
+                elif market == "VN":
+                    outcome_sum = f"[Đang theo dõi·chưa kết luận cuối cùng] {ep_sum}: {ep_claim}"
+                else:
+                    outcome_sum = f"[Developing / unverified] {ep_sum}: {ep_claim}"
             elif market == "KR":
-                outcome_sum = f"{topic_name}에 대한 당국의 공식 행정 조치, 사법 수사 및 특별 제도 시행."
+                outcome_sum = f"{topic_name}에 대한 공식 기록 및 진행 중인 사법·행정 절차 추적."
             elif market == "JA":
-                outcome_sum = f"{topic_name}に対する当局の公式行政措置、司法捜査および制度改革の発表。"
+                outcome_sum = f"{topic_name}に関する公式記録および進行中の司法・行政手続き。"
             elif market == "VN":
-                outcome_sum = f"Biện pháp hành chính, điều tra tư pháp và triển khai chính sách mới liên quan đến {topic_name}."
+                outcome_sum = f"Hồ sơ chính thức và diễn biến điều tra đang được cập nhật về {topic_name}."
             else:
-                outcome_sum = f"Regulatory scrutiny, market valuation realignment, and institutional policy changes following {topic_name}."
+                outcome_sum = f"Documented filings and ongoing institutional review surrounding {topic_name}."
 
             # Dynamic Angle Brief
             if grounding_intel and grounding_intel.get("angle_brief"):
@@ -207,12 +289,20 @@ def run(ctx: RunContext) -> StageArtifact:
             else:
                 angle_brief = f"Investigative forensic breakdown examining the structural dynamics and institutional fallout of {topic_name}."
 
-            money_val = 10_000_000_000.0
+            money_val = 0.0
             if grounding_intel and grounding_intel.get("money_at_stake_usd"):
                 try:
                     money_val = float(grounding_intel["money_at_stake_usd"])
                 except (ValueError, TypeError) as _num_err:
                     logger.debug(f"[s01_ideation] Notice parsing money_at_stake_usd: {_num_err}")
+            elif classified_g_claims:
+                from app.services.text_to_number_parser import parse_spoken_number
+
+                for cl_item in classified_g_claims:
+                    pm = parse_spoken_number(str(cl_item.get("claim", "")))
+                    if pm and pm.metric_type == "currency" and pm.raw_value > 0:
+                        money_val = float(pm.raw_value)
+                        break
             return StoryIdeationPayload(
                 preset=preset_raw if preset_raw in ("story_forensic", "vox_narrative") else "story_forensic",
                 niche="business_heist" if market == "KR" else "corporate_scandal",
@@ -244,22 +334,62 @@ def run(ctx: RunContext) -> StageArtifact:
                     f"Run ID: {ctx.run_id}\n\n"
                 )
                 if grounding_intel:
+                    from app.services.story_provenance_engine import (
+                        classify_claim_provenance as _classify_s1_claim,
+                    )
+                    from app.services.story_provenance_engine import (
+                        verification_priority_rank as _ver_rank,
+                    )
+
+                    live_classified = [
+                        _classify_s1_claim(c, market=market)
+                        for c in grounding_intel.get("claims", [])
+                    ]
+                    live_classified.sort(
+                        key=lambda x: (
+                            _ver_rank(x.get("verification_status", "unverified_secondary")),
+                            0 if x.get("causal_role") == "primary_catalyst" else 1,
+                        )
+                    )
                     g_summary = {
                         "topic": grounding_intel.get("topic"),
                         "temporal_cadence": grounding_intel.get("temporal_cadence"),
                         "causal_epochs": grounding_intel.get("causal_epochs", []),
-                        "verified_claims": [
-                            {"claim": c.get("claim"), "source": c.get("source"), "url": c.get("source_url")}
-                            for c in grounding_intel.get("claims", [])[:8]
-                        ],
+                        "verified_primary_or_corroborated_claims": [
+                            {
+                                "claim": c.get("claim"),
+                                "source": c.get("source_name"),
+                                "url": c.get("source_url"),
+                                "date": c.get("date"),
+                                "verification_status": c.get("verification_status"),
+                                "causal_role": c.get("causal_role"),
+                                "procedural_status": c.get("procedural_status"),
+                                "scope": c.get("scope"),
+                            }
+                            for c in live_classified
+                            if c.get("verification_status") in ("verified_primary", "corroborated_secondary")
+                        ][:6],
+                        "unverified_or_secondary_leads_do_not_present_as_settled_outcome": [
+                            {
+                                "claim": c.get("claim"),
+                                "source": c.get("source_name"),
+                                "date": c.get("date"),
+                                "verification_status": c.get("verification_status"),
+                                "causal_role": c.get("causal_role"),
+                                "scope": c.get("scope"),
+                            }
+                            for c in live_classified
+                            if c.get("verification_status") not in ("verified_primary", "corroborated_secondary")
+                        ][:6],
                         "news_headlines": [
                             chk.get("title") for chk in grounding_intel.get("grounding_chunks", [])[:5] if isinstance(chk, dict)
                         ]
                     }
                     user_prompt += (
-                        f"VERIFIED REAL-WORLD GROUNDING INTEL:\n{json.dumps(g_summary, indent=2, ensure_ascii=False)}\n\n"
-                        f"MANDATE: Ground your case dossier strictly in this verified real-world grounding intel for market '{market}'.\n"
-                        "Forbid generic US SEC/DOJ entities. Output must reflect the authentic market entities.\n\n"
+                        f"GROUNDING INTEL DOSSIER (STRICT PROVENANCE SEPARATION):\n{json.dumps(g_summary, indent=2, ensure_ascii=False)}\n\n"
+                        f"MANDATE: Anchor your central_question and documented_outcome ONLY in 'verified_primary_or_corroborated_claims'. "
+                        f"Do NOT promote items from 'unverified_or_secondary_leads_do_not_present_as_settled_outcome' into documented_outcome as settled fact.\n"
+                        "Forbid out-of-market agencies unless explicitly present in the dossier. Output must reflect authentic market entities.\n\n"
                     )
                 if market == "KR":
                     user_prompt += "MANDATE: Output all fields (title_working, central_question, antagonist name, scheme_mechanism_summary, documented_outcome, angle_brief) in 100% natural Korean (Hangul).\n\n"
@@ -323,15 +453,15 @@ def run(ctx: RunContext) -> StageArtifact:
                     clean_seeds = [s.model_dump() for s in generic.source_seeds]
                 parsed_json["source_seeds"] = clean_seeds
 
-                # Antagonist resolution guard
+                # Antagonist resolution guard (never inject English 'Leadership' into non-EN markets)
                 antagonist = parsed_json.get("antagonist")
                 if not antagonist:
-                    parsed_json["antagonist"] = {"name": f"{topic_name.split()[0]} Leadership", "type": "company"}
+                    parsed_json["antagonist"] = {"name": generic.antagonist.name, "type": "company"}
                 elif isinstance(antagonist, str):
                     parsed_json["antagonist"] = {"name": antagonist, "type": "company"}
                 elif isinstance(antagonist, dict):
                     if not antagonist.get("name"):
-                        antagonist["name"] = f"{topic_name.split()[0]} Leadership"
+                        antagonist["name"] = generic.antagonist.name
                     if antagonist.get("type") not in ("person", "company", "state"):
                         antagonist["type"] = "company"
 
@@ -343,7 +473,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 if parsed_json.get("niche") not in ("business_heist", "corporate_scandal", "geopolitical_anomaly"):
                     parsed_json["niche"] = "business_heist"
                 parsed_json["viability_score"] = parsed_json.get("viability_score") or 9.5
-                parsed_json["angle_brief"] = parsed_json.get("angle_brief") or parsed_json.get("scheme_mechanism_summary") or f"Investigative forensic breakdown of {topic_name}."
+                parsed_json["angle_brief"] = parsed_json.get("angle_brief") or parsed_json.get("scheme_mechanism_summary") or generic.angle_brief
                 parsed_json["status"] = "APPROVED"
 
                 score_dict = parsed_json.get("story_score")

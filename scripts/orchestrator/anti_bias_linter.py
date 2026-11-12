@@ -17,22 +17,21 @@ Usage:
 """
 
 import ast
-import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Set
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except (AttributeError, OSError, ValueError) as exc:
+        sys.__stderr__.write(f"[anti_bias_linter] stdout reconfigure notice: {exc}\n")
 if hasattr(sys.stderr, "reconfigure"):
     try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except (AttributeError, OSError, ValueError) as exc:
+        sys.__stderr__.write(f"[anti_bias_linter] stderr reconfigure notice: {exc}\n")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -58,6 +57,12 @@ BANNED_CASE_STUDY_ENTITIES = {
     "cathedraticum": "Hardcoded Oakland diocesan cathedraticum case literal",
     "en-enron-ep006": "Hardcoded legacy Enron episode slug literal",
     "RES-VOX-001": "Hardcoded mock research citation ID literal",
+    "jeonse": "Hardcoded EP0007 Jeonse deposit case literal",
+    "villa king": "Hardcoded EP0007 Villa King entity literal",
+    "빌라왕": "Hardcoded EP0007 Villa King Korean literal",
+    "바지임대인": "Hardcoded EP0007 proxy landlord Korean literal",
+    "최소보장제": "Hardcoded EP0007 minimum guarantee scheme Korean literal",
+    "제천오조": "Hardcoded EP0007 speech-normalized numeral literal",
 }
 
 # Static dictionary names that should not be hardcoded in generic services
@@ -69,6 +74,7 @@ BANNED_STATIC_ROSTERS = {
 # Directories to audit
 AUDIT_DIRS = [
     ROOT_DIR / "app" / "services",
+    ROOT_DIR / "stages",
     ROOT_DIR / "scripts" / "orchestrator",
     ROOT_DIR / "scripts" / "watchers",
 ]
@@ -88,6 +94,7 @@ EXEMPTED_FILES = {
     "ghost_code_detector.py",
     "ci_neighbor_tester.py",
     "e2e_pipeline_smoketest.py",
+    "supervisory_review_s01_s04.py",
 }
 
 
@@ -181,15 +188,19 @@ class AntiBiasLinter:
                 val_lower = node.value.strip().lower()
                 line_no = getattr(node, "lineno", 0)
                 snippet = lines[line_no - 1].strip() if 0 < line_no <= len(lines) else ""
-                
+
                 # Exclude comments explaining rules
                 if "rule 128" in snippet.lower() or "rule 132" in snippet.lower() or "banned" in snippet.lower():
                     continue
 
                 for banned_kw, reason in BANNED_CASE_STUDY_ENTITIES.items():
-                    # Case-insensitive word boundary or token matching
+                    # Case-insensitive word boundary for ASCII terms, substring match for non-ASCII / long phrases
                     b_kw_lower = banned_kw.lower()
-                    if re.search(r"\b" + re.escape(b_kw_lower) + r"\b", val_lower) or (len(b_kw_lower) > 8 and b_kw_lower in val_lower):
+                    has_non_ascii = any(ord(ch) > 127 for ch in b_kw_lower)
+                    if (
+                        re.search(r"\b" + re.escape(b_kw_lower) + r"\b", val_lower)
+                        or ((len(b_kw_lower) > 8 or has_non_ascii) and b_kw_lower in val_lower)
+                    ):
                         file_violations.append(
                             CodeViolation(
                                 rel_path,

@@ -1,575 +1,125 @@
-# ⚖️ BÁO CÁO NGHIỆM THU CỦA LLM CẤP CAO (HIGH-TIER SUPERVISORY AUDIT)
+# ⚖️ BÁO CÁO NGHIỆM THU CỦA LLM CẤP CAO (HIGH-TIER SUPERVISORY AUDIT - ROUND 2)
 
 - **Giám sát viên (Supervisor Model)**: `gpt-6.1-sol` (qua HHTech API Gateway)
-- **Thời điểm kiểm định**: 2026-11-11 02:32:25
-- **Thời gian phản hồi (Latency)**: 114.49s
+- **Thời điểm kiểm định**: 2026-11-11 20:53:20
+- **Thời gian phản hồi (Latency)**: 163.89s
 - **Tập phim nghiệm thu**: `KR_EP0007_jeonse_deposit_trap`
 
 ---
 
-# KẾT LUẬN ĐIỀU HÀNH
+**Kết luận nghiệm thu: CHƯA ĐẠT (REVISE). Chưa đủ điều kiện chuyển sang S05.** Có bằng chứng cho thấy bản thoại đã loại bỏ sự lẫn lộn ngôn ngữ và bám vào các chi tiết Jeonse. Nhưng hồ sơ hiện tại chưa chứng minh được kiến trúc đã “sạch” ở cấp hệ thống; kịch bản vẫn đặt những thông tin chính sách chưa xác minh vào vị trí trung tâm, còn kết quả S04 đang thể hiện mức bảo đảm cao hơn bằng chứng được cung cấp.
 
-**Verdict: CHƯA ĐẠT — REVISE. Không nên chuyển sang S05.**
+Phạm vi đánh giá cần nói rõ: tôi có mô tả thay đổi, kết quả kiểm thử do bạn cung cấp, 8 trong số 17 claim và toàn bộ bản thoại 22 dòng. Tôi **không có nội dung mã nguồn, diff đầy đủ, 9 claim còn lại, metadata ánh xạ thoại–claim hay báo cáo chấm điểm chi tiết**. Vì vậy, tôi có thể kết luận trực tiếp về bản thoại; với kiến trúc, tôi phân biệt điều đã được chứng minh với điều mới được báo cáo.
 
-Các sửa đổi ở commit cho thấy hệ thống đã vượt qua một số lỗi cục bộ nghiêm trọng: shadow script đã bị loại bỏ, dữ liệu grounding được nối vào S01–S03, invalidation được mở rộng, và đã có language gate. Tuy nhiên, **runtime artifact thực tế của S03 vẫn thất bại ở tầng nội dung cốt lõi**. S04 đang xác nhận rằng script đúng hình thức, không chứng minh rằng script đúng đề tài, đúng bằng chứng, đúng cấu trúc điều tra hay có giá trị biên tập.
+**1. Code có tính hệ thống chưa, đã sạch chưa?**
 
----
+**Hướng sửa có tính hệ thống; mức độ hoàn tất chưa được chứng minh.** Những thay đổi như nạp dữ liệu từ ledger, bỏ shadow script, đưa qualifier theo thị trường và bổ sung invalidation đều tác động đúng các ranh giới kiến trúc. Tuy nhiên, “đã đổi sang đọc dữ liệu động” không đồng nghĩa với “đã loại bỏ thiên kiến ngữ nghĩa”.
 
-# CÂU HỎI 1 — CODE ĐÃ MANG TÍNH HỆ THỐNG VÀ “SẠCH” CHƯA?
+| Thành phần | Nhận định từ hồ sơ | Khoảng trống ảnh hưởng nghiệm thu |
+|---|---|---|
+| DAG invalidation | Đã báo cáo reset S05–S11 và xóa các root exports liên quan | Chưa thấy kiểm tra đầy đủ phụ thuộc, trạng thái lỗi giữa chừng, chạy đồng thời và các artifact còn được consumer sử dụng |
+| Recon Bridge | Đã báo cáo nạp `grounding_intel.json`, bảo toàn `documented_outcome` | Chưa thấy kiểm soát nguồn gốc, độ tin cậy và trạng thái xác minh khi dữ liệu reconnaissance trở thành claim |
+| Sinh thoại từ ledger | Có dấu hiệu rõ trong bản thoại: ngày, lãi suất, luật và cơ quan cụ thể | Chưa có thử nghiệm thay ledger bằng đề tài khác để chứng minh engine không giữ cấu trúc ngữ nghĩa Jeonse |
+| Localization | Có thiết kế cho KR, JA, VN, EN | Chỉ có artifact KR; chưa đủ cơ sở xác nhận JA/VN/EN |
+| Language gate | Có thể chặn một số trường hợp lẫn tiếng Anh | Ngưỡng tiếng Anh không xác định được ngôn ngữ đích, cũng không xác định được cơ quan hoặc thể chế dùng sai thị trường |
 
-## 1. DAG invalidation: đã tiến bộ, nhưng chưa đủ bằng chứng để tuyên bố sạch tuyệt đối
+Với **DAG invalidation**, việc unlink các file như `spoken_script.txt` và `director_plan.json` giải quyết một dạng lỗi quan trọng: manifest nói pending nhưng consumer vẫn đọc bản xuất cũ. Tuy vậy, để gọi là sạch, cần chứng minh quy tắc sau được thực thi:
 
-Việc `core/run_manifest.py` tự động unlink các secondary exports:
+> Artifact chỉ hợp lệ khi thuộc đúng phiên bản đầu vào và cấu hình của lần chạy tạo ra nó.
 
-- `spoken_script.txt`
-- `director_plan.json`
-- `bulk_image_prompts.txt`
-- `images_manifest.json`
+Xóa một danh sách file root chưa tự chứng minh điều đó. Nếu stage thất bại sau khi ghi một phần, hoặc hai lần chạy ghi cùng đường dẫn, stale artifact vẫn có thể xuất hiện. Đây là các trường hợp cần kiểm chứng, **không phải khẳng định mã hiện tại chắc chắn có lỗi**. Snapshot manifest bạn đưa chỉ chứng minh trạng thái lần chạy này nhất quán ở mức được báo cáo.
 
-khi stage cha được chạy lại là đúng hướng. Nó xử lý được lỗi **split-brain artifact**: manifest nói một phiên bản, còn các file phụ vẫn chứa đầu ra của phiên bản cũ.
+Với **Recon Bridge**, rủi ro lớn nhất nằm ở chất lượng tri thức được chuyển tiếp. Bản thoại đưa ngày **2026년 11월 10일**, **2026년 11월 13일** và mức **3분의 1** vào các dòng 2, 4, 17, 18, 22, đồng thời thừa nhận chưa xác minh từ nguyên bản và pháp luật. Điều đó cho thấy pipeline có thể bảo toàn nội dung reconnaissance mà vẫn chưa đủ cơ sở dùng nội dung ấy làm trục kể chuyện.
 
-Runtime mới cũng xác nhận một điểm quan trọng:
+Bảo toàn `documented_outcome` chỉ có giá trị nếu engine đồng thời bảo toàn **nguồn, thời điểm, phạm vi áp dụng và trạng thái xác minh**. Tên trường “documented” không tạo ra bằng chứng.
 
-> `s05..s11: pending (đã bị invalidate sạch sẽ, không còn split-brain)`
+Với **Rule 128 và Rule 132**, chưa thể cấp chứng nhận tuân thủ vì chưa có nguyên văn quy tắc và mã thực thi. Theo ý nghĩa bạn nêu:
 
-Điều này chứng minh cơ chế đã hoạt động trong trường hợp kiểm thử hiện tại.
+- **Zero Semantic Bias:** cần phân biệt cấu hình ngôn ngữ hợp lệ với giả định nội dung bị cài vào engine. Bảng từ ngữ KR/JA/VN/EN là cấu hình hợp lý. Việc engine mặc định phải kể câu chuyện qua ngân hàng trung ương, cơ quan quản lý hay một loại tội phạm cụ thể mới là nguy cơ thiên kiến.
+- **Decoupled Engine:** engine phải xử lý hợp đồng dữ liệu chung; các chi tiết vụ việc phải đến từ dữ liệu. Đổi hardcode một tập thành template mang cùng giả định nội dung vẫn chưa đạt tách biệt.
 
-Tuy nhiên, từ thông tin cung cấp chưa thể kết luận DAG invalidation đã hoàn chỉnh ở cấp hệ thống. Còn ít nhất bốn điểm phải được kiểm tra trực tiếp trong code:
+**Có một điểm thiết kế đáng nghi ngay trong mô tả commit:** định tuyến `court → 공소장에 따르면`. `공소장` là cáo trạng; “nguồn từ tòa án” không tự động là cáo trạng. Nguồn ấy có thể là bản án, quyết định hoặc hồ sơ khác. Tương tự, nguồn báo chí không tự động đồng nghĩa với “chưa xác minh”.
 
-1. **Có invalidate theo toàn bộ hậu duệ của stage cha hay chỉ theo danh sách file cố định?**  
-   Việc unlink bốn file root là cần thiết nhưng chưa đồng nghĩa với việc mọi artifact downstream trong thư mục stage, cache, index hoặc metadata đều bị vô hiệu hóa.
+Qualifier pháp lý cần xét tối thiểu **loại tài liệu, chủ thể phát ngôn, tình trạng tố tụng và tình trạng xác minh của từng claim**. Chỉ dựa vào `source_type` sẽ tạo ra lỗi phân loại mới dù đã sửa được một lỗi cũ.
 
-2. **Có kiểm tra generation/run ID của artifact không?**  
-   Unlink là biện pháp vật lý. Cơ chế mạnh hơn phải gắn artifact với `source_stage_hash`, `run_id`, hoặc dependency fingerprint để phát hiện artifact cũ ngay cả khi file không bị xóa.
+**Khả năng mở rộng JA/VN/EN hiện ở mức có thiết kế hỗ trợ, chưa nghiệm thu vận hành.** Một tập KR không chứng minh được:
 
-3. **Có xử lý lỗi giữa chừng không?**  
-   Nếu invalidate đã xóa file nhưng stage mới thất bại, manifest phải phản ánh trạng thái `invalidated` hoặc `failed`, không được để hệ thống coi output cũ là hợp lệ.
+- Tokenization và ước lượng thời lượng cho tiếng Nhật.
+- Diễn đạt pháp lý đúng thủ tục tại Việt Nam hoặc Mỹ.
+- Xử lý tên riêng, từ vay mượn và chữ viết hỗn hợp.
+- Giữ cùng chuẩn chứng cứ khi ledger ít claim, nhiều claim hoặc thiếu kết quả cuối cùng.
 
-4. **Có kiểm tra secondary exports được tạo ở vị trí khác không?**  
-   Danh sách hardcode bốn tên file có thể trở thành điểm mù khi S05–S11 tạo thêm các export tương tự.
+Đặc biệt, gate “non-EN có hơn 15% tiếng Anh thì VETO” là một bộ lọc hạn chế. Một kịch bản tiếng Nhật đưa vào thị trường KR có thể gần như không chứa tiếng Anh mà vẫn sai hoàn toàn ngôn ngữ đích. Một câu tiếng Hàn nhắc SEC không đúng vụ việc cũng có thể vượt gate. Cần tách **nhận diện ngôn ngữ đích** khỏi **kiểm tra tính phù hợp của thực thể và thể chế**.
 
-**Đánh giá:** đạt mức **cải thiện kiến trúc**, chưa đủ dữ liệu để cấp chứng nhận “DAG sạch tuyệt đối”.
+**2. Chạy lại đã đạt chất lượng chưa?**
 
----
+**Về ngôn ngữ, bản thoại đạt yêu cầu hẹp trong mẫu được cung cấp.** Cả 22 dòng đều là tiếng Hàn; không thấy tiếng Anh lạc chỗ, SEC/Mỹ hay nội dung kiểm dịch thực phẩm. Các ngày và số liệu được viết bằng chữ số Ả Rập. Đây là kết luận trực tiếp từ artifact, không cần dựa vào điểm S04.
 
-## 2. Recon Bridge: đã thoát khỏi hardcode KR cũ, nhưng chưa chứng minh được độ trung lập ngữ nghĩa
+**Về Docudrama điều tra, bản này chưa đạt.** Nó hiện giống một bài giải thích chính sách có nhiều lưu ý pháp lý hơn là một tuyến điều tra phát triển qua năm beat.
 
-S02 hiện đã nạp `grounding_intel.json`, trích xuất thực thể động và loại bỏ factsheet cứng:
+Có thể ép nội dung vào năm khối: mở bằng lãi suất và mức bảo đảm; quay lại bối cảnh tín dụng; nói về cơ chế giao dịch; giải thích luật; kết bằng giới hạn chính sách. Nhưng cấu trúc đó chưa tạo thành một đường dây điều tra rõ:
 
-> `"22조 원 전세사기 HUG/MOLIT"`
+- Dòng 1 mở bằng lãi suất, dòng 2 chuyển sang mức bảo đảm chưa xác minh, dòng 3 đặt câu hỏi về thu hồi tiền cọc. Trục xung đột chưa ổn định.
+- Dòng 7–10 giới thiệu nghi vấn thổi giá và tái sử dụng tiền cọc, nhưng không đưa ra hồ sơ giao dịch hoặc phát hiện cụ thể để phát triển nghi vấn.
+- Dòng 11–20 chuyển sang giải thích pháp luật và các giới hạn diễn giải.
+- Dòng 21–22 nhắc lại phân biệt đã xuất hiện trước đó, chưa tạo ra kết quả điều tra mới.
 
-S01 cũng lấy động `money_at_stake_usd` từ grounding thay vì dùng con số cố định. Đây là thay đổi đúng về mặt kiến trúc: dữ liệu sự kiện được đưa từ upstream vào pipeline thay vì cấy trực tiếp vào stage.
+Một phim điều tra không nhất thiết phải có nhân vật tái dựng. Tuy nhiên, nó cần một câu hỏi được triển khai bằng chuỗi chứng cứ và đi đến kết quả xác định. Ở đây, kết quả chính là “chưa xác minh được cơ chế đang bàn”, trong khi cơ chế ấy vẫn được dùng làm điểm thu hút xuyên suốt.
 
-Tuy nhiên, artifact S03 cho thấy **Recon Bridge mới chỉ truyền được dữ liệu theo nghĩa kỹ thuật, chưa truyền được dữ liệu theo nghĩa biên tập**.
+**Về thời lượng, hồ sơ đang tự mâu thuẫn.** Phần mô tả ghi 327 từ; câu hỏi lại dùng 246 từ. Hai con số cho kết quả khác nhau:
 
-Evidence Ledger có các claim rất cụ thể:
+| Số lượng được nêu | Với 240 giây |
+|---|---:|
+| 246 từ | 61,5 từ/phút; 1,03 từ/giây |
+| 327 từ | 81,75 từ/phút; 1,36 từ/giây |
 
-- ngày pre-application: **10/11/2026**
-- ngày có hiệu lực pháp lý: **13/11/2026**
-- mức bảo đảm tối thiểu: **1/3 tiền đặt cọc**
-- số nạn nhân được công nhận ở Gyeonggi: **9.317**
-- các chủ thể: MOLIT, cơ quan bảo lãnh, proxy landlords, “Villa Kings”
+Tiếng Hàn còn cần làm rõ đang đếm đơn vị cách trắng, từ theo bộ tách hay đơn vị khác. Những chuỗi như `3.00퍼센트포인트` có độ dài phát âm lớn hơn nhiều so với một đơn vị đếm bằng khoảng trắng.
 
-Nhưng không một chi tiết nào xuất hiện trong `spoken_script.txt`.
+Do đó, **chưa thể xác nhận nhịp 240 giây phù hợp chỉ từ word count**. Cần dùng đúng bộ chuẩn hóa số của TTS, tạo bản đọc thử rồi đo thời lượng và nghe nhịp ngắt. Giọng chậm có thể phù hợp; phần lặp lại lời dè dặt hiện tại cũng có thể khiến bản đọc trì trệ. Hai việc này phải được phân biệt bằng âm thanh thực tế.
 
-Đây là dấu hiệu hệ thống **đã kết nối dữ liệu nhưng chưa bắt buộc sử dụng dữ liệu**. Một bridge chỉ thật sự đạt khi nó bảo đảm:
+**Về bám đề tài và nhân quả, kịch bản đúng chủ đề rộng nhưng thiếu chứng cứ cho luận điểm trung tâm.**
 
-- claim được chọn có mặt trong nội dung;
-- claim có mức ưu tiên;
-- claim bị bỏ qua phải có lý do;
-- claim quan trọng không bị thay bằng các câu văn tổng quát vô danh.
+Các đoạn về thu hồi tiền cọc có nền tảng trong phần ledger đã cung cấp:
 
-Hiện tại, S03 có thể nhận `grounding_intel.json` nhưng vẫn sản xuất một bài viết gần như có thể dùng cho bất kỳ vụ bê bối tài chính nào. Đó là lỗi **semantic bypass**, không phải lỗi truyền file.
+- Dòng 11–12 tương ứng C006: giá xử lý tài sản và quan hệ phân chia với quyền bảo đảm, nghĩa vụ thuế.
+- Dòng 13 tương ứng C007: mua và cho thuê nhà công không đồng nghĩa bồi thường toàn bộ tiền cọc bằng tiền mặt.
+- Dòng 19–20 tương ứng C005: người không được hoàn cọc và người được công nhận theo luật không phải cùng một tập hợp.
 
----
+Đây là những phân biệt cần thiết. Nhưng chúng chưa trả lời được chính sách **최소보장제** cụ thể có hiệu lực ra sao, ai được hưởng, công thức tính thế nào và mức tối thiểu có căn cứ nào.
 
-## 3. Multi-Market Localization: khung có tính mở rộng, nhưng chưa chứng minh được bản địa hóa thực chất
+C008 chỉ nói **luật ban hành năm 2023 không có quy định phổ quát như được mô tả**. Nó không chứng minh tình trạng của mọi chính sách hoặc sửa đổi ban hành sau đó. Bản thoại đã có lời giới hạn, nhưng việc lặp lại thông tin chưa xác minh vẫn có thể khiến người xem nhớ ngày và tỷ lệ như những dữ kiện chính.
 
-Các thay đổi được mô tả là hợp lý:
+Về “tín dụng đen bóng tối”, **artifact chưa cung cấp bằng chứng đủ để kết luận**. Dòng 8 mô tả tiền cọc được tái sử dụng làm vốn mua nhà; đó là một cơ chế tài trợ có thể cần điều tra. Nó không tự chứng minh cho vay nặng lãi, tổ chức tín dụng bất hợp pháp hoặc một mạng lưới tín dụng ngầm. Muốn đưa luận điểm ấy vào phim phải có chứng cứ bổ sung; nếu không, cần giới hạn phạm vi diễn giải.
 
-- ma trận legal qualifiers cho KR, JA, VN, EN;
-- thuật toán chọn một legal status cao nhất:
-  `charged > alleged > settled`;
-- generic multi-market template;
-- đồng bộ word/character budget.
+**S04 có các kiểm tra hữu ích, nhưng chưa đủ làm chốt nghiệm thu nội dung.** Tám gate hiện tại chủ yếu kiểm tra sự hiện diện, hình thức và một phần tuân thủ.
 
-Điểm tích cực là hệ thống không còn gắn toàn bộ logic vào một câu chuyện Hàn Quốc duy nhất. Về thiết kế, việc tách:
+| Gate | Giá trị thực tế | Điều chưa được bảo đảm |
+|---|---|---|
+| Duration | Phát hiện độ dài bất thường theo mô hình ước tính | Thời lượng và nhịp đọc TTS thực tế |
+| Factual line có claim ID | Bảo đảm có tham chiếu | Claim có chứng minh toàn bộ phát biểu hay không |
+| Legal language | Phát hiện một số lỗi diễn đạt | Đúng loại tài liệu, thủ tục và trạng thái pháp lý |
+| Hook trong 20 giây | Kiểm tra vị trí mở bài | Hook có đủ chứng cứ và đúng trọng tâm |
+| Pattern interrupt | Kiểm tra phân bố nhịp theo metadata | Hiệu quả nghe thực tế |
+| Language compliance | Chặn một số dạng lẫn tiếng Anh | Đúng ngôn ngữ đích và đúng thể chế |
+| Topic specificity | Khuyến khích xuất hiện thực thể, số, ngày | Các chi tiết có giải thích được câu hỏi trung tâm |
+| Claim coverage | Đo mức sử dụng ledger | Bao phủ luận điểm trọng yếu và suy luận đúng |
 
-- market;
-- language;
-- legal status;
-- duration;
-- word/character budget;
-- template
+Đặc biệt, nếu điều kiện đúng như mô tả **“≥50% hoặc ≥3 distinct claims”**, thì với 17 claim, dùng 3 claim tương đương **17,6%** vẫn có thể pass nhánh thứ hai. Ngưỡng đó không thể được diễn giải là bảo đảm độ bao phủ 50%. Nó còn có thể được đáp ứng bằng ba claim lãi suất C001–C003 trong khi bỏ qua câu hỏi chính sách trung tâm.
 
-là hướng đúng cho Rule 132 — **Decoupled Engine**.
+Đối chiếu từ khóa cũng không đủ để kiểm tra quan hệ chứng cứ. Một câu chứa đúng tên cơ quan, ngày và con số vẫn có thể đảo chiều kết luận hoặc thêm quan hệ nhân quả không có trong nguồn.
 
-Nhưng mức sẵn sàng thực tế hiện mới ở mức:
+Không thấy claim ID trong `spoken_script.txt` **không tự nó là lỗi**: bản đọc có thể chủ động bỏ metadata. Nhưng để xác nhận gate này, cần artifact có ánh xạ từng phát biểu thực chứng tới claim và nguồn tương ứng.
 
-| Thị trường | Đánh giá |
-|---|---|
-| KR | Có thể chạy pipeline, nhưng chất lượng runtime hiện tại không đạt |
-| JA | Chưa chứng minh được: thiếu artifact tiếng Nhật, thiếu test ngữ pháp/kính ngữ/legal terminology |
-| VN | Chưa chứng minh được: thiếu test dấu tiếng Việt, tên cơ quan, thuật ngữ pháp lý và nhịp đọc |
-| EN | Có vẻ được coi là default dễ nhất, nhưng chưa có bằng chứng test độc lập |
+**Điểm 9,2/10 hiện chưa có cơ sở để coi là điểm chất lượng điều tra.** Không có rubric, trọng số, phép tổng hợp hoặc thông tin đây là điểm LLM hay fallback. Việc fallback chấm từ tám gate minh bạch hơn một hằng số 9,4, nhưng không khắc phục được những năng lực mà tám gate chưa đo.
 
-Một ma trận qualifier không đồng nghĩa với localization hoàn chỉnh. Localization còn phải xử lý:
+9/9 unit test, 14/14 CI-neighbor và 15/15 smoke gate chứng minh các kiểm tra đã chạy thành công theo báo cáo. Chúng chưa chứng minh các kiểm tra đó phát hiện được sai nguồn, sai suy luận hoặc một kịch bản thiếu tuyến điều tra.
 
-- tên cơ quan bản địa;
-- cấu trúc câu và trật tự thông tin;
-- hệ đo lường;
-- cách biểu đạt tiền;
-- cách mô tả cáo buộc;
-- quy tắc gọi tên cá nhân và tổ chức;
-- tokenization và speech-rate;
-- ngưỡng ngôn ngữ;
-- văn phong phóng sự của từng thị trường.
+**Điều kiện cần hoàn tất trước khi mở S05:**
 
-Do đó, chưa thể nói “đã sẵn sàng mở rộng JA/VN/EN”. Có thể nói chính xác hơn:
+1. **Giải quyết trục chính sách:** xác minh nguồn gốc hai ngày năm 2026 và mức 1/3, hoặc bỏ chúng khỏi vai trò dữ kiện trung tâm. Cung cấp đủ 17 claim cùng nguồn để đối chiếu.
+2. **Sửa tuyến kể:** xác định một câu hỏi điều tra, triển khai chuỗi chứng cứ qua năm beat và kết bằng điều đã chứng minh cùng giới hạn còn lại. Giảm các đoạn lặp về bồi thường toàn phần và mức 1/3.
+3. **Kiểm tra quan hệ thoại–chứng cứ:** xuất ánh xạ phát biểu–claim; xét nội dung được nguồn hỗ trợ, phạm vi thời gian và suy luận nhân quả, thay vì chỉ ID và từ khóa.
+4. **Bổ sung bằng chứng kiến trúc:** kiểm tra diff thực tế và chạy thử cùng engine trên ledger khác chủ đề, kèm JA/VN/EN; kiểm chứng invalidation khi stage lỗi và khi artifact cũ tồn tại.
+5. **Đo bản đọc:** thống nhất cách đếm, render TTS và kiểm tra thời lượng thực.
 
-> **Engine đã có xu hướng multi-market; nhưng chỉ KR được chạy thực tế, và ngay ở KR semantic quality vẫn thất bại.**
-
----
-
-## 4. Language Gate: có thực chất ở mức nhiễm ngôn ngữ, nhưng quá hẹp
-
-Gate:
-
-> `target_market_language_compliance` — VETO nếu non-EN chứa >15% tiếng Anh
-
-là một chốt chặn hữu ích, nhưng không phải language compliance đầy đủ.
-
-Nó phát hiện được một số lỗi như:
-
-- script KR/VN/JA bị trộn quá nhiều tiếng Anh;
-- prompt rác từ SEC/Mỹ;
-- thuật ngữ tiếng Anh bị lọt vào văn bản.
-
-Nhưng nó không phát hiện được:
-
-1. **Sai ngôn ngữ nhưng không phải tiếng Anh**  
-   Ví dụ script KR chứa tiếng Nhật hoặc tiếng Trung.
-
-2. **Câu vô nghĩa nhưng thuần tiếng Hàn**  
-   Artifact hiện tại chính là ví dụ: văn bản chủ yếu là tiếng Hàn, nhưng generic và không bám đề tài.
-
-3. **Dịch máy sai ngữ cảnh**  
-   Tỷ lệ ký tự Hàn đúng không bảo đảm thuật ngữ pháp lý đúng.
-
-4. **Lẫn tên riêng và thuật ngữ kỹ thuật không được phép**  
-   Ngưỡng 15% có thể cho phép một lượng lớn từ ngoại lai ở những vị trí quan trọng.
-
-5. **Ngôn ngữ đúng nhưng register sai**  
-   Văn phong truyền hình điều tra, văn phong pháp lý, văn phong clickbait và văn phong báo cáo đều có thể cùng “đúng tiếng Hàn”.
-
-6. **Sai tokenization theo thị trường**  
-   Cách tính từ tiếng Anh trên tiếng Hàn không tương đương với cách tính contamination trên tiếng Nhật hoặc tiếng Việt.
-
-Ngoài ra, trong artifact được cung cấp, **không thấy từ tiếng Anh rõ ràng, không thấy SEC, không thấy rác kiểm dịch thực phẩm**. Vì vậy, gate có vẻ đã vượt qua trường hợp này. Nhưng đó chỉ là bằng chứng rằng script sạch về mặt bề mặt, không phải bằng chứng gate kiểm tra toàn diện.
-
----
-
-## 5. Hardcode và vi phạm Rule 128 / Rule 132
-
-Dựa trên diff và artifact được cung cấp:
-
-- Hardcode cũ `"22조"` / `"전세"` đã được loại bỏ khỏi S01–S02.
-- Shadow script tĩnh dài khoảng 150 dòng đã được xóa khỏi S03.
-- Generic template đã được đưa vào.
-
-Đây là dấu hiệu đã thoát khỏi bẫy sửa riêng cho `KR_EP0007` ở tầng mã nguồn cơ bản.
-
-Nhưng vẫn còn hai biểu hiện của **semantic bias**:
-
-### a. Template vẫn có thể đang ép mọi câu chuyện vào một kịch bản khủng hoảng giống nhau
-
-Artifact S03 dùng chuỗi câu như:
-
-- “광범위한 구조적 충격”
-- “치명적인 구조적 취약성”
-- “제도적 맹점”
-- “전례 없는 규모의 부실 노출”
-- “막대한 유동성이 증발”
-- “전면 개입”
-- “전례 없는 제도 개선안”
-
-Đây là ngôn ngữ khủng hoảng tổng quát. Nó có thể được sinh ra từ template generic, nhưng generic theo kiểu này vẫn tạo **bias về thể loại và kết luận**: mọi đề tài đều bị ép thành một vụ sụp đổ hệ thống.
-
-### b. Decoupling mới dừng ở tách dữ liệu, chưa tách được lập luận
-
-Một engine decoupled phải cho phép:
-
-- grounding quyết định sự kiện;
-- claim priority quyết định điểm nhấn;
-- legal status quyết định qualifier;
-- market profile quyết định cách trình bày;
-- story structure quyết định nhịp;
-- template chỉ cung cấp hình thức.
-
-Trong artifact hiện tại, template dường như đang chi phối nội dung mạnh hơn evidence. Đây là vi phạm Rule 132 ở tầng vận hành, dù code đã được tách module.
-
-**Kết luận cho Câu 1:**  
-**Kiến trúc đã được sửa theo hướng hệ thống, nhưng chưa đạt “clean pass”.** Không còn bằng chứng rõ ràng về hardcode KR cũ, nhưng còn bằng chứng mạnh về **template semantic bias** và **grounding không được chuyển hóa thành nội dung bắt buộc**.
-
----
-
-# CÂU HỎI 2 — CHẠY LẠI ĐÃ ĐẠT CHẤT LƯỢNG CHƯA?
-
-## 1. Độ thuần tiếng Hàn
-
-Về bề mặt, script đạt yêu cầu tương đối tốt:
-
-- toàn bộ nội dung là tiếng Hàn;
-- không thấy từ tiếng Anh đáng kể;
-- không thấy “SEC” hoặc dấu vết Mỹ;
-- không thấy rác kiểm dịch thực phẩm;
-- không thấy đoạn prompt hoặc metadata lọt vào spoken text.
-
-Vì vậy, `target_market_language_compliance = true` là **hợp lý ở nghĩa hẹp**.
-
-Nhưng cần tách hai khái niệm:
-
-- **language purity:** đạt tương đối;
-- **Korean editorial naturalness:** chưa được chứng minh.
-
-Nhiều câu có tính chất dịch máy hoặc văn phong báo cáo chung chung, ví dụ:
-
-> “대외적인 신뢰와 합법적 외관 이면에 숨겨진 실체와 의혹이 폭로되었습니다.”
-
-và:
-
-> “단기적인 이익 극대화 구조가 장기적인 시스템 붕괴를 가속화하는 구조적 모순이 발생했습니다.”
-
-Các câu này không sai rõ ràng về ngữ pháp, nhưng nặng tính trừu tượng, lặp cấu trúc và thiếu chủ thể cụ thể. Chúng giống “forensic boilerplate” hơn là lời dẫn phóng sự Hàn Quốc tự nhiên.
-
-**Đánh giá:** sạch ngôn ngữ ở mức lọc contamination; chưa đạt chuẩn biên tập bản ngữ.
-
----
-
-## 2. Có cấu trúc Docudrama 5 Beat không?
-
-Không. Script có thể được chia cơ học thành năm phần, nhưng đó không phải cấu trúc 5 Beat có chức năng.
-
-### Beat 1 — Hook
-
-Câu mở đầu:
-
-> “급격한 시장 위기 속에서, 보증금의 덫: 전세사기 최소보장제와 한국형 그림자 금융의 붕괴 사태는 광범위한 구조적 충격을 촉발했습니다.”
-
-Đây là một câu mở đầu lớn, trừu tượng và nhiều danh từ. Nó nêu “khủng hoảng”, “bẫy tiền đặt cọc”, “tín dụng bóng tối”, “cú sốc cấu trúc”, nhưng không có:
-
-- nạn nhân;
-- số tiền;
-- mốc thời gian;
-- câu hỏi cụ thể;
-- tình huống nghịch lý.
-
-Đây là **headline tổng quát**, không phải hook điều tra mạnh.
-
-### Beat 2 — Setup
-
-Các câu tiếp theo nói về:
-
-- lỗ hổng;
-- vẻ ngoài hợp pháp;
-- hồ sơ;
-- niềm tin thị trường;
-- vận hành bề ngoài lành mạnh.
-
-Nhưng không giới thiệu được:
-
-- Jeonse hoạt động cụ thể ra sao;
-- người thuê giao tiền như thế nào;
-- rủi ro nằm ở chênh lệch tài sản và tiền đặt cọc nào;
-- chính sách Minimum Guarantee Scheme là gì.
-
-### Beat 3 — Escalation
-
-Có các câu về:
-
-- cảnh báo nội bộ;
-- đòn bẩy;
-- dữ liệu vận hành;
-- thanh khoản biến mất.
-
-Nhưng không có chuỗi nhân quả cụ thể. Không biết:
-
-- ai làm gì;
-- bằng công cụ nào;
-- lỗ hổng nào cho phép hành vi đó;
-- thiệt hại chuyển sang người thuê ra sao.
-
-### Beat 4 — Reveal / confrontation
-
-Script nói:
-
-> “결정적 증거와 내부 고발이 이어지며 은폐되었던 거래 메커니즘이 완전히 해체되었습니다.”
-
-Nhưng không đưa ra “bằng chứng quyết định” nào. Không có tài liệu, cuộc điều tra, cơ quan, giao dịch, chủ thể hay con số nào được tiết lộ.
-
-Đây là **tuyên bố có reveal**, không phải reveal.
-
-### Beat 5 — Resolution
-
-Đoạn kết nói về:
-
-- cơ quan quản lý;
-- trách nhiệm pháp lý;
-- cải cách;
-- bài học về giám sát.
-
-Nhưng không giải thích chính sách trung tâm:
-
-- pre-application bắt đầu khi nào;
-- có hiệu lực khi nào;
-- ai đủ điều kiện;
-- mức tối thiểu là bao nhiêu;
-- đây là bảo lãnh toàn bộ hay chỉ ngưỡng tối thiểu;
-- tác động và giới hạn của chính sách.
-
-**Kết luận:** script có hình thức 5 đoạn, nhưng **không có 5 Beat theo nghĩa điều tra–kịch tính–nhân quả**.
-
----
-
-## 3. Nhịp độ: 246 từ cho 240 giây
-
-Tỷ lệ:
-
-> 246 / 240 ≈ 1,03 đơn vị từ mỗi giây
-
-không đủ để kết luận script có nhịp đọc đúng.
-
-Đối với tiếng Hàn, dùng “word” theo khoảng trắng là thước đo kém tin cậy hơn so với:
-
-- số ký tự Hangul;
-- số âm tiết;
-- số eojeol;
-- tốc độ đọc thực tế của voice model;
-- thời lượng pause;
-- nhấn câu và khoảng ngắt.
-
-246 đơn vị cách nhau trong 240 giây có thể cho cảm giác chậm vừa phải nếu có hình ảnh, pause và nhấn mạnh. Nhưng với 22 dòng văn bản trừu tượng, nó có nguy cơ tạo ra:
-
-- khoảng trống dài;
-- nhịp đều và phẳng;
-- cảm giác kéo dài bằng pause thay vì bằng kịch tính;
-- thời lượng “đủ gate” nhưng thiếu thông tin.
-
-Quan trọng hơn, **word budget đang được dùng như proxy cho duration**, trong khi nội dung tiếng Hàn chưa được kiểm chứng bằng TTS hoặc benchmark speech-rate. Gate `duration_estimate_in_window = true` chỉ chứng minh phép tính của hệ thống hợp ngưỡng, không chứng minh audio thực tế đạt 240 giây với nhịp phóng sự tự nhiên.
-
-**Đánh giá:** duration gate có thể đúng về số học, nhưng chưa đủ tin cậy về âm thanh thực.
-
----
-
-## 4. Mức độ bám sát đề tài
-
-Đây là lỗi nghiêm trọng nhất.
-
-Đề tài là:
-
-> chính sách bảo đảm tối thiểu tiền đặt cọc cho nạn nhân lừa đảo Jeonse tại Hàn Quốc.
-
-Evidence Ledger có 8 claim cụ thể. Script thực tế gần như không dùng claim nào. Không thấy:
-
-- MOLIT;
-- ngày 10/11/2026;
-- ngày 13/11/2026;
-- mức 1/3;
-- 9.317 nạn nhân tại Gyeonggi;
-- HUG;
-- “Villa Kings”;
-- cơ chế proxy landlord;
-- appraisal bị thổi phồng;
-- tiền đặt cọc được tái đầu tư vào nhiều bất động sản;
-- khác biệt giữa recovery và guarantee.
-
-Thay vào đó, script nói các câu có thể áp dụng cho:
-
-- bê bối ngân hàng;
-- gian lận bảo hiểm;
-- quỹ đầu tư;
-- khủng hoảng bất động sản;
-- công ty phá sản;
-- rửa tiền.
-
-Một kiểm thử đơn giản cho thấy thất bại:
-
-> Nếu thay “전세사기” và “보증금” bằng “quỹ đầu tư sụp đổ”, phần lớn script vẫn có thể tồn tại mà không cần viết lại.
-
-Đó là dấu hiệu **topic anchoring thất bại**.
-
----
-
-## 5. Tính nhân quả
-
-Các câu như:
-
-> “시장 이해관계자들은 단기적인 성과를 앞세워 리스크를 은폐했습니다.”
-
-và:
-
-> “단기적인 이익 극대화 구조가 장기적인 시스템 붕괴를 가속화하는 구조적 모순이 발생했습니다.”
-
-khẳng định quan hệ nhân quả nhưng không chỉ ra:
-
-- actor;
-- hành động;
-- cơ chế;
-- bằng chứng;
-- kết quả định lượng.
-
-Đối với một script forensic, đây là vấn đề lớn. Ngôn ngữ nhân quả không thể chỉ dựa trên các danh từ như “cấu trúc”, “rủi ro”, “sụp đổ”, “che giấu”. Mỗi causal beat phải trả lời:
-
-1. Ai thực hiện?
-2. Họ sử dụng cơ chế nào?
-3. Cơ chế đó chuyển rủi ro sang ai?
-4. Claim nào chứng minh điều này?
-5. Hệ quả cụ thể là gì?
-
-Script không trả lời các câu hỏi đó.
-
----
-
-## 6. S04 gate có thực chất không?
-
-Các gate hiện tại có giá trị, nhưng phạm vi rất hạn chế:
-
-| Gate | Đánh giá |
-|---|---|
-| `duration_estimate_in_window` | Có giá trị số học; chưa chứng minh thời lượng TTS thực |
-| `every_factual_line_has_claim_id` | Có giá trị nếu claim ID thật sự gắn với line; artifact không thể hiện điều đó |
-| `legal_language_matches_status` | Cần thiết; chưa chứng minh mức độ bao phủ |
-| `hook_within_20s` | Có thể đo vị trí; không đo chất lượng hook |
-| `pattern_interrupt_gap_ok` | Đo nhịp cấu trúc; không đo sức nặng nội dung |
-| `target_market_language_compliance` | Phát hiện contamination cơ bản; không đo tự nhiên và ngữ nghĩa |
-
-Điểm yếu lớn nhất là bộ gate không có các kiểm tra sau:
-
-1. **Claim coverage**  
-   Có sử dụng các claim bắt buộc hoặc claim có priority cao không?
-
-2. **Topic specificity**  
-   Script có đủ thực thể, ngày, số liệu và cơ chế riêng của đề tài không?
-
-3. **Evidence fidelity**  
-   Câu văn có diễn giải đúng claim hay phóng đại claim?
-
-4. **Causal graph completeness**  
-   Các mũi tên nguyên nhân–hậu quả có được thể hiện không?
-
-5. **Entity coverage**  
-   Các chủ thể quan trọng như MOLIT, HUG, victim, landlord, appraisal agency có xuất hiện không?
-
-6. **Genericity / substitution test**  
-   Script có thể thay tên vụ việc bằng một vụ khác mà vẫn không thay đổi nội dung không?
-
-7. **Unsupported assertion detection**  
-   Các câu như “유동성이 증발했습니다” hoặc “자산 가치가 허구였음” có claim tương ứng không?
-
-Do đó, S04 đã trở thành một **syntactic and structural validator**, chưa phải **forensic content validator**.
-
-Điểm `9.4/10` vì vậy bị thổi phồng nếu được hiểu là chất lượng script tổng thể. Điểm đó chỉ có thể đại diện cho một số gate đã pass, không đại diện cho:
-
-- độ bám đề tài;
-- độ trung thực với evidence;
-- chất lượng điều tra;
-- giá trị sử dụng trong sản xuất.
-
----
-
-# CÁC SỬA ĐỔI BẮT BUỘC TRƯỚC KHI VÀO S05
-
-## 1. Buộc S03 sử dụng claim trọng yếu
-
-Không được chỉ kiểm tra “mỗi factual line có claim ID”. Phải kiểm tra thêm:
-
-- claim coverage tối thiểu;
-- claim priority;
-- claim bắt buộc theo story profile;
-- lý do loại bỏ claim;
-- không được pass nếu script không sử dụng các claim trọng yếu.
-
-Với artifact này, tối thiểu cần xuất hiện có kiểm soát các nhóm:
-
-- chính sách là gì;
-- mốc hiệu lực;
-- mức bảo đảm 1/3;
-- đối tượng được chứng nhận;
-- quy mô nạn nhân;
-- cơ chế Jeonse;
-- cơ chế gian lận;
-- giới hạn hoặc điều kiện của chính sách.
-
-## 2. Thêm `topic_specificity_gate`
-
-Gate nên kiểm tra sự hiện diện có ngữ cảnh của:
-
-- tên chương trình;
-- thị trường;
-- cơ quan;
-- ngày;
-- số liệu;
-- nhân vật/chủ thể;
-- cơ chế gây thiệt hại;
-- kết quả hoặc phản ứng chính sách.
-
-Không nên chỉ kiểm tra keyword đơn lẻ; cần kiểm tra chúng nằm trong câu có quan hệ ngữ nghĩa đúng.
-
-## 3. Thêm genericity test
-
-Sinh hoặc chạy một phép thử thay thế thực thể:
-
-- thay `전세사기` bằng một scandal khác;
-- thay `보증금` bằng `투자금`;
-- thay `MOLIT` bằng một cơ quan khác.
-
-Nếu phần lớn script vẫn hợp lệ mà không cần sửa, script phải bị reject vì quá generic.
-
-## 4. Tách word budget khỏi audio duration
-
-Cần benchmark theo:
-
-- ký tự;
-- âm tiết;
-- eojeol;
-- tốc độ TTS thực tế;
-- pause budget;
-- nhịp đọc theo market/language.
-
-## 5. Mở rộng Language Gate
-
-Cần bổ sung:
-
-- foreign-script contamination;
-- native-language classifier;
-- terminology allowlist/denylist;
-- native fluency review hoặc model-based linguistic scoring;
-- kiểm tra tên riêng và thuật ngữ pháp lý;
-- kiểm tra văn phong theo market.
-
-## 6. Thêm semantic regression tests
-
-Bộ test hiện tại đạt `5/5` nhưng chưa kiểm tra lỗi nghiêm trọng nhất: pipeline nhận grounding cụ thể nhưng sinh nội dung chung chung.
-
-Cần có test kiểu:
-
-> Input grounding thay đổi từ Jeonse sang một vụ việc khác thì output phải thay đổi ở các thực thể, cơ chế, số liệu và causal beats tương ứng.
-
----
-
-# VERDICT CUỐI CÙNG
-
-## **CHƯA ĐẠT — REVISE**
-
-Lý do không phải vì còn vài từ tiếng Anh hay một lỗi format. Lý do là:
-
-1. **Code đã có nhiều sửa chữa mang tính hệ thống ở tầng plumbing và orchestration.**
-2. **DAG invalidation hiện cho thấy kết quả vận hành tốt trong run này.**
-3. **Language gate đã loại được contamination bề mặt.**
-4. Nhưng **S03 không chuyển evidence cụ thể thành một câu chuyện cụ thể**.
-5. Script **không có 5 Beat điều tra thực chất**.
-6. Script **quá generic, thiếu claim, thiếu chủ thể, thiếu mốc thời gian, thiếu số liệu và thiếu causal mechanism**.
-7. S04 **pass các điều kiện hình thức nhưng bỏ lọt lỗi semantic nghiêm trọng**.
-8. Điểm `9.4/10` không phản ánh chất lượng forensic thực tế của artifact.
-
-**Không được chuyển sang S05.** Nếu chuyển tiếp, Director Plan sẽ chỉ tạo hình ảnh và blocking cho một kịch bản rỗng bằng chứng, từ đó nhân bản lỗi xuống toàn bộ S05–S11.
+**Phán quyết cuối cùng: REVISE.** Bản thoại đã qua được kiểm tra ngôn ngữ KR trong mẫu này. Kiến trúc chưa đủ bằng chứng để chứng nhận sạch; nội dung chưa giải quyết được câu hỏi chính sách trung tâm; S04 chưa đủ sức bảo đảm chất lượng điều tra. Chuyển sang S05 lúc này sẽ biến các chi tiết chưa xác minh thành quyết định hình ảnh và nhịp dựng, làm tăng chi phí sửa về sau.

@@ -7,6 +7,7 @@ Implements Stage Shape Standard. Extracts factual grounding factsheet and narrat
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import Any, Dict, List, Tuple
@@ -43,18 +44,14 @@ def run(ctx: RunContext) -> StageArtifact:
     preset_raw = (getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) or "story_forensic"
     is_story = bool(preset_raw in ("story_forensic", "vox_narrative"))
 
-    import json
-    grounding_intel = None
-    grounding_file = ctx.paths.root / "grounding_intel.json"
-    if not grounding_file.is_file():
-        cand_grounding = ctx.paths.repo_root / "active_candidate" / "grounding_intel.json"
-        if cand_grounding.is_file():
-            grounding_file = cand_grounding
-    if grounding_file.is_file():
-        try:
-            grounding_intel = json.loads(grounding_file.read_text(encoding="utf-8"))
-        except Exception as _g_err:
-            logger.warning(f"[S02_RESEARCH] Failed reading grounding_intel.json: {_g_err}")
+    from app.services.story_provenance_engine import load_matching_grounding_intel
+
+    grounding_intel = load_matching_grounding_intel(
+        ctx.paths.root,
+        ctx.paths.repo_root,
+        topic_override=topic,
+        market=market,
+    )
 
     if is_story:
         from app.schemas.story_contracts import EvidenceClaim, StoryResearchPayload, TimelineEvent
@@ -63,45 +60,77 @@ def run(ctx: RunContext) -> StageArtifact:
         system_prompt = prompt_file.read_text(encoding="utf-8") if prompt_file.is_file() else ""
 
         def _build_generic_evidence_ledger(topic_name: str, s1_payload: Dict[str, Any]) -> Tuple[List[EvidenceClaim], List[TimelineEvent]]:
+            from app.services.story_provenance_engine import (
+                classify_claim_provenance,
+                verification_priority_rank,
+            )
+
             if grounding_intel and grounding_intel.get("claims"):
+                classified_list = [
+                    classify_claim_provenance(c, market=market) for c in grounding_intel["claims"]
+                ]
+                classified_list.sort(
+                    key=lambda x: (
+                        verification_priority_rank(x.get("verification_status", "unverified_secondary")),
+                        0 if x.get("causal_role") == "primary_catalyst" else (1 if x.get("causal_role") == "transmission_mechanism" else 2),
+                    )
+                )
                 claims = []
-                for idx, c in enumerate(grounding_intel["claims"], start=1):
+                for idx, prov_c in enumerate(classified_list, start=1):
                     c_id = f"C{idx:03d}"
-                    source_name = c.get("source", "Official Source")
-                    def_src_url = "https://www.korea.kr" if market == "KR" else ("https://www.fsa.go.jp" if market == "JA" else ("https://chinhphu.vn" if market == "VN" else "https://www.sec.gov"))
-                    source_url = c.get("source_url") or def_src_url
-                    source_type = "regulator" if any(w in source_name for w in ["정책", "국토", "MOLIT", "HUG", "FSA", "SEC", "정부", "당국"]) else ("court" if any(w in source_name for w in ["법원", "검찰", "court", "justice"]) else "press")
-                    c_role = c.get("causal_role", "")
-                    leg_st = "fact" if c.get("confidence") == "verified" else ("alleged" if "alleg" in str(c_role).lower() else "fact")
+                    def_src_url = (
+                        "https://www.korea.kr" if market == "KR"
+                        else ("https://www.fsa.go.jp" if market == "JA"
+                              else ("https://chinhphu.vn" if market == "VN" else "https://www.sec.gov"))
+                    )
+                    source_url = prov_c.get("source_url") or def_src_url
                     claims.append(EvidenceClaim(
                         claim_id=c_id,
-                        claim=c.get("claim", f"Factual evidentiary claim regarding {topic_name}"),
+                        claim=prov_c.get("claim") or f"Factual evidentiary claim regarding {topic_name}",
                         source_url=source_url,
-                        source_type=source_type,
-                        date=c.get("date", "2026-11-09"),
-                        legal_status=leg_st,
-                        confidence="high",
+                        source_name=prov_c.get("source_name", ""),
+                        source_type=prov_c.get("source_type", "press"),
+                        doc_type=prov_c.get("doc_type", "unknown"),
+                        speaker=prov_c.get("speaker"),
+                        date=prov_c.get("date"),
+                        legal_status=prov_c.get("legal_status", "alleged"),
+                        procedural_status=prov_c.get("procedural_status", "unknown"),
+                        verification_status=prov_c.get("verification_status", "unverified_secondary"),
+                        evidence_tier=prov_c.get("evidence_tier", "secondary"),
+                        causal_role=prov_c.get("causal_role", "unknown"),
+                        scope=prov_c.get("scope"),
+                        mechanism=prov_c.get("mechanism"),
+                        act_target=prov_c.get("act_target"),
+                        confidence=prov_c.get("confidence", "low"),
                     ))
                 events = []
                 causal_epochs = grounding_intel.get("causal_epochs", [])
                 if causal_epochs:
                     for ep_idx, ep in enumerate(causal_epochs, start=1):
                         events.append(TimelineEvent(
-                            date=ep.get("time_marker", "2026-11-09"),
+                            date=ep.get("time_marker") or "Undated",
                             event=f"[{ep.get('epoch_stage', '').upper()}] {ep.get('event_summary', '')}: {ep.get('verified_claim', '')}",
                             claim_ids=[claims[min(ep_idx - 1, len(claims) - 1)].claim_id] if claims else ["C001"]
                         ))
                 else:
                     for idx, clm in enumerate(claims[:7], start=1):
                         events.append(TimelineEvent(
-                            date=clm.date,
+                            date=clm.date or "Undated",
                             event=clm.claim,
                             claim_ids=[clm.claim_id]
                         ))
                 return claims, events
 
-            s1_scheme = s1_payload.get("scheme_mechanism_summary") or f"Structural agreements and commercial mechanisms behind {topic_name}."
-            s1_outcome = s1_payload.get("documented_outcome") or f"Regulatory oversight, court proceedings, and valuation adjustments in {topic_name}."
+            s1_scheme = s1_payload.get("scheme_mechanism_summary") or {
+                "KR": f"{topic_name} 관련 제도적·계약적 구조.",
+                "JA": f"{topic_name}に関する制度的・契約的構造。",
+                "VN": f"Cơ chế hợp đồng và kẽ hở quản lý xoay quanh {topic_name}.",
+            }.get(market, f"Structural agreements and commercial mechanisms behind {topic_name}.")
+            s1_outcome = s1_payload.get("documented_outcome") or {
+                "KR": f"{topic_name}에 대한 감독 조사 및 사법 절차 진행.",
+                "JA": f"{topic_name}に対する監督調査および司法手続きの推移。",
+                "VN": f"Quá trình thanh tra, xử lý pháp lý và điều chỉnh tại {topic_name}.",
+            }.get(market, f"Regulatory oversight, court proceedings, and valuation adjustments in {topic_name}.")
             antagonist_data = s1_payload.get("antagonist") or {}
             antagonist_name = antagonist_data.get("name") if isinstance(antagonist_data, dict) else (getattr(antagonist_data, "name", None) or topic_name.split()[0])
 
@@ -179,6 +208,156 @@ def run(ctx: RunContext) -> StageArtifact:
                     TimelineEvent(date="2024-11-15", event="계약 불이행 및 이해상충 관련 민원 제기 및 법적 분쟁 확산.", claim_ids=["C005"]),
                     TimelineEvent(date="2025-01-20", event=f"사법 기관, {topic_name} 관련 혐의로 정식 수사 및 기소.", claim_ids=["C006"]),
                     TimelineEvent(date="2025-06-30", event=f"감독 당국 공식 제재 및 제도 개선안 확정: {s1_outcome}", claim_ids=["C007"]),
+                ]
+            elif market == "JA":
+                claims = [
+                    EvidenceClaim(
+                        claim_id="C001",
+                        claim=f"公的企業開示および行政許認可資料により、{topic_name}の基本運営構造と事業体制が確認された。",
+                        source_url="https://www.fsa.go.jp",
+                        source_type="regulator",
+                        date="2024-02-15",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C002",
+                        claim=f"{antagonist_name}に関わる主要契約および取引構造の履行履歴が確認された：{s1_scheme}",
+                        source_url="https://www.fsa.go.jp",
+                        source_type="regulator",
+                        date="2024-03-01",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C003",
+                        claim=f"{topic_name}に直結する市場流動性の急変と財務的変動が確認された。",
+                        source_url="https://www.nikkei.com",
+                        source_type="press",
+                        date="2024-05-20",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C004",
+                        claim=f"監督当局および検査機関が、{topic_name}の健全性と開示の適正性について公式調査を開始した。",
+                        source_url="https://www.fsa.go.jp",
+                        source_type="regulator",
+                        date="2024-08-10",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C005",
+                        claim=f"{topic_name}における契約不履行および内部統制上の問題に関する申立て・疑惑が提起された。",
+                        source_url="https://www.courts.go.jp",
+                        source_type="court",
+                        date="2024-11-15",
+                        legal_status="alleged",
+                        confidence="medium",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C006",
+                        claim=f"司法当局が{topic_name}の主要関係者に対し、関連法令違反の容疑で捜査および起訴手続きを進めた。",
+                        source_url="https://www.courts.go.jp",
+                        source_type="court",
+                        date="2025-01-20",
+                        legal_status="charged",
+                        confidence="medium",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C007",
+                        claim=f"監督上の行政措置および公式な法的対応の結果が確認された：{s1_outcome}",
+                        source_url="https://www.courts.go.jp",
+                        source_type="court",
+                        date="2025-06-30",
+                        legal_status="settled",
+                        confidence="high",
+                    ),
+                ]
+                events = [
+                    TimelineEvent(date="2024-02-15", event=f"公的登録資料を通じて{topic_name}の構造的運用が開始。", claim_ids=["C001"]),
+                    TimelineEvent(date="2024-03-01", event=f"{antagonist_name}に関わる主要商業契約および金融スキームを締結。", claim_ids=["C002"]),
+                    TimelineEvent(date="2024-05-20", event=f"市場流動性の縮小とともに{topic_name}の財務圧迫が顕在化。", claim_ids=["C003"]),
+                    TimelineEvent(date="2024-08-10", event=f"監督当局が{topic_name}に関する会計・構造リスク調査に着手。", claim_ids=["C004"]),
+                    TimelineEvent(date="2024-11-15", event="契約不履行と利害衝突をめぐる申立ておよび法的紛争が拡大。", claim_ids=["C005"]),
+                    TimelineEvent(date="2025-01-20", event=f"司法機関が{topic_name}関連容疑で正式な捜査・起訴へ移行。", claim_ids=["C006"]),
+                    TimelineEvent(date="2025-06-30", event=f"監督当局の公式処分および制度見直しが決定：{s1_outcome}", claim_ids=["C007"]),
+                ]
+            elif market == "VN":
+                claims = [
+                    EvidenceClaim(
+                        claim_id="C001",
+                        claim=f"Hồ sơ công bố doanh nghiệp và giấy phép cơ quan quản lý xác nhận cấu trúc vận hành nền tảng của {topic_name}.",
+                        source_url="https://chinhphu.vn",
+                        source_type="regulator",
+                        date="2024-02-15",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C002",
+                        claim=f"Lịch sử giao dịch và hợp đồng thương mại trọng yếu do {antagonist_name} thực hiện đã được ghi nhận: {s1_scheme}",
+                        source_url="https://chinhphu.vn",
+                        source_type="regulator",
+                        date="2024-03-01",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C003",
+                        claim=f"Thanh khoản thị trường và biến động tài chính gắn trực tiếp với {topic_name} ghi nhận mức gia tăng bất thường.",
+                        source_url="https://vnexpress.net",
+                        source_type="press",
+                        date="2024-05-20",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C004",
+                        claim=f"Cơ quan thanh tra và giám sát tài chính đã mở cuộc kiểm tra chính thức đối với tính minh bạch công bố thông tin của {topic_name}.",
+                        source_url="https://chinhphu.vn",
+                        source_type="regulator",
+                        date="2024-08-10",
+                        legal_status="fact",
+                        confidence="high",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C005",
+                        claim=f"Đơn khiếu nại và nghi vấn vi phạm nghĩa vụ hợp đồng cùng lỗ hổng kiểm soát nội bộ liên quan đến {topic_name} đã được tiếp nhận.",
+                        source_url="https://toaan.gov.vn",
+                        source_type="court",
+                        date="2024-11-15",
+                        legal_status="alleged",
+                        confidence="medium",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C006",
+                        claim=f"Cơ quan tiến hành tố tụng đã khởi tố và truy tố các cá nhân, tổ chức liên quan đến {topic_name} về các sai phạm tài chính.",
+                        source_url="https://toaan.gov.vn",
+                        source_type="court",
+                        date="2025-01-20",
+                        legal_status="charged",
+                        confidence="medium",
+                    ),
+                    EvidenceClaim(
+                        claim_id="C007",
+                        claim=f"Biện pháp chế tài của cơ quan quản lý và kết quả xử lý pháp lý chính thức được xác nhận: {s1_outcome}",
+                        source_url="https://toaan.gov.vn",
+                        source_type="court",
+                        date="2025-06-30",
+                        legal_status="settled",
+                        confidence="high",
+                    ),
+                ]
+                events = [
+                    TimelineEvent(date="2024-02-15", event=f"Hồ sơ đăng ký chính thức ghi nhận hoạt động ban đầu của {topic_name}.", claim_ids=["C001"]),
+                    TimelineEvent(date="2024-03-01", event=f"{antagonist_name} ký kết các hợp đồng thương mại và cơ chế đòn bẩy trọng yếu.", claim_ids=["C002"]),
+                    TimelineEvent(date="2024-05-20", event=f"Áp lực thanh khoản và biến động dòng tiền xuất hiện tại {topic_name}.", claim_ids=["C003"]),
+                    TimelineEvent(date="2024-08-10", event=f"Cơ quan chức năng khởi động thanh tra rủi ro cấu trúc tại {topic_name}.", claim_ids=["C004"]),
+                    TimelineEvent(date="2024-11-15", event="Tranh chấp hợp đồng và khiếu nại xung đột lợi ích gia tăng.", claim_ids=["C005"]),
+                    TimelineEvent(date="2025-01-20", event=f"Cơ quan tố tụng tiến hành điều tra và truy tố sai phạm liên quan {topic_name}.", claim_ids=["C006"]),
+                    TimelineEvent(date="2025-06-30", event=f"Quyết định xử lý và khung chấn chỉnh thể chế được ban hành: {s1_outcome}", claim_ids=["C007"]),
                 ]
             else:
                 claims = [
@@ -289,12 +468,17 @@ def run(ctx: RunContext) -> StageArtifact:
                     f"Source Seeds: {json.dumps(s1_art.payload.get('source_seeds', []), ensure_ascii=False)}\n\n"
                 )
                 if grounding_intel and grounding_intel.get("claims"):
+                    from app.services.story_provenance_engine import classify_claim_provenance as _classify_g_claim
+
+                    tagged_claims = [_classify_g_claim(gc, market=market) for gc in grounding_intel["claims"]]
                     user_prompt += (
-                        f"VERIFIED REAL-WORLD GROUNDING INTEL CLAIMS ({len(grounding_intel['claims'])} verified claims):\n"
-                        f"{json.dumps(grounding_intel['claims'], indent=2, ensure_ascii=False)}\n\n"
+                        f"GROUNDING INTEL CLAIMS WITH VERIFIED PROVENANCE METADATA ({len(tagged_claims)} claims):\n"
+                        f"{json.dumps(tagged_claims, indent=2, ensure_ascii=False)}\n\n"
                         f"CAUSAL EPOCHS:\n"
                         f"{json.dumps(grounding_intel.get('causal_epochs', []), indent=2, ensure_ascii=False)}\n\n"
-                        f"MANDATE: Incorporate these real verified claims and causal epochs directly into your evidence_ledger and timeline for market '{market}'. Forbid generic US SEC/DOJ generic claims.\n\n"
+                        f"MANDATE: Preserve verification_status, doc_type, speaker, procedural_status, and scope for every claim in market '{market}'. "
+                        f"NEVER convert 'unverified_secondary' / RSS claims into settled 'fact' or 'verified_primary'. "
+                        "Forbid out-of-market agencies not present in the dossier.\n\n"
                     )
                 if market == "KR":
                     user_prompt += "MANDATE: Output all claim text and event descriptions in 100% natural Korean (Hangul).\n\n"
@@ -318,23 +502,59 @@ def run(ctx: RunContext) -> StageArtifact:
                 from core.llm_json import parse_llm_json
                 parsed_json = parse_llm_json(raw_response)
 
+                from app.services.story_provenance_engine import (
+                    classify_claim_provenance as _classify_llm_claim,
+                )
+                from app.services.story_provenance_engine import (
+                    is_rss_or_aggregator_url as _is_rss_url,
+                )
+
+                # Index grounding URLs/claims so LLM cannot launder an RSS claim into verified_primary
+                g_claims_raw = grounding_intel.get("claims", []) if grounding_intel else []
                 raw_ledger = parsed_json.get("evidence_ledger", [])
                 for idx, c in enumerate(raw_ledger, start=1):
                     c_id = c.get("claim_id") or f"C{idx:03d}"
-                    st = c.get("legal_status", "fact")
-                    if st not in ("convicted", "charged", "alleged", "settled", "fact"):
-                        st = "alleged" if "alleg" in st else ("settled" if "settle" in st else "fact")
-                    conf = c.get("confidence", "high")
-                    if conf not in ("high", "medium", "low"):
-                        conf = "high"
+                    c_dict = dict(c)
+                    if not c_dict.get("source") and c_dict.get("source_name"):
+                        c_dict["source"] = c_dict["source_name"]
+                    prov_c = _classify_llm_claim(c_dict, market=market)
+                    # Cross-check against grounding_intel URL provenance if matching source_url is RSS
+                    src_url = prov_c.get("source_url") or c.get("source_url") or ""
+                    if _is_rss_url(src_url) or any(
+                        _is_rss_url(str(gc.get("source_url", "")))
+                        and str(gc.get("source", "")).lower() in str(prov_c.get("source_name", "")).lower()
+                        for gc in g_claims_raw
+                    ):
+                        if prov_c.get("verification_status") == "verified_primary":
+                            prov_c["verification_status"] = "corroborated_secondary"
+                            prov_c["evidence_tier"] = "secondary"
+
+                    # Preserve explicit valid legal_status only when provenance supports it
+                    llm_ls = str(c.get("legal_status", "")).lower()
+                    st = prov_c["legal_status"]
+                    if llm_ls in ("convicted", "charged", "settled", "alleged") and prov_c["verification_status"] != "unverified_secondary":
+                        st = llm_ls
+                    elif prov_c["verification_status"] == "unverified_secondary" and llm_ls == "fact":
+                        st = "alleged"
+
                     ledger.append(EvidenceClaim(
                         claim_id=c_id,
-                        claim=c.get("claim", f"Factual evidentiary claim regarding {topic}"),
-                        source_url=c.get("source_url", "https://www.reuters.com"),
-                        source_type=c.get("source_type", "press"),
-                        date=c.get("date", "2026-01-01"),
+                        claim=prov_c.get("claim") or f"Factual evidentiary claim regarding {topic}",
+                        source_url=src_url,
+                        source_name=prov_c.get("source_name", ""),
+                        source_type=prov_c.get("source_type", "press"),
+                        doc_type=prov_c.get("doc_type", "unknown"),
+                        speaker=prov_c.get("speaker"),
+                        date=prov_c.get("date") or c.get("date"),
                         legal_status=st,
-                        confidence=conf,
+                        procedural_status=prov_c.get("procedural_status", "unknown"),
+                        verification_status=prov_c.get("verification_status", "unverified_secondary"),
+                        evidence_tier=prov_c.get("evidence_tier", "secondary"),
+                        causal_role=prov_c.get("causal_role", "unknown"),
+                        scope=prov_c.get("scope"),
+                        mechanism=prov_c.get("mechanism") or c.get("mechanism"),
+                        act_target=prov_c.get("act_target") or c.get("act_target"),
+                        confidence=prov_c.get("confidence", "low"),
                     ))
 
                 if doc_outcome and len(ledger) < 8:
@@ -344,14 +564,26 @@ def run(ctx: RunContext) -> StageArtifact:
                     )
                     if not outcome_covered:
                         c_id = f"C{len(ledger) + 1:03d}"
+                        out_prov = _classify_llm_claim(
+                            {"claim": doc_outcome, "source": "Ideation Synthesis", "source_url": ""},
+                            market=market,
+                        )
                         ledger.append(EvidenceClaim(
                             claim_id=c_id,
                             claim=doc_outcome,
-                            source_url="https://www.law.go.kr" if market == "KR" else "https://www.reuters.com",
-                            source_type="gov",
-                            date="2026-11-13" if "11월 13일" in doc_outcome else "2026-01-01",
-                            legal_status="fact",
-                            confidence="high",
+                            source_url=out_prov.get("source_url") or "",
+                            source_name=out_prov.get("source_name") or "Ideation Synthesis",
+                            source_type=out_prov.get("source_type", "press"),
+                            doc_type=out_prov.get("doc_type", "commentary"),
+                            speaker=out_prov.get("speaker"),
+                            date=out_prov.get("date"),
+                            legal_status=out_prov.get("legal_status", "alleged"),
+                            procedural_status=out_prov.get("procedural_status", "unknown"),
+                            verification_status=out_prov.get("verification_status", "unverified_secondary"),
+                            evidence_tier=out_prov.get("evidence_tier", "secondary"),
+                            causal_role=out_prov.get("causal_role", "background_context"),
+                            scope=out_prov.get("scope"),
+                            confidence=out_prov.get("confidence", "low"),
                         ))
 
                 raw_timeline = parsed_json.get("timeline", [])
@@ -444,21 +676,24 @@ def run(ctx: RunContext) -> StageArtifact:
             competitor_vacuums=comp_vacs,
             status="APPROVED",
         )
+        from app.services.story_provenance_engine import summarize_evidence_provenance
+
         payload = story_research.model_dump()
+        payload["evidence_summary"] = summarize_evidence_provenance(payload.get("evidence_ledger", []))
     else:
         payload = {
             "task_id": ctx.run_id,
             "market": market,
             "topic": topic,
             "factsheet": {
-                "verified_anchor": "2026 Regulatory Inquest Findings",
-                "key_entities": ["Primary Corporation", "Regulatory Tribunal", "Consumer Stakeholders"],
-                "core_mechanism": f"Capital reallocation and jurisdictional arbitrage underlying {topic}.",
-                "ground_truth_metric": "Forensic audit record showing 65% cross-border capital extraction."
+                "verified_anchor": f"Baseline documentary inquiry into {topic}",
+                "key_entities": ["Primary Subject", "Oversight Authority", "Affected Stakeholders"],
+                "core_mechanism": f"Structural mechanics and institutional dynamics underlying {topic}.",
+                "ground_truth_metric": "Pending verified ledger compilation."
             },
             "competitor_vacuums": [
-                "Competitors only cover superficial headlines without technical contract mechanics.",
-                "Zero breakdown of the cross-border financial plumbing."
+                "Competitors only cover superficial headlines without technical mechanics.",
+                "Lack of source-verified causal breakdown."
             ],
             "status": "APPROVED"
         }

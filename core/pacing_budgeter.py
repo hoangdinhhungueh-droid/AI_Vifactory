@@ -124,22 +124,72 @@ class ProjectedFrameOutline:
         }
 
 
-def count_speech_units(sentence: str, market_code: str) -> int:
-    """Count the relevant linguistic speech units (syllables, morae, or words)."""
+def count_speech_units(sentence: str, market_code: str, expand_numbers: bool = True) -> int:
+    """Count the relevant linguistic speech units (syllables, morae, or words)
+    after normalizing digits/currencies/dates to their TTS spoken equivalents.
+    """
     if not sentence or not sentence.strip():
         return 0
 
     s = sentence.strip()
     canon_market = resolve_canonical_market(market_raw=market_code)
+    if expand_numbers:
+        from app.services.story_provenance_engine import expand_text_for_tts_timing
+
+        s = expand_text_for_tts_timing(s, market=canon_market)
 
     if canon_market in ("KR", "KO", "JA", "JP"):
-        # For CJK, count non-whitespace characters
-        clean_chars = re.sub(r"\s+", "", s)
+        # For CJK, strip whitespace and non-spoken punctuation so duration reflects real speech units
+        clean_chars = re.sub(r"[\s.,!?;:\"'()\[\]{}「」『』（）…—–\-。、．，！？/]+", "", s)
         return len(clean_chars)
     else:
-        # For Latin/space-delimited alphabets (EN, VN), count words
-        words = s.split()
+        # For Latin/space-delimited alphabets (EN, VN), count spoken words
+        words = [w for w in re.split(r"\s+", s) if re.search(r"[A-Za-z0-9À-ỹ]", w)]
         return len(words)
+
+
+def estimate_script_speech_duration(
+    text_or_lines: Any,
+    market: str,
+    docudrama_tempo: bool = True,
+    pause_per_line_sec: float = 0.15,
+) -> Dict[str, Any]:
+    """Compute true un-tautological TTS speech duration and unit count from spoken text.
+
+    Never clamps or overwrites total duration to target_run_s.
+    """
+    canon_market = resolve_canonical_market(market_raw=market)
+    rate = (
+        DOCUDRAMA_SPEECH_RATES.get(canon_market, DOCUDRAMA_WORDS_PER_SEC)
+        if docudrama_tempo
+        else CALIBRATED_SPEECH_RATES.get(canon_market, 3.2)
+    )
+    if isinstance(text_or_lines, str):
+        lines = [ln.strip() for ln in re.split(r"(?<=[.!?。？！])\s+|\n+", text_or_lines) if ln.strip()]
+    else:
+        lines = [str(ln).strip() for ln in (text_or_lines or []) if str(ln).strip()]
+
+    total_units = sum(count_speech_units(ln, canon_market, expand_numbers=True) for ln in lines)
+    if total_units == 0:
+        return {
+            "estimated_duration_sec": 0.0,
+            "spoken_units": 0,
+            "unit_type": "syllables_or_chars" if canon_market in ("KR", "KO", "JA", "JP") else "words",
+            "speech_rate_per_sec": rate,
+            "line_count": 0,
+            "market": canon_market,
+        }
+    speech_sec = total_units / rate
+    pause_sec = max(0, len(lines) - 1) * max(0.0, pause_per_line_sec)
+    total_sec = round(speech_sec + pause_sec, 2)
+    return {
+        "estimated_duration_sec": total_sec,
+        "spoken_units": total_units,
+        "unit_type": "syllables" if canon_market in ("KR", "KO") else ("chars" if canon_market in ("JA", "JP") else "words"),
+        "speech_rate_per_sec": rate,
+        "line_count": len(lines),
+        "market": canon_market,
+    }
 
 
 def estimate_calibrated_speech_duration(
