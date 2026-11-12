@@ -158,10 +158,31 @@ def is_reputable_press_domain(url: str, source_name: str = "") -> bool:
     s_low = (source_name or "").lower()
     wire_names = (
         "reuters", "associated press", "ap news", "bloomberg", "financial times", "wsj",
-        "wall street journal", "nikkei", "nhk", "kyodo", "yonhap", "연합뉴스", "kbs", "mbc", "sbs",
-        "한국경제", "매일경제", "조선일보", "중앙일보", "vnexpress", "tuổi trẻ", "ttxvn",
+        "wall street journal", "new york times", "washington post", "cnbc", "bbc", "guardian",
+        "npr", "pbs", "propublica", "economist",
+        "nikkei", "nhk", "kyodo", "asahi", "yomiuri", "mainichi", "jiji", "日本経済新聞", "朝日新聞", "読売新聞", "毎日新聞", "共同通信",
+        "yonhap", "연합뉴스", "kbs", "mbc", "sbs", "ytn", "jtbc", "경향신문", "한겨레", "조선비즈", "동아일보",
+        "한국경제", "매일경제", "조선일보", "중앙일보", "서울경제", "머니투데이", "이데일리", "뉴스1", "뉴시스", "한국일보", "세계일보", "국민일보",
+        "vnexpress", "tuổi trẻ", "tuoi tre", "thanh niên", "thanh nien", "ttxvn", "vietnamplus", "vtv", "vov", "lao động", "nhân dân",
     )
     return any(w in s_low for w in wire_names)
+
+
+def is_official_portal_name(source_name: str = "") -> bool:
+    """True when outlet/source name identifies an official government briefing portal, ministry, regulator, or court."""
+    s_low = (source_name or "").lower()
+    if not s_low:
+        return False
+    portal_markers = (
+        "대한민국 정책브리핑", "정책브리핑", "korea.kr", "국토교통부", "금융위원회", "금융감독원",
+        "법무부", "대검찰청", "대법원", "감사원", "공정거래위원회", "보건복지부", "기획재정부",
+        "u.s. department of justice", "department of justice", "justice department",
+        "centers for medicare", "federal register", "securities and exchange commission",
+        "federal trade commission", "inspector general", "supreme court",
+        "金融庁", "総務省", "法務省", "国土交通省", "経済産業省", "厚生労働省", "公正取引委員会", "最高裁判所",
+        "bộ tài chính", "bộ công an", "ngân hàng nhà nước", "thanh tra chính phủ", "cổng thông tin chính phủ",
+    )
+    return any(p in s_low for p in portal_markers)
 
 
 def extract_normalized_date(date_raw: Optional[str], claim_text: str = "") -> Optional[str]:
@@ -499,6 +520,83 @@ def summarize_evidence_provenance(claims: List[Dict[str, Any]]) -> Dict[str, Any
     }
 
 
+def _extract_corroboration_signals(claim_dict: Dict[str, Any]) -> Tuple[set[str], set[str]]:
+    """Extract normalized entities/metrics/dates and substantive content tokens for cross-outlet corroboration."""
+    txt = str(claim_dict.get("claim", ""))
+    elems = extract_claim_elements(txt)
+    strong_signals: set[str] = set()
+    for m in elems.get("metrics", []):
+        m_norm = re.sub(r"\s+", "", str(m).lower())
+        if len(m_norm) >= 2:
+            strong_signals.add(m_norm)
+    for d in elems.get("dates", []):
+        strong_signals.add(str(d).lower())
+    for ent in elems.get("entities", []):
+        if len(str(ent)) >= 2:
+            strong_signals.add(str(ent).lower())
+
+    # Substantive script/topic tokens (Hangul >= 2, Kana/Kanji >= 2, Latin >= 4)
+    tokens: set[str] = set()
+    for tok in re.findall(r"[가-힣]{2,}|[一-龯ァ-ヶ]{2,}|[A-Za-zÀ-ỹ]{4,}", txt.lower()):
+        tokens.add(tok)
+    return strong_signals, tokens
+
+
+def corroborate_evidence_ledger(
+    claims: List[Dict[str, Any]],
+    market: str = "EN",
+) -> List[Dict[str, Any]]:
+    """Promote unverified_secondary claims ONLY when >= 2 distinct reputable/official outlets
+    independently corroborate overlapping factual signals (never promoting RSS links to verified_primary).
+    """
+    _ = market
+    if not claims or len(claims) < 2:
+        return claims
+
+    enriched: List[Dict[str, Any]] = [dict(c) for c in claims]
+    signals: List[Tuple[str, bool, set[str], set[str]]] = []
+    for c in enriched:
+        src = str(c.get("source_name") or c.get("source") or "").strip().lower()
+        url = str(c.get("source_url") or "")
+        reputable = is_reputable_press_domain(url, src) or is_official_portal_name(src) or (
+            str(c.get("verification_status", "")).lower() in ("verified_primary", "corroborated_secondary")
+        )
+        strong, toks = _extract_corroboration_signals(c)
+        signals.append((src, reputable, strong, toks))
+
+    for i, c_i in enumerate(enriched):
+        vs_i = str(c_i.get("verification_status", "unverified_secondary")).lower()
+        if vs_i != "unverified_secondary":
+            continue
+        src_i, rep_i, strong_i, toks_i = signals[i]
+        if not rep_i or not src_i:
+            continue
+
+        corroborating_sources: set[str] = set()
+        for j, c_j in enumerate(enriched):
+            if i == j:
+                continue
+            vs_j = str(c_j.get("verification_status", "unverified_secondary")).lower()
+            if vs_j == "speculative":
+                continue
+            src_j, rep_j, strong_j, toks_j = signals[j]
+            if not rep_j or not src_j or src_j == src_i:
+                continue
+            shared_strong = strong_i & strong_j
+            shared_toks = toks_i & toks_j
+            if shared_strong or len(shared_toks) >= 2:
+                corroborating_sources.add(src_j)
+
+        if corroborating_sources:
+            c_i["verification_status"] = "corroborated_secondary"
+            c_i["evidence_tier"] = "secondary"
+            if str(c_i.get("confidence", "low")).lower() == "low":
+                c_i["confidence"] = "medium"
+            if is_official_portal_name(src_i) and str(c_i.get("source_type", "press")).lower() == "press":
+                c_i["source_type"] = "gov"
+    return enriched
+
+
 # ==============================================================================
 # 3. STRUCTURED LEGAL & PROVENANCE QUALIFIER ROUTER
 # ==============================================================================
@@ -542,7 +640,13 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "indictment": ["according to the indictment", "according to court filings", "indictment alleges", "prosecutors allege", "prosecutors say"],
         "criminal_complaint": ["according to the complaint", "complaint alleges", "lawsuit alleges", "plaintiff alleges"],
         "press_charge": ["according to press reports", "according to news reports", "press reports", "reportedly charged"],
-        "alleged_regulator": ["according to regulatory filings", "according to regulators", "regulators allege", "regulatory inquiry"],
+        "alleged_regulator": [
+            "according to regulatory filings", "according to official filings",
+            "according to court records", "according to regulators",
+            "according to the justice department", "according to federal",
+            "regulators allege", "regulatory inquiry", "justice department",
+            "department of justice", "federal allegations",
+        ],
         "alleged": ["according to press reports", "allegedly", "alleged", "claimed", "according to", "reportedly"],
         "settled": ["settled without admitting", "consent decree", "agreed to pay without admitting"],
         "unverified": ["unverified", "preliminary reports", "initial reports", "early reports", "yet to be verified"],
@@ -604,7 +708,7 @@ def expected_qualifier_bucket(
     if vs == "unverified_secondary":
         return "unverified"
     if ls == "alleged":
-        if st in ("regulator", "gov"):
+        if st in ("regulator", "gov", "court"):
             return "alleged_regulator"
         return "alleged"
     if vs == "speculative":
@@ -614,9 +718,9 @@ def expected_qualifier_bucket(
 
 _EN_COMMON_STARTERS = {
     "the", "a", "an", "in", "on", "at", "by", "as", "when", "while", "before", "after",
-    "for", "from", "with", "during", "following", "under", "until", "according", "placed",
+    "for", "from", "with", "during", "following", "under", "until", "according", "against", "placed",
     "tracing", "what", "however", "meanwhile", "subsequently", "internal", "public",
-    "official", "market", "records", "disclosures", "regulatory", "civil", "criminal",
+    "official", "federal", "overall", "nationwide", "market", "records", "disclosures", "regulatory", "civil", "criminal",
     "early", "later", "behind", "despite", "once", "though",
 }
 

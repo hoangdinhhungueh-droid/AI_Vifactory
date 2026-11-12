@@ -174,17 +174,9 @@ def run(ctx: RunContext) -> StageArtifact:
         d_min = float(preset_obj.duration_window_s.min) if (preset_obj and hasattr(preset_obj, "duration_window_s")) else 180.0
         d_max = float(preset_obj.duration_window_s.max) if (preset_obj and hasattr(preset_obj, "duration_window_s")) else 300.0
 
-        # Market-calibrated spoken-unit bounds corresponding to ~180s-300s docudrama pacing
-        if market == "KR":
-            u_min, u_max = 750, 1550
-        elif market == "JA":
-            u_min, u_max = 900, 1950
-        elif market == "VN":
-            u_min, u_max = 640, 1125
-        else:
-            wb = getattr(getattr(preset_obj, "narration", None), "word_budget", None)
-            u_min = int(getattr(wb, "min", 430) or 430)
-            u_max = int(getattr(wb, "max", 580) or 580)
+        # Market-calibrated spoken-unit bounds corresponding to ~180s-300s docudrama pacing (single truth from pacing_budgeter)
+        from core.pacing_budgeter import get_market_unit_bounds
+        u_min, u_max = get_market_unit_bounds(market, preset_obj=preset_obj)
 
         duration_ok = True
         drift_s = abs(self_est_dur - measured_dur)

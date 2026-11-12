@@ -192,6 +192,21 @@ def estimate_script_speech_duration(
     }
 
 
+def get_market_unit_bounds(market: str, preset_obj: Any = None) -> Tuple[int, int]:
+    """Return single canonical spoken-unit bounds (u_min, u_max) matching S03 & S04 gates."""
+    canon_market = resolve_canonical_market(market_raw=market)
+    if canon_market in ("KR", "KO"):
+        return 750, 1550
+    if canon_market in ("JA", "JP"):
+        return 900, 1950
+    if canon_market == "VN":
+        return 640, 1125
+    wb = getattr(getattr(preset_obj, "narration", None), "word_budget", None)
+    u_min = int(getattr(wb, "min", 460) or 460)
+    u_max = int(getattr(wb, "max", 540) or 540)
+    return u_min, u_max
+
+
 def estimate_calibrated_speech_duration(
     sentence: str,
     market: Optional[str] = None,

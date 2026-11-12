@@ -1090,3 +1090,103 @@ def test_live_regression_fixes_json_metric_trim_and_tts_rates():
     assert DOCUDRAMA_SPEECH_RATES["JA"] == 6.3
     assert DOCUDRAMA_SPEECH_RATES["VN"] == 3.75
     assert 2.0 <= DOCUDRAMA_SPEECH_RATES["EN"] <= 2.2
+
+
+def test_systemic_s01_money_null_court_bucket_corroboration_and_bounds():
+    """Verify null money_at_stake healing, court alleged routing, RSS multi-outlet corroboration, and shared bounds."""
+    from app.services.story_provenance_engine import (
+        classify_claim_provenance,
+        corroborate_evidence_ledger,
+        expected_qualifier_bucket,
+        route_legal_qualifier,
+    )
+    from core.pacing_budgeter import estimate_script_speech_duration, get_market_unit_bounds
+    from stages.s01_ideation import _coerce_money_at_stake_usd
+    from stages.s03_script import _build_grounded_story_beats
+
+    # 1. S01 null / string money_at_stake_usd coercion
+    assert _coerce_money_at_stake_usd(None, 5000000.0) == 5000000.0
+    assert _coerce_money_at_stake_usd("$22 trillion", 5000000.0) == 22e12
+    assert _coerce_money_at_stake_usd(0, 5000000.0) == 5000000.0
+
+    # 2. court + alleged never gets 'According to press reports,'
+    assert expected_qualifier_bucket("alleged", source_type="court", verification_status="verified_primary") == "alleged_regulator"
+    out_doj = route_legal_qualifier(
+        "Against that enforcement framework, the Justice Department announced allegations involving unsupported codes.",
+        legal_status="alleged",
+        source_type="court",
+        market="EN",
+        verification_status="verified_primary",
+    )
+    assert "press reports" not in out_doj.lower(), out_doj
+
+    # 3. Cross-outlet corroboration promotes multi-outlet reputable RSS claims without promoting RSS to verified_primary
+    multi_rss = [
+        classify_claim_provenance({
+            "claim_id": "C001",
+            "claim": "국토교통부가 2026년 11월 13일 최소보장제 시행을 공식 발표했다.",
+            "source": "대한민국 정책브리핑",
+            "source_url": "https://news.google.com/rss/articles/111",
+        }, market="KR"),
+        classify_claim_provenance({
+            "claim_id": "C002",
+            "claim": "연합뉴스 보도에 따르면 2026년 11월 13일 최소보장제 신청이 시작됐다.",
+            "source": "연합뉴스",
+            "source_url": "https://news.google.com/rss/articles/222",
+        }, market="KR"),
+        classify_claim_provenance({
+            "claim_id": "C003",
+            "claim": "익명 커뮤니티에서 완전히 별개의 미확인 추측이 제기됐다.",
+            "source": "무명 블로그",
+            "source_url": "https://news.google.com/rss/articles/333",
+        }, market="KR"),
+    ]
+    corr = corroborate_evidence_ledger(multi_rss, market="KR")
+    assert corr[0]["verification_status"] == "corroborated_secondary"
+    assert corr[1]["verification_status"] == "corroborated_secondary"
+    assert corr[2]["verification_status"] == "unverified_secondary"
+    assert all(c["verification_status"] != "verified_primary" for c in corr)
+
+    # Single-outlet or zero-overlap claims stay unverified_secondary (preserving S04 unverified gate)
+    single_only = [
+        classify_claim_provenance({
+            "claim_id": "S001",
+            "claim": "연합뉴스는 단독 500억원 규모 의혹을 전했다.",
+            "source": "연합뉴스",
+            "source_url": "https://news.google.com/rss/articles/444",
+        }, market="KR"),
+    ]
+    assert corroborate_evidence_ledger(single_only, market="KR")[0]["verification_status"] == "unverified_secondary"
+
+    # 4. Shared bounds & fallback Beat 1 <= 24s + total <= d_max guard
+    assert get_market_unit_bounds("KR") == (750, 1550)
+    assert get_market_unit_bounds("JA") == (900, 1950)
+    assert get_market_unit_bounds("VN") == (640, 1125)
+    assert get_market_unit_bounds("EN") == (460, 540)
+
+    long_kr_claims = [
+        {
+            "claim_id": f"C{i:03d}",
+            "claim": f"2026년 11월 {10+i}일 국토교통부와 관련 기관이 총 {i*12}조원 규모의 전세보증금 최소보장제 지원 대상 심사 및 회수 절차를 진행하고 있다는 공식 발표가 나왔다.",
+            "verification_status": "corroborated_secondary",
+            "source_type": "press",
+            "legal_status": "alleged",
+            "causal_role": "primary_catalyst" if i == 1 else "transmission_mechanism",
+        }
+        for i in range(1, 15)
+    ]
+    beats_fb = _build_grounded_story_beats(
+        topic="전세사기 피해자 최소보장제",
+        evidence_ledger=long_kr_claims,
+        evidence_map={c["claim_id"]: c for c in long_kr_claims},
+        market="KR",
+        d_min=180.0,
+        d_max=300.0,
+        u_min=750,
+        u_max=1550,
+    )
+    b1_sec = estimate_script_speech_duration([ln.text for ln in beats_fb[0][2]], market="KR", docudrama_tempo=True)["estimated_duration_sec"]
+    tot_info = estimate_script_speech_duration([ln.text for _, _, lns in beats_fb for ln in lns], market="KR", docudrama_tempo=True)
+    assert b1_sec <= 24.0, f"Fallback Beat 1 {b1_sec}s > 24.0s"
+    assert tot_info["estimated_duration_sec"] <= 300.0, tot_info
+    assert tot_info["spoken_units"] <= 1550, tot_info

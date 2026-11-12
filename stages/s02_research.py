@@ -645,6 +645,16 @@ def run(ctx: RunContext) -> StageArtifact:
             else:
                 ledger, timeline = _build_generic_evidence_ledger(topic, s1_art.payload)
 
+        if ledger:
+            from app.services.story_provenance_engine import corroborate_evidence_ledger
+
+            corr_dicts = corroborate_evidence_ledger([c.model_dump() for c in ledger], market=market)
+            for idx_c, c_dict in enumerate(corr_dicts):
+                ledger[idx_c].verification_status = c_dict.get("verification_status", ledger[idx_c].verification_status)
+                ledger[idx_c].evidence_tier = c_dict.get("evidence_tier", ledger[idx_c].evidence_tier)
+                ledger[idx_c].confidence = c_dict.get("confidence", ledger[idx_c].confidence)
+                ledger[idx_c].source_type = c_dict.get("source_type", ledger[idx_c].source_type)
+
         # Build dynamic factsheet and competitor vacuums anchored in S1 payload
         s1_scheme = s1_art.payload.get("scheme_mechanism_summary") or f"Systemic mechanisms and operational dependencies underlying {topic}."
         central_q = s1_art.payload.get("central_question") or f"Core investigative paradox regarding {topic}."

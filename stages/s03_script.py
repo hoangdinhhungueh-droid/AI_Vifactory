@@ -681,6 +681,10 @@ def _build_grounded_story_beats(
     evidence_map: Dict[str, Any],
     market: str = "EN",
     central_question: str = "",
+    d_min: float = 180.0,
+    d_max: float = 300.0,
+    u_min: Optional[int] = None,
+    u_max: Optional[int] = None,
 ) -> List[Tuple[str, float, List[Any]]]:
     """Generate a generic, provenance-prioritized 5-beat forensic docudrama script
     grounded strictly in `evidence_ledger` with zero topic-specific hardcoding.
@@ -806,16 +810,39 @@ def _build_grounded_story_beats(
             ))
         raw_beats.append((beat_id, dur_s, beat_lines))
 
-    # Closed-loop TTS duration calibration: ensure B2-B5 expand cleanly above 180s floor on any market/ledger size
-    from core.pacing_budgeter import estimate_script_speech_duration
+    # Closed-loop TTS duration calibration: ensure B1 <= 24s AND total fits strictly inside [d_min..d_max] & [u_min..u_max]
+    from core.pacing_budgeter import estimate_script_speech_duration, get_market_unit_bounds
+
+    if u_min is None or u_max is None:
+        eff_u_min, eff_u_max = get_market_unit_bounds(m)
+    else:
+        eff_u_min, eff_u_max = int(u_min), int(u_max)
+
+    # 1. Trim Beat 1 hook lines if they exceed 24.0s (S04 rejects Beat 1 > 25.0s)
+    from app.services.story_provenance_engine import extract_claim_elements as _b1_extract
+
+    b1_texts = [ln.text for ln in raw_beats[0][2]]
+    b1_dur = float(estimate_script_speech_duration(b1_texts, market=m, docudrama_tempo=True)["estimated_duration_sec"])
+    if b1_dur > 24.0:
+        for ln_b1 in raw_beats[0][2]:
+            elems_b1 = _b1_extract(ln_b1.text)
+            trimmed_b1 = _trim_clause_smart(ln_b1.text, elems_b1, market=m, hook_mode=True)
+            ln_b1.text = trimmed_b1 if trimmed_b1.endswith((".", "!", "?", "。")) else f"{trimmed_b1}."
+        b1_dur = float(
+            estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
+        )
+        if b1_dur > 24.0 and len(raw_beats[0][2]) > 2:
+            raw_beats[0][2].pop()
 
     all_line_texts = [ln.text for _, _, lns in raw_beats for ln in lns]
-    measured_s = float(estimate_script_speech_duration(all_line_texts, market=m, docudrama_tempo=True)["estimated_duration_sec"])
+    timing_now = estimate_script_speech_duration(all_line_texts, market=m, docudrama_tempo=True)
+    measured_s = float(timing_now["estimated_duration_sec"])
+    measured_units = int(timing_now["spoken_units"])
     expand_beats = [2, 3, 1, 4]  # B3_scheme, B4_crack, B2_setup, B5_aftermath (never bloat B1_hook)
     expand_roles = {1: "setup", 2: "mechanism", 3: "crack", 4: "aftermath"}
     expand_pools = {1: b2_source, 2: b3_source, 3: b4_source, 4: b5_source}
     extra_guard = 0
-    while measured_s < 222.0 and extra_guard < 26 and all_claims:
+    while (measured_s < max(195.0, d_min + 15.0) or measured_units < eff_u_min) and measured_s < (d_max - 20.0) and measured_units < (eff_u_max - 30) and extra_guard < 26 and all_claims:
         b_idx = expand_beats[extra_guard % len(expand_beats)]
         beat_id_e, _, beat_lines_e = raw_beats[b_idx]
         c_obj = _pick_claim(expand_pools[b_idx])
@@ -837,8 +864,24 @@ def _build_grounded_story_beats(
             visual_hook=vh_e,
         ))
         all_line_texts.append(txt_e)
-        measured_s = float(estimate_script_speech_duration(all_line_texts, market=m, docudrama_tempo=True)["estimated_duration_sec"])
+        timing_now = estimate_script_speech_duration(all_line_texts, market=m, docudrama_tempo=True)
+        measured_s = float(timing_now["estimated_duration_sec"])
+        measured_units = int(timing_now["spoken_units"])
         extra_guard += 1
+
+    # 2. Trim upper excess if initial fallback lines already overshoot d_max or u_max
+    trim_guard = 0
+    while (measured_s > (d_max - 10.0) or measured_units > eff_u_max) and trim_guard < 24:
+        trimmable = [b_i for b_i in (2, 3, 1, 4) if len(raw_beats[b_i][2]) > 2]
+        if not trimmable:
+            break
+        b_i = max(trimmable, key=lambda idx_b: len(raw_beats[idx_b][2]))
+        raw_beats[b_i][2].pop()
+        all_line_texts = [ln.text for _, _, lns in raw_beats for ln in lns]
+        timing_now = estimate_script_speech_duration(all_line_texts, market=m, docudrama_tempo=True)
+        measured_s = float(timing_now["estimated_duration_sec"])
+        measured_units = int(timing_now["spoken_units"])
+        trim_guard += 1
 
     return raw_beats
 
@@ -924,6 +967,7 @@ def run(ctx: RunContext) -> StageArtifact:
         from core.pacing_budgeter import (
             count_speech_units,
             estimate_script_speech_duration,
+            get_market_unit_bounds,
         )
 
         # Pull S01 ideation context cleanly if available so central_question is never unbound
@@ -952,12 +996,14 @@ def run(ctx: RunContext) -> StageArtifact:
         d_min = 180.0
         d_max = 300.0
         target_run_s = 240.0
-        if hasattr(ctx, "preset") and ctx.preset:
-            dw = getattr(ctx.preset, "duration_window_s", None)
+        preset_obj = getattr(ctx, "preset", None)
+        if preset_obj:
+            dw = getattr(preset_obj, "duration_window_s", None)
             if dw:
                 d_min = float(getattr(dw, "min", 180.0) or 180.0)
                 d_max = float(getattr(dw, "max", 300.0) or 300.0)
                 target_run_s = float(getattr(dw, "target", 240.0) or 240.0)
+        u_min, u_max = get_market_unit_bounds(market, preset_obj=preset_obj)
 
         raw_beats: List[Tuple[str, float, List[Any]]] = []
         if not ctx.dry_run and system_prompt:
@@ -978,7 +1024,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR KOREAN (KR) MARKET:\n"
                         "1. Write 100% natural, authoritative investigative Korean narration (Hangul). English/foreign prose is STRICTLY FORBIDDEN.\n"
-                        "2. Target duration: 180-300s (~900-1250 spoken Korean Hangul+numeral syllables across 19-24 lines).\n"
+                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} spoken Hangul+numeral syllables across 19-24 lines). Beat 1 (B1_hook) MUST be ultra-punchy: 3 concise lines totaling <= 105 syllables (<= 21s).\n"
                         "3. LEGAL & PROVENANCE ATTRIBUTION:\n"
                         "   - Cite valid claim_ids on every factual line.\n"
                         "   - Distinguish 'court_judgment' (법원 확정 판결에 따르면) vs 'indictment' (검찰 공소장에 따르면) vs 'criminal_complaint' (고발장·소장에 따르면) vs 'press' reports (보도에 따르면).\n"
@@ -989,7 +1035,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR JAPANESE (JA) MARKET:\n"
                         "1. Write 100% natural, authoritative Japanese investigative narration. No Hangul or foreign sentences.\n"
-                        "2. Target duration: 180-300s (~1100-1700 spoken Japanese characters across 19-24 lines).\n"
+                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} spoken Japanese characters across 19-24 lines). Beat 1 (B1_hook) MUST be 3 concise lines totaling <= 125 chars (<= 21s).\n"
                         "3. Distinguish judgment (判決によれば) vs indictment (起訴状によれば) vs complaint (訴状によれば) vs unverified press reports (未確認の報道によれば).\n"
                         "4. Beat 1 must anchor strictly in verified_primary or corroborated_secondary catalyst facts.\n\n"
                     )
@@ -997,14 +1043,14 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR VIETNAMESE (VN) MARKET:\n"
                         "1. Write 100% natural, authoritative Vietnamese narration with full Vietnamese diacritics. No English/CJK prose.\n"
-                        "2. Target duration: 180-300s (~680-950 Vietnamese words across 19-24 lines).\n"
+                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} Vietnamese words across 19-24 lines). Beat 1 (B1_hook) MUST be 3 concise lines totaling <= 75 words (<= 21s).\n"
                         "3. Distinguish judgment (Theo phán quyết của tòa án) vs indictment (Theo cáo trạng) vs complaint (Theo đơn kiện) vs unverified press reports (Theo thông tin bước đầu chưa kiểm chứng).\n\n"
                     )
                 else:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR ENGLISH (EN) MARKET:\n"
-                        "1. Write 100% crisp investigative English narration (440-560 words across 19-24 lines, target 180-300s).\n"
-                        "2. Distinguish court_judgment vs indictment vs criminal_complaint vs settled without admitting wrongdoing vs unverified preliminary reports.\n"
+                        f"1. STRICT LENGTH & PACING: Write 100% crisp investigative English narration strictly totaling {u_min}-{u_max} words across 20-26 lines (180-300s). Beat 1 (B1_hook) MUST be 3 tight, punchy lines totaling <= 44 words (<= 22s).\n"
+                        "2. Distinguish court_judgment vs indictment vs criminal_complaint vs settled without admitting wrongdoing vs unverified preliminary reports. Attribute DOJ/regulatory allegations directly to the agency/court, NOT to 'press reports'.\n"
                         "3. Beat 1 MUST anchor in verified_primary or corroborated_secondary catalyst facts.\n\n"
                     )
 
@@ -1052,6 +1098,13 @@ def run(ctx: RunContext) -> StageArtifact:
                                 text = _normalize_spoken_korean_numbers(text)
 
                             c_objs = [evidence_map[cid] for cid in c_ids if cid in evidence_map]
+                            if len(c_objs) > 1:
+                                _ver_rank = {"verified_primary": 0, "corroborated_secondary": 1, "unverified_secondary": 2, "speculative": 3}
+                                _src_rank = {"court": 0, "regulator": 1, "gov": 2, "press": 3}
+                                c_objs.sort(key=lambda co: (
+                                    _ver_rank.get(str(co.get("verification_status") if isinstance(co, dict) else getattr(co, "verification_status", "")), 2),
+                                    _src_rank.get(str(co.get("source_type") if isinstance(co, dict) else getattr(co, "source_type", "")), 3),
+                                ))
                             primary_c = c_objs[0] if c_objs else None
                             if primary_c is not None:
                                 get_a = (lambda k, d="": primary_c.get(k, d)) if isinstance(primary_c, dict) else (lambda k, d="": getattr(primary_c, k, d))
@@ -1093,6 +1146,11 @@ def run(ctx: RunContext) -> StageArtifact:
                     cand_full = " ".join(cand_lines)
                     cand_timing = estimate_script_speech_duration(cand_lines, market=market, docudrama_tempo=True)
                     cand_dur = float(cand_timing["estimated_duration_sec"])
+                    cand_units = int(cand_timing["spoken_units"])
+                    b1_lines = [ln.text for ln in cand_beats[0][2]] if cand_beats else []
+                    b1_dur = float(
+                        estimate_script_speech_duration(b1_lines, market=market, docudrama_tempo=True)["estimated_duration_sec"]
+                    ) if b1_lines else 0.0
                     lang_ok, lang_issues = check_target_market_language_purity(
                         cand_full, market=market, grounded_proper_nouns=grounded_nouns
                     )
@@ -1112,8 +1170,10 @@ def run(ctx: RunContext) -> StageArtifact:
                                     ok_q, q_msg = _match_qual(ln.text, c_dict, market=market)
                                     if not ok_q:
                                         qual_issues.append(f"{ln.line_id}:{cid}:{q_msg}")
-                    b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and not align_res.get("beat1_unverified_elevation"))
-                    dur_ok = d_min <= cand_dur <= d_max
+                    b1_dur_ok = b1_dur <= 24.0
+                    b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and b1_dur_ok and not align_res.get("beat1_unverified_elevation"))
+                    units_ok = u_min <= cand_units <= u_max
+                    dur_ok = (d_min <= cand_dur <= d_max) and units_ok
                     passed = (
                         len(cand_beats) == 5
                         and b1_ok
@@ -1123,7 +1183,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         and not qual_issues
                         and align_res.get("passed", False)
                     )
-                    return passed, cand_timing, cand_dur, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res
+                    return passed, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res
 
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
@@ -1135,16 +1195,23 @@ def run(ctx: RunContext) -> StageArtifact:
                     fallback="claude-v4.1-flash",
                 )
                 llm_beats = _parse_and_build_llm_beats(raw_response)
-                passed_pre, cand_timing, cand_dur, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res = _eval_llm_beats(llm_beats)
+                passed_pre, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res = _eval_llm_beats(llm_beats)
 
                 if not passed_pre:
                     repair_notes: List[str] = []
-                    if not dur_ok:
-                        repair_notes.append(f"Duration {cand_dur:.1f}s ({cand_timing['spoken_units']} {cand_timing['unit_type']}) MUST fit strictly within {d_min:.0f}-{d_max:.0f}s.")
+                    if not dur_ok or not units_ok:
+                        repair_notes.append(
+                            f"Length {cand_timing['spoken_units']} {cand_timing['unit_type']} ({cand_dur:.1f}s) is OUT OF BOUNDS: "
+                            f"MUST be strictly {u_min}-{u_max} {cand_timing['unit_type']} AND {d_min:.0f}-{d_max:.0f}s."
+                        )
+                    if not b1_dur_ok:
+                        repair_notes.append(
+                            f"Beat 1 (B1_hook) duration is {b1_dur:.1f}s (> 24.0s limit). Shorten Beat 1 lines so total Beat 1 speech is 15-21s."
+                        )
                     if len(llm_beats) != 5:
                         repair_notes.append(f"Must have exactly 5 beats (got {len(llm_beats)}).")
-                    if not b1_ok:
-                        repair_notes.append("Beat 1 must have >=3 lines anchored strictly in verified_primary/corroborated_secondary claims.")
+                    if not b1_ok and (b1_dur_ok or align_res.get("beat1_unverified_elevation") or not llm_beats or len(llm_beats[0][2]) < 3):
+                        repair_notes.append("Beat 1 must have >=3 concise lines anchored strictly in verified_primary/corroborated_secondary claims.")
                     if not lang_ok:
                         repair_notes.append(f"Language purity issues: {lang_issues[:3]}")
                     if not ent_ok:
@@ -1176,10 +1243,10 @@ def run(ctx: RunContext) -> StageArtifact:
                         fallback="claude-v4.1-flash",
                     )
                     llm_beats_retry = _parse_and_build_llm_beats(raw_retry)
-                    passed_retry, cand_timing_r, cand_dur_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r = _eval_llm_beats(llm_beats_retry)
+                    passed_retry, cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r = _eval_llm_beats(llm_beats_retry)
                     if passed_retry:
                         llm_beats = llm_beats_retry
-                        cand_timing, cand_dur = cand_timing_r, cand_dur_r
+                        cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok = cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r
                         lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res = (
                             lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r
                         )
@@ -1189,12 +1256,13 @@ def run(ctx: RunContext) -> StageArtifact:
                     raw_beats = llm_beats
                     logger.info(
                         f"[S03_SCRIPT] Live LLM accepted: {len(llm_beats)} beats, {cand_timing['spoken_units']} "
-                        f"{cand_timing['unit_type']}, est={cand_dur:.1f}s, cov={align_res['coverage_ratio']:.0%}."
+                        f"{cand_timing['unit_type']}, est={cand_dur:.1f}s (B1={b1_dur:.1f}s), cov={align_res['coverage_ratio']:.0%}."
                     )
                 else:
                     logger.warning(
                         f"[S03_SCRIPT] LLM output rejected by S03 quality pre-check after retry "
-                        f"(beats={len(llm_beats)}, dur={cand_dur:.1f}s, lang_ok={lang_ok}:{lang_issues}, "
+                        f"(beats={len(llm_beats)}, dur={cand_dur:.1f}s, units={cand_timing['spoken_units']}[{u_min}-{u_max}], "
+                        f"b1_dur={b1_dur:.1f}s, lang_ok={lang_ok}:{lang_issues}, "
                         f"ent_ok={ent_ok}:{ent_issues}, qual={qual_issues[:2]}, cov_ok={align_res.get('coverage_ok')}, b1_ok={b1_ok}). "
                         "Falling back to provenance-grounded builder."
                     )
@@ -1209,6 +1277,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 evidence_map=evidence_map,
                 market=market,
                 central_question=c_quest,
+                d_min=d_min,
+                d_max=d_max,
+                u_min=u_min,
+                u_max=u_max,
             )
 
         story_beats: List[StoryScriptBeat] = []

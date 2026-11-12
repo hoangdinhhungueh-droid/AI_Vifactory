@@ -22,6 +22,31 @@ logger = logging.getLogger(__name__)
 STAGE: StageID = StageID.S1_IDEATION
 
 
+def _coerce_money_at_stake_usd(raw_val: object, fallback_val: float) -> float:
+    """Safely coerce LLM-emitted money_at_stake_usd (None, 'null', '$172.7M', <=0) into a valid float."""
+    if isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool):
+        val = float(raw_val)
+        return val if val > 0 else float(fallback_val)
+    if isinstance(raw_val, str):
+        txt = raw_val.strip().lower().replace(",", "")
+        mult = 1.0
+        if "trillion" in txt or "조" in txt:
+            mult = 1e12
+        elif "billion" in txt or "억" in txt:
+            mult = 1e9 if "billion" in txt else 1e8
+        elif "million" in txt or "만" in txt:
+            mult = 1e6 if "million" in txt else 1e4
+        m = re.search(r"([0-9]+(?:\.[0-9]+)?)", txt)
+        if m:
+            try:
+                val = float(m.group(1)) * mult
+                if val > 0:
+                    return val
+            except ValueError as _val_err:
+                logger.debug(f"[S01_IDEATION] Could not parse money_at_stake_usd from {raw_val!r}: {_val_err}")
+    return float(fallback_val)
+
+
 @pipeline_stage(
     id="s01_ideation",
     order=1,
@@ -425,8 +450,12 @@ def run(ctx: RunContext) -> StageArtifact:
                         parsed_json["scheme_mechanism_summary"] = generic.scheme_mechanism_summary
                     if not parsed_json.get("documented_outcome"):
                         parsed_json["documented_outcome"] = generic.documented_outcome
-                    if not parsed_json.get("money_at_stake_usd") or parsed_json.get("money_at_stake_usd") <= 0:
-                        parsed_json["money_at_stake_usd"] = generic.money_at_stake_usd
+                parsed_json["money_at_stake_usd"] = _coerce_money_at_stake_usd(
+                    parsed_json.get("money_at_stake_usd"),
+                    generic.money_at_stake_usd,
+                )
+                if parsed_json.get("status") not in ("ok", "rejected"):
+                    parsed_json["status"] = "ok"
 
                 # 2. Source seeds unconditional sanitization guard
                 raw_seeds = parsed_json.get("source_seeds")
