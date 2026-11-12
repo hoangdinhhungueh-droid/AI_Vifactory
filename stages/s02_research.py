@@ -62,6 +62,7 @@ def run(ctx: RunContext) -> StageArtifact:
         def _build_generic_evidence_ledger(topic_name: str, s1_payload: Dict[str, Any]) -> Tuple[List[EvidenceClaim], List[TimelineEvent]]:
             from app.services.story_provenance_engine import (
                 classify_claim_provenance,
+                credibility_tier_rank,
                 verification_priority_rank,
             )
 
@@ -71,6 +72,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 ]
                 classified_list.sort(
                     key=lambda x: (
+                        credibility_tier_rank(x.get("credibility_tier", "unconfirmed_claim")),
                         verification_priority_rank(x.get("verification_status", "unverified_secondary")),
                         0 if x.get("causal_role") == "primary_catalyst" else (1 if x.get("causal_role") == "transmission_mechanism" else 2),
                     )
@@ -96,6 +98,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         legal_status=prov_c.get("legal_status", "alleged"),
                         procedural_status=prov_c.get("procedural_status", "unknown"),
                         verification_status=prov_c.get("verification_status", "unverified_secondary"),
+                        credibility_tier=prov_c.get("credibility_tier", "unconfirmed_claim"),
                         evidence_tier=prov_c.get("evidence_tier", "secondary"),
                         causal_role=prov_c.get("causal_role", "unknown"),
                         scope=prov_c.get("scope"),
@@ -141,8 +144,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"공식 기업 공시 및 정부 인허가 등록 문서를 통해 {topic_name} 관련 기본 운영 구조와 사업 모델이 확인됨.",
                         source_url="https://www.korea.kr",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-02-15",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="primary_catalyst",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -150,8 +158,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"이해관계자 간 주요 상업 계약 및 거래 구조의 실행 내역 확인: {s1_scheme}",
                         source_url="https://www.ftc.go.kr",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-03-01",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -159,8 +172,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"{topic_name}과 직접 연계된 시장 유동성 및 재무적 변동성 급증이 확인됨.",
                         source_url="https://www.yna.co.kr",
                         source_type="press",
+                        doc_type="news_article",
+                        speaker="journalist",
                         date="2024-05-20",
                         legal_status="fact",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -168,8 +186,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"감독 당국 및 금융 조사 기관이 {topic_name}에 대한 구조적 건전성 및 공시 적정성 정밀 조사에 착수함.",
                         source_url="https://www.fss.or.kr",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-08-10",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -177,8 +200,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"{topic_name} 관련 계약 불이행 및 내부 통제 결함 의혹에 대한 민원과 피해 진정이 제기됨.",
                         source_url="https://www.scourt.go.kr",
                         source_type="court",
+                        doc_type="criminal_complaint",
+                        speaker="complainant",
                         date="2024-11-15",
                         legal_status="alleged",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -186,8 +214,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"사법 당국이 {topic_name} 관련 주요 책임자 및 유관 조직에 대해 특정 혐의로 정식 수사 및 기소 절차를 진행함.",
                         source_url="https://www.scourt.go.kr",
                         source_type="court",
+                        doc_type="indictment",
+                        speaker="prosecutor",
                         date="2025-01-20",
                         legal_status="charged",
+                        verification_status="verified_primary",
+                        credibility_tier="press_allegation",
+                        causal_role="transmission_mechanism",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -195,8 +228,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"제도적 감독 조치 및 공식 법적 대응 결과 확정: {s1_outcome}",
                         source_url="https://www.korea.kr",
                         source_type="court",
+                        doc_type="court_judgment",
+                        speaker="court",
                         date="2025-06-30",
                         legal_status="settled",
+                        verification_status="verified_primary",
+                        credibility_tier="verified_fact",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                 ]
@@ -216,8 +254,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"公的企業開示および行政許認可資料により、{topic_name}の基本運営構造と事業体制が確認された。",
                         source_url="https://www.fsa.go.jp",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-02-15",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="primary_catalyst",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -225,8 +268,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"{antagonist_name}に関わる主要契約および取引構造の履行履歴が確認された：{s1_scheme}",
                         source_url="https://www.fsa.go.jp",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-03-01",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -234,8 +282,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"{topic_name}に直結する市場流動性の急変と財務的変動が確認された。",
                         source_url="https://www.nikkei.com",
                         source_type="press",
+                        doc_type="news_article",
+                        speaker="journalist",
                         date="2024-05-20",
                         legal_status="fact",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -243,8 +296,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"監督当局および検査機関が、{topic_name}の健全性と開示の適正性について公式調査を開始した。",
                         source_url="https://www.fsa.go.jp",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-08-10",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -252,8 +310,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"{topic_name}における契約不履行および内部統制上の問題に関する申立て・疑惑が提起された。",
                         source_url="https://www.courts.go.jp",
                         source_type="court",
+                        doc_type="criminal_complaint",
+                        speaker="complainant",
                         date="2024-11-15",
                         legal_status="alleged",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -261,8 +324,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"司法当局が{topic_name}の主要関係者に対し、関連法令違反の容疑で捜査および起訴手続きを進めた。",
                         source_url="https://www.courts.go.jp",
                         source_type="court",
+                        doc_type="indictment",
+                        speaker="prosecutor",
                         date="2025-01-20",
                         legal_status="charged",
+                        verification_status="verified_primary",
+                        credibility_tier="press_allegation",
+                        causal_role="transmission_mechanism",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -270,15 +338,20 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"監督上の行政措置および公式な法的対応の結果が確認された：{s1_outcome}",
                         source_url="https://www.courts.go.jp",
                         source_type="court",
+                        doc_type="court_judgment",
+                        speaker="court",
                         date="2025-06-30",
                         legal_status="settled",
+                        verification_status="verified_primary",
+                        credibility_tier="verified_fact",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                 ]
                 events = [
                     TimelineEvent(date="2024-02-15", event=f"公的登録資料を通じて{topic_name}の構造的運用が開始。", claim_ids=["C001"]),
                     TimelineEvent(date="2024-03-01", event=f"{antagonist_name}に関わる主要商業契約および金融スキームを締結。", claim_ids=["C002"]),
-                    TimelineEvent(date="2024-05-20", event=f"市場流動性の縮小とともに{topic_name}の財務圧迫が顕在化。", claim_ids=["C003"]),
+                    TimelineEvent(date="2024-05-20", event=f"市場流동性の縮小とともに{topic_name}の財務圧迫が顕在化。", claim_ids=["C003"]),
                     TimelineEvent(date="2024-08-10", event=f"監督当局が{topic_name}に関する会計・構造リスク調査に着手。", claim_ids=["C004"]),
                     TimelineEvent(date="2024-11-15", event="契約不履行と利害衝突をめぐる申立ておよび法的紛争が拡大。", claim_ids=["C005"]),
                     TimelineEvent(date="2025-01-20", event=f"司法機関が{topic_name}関連容疑で正式な捜査・起訴へ移行。", claim_ids=["C006"]),
@@ -291,8 +364,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Hồ sơ công bố doanh nghiệp và giấy phép cơ quan quản lý xác nhận cấu trúc vận hành nền tảng của {topic_name}.",
                         source_url="https://chinhphu.vn",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-02-15",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="primary_catalyst",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -300,8 +378,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Lịch sử giao dịch và hợp đồng thương mại trọng yếu do {antagonist_name} thực hiện đã được ghi nhận: {s1_scheme}",
                         source_url="https://chinhphu.vn",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-03-01",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -309,8 +392,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Thanh khoản thị trường và biến động tài chính gắn trực tiếp với {topic_name} ghi nhận mức gia tăng bất thường.",
                         source_url="https://vnexpress.net",
                         source_type="press",
+                        doc_type="news_article",
+                        speaker="journalist",
                         date="2024-05-20",
                         legal_status="fact",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -318,8 +406,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Cơ quan thanh tra và giám sát tài chính đã mở cuộc kiểm tra chính thức đối với tính minh bạch công bố thông tin của {topic_name}.",
                         source_url="https://chinhphu.vn",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-08-10",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -327,8 +420,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Đơn khiếu nại và nghi vấn vi phạm nghĩa vụ hợp đồng cùng lỗ hổng kiểm soát nội bộ liên quan đến {topic_name} đã được tiếp nhận.",
                         source_url="https://toaan.gov.vn",
                         source_type="court",
+                        doc_type="criminal_complaint",
+                        speaker="complainant",
                         date="2024-11-15",
                         legal_status="alleged",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -336,8 +434,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Cơ quan tiến hành tố tụng đã khởi tố và truy tố các cá nhân, tổ chức liên quan đến {topic_name} về các sai phạm tài chính.",
                         source_url="https://toaan.gov.vn",
                         source_type="court",
+                        doc_type="indictment",
+                        speaker="prosecutor",
                         date="2025-01-20",
                         legal_status="charged",
+                        verification_status="verified_primary",
+                        credibility_tier="press_allegation",
+                        causal_role="transmission_mechanism",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -345,8 +448,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Biện pháp chế tài của cơ quan quản lý và kết quả xử lý pháp lý chính thức được xác nhận: {s1_outcome}",
                         source_url="https://toaan.gov.vn",
                         source_type="court",
+                        doc_type="court_judgment",
+                        speaker="court",
                         date="2025-06-30",
                         legal_status="settled",
+                        verification_status="verified_primary",
+                        credibility_tier="verified_fact",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                 ]
@@ -366,8 +474,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Official corporate filings and regulatory registration disclosures established foundational business operations for {topic_name}.",
                         source_url="https://www.sec.gov",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-02-15",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="primary_catalyst",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -375,8 +488,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Commercial agreements and operational risk mechanisms were executed by {antagonist_name}: {s1_scheme}",
                         source_url="https://www.sec.gov",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-03-01",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -384,8 +502,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Capital markets recorded intense valuation volatility and financial reallocation directly tied to {topic_name}.",
                         source_url="https://www.reuters.com",
                         source_type="press",
+                        doc_type="news_article",
+                        speaker="journalist",
                         date="2024-05-20",
                         legal_status="fact",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -393,8 +516,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Institutional supervisory agencies and examiners commenced formal reviews into contractual dependencies and market disclosure integrity for {topic_name}.",
                         source_url="https://www.sec.gov",
                         source_type="regulator",
+                        doc_type="regulatory_notice",
+                        speaker="regulator",
                         date="2024-08-10",
                         legal_status="fact",
+                        verification_status="verified_primary",
+                        credibility_tier="official_regulation",
+                        causal_role="transmission_mechanism",
                         confidence="high",
                     ),
                     EvidenceClaim(
@@ -402,8 +530,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Civil litigation and regulatory complaints alleged material governance failures and breach of internal compliance controls surrounding {topic_name}.",
                         source_url="https://www.courtlistener.com",
                         source_type="court",
+                        doc_type="criminal_complaint",
+                        speaker="complainant",
                         date="2024-11-15",
                         legal_status="alleged",
+                        verification_status="corroborated_secondary",
+                        credibility_tier="press_allegation",
+                        causal_role="background_context",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -411,8 +544,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Formal judicial petitions charged counterparties and responsible entities with systematic statutory and contractual breaches related to {topic_name}.",
                         source_url="https://www.courtlistener.com",
                         source_type="court",
+                        doc_type="indictment",
+                        speaker="prosecutor",
                         date="2025-01-20",
                         legal_status="charged",
+                        verification_status="verified_primary",
+                        credibility_tier="press_allegation",
+                        causal_role="transmission_mechanism",
                         confidence="medium",
                     ),
                     EvidenceClaim(
@@ -420,8 +558,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         claim=f"Documented enforcement outcomes and market restructuring materialized: {s1_outcome}",
                         source_url="https://www.justice.gov",
                         source_type="court",
+                        doc_type="court_judgment",
+                        speaker="court",
                         date="2025-06-30",
                         legal_status="settled",
+                        verification_status="verified_primary",
+                        credibility_tier="verified_fact",
+                        causal_role="background_context",
                         confidence="high",
                     ),
                 ]
@@ -525,9 +668,11 @@ def run(ctx: RunContext) -> StageArtifact:
                         and str(gc.get("source", "")).lower() in str(prov_c.get("source_name", "")).lower()
                         for gc in g_claims_raw
                     ):
-                        if prov_c.get("verification_status") == "verified_primary":
-                            prov_c["verification_status"] = "corroborated_secondary"
-                            prov_c["evidence_tier"] = "secondary"
+                        prov_c["verification_status"] = "unverified_secondary"
+                        prov_c["evidence_tier"] = "secondary"
+                        prov_c["credibility_tier"] = "unconfirmed_claim"
+                        if prov_c.get("causal_role") == "primary_catalyst":
+                            prov_c["causal_role"] = "background_context"
 
                     # Preserve explicit valid legal_status only when provenance supports it
                     llm_ls = str(c.get("legal_status", "")).lower()
@@ -549,6 +694,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         legal_status=st,
                         procedural_status=prov_c.get("procedural_status", "unknown"),
                         verification_status=prov_c.get("verification_status", "unverified_secondary"),
+                        credibility_tier=prov_c.get("credibility_tier", "unconfirmed_claim"),
                         evidence_tier=prov_c.get("evidence_tier", "secondary"),
                         causal_role=prov_c.get("causal_role", "unknown"),
                         scope=prov_c.get("scope"),
@@ -580,6 +726,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             legal_status=out_prov.get("legal_status", "alleged"),
                             procedural_status=out_prov.get("procedural_status", "unknown"),
                             verification_status=out_prov.get("verification_status", "unverified_secondary"),
+                            credibility_tier=out_prov.get("credibility_tier", "unconfirmed_claim"),
                             evidence_tier=out_prov.get("evidence_tier", "secondary"),
                             causal_role=out_prov.get("causal_role", "background_context"),
                             scope=out_prov.get("scope"),
@@ -625,6 +772,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             legal_status=prov_g.get("legal_status", "alleged"),
                             procedural_status=prov_g.get("procedural_status", "unknown"),
                             verification_status=prov_g.get("verification_status", "unverified_secondary"),
+                            credibility_tier=prov_g.get("credibility_tier", "unconfirmed_claim"),
                             evidence_tier=prov_g.get("evidence_tier", "secondary"),
                             causal_role=prov_g.get("causal_role", "unknown"),
                             scope=prov_g.get("scope"),
@@ -646,14 +794,27 @@ def run(ctx: RunContext) -> StageArtifact:
                 ledger, timeline = _build_generic_evidence_ledger(topic, s1_art.payload)
 
         if ledger:
-            from app.services.story_provenance_engine import corroborate_evidence_ledger
+            from app.services.story_provenance_engine import (
+                corroborate_evidence_ledger,
+                credibility_tier_rank,
+                verification_priority_rank,
+            )
 
             corr_dicts = corroborate_evidence_ledger([c.model_dump() for c in ledger], market=market)
             for idx_c, c_dict in enumerate(corr_dicts):
                 ledger[idx_c].verification_status = c_dict.get("verification_status", ledger[idx_c].verification_status)
+                ledger[idx_c].credibility_tier = c_dict.get("credibility_tier", ledger[idx_c].credibility_tier)
                 ledger[idx_c].evidence_tier = c_dict.get("evidence_tier", ledger[idx_c].evidence_tier)
                 ledger[idx_c].confidence = c_dict.get("confidence", ledger[idx_c].confidence)
                 ledger[idx_c].source_type = c_dict.get("source_type", ledger[idx_c].source_type)
+
+            ledger.sort(
+                key=lambda x: (
+                    credibility_tier_rank(getattr(x, "credibility_tier", "unconfirmed_claim")),
+                    verification_priority_rank(getattr(x, "verification_status", "unverified_secondary")),
+                    0 if getattr(x, "causal_role", "") == "primary_catalyst" else (1 if getattr(x, "causal_role", "") == "transmission_mechanism" else 2),
+                )
+            )
 
         # Build dynamic factsheet and competitor vacuums anchored in S1 payload
         s1_scheme = s1_art.payload.get("scheme_mechanism_summary") or f"Systemic mechanisms and operational dependencies underlying {topic}."

@@ -369,7 +369,14 @@ def run(ctx: RunContext) -> StageArtifact:
 
         def _term_present(term: str) -> bool:
             t_norm = re.sub(r"[,\s]+", "", term)
-            return bool(term in all_text_lower or (len(t_norm) >= 2 and t_norm in all_text_nospace))
+            if term in all_text_lower or (len(t_norm) >= 2 and t_norm in all_text_nospace):
+                return True
+            t_words = term.split()
+            if len(t_words) >= 3:
+                head_phrase = " ".join(t_words[:2])
+                if len(head_phrase) >= 8 and head_phrase in all_text_lower:
+                    return True
+            return False
 
         def _metric_present(m_tok: str) -> bool:
             if _term_present(m_tok):
@@ -560,6 +567,8 @@ def run(ctx: RunContext) -> StageArtifact:
         # ------------------------------------------------------------------
         # Active LLM Critic Evaluation via model_gateway (Live Runs Only)
         # ------------------------------------------------------------------
+        det_duration_ok = bool(duration_ok)
+        det_claims_ok = bool(claims_ok)
         llm_verdict = None
         llm_score = None
         llm_feedback: List[str] = []
@@ -575,20 +584,26 @@ def run(ctx: RunContext) -> StageArtifact:
                     script_summary = {
                         "market": market,
                         "topic": topic,
-                        "total_words": total_words,
                         "measured_spoken_units": measured_units,
                         "measured_unit_type": unit_type,
+                        "deterministic_unit_bounds": [u_min, u_max],
                         "self_est_duration_s": self_est_dur,
                         "measured_speech_duration_s": measured_dur,
+                        "deterministic_duration_window_s": [d_min, d_max],
+                        "deterministic_duration_ok": det_duration_ok,
                         "statement_claim_audit": claim_audit,
                         "beats": beats,
                     }
+                    if market not in ("KR", "JA"):
+                        script_summary["total_words"] = total_words
                     user_prompt = (
                         f"Target Market: {market}\n"
                         f"Script Under Audit:\n{json.dumps(script_summary, indent=2, ensure_ascii=False)}\n\n"
                         f"Evidence Ledger:\n{json.dumps(evidence_list, indent=2, ensure_ascii=False)}\n\n"
-                        "Audit the script against all evaluation gates (duration/TTS sync, provenance verification, "
-                        "legal/procedural qualifier specificity, script/institutional purity, causal polarity & claim coverage).\n"
+                        "Audit the script against all evaluation gates (provenance verification, "
+                        "legal/procedural qualifier specificity, script/institutional purity, causal polarity & claim coverage). "
+                        f"NOTE: Deterministic TTS timing already verified duration={measured_dur:.2f}s ({measured_units} {unit_type}) "
+                        f"and deterministic_duration_ok={det_duration_ok}; do NOT invent a word-count mismatch on KR/JA unspaced text.\n"
                         "Output ONLY a single valid JSON block starting with { and ending with }."
                     )
                     raw_resp = gateway.call_llm(
@@ -619,7 +634,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
                     if isinstance(parsed_critic.get("gates"), dict):
                         g_map = parsed_critic["gates"]
-                        if g_map.get("duration_estimate_in_window") is False:
+                        if not det_duration_ok and g_map.get("duration_estimate_in_window") is False:
                             duration_ok = False
                         if g_map.get("every_factual_line_has_claim_id") is False:
                             claims_ok = False
@@ -638,11 +653,21 @@ def run(ctx: RunContext) -> StageArtifact:
                         if g_map.get("claim_coverage_gate") is False or g_map.get("statement_claim_alignment_ok") is False:
                             claim_coverage_ok = False
 
+                    kept_llm_viols = []
                     for v in parsed_critic.get("violations", []):
                         if isinstance(v, dict) and v.get("gate"):
+                            if det_duration_ok and v.get("gate") == "duration_estimate_in_window":
+                                continue
                             violations.append(v)
+                            kept_llm_viols.append(v)
                     for feed in parsed_critic.get("feedback", []):
                         llm_feedback.append(str(feed))
+                    if llm_verdict in ("fail", "revise") and not kept_llm_viols:
+                        violations.append({
+                            "line_id": None,
+                            "gate": "claim_coverage_gate",
+                            "detail": f"LLM supervisor verdict '{llm_verdict}': {'; '.join(llm_feedback) if llm_feedback else 'Revision required by supervisor'}",
+                        })
             except Exception as _llm_err:
                 logger.warning(f"[S04_CRITIC] Live LLM critic evaluation unavailable: {_llm_err}")
                 llm_verdict = None

@@ -1226,3 +1226,263 @@ def test_systemic_s01_money_null_court_bucket_corroboration_and_bounds():
     assert line_matches_expected_qualifier(mixed_txt, gov_c, market="KR", peer_claims=[gov_c, press_c])[0] is True
     assert line_matches_expected_qualifier(mixed_txt, press_c, market="KR", peer_claims=[gov_c, press_c])[0] is True
     assert line_matches_expected_qualifier("규제 당국에 따르면 3분의 1 회수가 보장됩니다.", press_c, market="KR")[0] is False
+
+
+def test_adversarial_credibility_tier_anti_laundering_and_corroboration():
+    """Verify that unverified/speculative claims cannot launder credibility_tier or causal_role."""
+    from app.schemas.story_contracts import EvidenceClaim
+    from app.services.story_provenance_engine import (
+        corroborate_evidence_ledger,
+        expected_qualifier_bucket,
+        line_matches_expected_qualifier,
+        route_legal_qualifier,
+    )
+
+    # 1. Unverified secondary claim attempting to claim verified_fact + primary_catalyst
+    c1 = EvidenceClaim(
+        claim_id="C001",
+        claim="Blog rumor asserts company executives absconded with funds.",
+        source_url="https://unknown-blog.com/post",
+        source_type="press",
+        verification_status="unverified_secondary",
+        credibility_tier="verified_fact",
+        causal_role="primary_catalyst",
+        confidence="low",
+    )
+    assert c1.credibility_tier == "unconfirmed_claim"
+    assert c1.causal_role == "background_context"
+
+    # 2. Speculative claim attempting to claim official_regulation
+    c2 = EvidenceClaim(
+        claim_id="C002",
+        claim="Analyst predicts new bill will pass next year.",
+        source_url="https://market-commentary.com/note",
+        source_type="press",
+        legal_status="alleged",
+        verification_status="speculative",
+        credibility_tier="official_regulation",
+        causal_role="primary_catalyst",
+    )
+    assert c2.credibility_tier == "unconfirmed_claim"
+    assert c2.causal_role == "background_context"
+
+    # 3. Indictment charge attempting to claim verified_fact
+    c3 = EvidenceClaim(
+        claim_id="C003",
+        claim="Prosecution indictment charges executive with fraud.",
+        source_url="https://court.gov/filing",
+        source_type="court",
+        doc_type="indictment",
+        legal_status="charged",
+        verification_status="verified_primary",
+        credibility_tier="verified_fact",
+    )
+    assert c3.credibility_tier == "press_allegation"
+
+    # 4. Multi-outlet corroboration elevates credibility_tier to press_allegation
+    unv_list = [
+        {
+            "claim_id": "U001",
+            "claim": "Yonhap News reports 400 billion KRW penalty investigation.",
+            "source_name": "연합뉴스",
+            "source_url": "https://www.yna.co.kr/article/1",
+            "source_type": "press",
+            "legal_status": "alleged",
+            "verification_status": "unverified_secondary",
+            "credibility_tier": "unconfirmed_claim",
+        },
+        {
+            "claim_id": "U002",
+            "claim": "Maeil Business confirms 400 billion KRW penalty investigation.",
+            "source_name": "매일경제",
+            "source_url": "https://www.mk.co.kr/article/2",
+            "source_type": "press",
+            "legal_status": "alleged",
+            "verification_status": "unverified_secondary",
+            "credibility_tier": "unconfirmed_claim",
+        },
+    ]
+    corroborated = corroborate_evidence_ledger(unv_list, market="KR")
+    assert corroborated[0]["verification_status"] == "corroborated_secondary"
+    assert corroborated[0]["credibility_tier"] == "press_allegation"
+
+    # 5. Court record bucket routing for alleged docket filings
+    assert expected_qualifier_bucket("alleged", source_type="court", doc_type="court_record", verification_status="corroborated_secondary") == "court_record"
+    assert expected_qualifier_bucket("alleged", source_type="court", doc_type="court_docket", verification_status="corroborated_secondary") == "court_record"
+
+    # 6. KR & JA press_charge legitimate phrasing is not misflagged as authority laundering
+    kr_pc_line = route_legal_qualifier(
+        "피고인들의 기소 내용이 공개됐습니다.",
+        legal_status="charged",
+        source_type="press",
+        market="KR",
+        doc_type="news_article",
+        verification_status="corroborated_secondary",
+    )
+    kr_claim = {
+        "claim_id": "C010",
+        "legal_status": "charged",
+        "source_type": "press",
+        "doc_type": "news_article",
+        "verification_status": "corroborated_secondary",
+        "claim": "피고인들의 기소 내용이 공개됐습니다.",
+    }
+    ok_kr_pc, msg_kr = line_matches_expected_qualifier(kr_pc_line, kr_claim, market="KR")
+    assert ok_kr_pc is True, f"False positive on KR press_charge: {msg_kr}"
+
+    ja_pc_line = route_legal_qualifier(
+        "被告らの起訴内容が公表された。",
+        legal_status="charged",
+        source_type="press",
+        market="JA",
+        doc_type="news_article",
+        verification_status="corroborated_secondary",
+    )
+    ja_claim = {
+        "claim_id": "C011",
+        "legal_status": "charged",
+        "source_type": "press",
+        "doc_type": "news_article",
+        "verification_status": "corroborated_secondary",
+        "claim": "被告らの起訴内容が公表された。",
+    }
+    ok_ja_pc, msg_ja = line_matches_expected_qualifier(ja_pc_line, ja_claim, market="JA")
+    assert ok_ja_pc is True, f"False positive on JA press_charge: {msg_ja}"
+
+    # But bare prosecutor authority on press claim MUST still be rejected as laundering
+    ok_kr_launder, _ = line_matches_expected_qualifier("검찰 공소장에 따르면 자금이 유출됐습니다.", kr_claim, market="KR")
+    assert ok_kr_launder is False
+    ok_ja_launder, _ = line_matches_expected_qualifier("検察の起訴状によれば資金が流出した。", ja_claim, market="JA")
+    assert ok_ja_launder is False
+
+
+def test_s03_beat1_catalyst_monopoly_and_s04_speculative_elevation(tmp_path):
+    """Verify Beat 1 accesses distinct verified claims and S04 rejects speculative opening hook elevation."""
+    from stages.s03_script import _build_grounded_story_beats
+    from stages.s04_critic_script import run as s04_run
+    from app.schemas.story_contracts import EvidenceClaim, StoryScriptBeat, StorySceneLine
+    from core.contracts.stages import StageArtifact, Provenance
+    from core.paths import RunPaths
+    from core.run_manifest import RunManifest
+    from core.config import RunContext, load_profile
+    from app.services.preset_loader import load_preset
+    from core.gates import emit_artifact, GateError
+
+    # Ledger with 1 catalyst and 4 other verified claims
+    claims_ledger = [
+        EvidenceClaim(
+            claim_id="C001",
+            claim="Federal Trade Commission formally fined Alpha Semiconductor $300M on May 12, 2025 for market manipulation.",
+            source_url="https://www.ftc.go.kr",
+            source_type="regulator",
+            doc_type="regulatory_notice",
+            legal_status="fact",
+            verification_status="verified_primary",
+            credibility_tier="official_regulation",
+            causal_role="primary_catalyst",
+            confidence="high",
+        ),
+        EvidenceClaim(
+            claim_id="C002",
+            claim="Audit Board findings documented 84 undocumented supply subcontract agreements diverting production subsidies.",
+            source_url="https://www.ftc.go.kr",
+            source_type="regulator",
+            doc_type="audit_report",
+            legal_status="fact",
+            verification_status="verified_primary",
+            credibility_tier="verified_fact",
+            causal_role="transmission_mechanism",
+            confidence="high",
+        ),
+        EvidenceClaim(
+            claim_id="C003",
+            claim="National judicial dockets recorded 14 related civil complaints alleging corporate asset diversion.",
+            source_url="https://www.scourt.go.kr",
+            source_type="court",
+            doc_type="court_record",
+            legal_status="fact",
+            verification_status="verified_primary",
+            credibility_tier="verified_fact",
+            causal_role="background_context",
+            confidence="high",
+        ),
+        EvidenceClaim(
+            claim_id="C004",
+            claim="Financial supervisory records revealed $120M in irregular credit guarantees extended to affiliate entities.",
+            source_url="https://www.fss.or.kr",
+            source_type="regulator",
+            doc_type="regulatory_notice",
+            legal_status="fact",
+            verification_status="verified_primary",
+            credibility_tier="official_regulation",
+            causal_role="transmission_mechanism",
+            confidence="high",
+        ),
+    ]
+    claims_map = {c.claim_id: c for c in claims_ledger}
+
+    beats = _build_grounded_story_beats("Alpha Semiconductor Subsidy Probe", claims_ledger, claims_map, market="EN")
+    b1_lines = beats[0][2]
+    assert len(b1_lines) >= 3
+    # Check that Beat 1 slots do not repeat C001 on both Line 1 and Line 3
+    b1_cids = [ln.claim_ids[0] for ln in b1_lines if ln.claim_ids]
+    assert len(set(b1_cids)) >= 2, f"Beat 1 suffered catalyst monopoly: {b1_cids}"
+
+    # S04 must reject speculative opening hook elevation
+    spec_claim = EvidenceClaim(
+        claim_id="S001",
+        claim="Analyst forum speculation predicted that regional subsidy allocations would face 50% default risk.",
+        source_url="https://market-forum.com/speculation",
+        source_type="press",
+        doc_type="commentary",
+        legal_status="alleged",
+        verification_status="speculative",
+        credibility_tier="unconfirmed_claim",
+        causal_role="background_context",
+        confidence="low",
+    )
+    mixed_ledger = [spec_claim] + claims_ledger
+    paths = RunPaths(run_id="TEST_SPEC_ELEV", repo_root=tmp_path)
+    paths.ensure_dirs()
+    # Script starts with speculative hook in line 1
+    bad_b1 = StoryScriptBeat(
+        beat_id="B1_hook",
+        target_duration_s=19.2,
+        lines=[
+            StorySceneLine(line_id="B1_L01", text="According to unverified preliminary reports, analyst forum speculation predicted that regional subsidy allocations would face 50% default risk.", claim_ids=["S001"], visual_hook="stamp"),
+            StorySceneLine(line_id="B1_L02", text="According to regulatory filings, Federal Trade Commission formally fined Alpha Semiconductor $300M on May 12, 2025 for market manipulation.", claim_ids=["C001"], visual_hook="magnifier"),
+            StorySceneLine(line_id="B1_L03", text="Why did early oversight fail to halt the documented allocation?", claim_ids=["C002"], visual_hook="ruler_measure"),
+        ],
+    )
+    other_beats = [
+        StoryScriptBeat(beat_id=b[0], target_duration_s=b[1], lines=[ln.model_dump() for ln in b[2]])
+        for b in beats[1:]
+    ]
+    emit_artifact(
+        StageArtifact(
+            schema_version="1.0.0",
+            run_id="TEST_SPEC_ELEV",
+            stage="s03_script",
+            status="ok",
+            payload={
+                "topic": "Alpha Semiconductor Subsidy Probe",
+                "market": "EN",
+                "beats": [bad_b1.model_dump()] + other_beats,
+                "evidence_ledger": [c.model_dump() for c in mixed_ledger],
+            },
+            provenance=Provenance(generator="test"),
+        ),
+        paths,
+    )
+    ctx = RunContext(
+        run_id="TEST_SPEC_ELEV",
+        preset=load_preset("story_forensic"),
+        paths=paths,
+        manifest=RunManifest.create_new("TEST_SPEC_ELEV", profile="e2e_min"),
+        config=load_profile("e2e_min"),
+        dry_run=True,
+    )
+    with pytest.raises(GateError) as exc_info:
+        s04_run(ctx)
+    assert exc_info.value.details["gates"]["claim_coverage_gate"] is False
+

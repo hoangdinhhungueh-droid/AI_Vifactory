@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -87,6 +88,7 @@ def _apply_legal_qualifier(
     speaker: Optional[str] = None,
     procedural_status: str = "unknown",
     verification_status: str = "corroborated_secondary",
+    slot_idx: int = 0,
 ) -> str:
     """Apply context-aware procedural & verification qualifier based on full evidence provenance."""
     from app.services.story_provenance_engine import route_legal_qualifier
@@ -118,6 +120,7 @@ def _apply_legal_qualifier(
         speaker=speaker,
         procedural_status=procedural_status,
         verification_status=verification_status,
+        slot_idx=slot_idx,
     )
 
 
@@ -337,6 +340,9 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         "million", "billion", "trillion", "thousand", "percent", "%", "m", "b", "usd", "krw", "jpy", "vnd"
     ):
         word_cap += 1
+    # Avoid severing multi-word capitalized entities at word boundary
+    while word_cap < len(words) and word_cap < 18 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
+        word_cap += 1
     trimmed = " ".join(words[:word_cap]).rstrip(",;:")
     if trimmed.count("(") > trimmed.count(")"):
         trimmed = trimmed[: trimmed.rfind("(")].strip(" ,;:")
@@ -411,8 +417,11 @@ def _format_claim_fact(c: Any, market: str, topic: str = "", hook_mode: bool = F
 
 
 def _select_ordered_claims(evidence_ledger: List[Any]) -> Dict[str, List[Any]]:
-    """Group evidence claims cleanly by verification priority and causal hierarchy."""
-    from app.services.story_provenance_engine import verification_priority_rank
+    """Group evidence claims cleanly by credibility hierarchy, verification priority, and causal role."""
+    from app.services.story_provenance_engine import (
+        credibility_tier_rank,
+        verification_priority_rank,
+    )
 
     def _get(obj: Any, attr: str, default: Any = "") -> Any:
         return obj.get(attr, default) if isinstance(obj, dict) else getattr(obj, attr, default)
@@ -420,18 +429,24 @@ def _select_ordered_claims(evidence_ledger: List[Any]) -> Dict[str, List[Any]]:
     sorted_claims = sorted(
         list(evidence_ledger or []),
         key=lambda c: (
-            verification_priority_rank(str(_get(c, "verification_status", "unverified_secondary"))),
+            credibility_tier_rank(str(_get(c, "credibility_tier", ""))) if _get(c, "credibility_tier")
+            else verification_priority_rank(str(_get(c, "verification_status", "unverified_secondary"))),
+            0 if str(_get(c, "legal_status", "")).lower() == "charged" else 1,
             0 if _get(c, "causal_role", "") == "primary_catalyst"
             else (1 if _get(c, "causal_role", "") == "transmission_mechanism" else 2),
         ),
     )
     verified_pool = [
         c for c in sorted_claims
-        if str(_get(c, "verification_status", "unverified_secondary")) in ("verified_primary", "corroborated_secondary")
+        if str(_get(c, "credibility_tier", "")) in ("verified_fact", "official_regulation")
+        or (
+            str(_get(c, "verification_status", "unverified_secondary")) in ("verified_primary", "corroborated_secondary")
+            and str(_get(c, "credibility_tier", "")) != "unconfirmed_claim"
+        )
     ]
     unverified_pool = [
         c for c in sorted_claims
-        if str(_get(c, "verification_status", "unverified_secondary")) not in ("verified_primary", "corroborated_secondary")
+        if c not in verified_pool
     ]
     catalysts = [c for c in verified_pool if _get(c, "causal_role", "") == "primary_catalyst"]
     mechanisms = [c for c in verified_pool if _get(c, "causal_role", "") == "transmission_mechanism"]
@@ -492,38 +507,38 @@ def _render_claim_sentence(
             raw = f"{q_short} {fact}."
         elif role_slot == "setup":
             frames = [
-                f"초기 국면의 공식 보고서는 외형적 안정만 강조했고, 이면에서는 {fact} 상황이 누적됐습니다.",
-                f"시장 참여자들이 표면 지표에 집중하는 사이, 현장에서는 {fact} 흐름이 조용히 굳어졌죠.",
-                f"당시 감독 체계가 정상 작동을 자부할 무렵에도 {fact} 정황이 내부 문건 곳곳에 쌓이고 있었습니다.",
-                f"낙관론이 시장을 덮고 있던 시점에 실제 장부에는 {fact} 대목이 선명하게 찍혀 나왔습니다.",
-                f"외부에서는 관리 가능한 위험으로 평가했지만, 구조적 취약성은 이미 {fact} 지점에서 번졌습니다.",
+                f"초기 기록을 보면 {fact} 내용이 확인됩니다.",
+                f"{fact} 사실이 드러나며 초기 거래 구조의 출발점이 됐습니다.",
+                f"기초 자료를 살펴보면 {fact} 점이 적시돼 있습니다.",
+                f"{fact} 대목은 후속 사태를 부른 구조적 배경으로 꼽힙니다.",
+                f"관련 기록의 앞부분은 {fact} 사실을 전합니다.",
             ]
             raw = frames[v_idx]
         elif role_slot == "mechanism":
             frames = [
-                f"자금과 계약의 연결고리를 따라가면, {fact} 구조가 위험을 증폭시킨 핵심 통로로 드러납니다.",
-                f"단순 실수가 아닌 반복 설계였습니다. 바로 {fact} 장치가 손실 규모를 기하급수적으로 키웠죠.",
-                f"위험이 하위 당사자에게 전가되는 과정에는 {fact} 기제가 결정적 매개체 역할을 수행했습니다.",
-                f"제도적 공백을 파고든 전달 경로를 뜯어보면, {fact} 항목이 연쇄 충격을 촉발했습니다.",
-                f"실무 거래 내역을 교차 검증한 결과, {fact} 방식이 내부 견제 장치를 무력화한 점이 확인됩니다.",
+                f"구조와 경위를 따져보면 {fact} 점이 기록에 남았습니다.",
+                f"{fact} 정황은 자금 흐름과 제도적 허점을 구체적으로 보여줍니다.",
+                f"관련 문건은 {fact} 대목을 구체적으로 짚고 있습니다.",
+                f"{fact} 내역이 연속적으로 집행되며 재무적 위험을 키웠습니다.",
+                f"자료상의 흐름을 보면 {fact} 점이 핵심 연결고리로 꼽힙니다.",
             ]
             raw = frames[v_idx]
         elif role_slot == "crack":
             frames = [
-                f"임계점을 넘긴 균열이 터져 나오자, {fact} 정황이 공식 조사와 감사 기록에 올랐습니다.",
-                f"상환과 점검 압력이 한꺼번에 몰린 순간, {fact} 사실은 더 이상 은폐될 수 없었죠.",
-                f"유동성 완충 장치가 한계를 드러내면서 {fact} 대목이 핵심 수사 쟁점으로 비화했습니다.",
-                f"내부 자료와 현장 실사가 맞물리자, {fact} 진상이 연쇄적으로 외부에 공개됐습니다.",
-                f"부실 징후가 수면 위로 급격히 번지며 {fact} 기록이 결정적 근거로 제출됐습니다.",
+                f"후속 단계의 기록에는 {fact} 내용이 올라와 있습니다.",
+                f"{fact} 사실이 공표되면서 사안은 본격적인 수사와 감독 단계로 전환됐습니다.",
+                f"공개된 후속 문건에서도 {fact} 내용이 확인됩니다.",
+                f"{fact} 정황이 입증되며 기존의 설명은 설득력을 잃었습니다.",
+                f"관련 자료는 {fact} 점을 중대한 전환점으로 전합니다.",
             ]
             raw = frames[v_idx]
         else:
             frames = [
-                f"사후 수습 과정에서 남은 과제는 {fact} 사례처럼 사전 경보 기준을 엄격히 세우는 일입니다.",
-                f"피해 복구와 책임 규명은 이어졌지만, {fact} 쟁점은 유사 구조 전반에 짙은 경고를 남겼죠.",
-                f"결국 제도의 신뢰는 사후 처벌이 아니라 {fact} 위험을 조기에 차단하는 검증력에 달려 있습니다.",
-                f"앞으로의 정책 검증 기준은 분명합니다. {fact} 지점이 재발하지 않도록 공시와 책임을 묶어야 합니다.",
-                f"이 사건이 남긴 현대적 교훈은 {fact} 대목이 보여주듯, 감춰진 연쇄 부채의 조기 포착입니다.",
+                f"사후 정리 자료에는 {fact} 점이 남아 있습니다.",
+                f"{fact} 결과는 제도적 보완과 시장 전반에 중요한 교훈을 남겼습니다.",
+                f"마무리 단계의 기록 역시 {fact} 점을 전하고 있습니다.",
+                f"{fact} 사실은 향후 유사 피해를 막기 위한 기준선이 됐습니다.",
+                f"전체 기록을 종합하면 {fact} 대목이 핵심 결론으로 남습니다.",
             ]
             raw = frames[v_idx]
 
@@ -534,41 +549,41 @@ def _render_claim_sentence(
             raw = f"規模は{fact}に達した。"
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean) <= 16) else "なぜ止められたはずが放置されたか。"
-            raw = f"{q_short}{fact}。"
+            raw = f"{q_short} {fact}。"
         elif role_slot == "setup":
             frames = [
-                f"表面的な安定が語られた初期段階でも、現場の帳簿には{fact}という歪みが静かに蓄積していました。",
-                f"市場が短期的な好調さに目を奪われる裏側で、実務上は{fact}という前提がすでに進行中だったのです。",
-                f"監視体制の健全性が強調された時期でさえ、内部記録には{fact}を示す兆候が幾重にも残っていました。",
-                f"外向けの説明では管理可能とされたものの、実際の取引構造では{fact}という偏りが強まりました。",
-                f"制度の枠組みが問題視される以前から、関係者間では{fact}をめぐる負担が水面下で拡大しています。",
+                f"初期の記録では、{fact}という点が記されています。",
+                f"経緯の出発点として、資料は{fact}と伝えています。",
+                f"基礎資料の記述によれば、{fact}という経緯があります。",
+                f"発端部分の文書には、{fact}との内容が含まれています。",
+                f"初期段階の資料でも、{fact}という点が確認できます。",
             ]
             raw = frames[v_idx]
         elif role_slot == "mechanism":
             frames = [
-                f"資金と契約の連鎖を精査すると、{fact}という仕組みこそがリスクを増幅させた中核経路でした。",
-                f"偶発的な不手際ではありません。実務では{fact}という手法が繰り返され、損失の連鎖を生んだのです。",
-                f"下位当事者へ負担が転嫁される構造の中で、{fact}という条項が致命的な連動装置となりました。",
-                f"規制の隙間を突く運用実態をたどると、{fact}が内部統制を形骸化させた決定打として浮かびます。",
-                f"台帳と契約書を照合すれば明確です。{fact}の設計がリスクの早期遮断を阻み続けていました。",
+                f"構造や仕組みに関する記録では、{fact}と示されています。",
+                f"詳細な文書をたどると、{fact}という記述が続きます。",
+                f"関連資料の該当箇所では、{fact}との点が挙げられています。",
+                f"取引と制度の面からは、{fact}という実態が記されています。",
+                f"記録上の推移を見ると、{fact}という流れが確認できます。",
             ]
             raw = frames[v_idx]
         elif role_slot == "crack":
             frames = [
-                f"限界を超えた亀裂が露呈したことで、{fact}の経緯が公式な調査記録へと刻まれました。",
-                f"返済と監査の圧力が同時に集中した瞬間、{fact}という事実はもはや隠しきれなくなったのです。",
-                f"資金繰りの緩衝材が失われるとともに、{fact}が行政および司法の焦点へと急浮上しました。",
-                f"現場査察と内部資料の突き合わせにより、{fact}をめぐる構造破綻が一気に表面化しています。",
-                f"信用不安が連鎖的に広がる局面で、{fact}を示す一次記録が重大な証拠として提出されました。",
+                f"その後の局面の資料には、{fact}という内容が記されています。",
+                f"変化が表面化した段階では、{fact}との点が見られます。",
+                f"後続の公表記録においても、{fact}という事実が挙げられています。",
+                f"推移を追った文書では、{fact}という展開が示されています。",
+                f"一連の記録の後半には、{fact}との記述があります。",
             ]
             raw = frames[v_idx]
         else:
             frames = [
-                f"事後対応を経て残された課題は、{fact}のように検証可能な早期警戒網をどう築くかという点です。",
-                f"救済と責任追及が続く一方、{fact}の事例は同種の市場構造に対する厳しい警鐘となりました。",
-                f"制度の信頼を支えるのは事後処分だけでなく、{fact}の予兆を捉える継続的な監査能力にあります。",
-                f"再発防止の要点は明白であり、{fact}のような死角を情報開示でふさぐ体制整備が欠かせません。",
-                f"一連の破綻が突きつける教訓は、{fact}が示す見えにくい連鎖リスクを平時から直視することです。",
+                f"事後の整理資料では、{fact}という点が残されています。",
+                f"その後の経過をまとめた記録は、{fact}と伝えています。",
+                f"一連の末尾にあたる文書でも、{fact}との内容が続きます。",
+                f"総括部分の記述においては、{fact}という点が挙げられます。",
+                f"記録全体を通じて、{fact}という状況が記されています。",
             ]
             raw = frames[v_idx]
 
@@ -582,38 +597,38 @@ def _render_claim_sentence(
             raw = f"{q_short} {fact}."
         elif role_slot == "setup":
             frames = [
-                f"Ở giai đoạn khởi phát, báo cáo bề nổi giữ vẻ ổn định trong khi {fact} âm thầm tích tụ.",
-                f"Khi dư luận còn nhìn vào tăng trưởng bề mặt, thực tế sổ sách đã cho thấy {fact} kéo dài.",
-                f"Dưới lớp vỏ bọc vận hành bình thường, các dữ liệu nội bộ từng ghi nhận {fact} từ sớm.",
-                f"Trái với nhận định lạc quan ban đầu, điểm nghẽn đã hình thành quanh {fact} suốt nhiều quý.",
-                f"Trước lúc khủng hoảng bùng phát công khai, hồ sơ giao dịch phản ánh rõ tình trạng {fact}.",
+                f"Trong giai đoạn đầu của hồ sơ, việc {fact} đã được tài liệu ghi nhận rõ.",
+                f"{fact}, đặt nền tảng ban đầu cho toàn bộ chuỗi giao dịch.",
+                f"Các dữ liệu khởi đầu cho thấy {fact}, mở ra diễn biến phức tạp tiếp theo.",
+                f"{fact}, tạo tiền đề cho các diễn biến tiếp theo.",
+                f"Những ghi chép mở đầu xác nhận việc {fact} trước khi sự việc mở rộng.",
             ]
             raw = frames[v_idx]
         elif role_slot == "mechanism":
             frames = [
-                f"Khi bóc tách dòng tiền và hợp đồng, mắt xích {fact} chính là cơ chế khuếch đại rủi ro.",
-                f"Đây không phải sai sót đơn lẻ mà là cách vận hành lặp lại gắn với {fact} qua từng chu kỳ.",
-                f"Áp lực thanh khoản bị đẩy dồn sang bên yếu thế thông qua cơ chế {fact} thiếu kiểm soát.",
-                f"Lần theo dấu vết hồ sơ, chính lỗ hổng quanh {fact} đã vô hiệu hóa hàng rào giám sát.",
-                f"Đối chiếu các chứng từ liên quan cho thấy {fact} biến rủi ro cục bộ thành hiệu ứng dây chuyền.",
+                f"Khi xem xét chi tiết cơ chế, việc {fact} được tài liệu ghi nhận cụ thể.",
+                f"{fact}, làm gia tăng đáng kể áp lực tài chính trong giai đoạn này.",
+                f"Phân tích chuỗi dòng tiền cho thấy {fact}, tạo nút thắt lớn cho thanh khoản.",
+                f"{fact}, tạo ra kẽ hở lớn trong quản lý và giám sát.",
+                f"Theo trình tự dữ liệu công bố, {fact} là mắt xích trực tiếp dẫn đến sai phạm.",
             ]
             raw = frames[v_idx]
         elif role_slot == "crack":
             frames = [
-                f"Khi áp lực đáo hạn vượt ngưỡng chịu đựng, {fact} lập tức trở thành tâm điểm thanh tra.",
-                f"Đến thời điểm vỡ trận, mọi che chắn bị gạt bỏ và {fact} hiện rõ trên tài liệu chính thức.",
-                f"Đà sụp đổ dây chuyền bùng lên ngay khi {fact} bị phanh phui qua kiểm tra thực địa.",
-                f"Sự kết hợp giữa đơn tố cáo và kiểm toán độc lập đã đưa {fact} ra ánh sáng công luận.",
-                f"Ngay khi dòng tiền mất cân đối, hồ sơ ghi nhận {fact} được chuyển tới cơ quan thụ lý.",
+                f"Ở bước ngoặt điều tra tiếp theo, hồ sơ xác định việc {fact} có dấu hiệu bất thường.",
+                f"{fact}, dẫn tới các biện pháp xử lý và can thiệp từ cơ quan chức năng.",
+                f"Các ghi nhận công khai sau đó cho thấy {fact}, buộc các bên phải vào cuộc.",
+                f"{fact}, phơi bày toàn bộ sai phạm trong quản trị.",
+                f"Hồ sơ điều tra giai đoạn này ghi nhận {fact} như một chứng cứ then chốt.",
             ]
             raw = frames[v_idx]
         else:
             frames = [
-                f"Bài học dài hạn sau biến cố nằm ở việc siết chuẩn giám sát ngay từ dấu hiệu {fact}.",
-                f"Quá trình xử lý hậu quả vẫn tiếp diễn, nhưng {fact} đã đặt ra chuẩn mực minh bạch mới.",
-                f"Niềm tin thị trường không chỉ dựa vào xử phạt mà phải chặn sớm những mô hình kiểu {fact}.",
-                f"Yêu cầu cải cách trọng tâm hiện nay là buộc trách nhiệm giải trình gắn liền với {fact}.",
-                f"Dư âm lớn nhất của vụ việc xoay quanh {fact}, lời nhắc về kỷ luật kiểm soát đòn bẩy.",
+                f"Trong phần tổng kết hồ sơ, tài liệu nêu rõ việc {fact} đã để lại tổn thất lớn.",
+                f"{fact}, để lại hệ quả pháp lý và nghĩa vụ tài chính kéo dài.",
+                f"Các kết luận sau sự kiện tiếp tục khẳng định {fact} là bài học quản trị đắt giá.",
+                f"{fact}, trở thành bài học cảnh báo sâu sắc cho thị trường.",
+                f"Nhìn lại toàn bộ chuỗi chứng cứ, hồ sơ chỉ rõ việc {fact} khó có thể đảo ngược.",
             ]
             raw = frames[v_idx]
 
@@ -624,41 +639,41 @@ def _render_claim_sentence(
             raw = f"Verified scale: {fact}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Why did early oversight fail?"
-            raw = f"{q_short} Records cite {fact}."
+            raw = f"{q_short} {fact}."
         elif role_slot == "setup":
             frames = [
-                f"In the opening phase, routine disclosures projected calm while {fact} quietly built beneath the surface.",
-                f"Public commentary pointed to stability even as underlying ledgers showed {fact} taking hold.",
-                f"Long before headlines turned urgent, archival filings documented {fact} across core operations.",
-                f"Despite reassuring institutional briefings, early compliance records revealed {fact} widening over time.",
-                f"While external analysts assumed risks remained contained, transaction logs pointed directly to {fact}.",
+                f"Early in the documented timeline, records show that {fact}, establishing the starting point.",
+                f"{fact}, establishing the foundational baseline of the arrangement.",
+                f"Initial entries in the dossier demonstrate that {fact}, initiating the sequence.",
+                f"Behind the institutional facade, {fact}, as reflected in opening filings.",
+                f"At the outset of the transaction history, documentation reveals how {fact} unfolded.",
             ]
             raw = frames[v_idx]
         elif role_slot == "mechanism":
             frames = [
-                f"Tracing the payment and governance chain confirms {fact} served as the primary transmission channel.",
-                f"Rather than an isolated mistake, repeating structural incentives tied to {fact} multiplied exposure.",
-                f"As liabilities shifted toward weaker counterparties, {fact} removed crucial safeguards from the balance sheet.",
-                f"Auditing the contractual sequence shows how {fact} bypassed standard oversight checks.",
-                f"Cross-referencing filings highlights {fact} as the exact lever converting local strain into systemic shock.",
+                f"Within the operational details, filings show that {fact}, creating structural friction.",
+                f"{fact}, which accelerated the structural distortion across the network.",
+                f"Tracing the documented sequence reveals how {fact}, compounding financial exposures.",
+                f"Detailed exhibits confirm that {fact}, directly compounding financial risks.",
+                f"Forensic audit records uncover that {fact}, exposing critical operational gaps.",
             ]
             raw = frames[v_idx]
         elif role_slot == "crack":
             frames = [
-                f"Once liquidity buffers gave way, formal inquiries placed {fact} at the center of the breakdown.",
-                f"As refinancing stress peaked, {fact} surfaced in official findings and public records.",
-                f"Under mounting counterparty defaults, investigators documented {fact} across multiple reporting lines.",
-                f"Field audits and internal records converged quickly, exposing {fact} to outside scrutiny.",
-                f"When emergency reviews opened, {fact} became impossible to insulate from institutional accountability.",
+                f"At the critical escalation point, evidence established that {fact}, triggering scrutiny.",
+                f"{fact}, precipitating formal regulatory and investigative intervention.",
+                f"Subsequent official proceedings documented that {fact}, challenging earlier disclosures.",
+                f"Inspection findings confirmed {fact}, dismantling the prior narrative.",
+                f"Later evidentiary disclosures placed {fact} at the center of the inquest.",
             ]
             raw = frames[v_idx]
         else:
             frames = [
-                f"The lasting institutional lesson centers on building earlier enforcement gates around {fact}.",
-                f"Remediation remains ongoing, yet {fact} already reshaped how similar market risks get audited.",
-                f"Durable reform depends less on retroactive penalties than spotting warning patterns like {fact} early.",
-                f"What endures beyond this episode is a clear governance test anchored in {fact}.",
-                f"Looking ahead, the case stands as a direct caution against overlooking hidden leverage tied to {fact}.",
+                f"In the post-event resolution, documentation records that {fact}, leaving lasting obligations.",
+                f"{fact}, leaving systemic liabilities across the sector.",
+                f"Following the documented enforcement actions, filings confirm that {fact}, reshaping oversight.",
+                f"Across the concluding evidentiary record, findings establish that {fact}, underscoring systemic risk.",
+                f"In the final institutional assessment, {fact}, serving as an enduring market warning.",
             ]
             raw = frames[v_idx]
 
@@ -671,6 +686,7 @@ def _render_claim_sentence(
         speaker=sp,
         procedural_status=ps,
         verification_status=vs,
+        slot_idx=slot_idx,
     )
     return qualified, [cid]
 
@@ -700,7 +716,7 @@ def _build_grounded_story_beats(
     # Beat 1 MUST prefer verified_primary / corroborated_secondary claims; only fall back if ledger has zero verified claims
     hook_source = (
         pools["catalysts"]
-        or verified_pool
+        + [c for c in verified_pool if c not in pools["catalysts"]]
         or all_claims
     )
     b2_source = pools["backgrounds"] or verified_pool or all_claims
@@ -818,21 +834,15 @@ def _build_grounded_story_beats(
     else:
         eff_u_min, eff_u_max = int(u_min), int(u_max)
 
-    # 1. Trim Beat 1 hook lines if they exceed 24.0s (S04 rejects Beat 1 > 25.0s)
-    from app.services.story_provenance_engine import extract_claim_elements as _b1_extract
-
+    # 1. Ensure Beat 1 stays concise (<= 24.0s) WITHOUT mangling trailing legal qualifiers
     b1_texts = [ln.text for ln in raw_beats[0][2]]
     b1_dur = float(estimate_script_speech_duration(b1_texts, market=m, docudrama_tempo=True)["estimated_duration_sec"])
-    if b1_dur > 24.0:
-        for ln_b1 in raw_beats[0][2]:
-            elems_b1 = _b1_extract(ln_b1.text)
-            trimmed_b1 = _trim_clause_smart(ln_b1.text, elems_b1, market=m, hook_mode=True)
-            ln_b1.text = trimmed_b1 if trimmed_b1.endswith((".", "!", "?", "。")) else f"{trimmed_b1}."
-        b1_dur = float(
-            estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
-        )
-        if b1_dur > 24.0 and len(raw_beats[0][2]) > 2:
+    if b1_dur > 24.0 and len(raw_beats[0][2]) > 3:
+        while b1_dur > 24.0 and len(raw_beats[0][2]) > 3:
             raw_beats[0][2].pop()
+            b1_dur = float(
+                estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
+            )
 
     all_line_texts = [ln.text for _, _, lns in raw_beats for ln in lns]
     timing_now = estimate_script_speech_duration(all_line_texts, market=m, docudrama_tempo=True)

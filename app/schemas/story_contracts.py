@@ -77,11 +77,14 @@ class EvidenceClaim(BaseModel):
     doc_type: Literal[
         "statute",
         "court_judgment",
+        "court_record",
+        "court_docket",
         "indictment",
         "criminal_complaint",
         "regulatory_notice",
         "gov_report",
         "audit_report",
+        "proposed_bill",
         "news_article",
         "rss_snippet",
         "press_release",
@@ -117,6 +120,12 @@ class EvidenceClaim(BaseModel):
     scope: Optional[str] = None
     mechanism: Optional[str] = None
     act_target: Optional[str] = None
+    credibility_tier: Literal[
+        "verified_fact",
+        "official_regulation",
+        "press_allegation",
+        "unconfirmed_claim",
+    ] = "unconfirmed_claim"
     confidence: Literal["high", "medium", "low"] = "medium"
 
     @model_validator(mode="before")
@@ -135,6 +144,9 @@ class EvidenceClaim(BaseModel):
 
         src_url = str(out.get("source_url") or "")
         src_type = str(out.get("source_type") or "press").lower()
+        doc_type = str(out.get("doc_type") or "unknown").lower()
+        proc_status = str(out.get("procedural_status") or "unknown").lower()
+        legal_status = str(out.get("legal_status") or "alleged").lower()
         conf_supplied = "confidence" in out and out.get("confidence") is not None
         ver_supplied = "verification_status" in out and out.get("verification_status") is not None
         is_rss = is_rss_or_aggregator_url(src_url)
@@ -146,6 +158,10 @@ class EvidenceClaim(BaseModel):
                 out["evidence_tier"] = "secondary"
             if not conf_supplied or out.get("confidence") == "high":
                 out["confidence"] = "medium"
+            out["credibility_tier"] = "unconfirmed_claim"
+            # Unverified RSS rumors cannot serve as primary catalyst
+            if out.get("causal_role") == "primary_catalyst":
+                out["causal_role"] = "background_context"
         elif not ver_supplied:
             if src_type in ("court", "regulator", "gov"):
                 if is_primary_official_domain(src_url):
@@ -162,6 +178,81 @@ class EvidenceClaim(BaseModel):
                     out["verification_status"] = "corroborated_secondary"
                 else:
                     out["verification_status"] = "unverified_secondary"
+
+        # Resolve or enforce credibility_tier hierarchy
+        ver_stat = str(out.get("verification_status", "unverified_secondary"))
+        supplied_tier = out.get("credibility_tier")
+
+        # Invariant 1: Unverified/speculative/RSS claims can NEVER be verified_fact or official_regulation
+        if (
+            ver_stat in ("unverified_secondary", "speculative")
+            or is_rss
+            or proc_status in ("bill_proposed", "speculation")
+            or doc_type in ("proposed_bill", "rss_snippet")
+        ):
+            out["credibility_tier"] = "unconfirmed_claim"
+        elif supplied_tier == "verified_fact":
+            # Verified fact requires verified/corroborated status, final judgment/audit/fact status, and not alleged/charged
+            if (
+                ver_stat in ("verified_primary", "corroborated_secondary")
+                and (
+                    doc_type in ("court_judgment", "audit_report")
+                    or proc_status == "final_judgment"
+                    or (src_type in ("court", "regulator", "gov") and ver_stat == "verified_primary")
+                )
+                and legal_status in ("fact", "convicted", "settled")
+            ):
+                out["credibility_tier"] = "verified_fact"
+            elif (
+                doc_type in ("statute", "regulatory_notice", "gov_report")
+                or proc_status == "legislative_enacted"
+                or (src_type in ("regulator", "gov") and legal_status not in ("alleged", "charged"))
+            ):
+                out["credibility_tier"] = "official_regulation"
+            else:
+                out["credibility_tier"] = "press_allegation"
+        elif supplied_tier == "official_regulation":
+            # Official regulation cannot have unresolved individual criminal/civil charges
+            if (
+                ver_stat in ("verified_primary", "corroborated_secondary")
+                and legal_status not in ("alleged", "charged")
+                and (
+                    doc_type in ("statute", "regulatory_notice", "gov_report")
+                    or proc_status == "legislative_enacted"
+                    or src_type in ("regulator", "gov")
+                )
+            ):
+                out["credibility_tier"] = "official_regulation"
+            else:
+                out["credibility_tier"] = "press_allegation"
+        elif supplied_tier == "press_allegation":
+            out["credibility_tier"] = "press_allegation"
+        elif not supplied_tier:
+            if (
+                (doc_type in ("court_judgment", "audit_report") or proc_status == "final_judgment")
+                and ver_stat in ("verified_primary", "corroborated_secondary")
+            ) or (src_type in ("court", "regulator", "gov") and ver_stat == "verified_primary" and legal_status in ("fact", "convicted", "settled") and not is_rss):
+                out["credibility_tier"] = "verified_fact"
+            elif (
+                doc_type in ("statute", "regulatory_notice", "gov_report")
+                or proc_status == "legislative_enacted"
+                or (src_type in ("regulator", "gov") and ver_stat in ("verified_primary", "corroborated_secondary") and legal_status not in ("alleged", "charged") and not is_rss)
+            ):
+                out["credibility_tier"] = "official_regulation"
+            elif (
+                src_type in ("press", "court", "regulator", "gov")
+                or doc_type in ("news_article", "indictment", "criminal_complaint")
+                or legal_status in ("charged", "alleged")
+            ) and ver_stat in ("corroborated_secondary", "verified_primary") and not is_rss:
+                out["credibility_tier"] = "press_allegation"
+            else:
+                out["credibility_tier"] = "unconfirmed_claim"
+        else:
+            out["credibility_tier"] = "unconfirmed_claim"
+
+        # Structural Invariant: unconfirmed claims cannot be primary catalyst
+        if out.get("credibility_tier") == "unconfirmed_claim" and out.get("causal_role") == "primary_catalyst":
+            out["causal_role"] = "background_context"
         return out
 
 
