@@ -180,7 +180,7 @@ def run(ctx: RunContext) -> StageArtifact:
         elif market == "JA":
             u_min, u_max = 900, 1950
         elif market == "VN":
-            u_min, u_max = 360, 750
+            u_min, u_max = 640, 1125
         else:
             wb = getattr(getattr(preset_obj, "narration", None), "word_budget", None)
             u_min = int(getattr(wb, "min", 430) or 430)

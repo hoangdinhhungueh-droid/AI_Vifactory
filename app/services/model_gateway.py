@@ -412,8 +412,10 @@ class ModelGateway:
         total_tokens = 0
 
         proxy_url = os.getenv("HHTECH_PROXY")
+        strict_proxy = os.getenv("HHTECH_PROXY_STRICT", "").strip().lower() in ("1", "true", "yes")
         if not proxy_url and _is_local_proxy_running(40000):
             proxy_url = "socks5://127.0.0.1:40000"
+        attempt_proxy = proxy_url
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -422,7 +424,7 @@ class ModelGateway:
                 total_tokens = 0
                 timeout_config = httpx.Timeout(timeout=timeout, connect=30.0, read=timeout, write=30.0, pool=30.0)
 
-                with httpx.Client(timeout=timeout_config, proxy=proxy_url) as client:
+                with httpx.Client(timeout=timeout_config, proxy=attempt_proxy) as client:
                     with client.stream(
                         "POST",
                         f"{self.hhtech_base_url}/chat/completions",
@@ -476,9 +478,17 @@ class ModelGateway:
                 logger.warning(f"[GATEWAY] HHTech attempt {attempt}/{max_retries} failed: {e}")
                 if isinstance(e, ModelGatewayError) and any(s in str(e) for s in ["502", "503", "hết nguồn khả dụng", "backend error", "400", "BAD_REQUEST", "rejected a generation parameter", "invalid_request_error"]):
                     raise e
+                err_low = str(e).lower()
+                if attempt_proxy and not strict_proxy and (
+                    isinstance(e, (httpx.ProxyError, httpx.ConnectError))
+                    or "proxy" in err_low
+                    or "host unreachable" in err_low
+                ):
+                    logger.warning(f"[GATEWAY] Dropping flaky proxy ({attempt_proxy}) for direct connection on next attempt.")
+                    attempt_proxy = None
                 if attempt < max_retries:
                     import time
-                    time.sleep(attempt * 3.0)
+                    time.sleep(0.5 if attempt_proxy is None else attempt * 3.0)
                 else:
                     raise last_error
 

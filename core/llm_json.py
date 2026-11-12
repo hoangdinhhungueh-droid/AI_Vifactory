@@ -60,11 +60,20 @@ def parse_llm_json(raw_text: str) -> Union[Dict[str, Any], List[Any]]:
     else:
         target_str = cleaned
 
-    # Attempt 1: Direct parse
+    # Attempt 1: Direct parse or JSONDecoder.raw_decode on first complete object/array
     try:
         return json.loads(target_str)
     except (json.JSONDecodeError, ValueError) as _err1:
         logger.debug("[llm_json] Direct parse unviable: %s", _err1)
+        decoder = json.JSONDecoder()
+        for idx, ch in enumerate(cleaned):
+            if ch in "{[":
+                try:
+                    obj, _ = decoder.raw_decode(cleaned[idx:])
+                    if isinstance(obj, (dict, list)) and len(obj) > 0:
+                        return obj
+                except (json.JSONDecodeError, ValueError):
+                    continue
 
     # Attempt 2: Trailing comma elimination loop
     repaired = target_str

@@ -332,13 +332,20 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     words = clean.split()
     if len(words) <= word_cap:
         return clean
+    # Avoid severing a currency/number from its scale unit (e.g. "$172.7" | "million")
+    if word_cap < len(words) and words[word_cap].lower().rstrip(".,;:") in (
+        "million", "billion", "trillion", "thousand", "percent", "%", "m", "b", "usd", "krw", "jpy", "vnd"
+    ):
+        word_cap += 1
     trimmed = " ".join(words[:word_cap]).rstrip(",;:")
     if trimmed.count("(") > trimmed.count(")"):
         trimmed = trimmed[: trimmed.rfind("(")].strip(" ,;:")
     anchors = (elems.get("metrics", []) + elems.get("dates", []))
     if not hook_mode and anchors and not any(a.lower() in trimmed.lower() for a in anchors):
         a0 = anchors[0]
-        if len(a0.split()) <= 4:
+        a0_nums = re.findall(r"\d[\d,.]*", a0)
+        already_has_num = any(n in trimmed for n in a0_nums) if a0_nums else False
+        if not already_has_num and len(a0.split()) <= 4:
             trimmed = f"{trimmed} ({a0})"
     return trimmed
 
@@ -808,7 +815,7 @@ def _build_grounded_story_beats(
     expand_roles = {1: "setup", 2: "mechanism", 3: "crack", 4: "aftermath"}
     expand_pools = {1: b2_source, 2: b3_source, 3: b4_source, 4: b5_source}
     extra_guard = 0
-    while measured_s < 222.0 and extra_guard < 16 and all_claims:
+    while measured_s < 222.0 and extra_guard < 26 and all_claims:
         b_idx = expand_beats[extra_guard % len(expand_beats)]
         beat_id_e, _, beat_lines_e = raw_beats[b_idx]
         c_obj = _pick_claim(expand_pools[b_idx])
@@ -990,7 +997,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR VIETNAMESE (VN) MARKET:\n"
                         "1. Write 100% natural, authoritative Vietnamese narration with full Vietnamese diacritics. No English/CJK prose.\n"
-                        "2. Target duration: 180-300s (~450-650 Vietnamese words across 19-24 lines).\n"
+                        "2. Target duration: 180-300s (~680-950 Vietnamese words across 19-24 lines).\n"
                         "3. Distinguish judgment (Theo phán quyết của tòa án) vs indictment (Theo cáo trạng) vs complaint (Theo đơn kiện) vs unverified press reports (Theo thông tin bước đầu chưa kiểm chứng).\n\n"
                     )
                 else:
@@ -1011,6 +1018,113 @@ def run(ctx: RunContext) -> StageArtifact:
                     "Start response immediately with { and end with }. Output ONLY valid JSON adhering to schema with NO preamble."
                 )
 
+                def _parse_and_build_llm_beats(raw_resp_text: str):
+                    p_json = parse_llm_json(raw_resp_text)
+                    if isinstance(p_json, list):
+                        if p_json and isinstance(p_json[0], dict) and "beats" in p_json[0]:
+                            p_json = p_json[0]
+                        elif p_json and isinstance(p_json[0], dict) and any(k in p_json[0] for k in ("beat_id", "lines", "id")):
+                            p_json = {"beats": p_json}
+                        else:
+                            p_json = {}
+                    elif not isinstance(p_json, dict):
+                        p_json = {}
+
+                    built_beats: List[Tuple[str, float, List[StorySceneLine]]] = []
+                    for idx, beat_data in enumerate(p_json.get("beats", []), start=1):
+                        if not isinstance(beat_data, dict):
+                            continue
+                        b_id = beat_data.get("beat_id") or beat_data.get("id") or f"B{idx}_beat"
+                        target_dur = float(beat_data.get("target_duration_s") or beat_data.get("duration_seconds") or (
+                            19.2 if "B1" in b_id else (40.8 if "B2" in b_id else (79.2 if "B3" in b_id else (60.0 if "B4" in b_id else 40.8)))
+                        ))
+                        lines_data: List[StorySceneLine] = []
+                        for l_idx, ln in enumerate(beat_data.get("lines", []), start=1):
+                            if isinstance(ln, str):
+                                ln = {"text": ln}
+                            elif not isinstance(ln, dict):
+                                continue
+                            c_ids = [cid for cid in (ln.get("claim_ids") or []) if cid in evidence_map]
+                            if not c_ids and evidence_ledger:
+                                c_ids = [evidence_ledger[min(idx - 1, len(evidence_ledger) - 1)].claim_id]
+                            text = ln.get("text", "")
+                            if (market or "EN").upper() in ("KR", "KO"):
+                                text = _normalize_spoken_korean_numbers(text)
+
+                            c_objs = [evidence_map[cid] for cid in c_ids if cid in evidence_map]
+                            primary_c = c_objs[0] if c_objs else None
+                            if primary_c is not None:
+                                get_a = (lambda k, d="": primary_c.get(k, d)) if isinstance(primary_c, dict) else (lambda k, d="": getattr(primary_c, k, d))
+                                text = _apply_legal_qualifier(
+                                    text=text,
+                                    legal_status=str(get_a("legal_status", "alleged")),
+                                    market=market,
+                                    source_type=str(get_a("source_type", "press")),
+                                    doc_type=str(get_a("doc_type", "unknown")),
+                                    speaker=get_a("speaker", None),
+                                    procedural_status=str(get_a("procedural_status", "unknown")),
+                                    verification_status=str(get_a("verification_status", "corroborated_secondary")),
+                                )
+
+                            v_hook = ln.get("visual_hook") or "stamp"
+                            lines_data.append(StorySceneLine(
+                                line_id=ln.get("line_id", f"{b_id}_L{l_idx:02d}"),
+                                text=text,
+                                claim_ids=c_ids,
+                                visual_hook=v_hook,
+                            ))
+                        built_beats.append((b_id, target_dur, lines_data))
+                    return built_beats
+
+                from app.services.story_provenance_engine import extract_claim_elements as _extract_elems
+                from app.services.story_provenance_engine import line_matches_expected_qualifier as _match_qual
+
+                grounded_nouns: set[str] = {"KRW", "USD", "JPY", "VND", "EUR", "GDP", "CPI", "IPO", "ETF", "LTV", "SEC", "FTC", "CMS", "DOJ", "OIG", "HHS", "RADV"}
+                for tok in re.findall(r"\b[A-Z][A-Za-z0-9&\-]{1,}\b", topic or ""):
+                    grounded_nouns.add(tok)
+                for ev_d in evidence_raw:
+                    for ent in _extract_elems(str(ev_d.get("claim", ""))).get("entities", []):
+                        grounded_nouns.add(ent)
+                    for tok in re.findall(r"\b[A-Z][A-Za-z0-9&\-]{1,}\b", str(ev_d.get("source_name", ""))):
+                        grounded_nouns.add(tok)
+
+                def _eval_llm_beats(cand_beats: List[Tuple[str, float, List[StorySceneLine]]]):
+                    cand_lines = [ln.text for _, _, lns in cand_beats for ln in lns]
+                    cand_full = " ".join(cand_lines)
+                    cand_timing = estimate_script_speech_duration(cand_lines, market=market, docudrama_tempo=True)
+                    cand_dur = float(cand_timing["estimated_duration_sec"])
+                    lang_ok, lang_issues = check_target_market_language_purity(
+                        cand_full, market=market, grounded_proper_nouns=grounded_nouns
+                    )
+                    ent_ok, ent_issues = check_market_entity_appropriateness(cand_full, market=market, evidence_ledger=evidence_raw, topic=topic)
+                    beats_dicts = [
+                        {"beat_id": b_id, "lines": [ln.model_dump() for ln in lns]}
+                        for b_id, _, lns in cand_beats
+                    ]
+                    align_res = audit_statement_claim_alignment(beats_dicts, evidence_raw, market=market)
+                    qual_issues: List[str] = []
+                    for _, _, lns in cand_beats:
+                        for ln in lns:
+                            for cid in (ln.claim_ids or []):
+                                c_obj = evidence_map.get(cid)
+                                if c_obj is not None:
+                                    c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
+                                    ok_q, q_msg = _match_qual(ln.text, c_dict, market=market)
+                                    if not ok_q:
+                                        qual_issues.append(f"{ln.line_id}:{cid}:{q_msg}")
+                    b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and not align_res.get("beat1_unverified_elevation"))
+                    dur_ok = d_min <= cand_dur <= d_max
+                    passed = (
+                        len(cand_beats) == 5
+                        and b1_ok
+                        and dur_ok
+                        and lang_ok
+                        and ent_ok
+                        and not qual_issues
+                        and align_res.get("passed", False)
+                    )
+                    return passed, cand_timing, cand_dur, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res
+
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
                     model="gpt-6.1-sol",
@@ -1020,110 +1134,58 @@ def run(ctx: RunContext) -> StageArtifact:
                     timeout=120.0,
                     fallback="claude-v4.1-flash",
                 )
-                parsed_json = parse_llm_json(raw_response)
-                if isinstance(parsed_json, list):
-                    if parsed_json and isinstance(parsed_json[0], dict) and "beats" in parsed_json[0]:
-                        parsed_json = parsed_json[0]
-                    elif parsed_json and isinstance(parsed_json[0], dict) and any(k in parsed_json[0] for k in ("beat_id", "lines", "id")):
-                        parsed_json = {"beats": parsed_json}
-                    else:
-                        parsed_json = {}
-                elif not isinstance(parsed_json, dict):
-                    parsed_json = {}
+                llm_beats = _parse_and_build_llm_beats(raw_response)
+                passed_pre, cand_timing, cand_dur, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res = _eval_llm_beats(llm_beats)
 
-                llm_beats: List[Tuple[str, float, List[StorySceneLine]]] = []
-                for idx, beat_data in enumerate(parsed_json.get("beats", []), start=1):
-                    if not isinstance(beat_data, dict):
-                        continue
-                    b_id = beat_data.get("beat_id") or beat_data.get("id") or f"B{idx}_beat"
-                    target_dur = float(beat_data.get("target_duration_s") or beat_data.get("duration_seconds") or (
-                        19.2 if "B1" in b_id else (40.8 if "B2" in b_id else (79.2 if "B3" in b_id else (60.0 if "B4" in b_id else 40.8)))
-                    ))
-                    lines_data: List[StorySceneLine] = []
-                    for l_idx, ln in enumerate(beat_data.get("lines", []), start=1):
-                        if isinstance(ln, str):
-                            ln = {"text": ln}
-                        elif not isinstance(ln, dict):
-                            continue
-                        c_ids = [cid for cid in (ln.get("claim_ids") or []) if cid in evidence_map]
-                        if not c_ids and evidence_ledger:
-                            c_ids = [evidence_ledger[min(idx - 1, len(evidence_ledger) - 1)].claim_id]
-                        text = ln.get("text", "")
-                        if (market or "EN").upper() in ("KR", "KO"):
-                            text = _normalize_spoken_korean_numbers(text)
+                if not passed_pre:
+                    repair_notes: List[str] = []
+                    if not dur_ok:
+                        repair_notes.append(f"Duration {cand_dur:.1f}s ({cand_timing['spoken_units']} {cand_timing['unit_type']}) MUST fit strictly within {d_min:.0f}-{d_max:.0f}s.")
+                    if len(llm_beats) != 5:
+                        repair_notes.append(f"Must have exactly 5 beats (got {len(llm_beats)}).")
+                    if not b1_ok:
+                        repair_notes.append("Beat 1 must have >=3 lines anchored strictly in verified_primary/corroborated_secondary claims.")
+                    if not lang_ok:
+                        repair_notes.append(f"Language purity issues: {lang_issues[:3]}")
+                    if not ent_ok:
+                        repair_notes.append(f"Entity appropriateness issues: {ent_issues[:3]}")
+                    if qual_issues:
+                        repair_notes.append(f"Legal/procedural qualifier mismatches: {qual_issues[:4]}")
+                    if not align_res.get("passed", False):
+                        repair_notes.append(
+                            f"Alignment issues: coverage={align_res.get('coverage_ratio', 0):.0%}, "
+                            f"missing={align_res.get('uncovered_claims', [])[:4]}, "
+                            f"mismatched={align_res.get('mismatched_lines', [])[:3]}"
+                        )
+                    logger.warning(
+                        f"[S03_SCRIPT] Attempt 1 LLM pre-check failed ({'; '.join(repair_notes)}). Retrying once with targeted feedback."
+                    )
+                    repair_prompt = (
+                        f"{user_prompt}\n\n"
+                        "SELF-CORRECTION REQUIRED — FIX ALL ISSUES BELOW IN YOUR JSON OUTPUT:\n- "
+                        + "\n- ".join(repair_notes)
+                        + "\nReturn ONLY corrected valid JSON starting with { and ending with }."
+                    )
+                    raw_retry = gateway.call_llm(
+                        prompt=repair_prompt,
+                        model="gpt-6.1-sol",
+                        system_prompt=system_prompt,
+                        max_tokens=4000,
+                        temperature=0.2,
+                        timeout=120.0,
+                        fallback="claude-v4.1-flash",
+                    )
+                    llm_beats_retry = _parse_and_build_llm_beats(raw_retry)
+                    passed_retry, cand_timing_r, cand_dur_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r = _eval_llm_beats(llm_beats_retry)
+                    if passed_retry:
+                        llm_beats = llm_beats_retry
+                        cand_timing, cand_dur = cand_timing_r, cand_dur_r
+                        lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res = (
+                            lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r
+                        )
+                        passed_pre = True
 
-                        c_objs = [evidence_map[cid] for cid in c_ids if cid in evidence_map]
-                        primary_c = c_objs[0] if c_objs else None
-                        if primary_c is not None:
-                            get_a = (lambda k, d="": primary_c.get(k, d)) if isinstance(primary_c, dict) else (lambda k, d="": getattr(primary_c, k, d))
-                            text = _apply_legal_qualifier(
-                                text=text,
-                                legal_status=str(get_a("legal_status", "alleged")),
-                                market=market,
-                                source_type=str(get_a("source_type", "press")),
-                                doc_type=str(get_a("doc_type", "unknown")),
-                                speaker=get_a("speaker", None),
-                                procedural_status=str(get_a("procedural_status", "unknown")),
-                                verification_status=str(get_a("verification_status", "corroborated_secondary")),
-                            )
-
-                        v_hook = ln.get("visual_hook") or "stamp"
-                        lines_data.append(StorySceneLine(
-                            line_id=ln.get("line_id", f"{b_id}_L{l_idx:02d}"),
-                            text=text,
-                            claim_ids=c_ids,
-                            visual_hook=v_hook,
-                        ))
-                    llm_beats.append((b_id, target_dur, lines_data))
-
-                # Validate candidate LLM script using unified TTS-normalized pacing, language purity & provenance checks
-                from app.services.story_provenance_engine import extract_claim_elements as _extract_elems
-                from app.services.story_provenance_engine import line_matches_expected_qualifier as _match_qual
-
-                grounded_nouns: set[str] = {"KRW", "USD", "JPY", "VND", "EUR", "GDP", "CPI", "IPO", "ETF", "LTV", "SEC", "FTC"}
-                for tok in re.findall(r"\b[A-Z][A-Za-z0-9&\-]{1,}\b", topic or ""):
-                    grounded_nouns.add(tok)
-                for ev_d in evidence_raw:
-                    for ent in _extract_elems(str(ev_d.get("claim", ""))).get("entities", []):
-                        grounded_nouns.add(ent)
-                    for tok in re.findall(r"\b[A-Z][A-Za-z0-9&\-]{1,}\b", str(ev_d.get("source_name", ""))):
-                        grounded_nouns.add(tok)
-
-                cand_lines = [ln.text for _, _, lns in llm_beats for ln in lns]
-                cand_full = " ".join(cand_lines)
-                cand_timing = estimate_script_speech_duration(cand_lines, market=market, docudrama_tempo=True)
-                cand_dur = float(cand_timing["estimated_duration_sec"])
-                lang_ok, lang_issues = check_target_market_language_purity(
-                    cand_full, market=market, grounded_proper_nouns=grounded_nouns
-                )
-                ent_ok, ent_issues = check_market_entity_appropriateness(cand_full, market=market, evidence_ledger=evidence_raw, topic=topic)
-                beats_dicts = [
-                    {"beat_id": b_id, "lines": [ln.model_dump() for ln in lns]}
-                    for b_id, _, lns in llm_beats
-                ]
-                align_res = audit_statement_claim_alignment(beats_dicts, evidence_raw, market=market)
-                qual_ok = True
-                for _, _, lns in llm_beats:
-                    for ln in lns:
-                        for cid in (ln.claim_ids or []):
-                            c_obj = evidence_map.get(cid)
-                            if c_obj is not None:
-                                c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
-                                ok_q, _ = _match_qual(ln.text, c_dict, market=market)
-                                if not ok_q:
-                                    qual_ok = False
-                b1_ok = bool(llm_beats and len(llm_beats[0][2]) >= 3 and not align_res.get("beat1_unverified_elevation"))
-                dur_ok = d_min <= cand_dur <= d_max
-
-                if (
-                    len(llm_beats) == 5
-                    and b1_ok
-                    and dur_ok
-                    and lang_ok
-                    and ent_ok
-                    and qual_ok
-                    and align_res.get("passed", False)
-                ):
+                if passed_pre:
                     raw_beats = llm_beats
                     logger.info(
                         f"[S03_SCRIPT] Live LLM accepted: {len(llm_beats)} beats, {cand_timing['spoken_units']} "
@@ -1131,9 +1193,9 @@ def run(ctx: RunContext) -> StageArtifact:
                     )
                 else:
                     logger.warning(
-                        f"[S03_SCRIPT] LLM output rejected by S03 quality pre-check "
+                        f"[S03_SCRIPT] LLM output rejected by S03 quality pre-check after retry "
                         f"(beats={len(llm_beats)}, dur={cand_dur:.1f}s, lang_ok={lang_ok}:{lang_issues}, "
-                        f"ent_ok={ent_ok}:{ent_issues}, cov_ok={align_res.get('coverage_ok')}, b1_ok={b1_ok}). "
+                        f"ent_ok={ent_ok}:{ent_issues}, qual={qual_issues[:2]}, cov_ok={align_res.get('coverage_ok')}, b1_ok={b1_ok}). "
                         "Falling back to provenance-grounded builder."
                     )
             except Exception as _llm_err:

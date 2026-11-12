@@ -1059,3 +1059,34 @@ def test_ja_vn_fallback_without_grounding_and_three_run_cache_hit(tmp_path):
         run_pipeline_mod.resolve_run_paths = orig_resolve
     assert not test_paths.artifact_file("s05_director_plan").exists()
     assert manifest_data["stages"]["s05_director_plan"]["status"] == "pending"
+
+
+def test_live_regression_fixes_json_metric_trim_and_tts_rates():
+    """Verify parse_llm_json raw_decode resilience, metric regex word-before-letter, and calibrated TTS rates."""
+    from app.services.story_provenance_engine import extract_claim_elements
+    from core.llm_json import parse_llm_json
+    from core.pacing_budgeter import DOCUDRAMA_SPEECH_RATES
+    from stages.s03_script import _trim_clause_smart
+
+    # 1. Leading digit / trailing prose must not trigger 'Extra data: line 1 column 2'
+    parsed = parse_llm_json('1.\n{"title_working": "Audit Gap", "status": "APPROVED"}\nNote: done')
+    assert isinstance(parsed, dict)
+    assert parsed["title_working"] == "Audit Gap"
+
+    # 2. '$172.7 million' must not be truncated to '$172.7 m' or duplicated by _trim_clause_smart
+    claim_txt = (
+        "Documented enforcement outcomes materialized as the insurer agreed to pay $172.7 million "
+        "to resolve False Claims Act allegations without admitting liability."
+    )
+    elems = extract_claim_elements(claim_txt)
+    assert any("$172.7 million" in m for m in elems["metrics"]), elems["metrics"]
+    assert not any(m.endswith(" m") for m in elems["metrics"]), elems["metrics"]
+    trimmed = _trim_clause_smart(claim_txt, elems, market="EN", hook_mode=False)
+    assert "($172.7 m)" not in trimmed
+    assert trimmed.count("$172.7") == 1
+
+    # 3. Empirically calibrated docudrama TTS speeds
+    assert DOCUDRAMA_SPEECH_RATES["KR"] == 5.0
+    assert DOCUDRAMA_SPEECH_RATES["JA"] == 6.3
+    assert DOCUDRAMA_SPEECH_RATES["VN"] == 3.75
+    assert 2.0 <= DOCUDRAMA_SPEECH_RATES["EN"] <= 2.2

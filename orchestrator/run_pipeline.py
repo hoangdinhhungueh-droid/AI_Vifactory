@@ -388,8 +388,6 @@ def execute_pipeline(
             print(f"❌ [CONFIGURATION ERROR]: Unknown --from stage '{from_stage}'. Available: {[s.value for s in stage_list]}")
             return 1
         start_idx = resolved_from
-        manifest.invalidate_downstream(stage_list[start_idx], inclusive=True, paths=paths)
-        manifest.save_atomic(paths)
 
     end_idx = len(stage_list) - 1
     if effective_to:
@@ -406,53 +404,59 @@ def execute_pipeline(
             print(f"❌ [CONFIGURATION ERROR]: Unknown --only stage '{only_stage}'. Available: {[s.value for s in stage_list]}")
             return 1
 
-    # 3. Stage Execution Loop
-    for idx, stage in enumerate(stage_list):
-        if only_target_idx is not None:
-            if idx != only_target_idx:
-                continue
-        else:
-            if idx < start_idx:
-                continue
-            if idx > end_idx:
-                break
+    # Acquire exclusive per-run lock BEFORE invalidation or stage execution to prevent split-brain races
+    from core.dag_provenance import (
+        acquire_run_lock,
+        check_stage_cache_valid,
+        compute_stage_config_sha256,
+        compute_stage_input_provenance,
+        purge_stage_outputs,
+        stamp_artifact_provenance,
+    )
+    import uuid as _uuid
 
-        stage_name = stage.value
-        mod_name = STAGE_MODULES.get(stage)
-        if not mod_name:
-            print(f"[-] Unknown stage: {stage_name}")
-            return 1
+    with acquire_run_lock(paths):
+        manifest = RunManifest.load_or_create(paths, profile=config.name)
+        ctx.manifest = manifest
+        if from_stage:
+            manifest.invalidate_downstream(stage_list[start_idx], inclusive=True, paths=paths)
+            manifest.save_atomic(paths)
 
-        print(f"\n▶ [{idx+1}/{len(stage_list)}] Executing Stage: {stage_name.upper()}...")
+        # 3. Stage Execution Loop
+        for idx, stage in enumerate(stage_list):
+            if only_target_idx is not None:
+                if idx != only_target_idx:
+                    continue
+            else:
+                if idx < start_idx:
+                    continue
+                if idx > end_idx:
+                    break
 
-        # 4. Idempotency + DAG Provenance Check: only skip if hash AND upstream/config provenance match
-        import uuid as _uuid
+            stage_name = stage.value
+            mod_name = STAGE_MODULES.get(stage)
+            if not mod_name:
+                print(f"[-] Unknown stage: {stage_name}")
+                return 1
 
-        from core.dag_provenance import (
-            acquire_run_lock,
-            check_stage_cache_valid,
-            compute_stage_config_sha256,
-            compute_stage_input_provenance,
-            purge_stage_outputs,
-            stamp_artifact_provenance,
-        )
+            print(f"\n▶ [{idx+1}/{len(stage_list)}] Executing Stage: {stage_name.upper()}...")
 
-        cfg_sha = compute_stage_config_sha256(
-            stage,
-            preset_name=preset_name,
-            extra_params={
-                "market": str(getattr(getattr(ctx, "config", None), "market", "") or ""),
-                "profile": str(config.name),
-                "dry_run": bool(getattr(ctx, "dry_run", False)),
-            },
-        )
-        expected_in_sha, upstream_map = compute_stage_input_provenance(stage, paths, config_sha256=cfg_sha)
-        stage_nonce = _uuid.uuid4().hex[:16]
+            # 4. Idempotency + DAG Provenance Check: only skip if hash AND upstream/config provenance match
+            cfg_sha = compute_stage_config_sha256(
+                stage,
+                preset_name=preset_name,
+                extra_params={
+                    "market": str(getattr(getattr(ctx, "config", None), "market", "") or ""),
+                    "profile": str(config.name),
+                    "dry_run": bool(getattr(ctx, "dry_run", False)),
+                },
+            )
+            expected_in_sha, upstream_map = compute_stage_input_provenance(stage, paths, config_sha256=cfg_sha)
+            stage_nonce = _uuid.uuid4().hex[:16]
 
-        art_path = paths.artifact_file(stage_name)
-        try:
-            stage_mod = importlib.import_module(mod_name)
-            with acquire_run_lock(paths):
+            art_path = paths.artifact_file(stage_name)
+            try:
+                stage_mod = importlib.import_module(mod_name)
                 manifest = RunManifest.load_or_create(paths, profile=config.name)
                 ctx.manifest = manifest
                 state = manifest.stages.get(stage)
@@ -496,6 +500,11 @@ def execute_pipeline(
 
                 try:
                     _artifact = stage_mod.run(ctx)
+                except GateError:
+                    # Preserve diagnostic critic artifact when a stage deliberately rejects via GateError
+                    manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
+                    manifest.save_atomic(paths)
+                    raise
                 except BaseException:
                     purge_stage_outputs(stage, paths, include_artifact_file=True)
                     manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
@@ -527,200 +536,200 @@ def execute_pipeline(
                 # Upstream stage produced a new artifact -> invalidate downstream stages to prevent split-brain
                 manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
                 manifest.save_atomic(paths)
-            try:
-                print(f"   ✅ PASS (Artifact emitted: {art_path.name})")
-            except (BrokenPipeError, OSError):
-                pass
-
-            # ------------------------------------------------------------------
-            # HUMAN GATE 1: After Candidate Selection (S01 Ideation)
-            # ------------------------------------------------------------------
-            if stage == StageID.S1_IDEATION and effective_human_gates and (only_target_idx is None or only_target_idx == 0):
-                if (start_idx == 0 or only_target_idx == 0) and (effective_to is None or resolve_stage_index(effective_to, stage_list) == 0):
-                    payload = _artifact.payload if isinstance(_artifact.payload, dict) else {}
-                    topic_display = ctx.topic or payload.get("topic") or payload.get("title_working") or effective_run_id
-                    print("\n" + "=" * 75)
-                    print("🛑 [HUMAN GATE 1 REACHED: CANDIDATE SELECTION APPROVED]")
-                    print("=" * 75)
-                    print(f"📌 Candidate Topic:    {topic_display}")
-                    print(f"🌍 Target Market:      {manifest.market}")
-                    print(f"🧭 Track Preset:       {preset_name}")
-                    print(f"📁 Workspace:          {paths.root}")
-                    print(f"📄 Manifest:           {paths.manifest_file}")
-                    print("\nCandidate confirmed and locked into master run manifest.")
-                    print("\n👉 NEXT STEP: Generate Story Research, Script & Critic Audit (S02 -> S04)")
-                    print("Execute CLI Command:")
-                    print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s02_research --to s04_critic_script")
-                    print("=" * 75 + "\n")
-                    try:
-                        from app.services.telegram_buttons import send_hg1_candidate_selected
-                        send_hg1_candidate_selected(
-                            task_id=effective_run_id,
-                            topic=str(topic_display),
-                            market=manifest.market,
-                            preset=preset_name,
-                            viability_score=payload.get("viability_score"),
-                            specific_angle=payload.get("specific_angle"),
-                            competitor_gap=payload.get("competitor_gap"),
-                            next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s02_research --to s04_critic_script",
-                        )
-                    except Exception as _tg_err:
-                        logger.warning(f"[HG1] Telegram notification notice: {_tg_err}")
-                    return 0
-
-            # ------------------------------------------------------------------
-            # HUMAN GATE 2: After Story Generation & Audit (S04 Critic Script)
-            # ------------------------------------------------------------------
-            if stage == StageID.S4_CRITIC_SCRIPT and effective_human_gates and (only_target_idx is None or only_target_idx == 3):
-                if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 3 or only_target_idx == 3:
-                    s3_art_path = paths.artifact_file(StageID.S3_SCRIPT.value)
-                    s3_info = {}
-                    if s3_art_path.exists():
-                        try:
-                            s3_info = json.loads(s3_art_path.read_text(encoding="utf-8")).get("payload", {})
-                        except Exception:
-                            pass
-                    title_disp = s3_info.get("title") or ctx.topic or effective_run_id
-                    w_count = s3_info.get("total_words", "N/A")
-                    est_dur = s3_info.get("est_duration_s", "N/A")
-                    print("\n" + "=" * 75)
-                    print("🛑 [HUMAN GATE 2 REACHED: STORY SCRIPT GENERATED & AUDITED]")
-                    print("=" * 75)
-                    print(f"📖 Story Title:        {title_disp}")
-                    print(f"📊 Word Count:         {w_count} words (Preset target: 450-750 words, 180-300s)")
-                    print(f"⏱️ Estimated Duration: {est_dur}s")
-                    print("🛡️ Script Audit:       PASS (Dual Critic Council Rule 444 & 445)")
-                    print(f"📄 Script Artifact:    {s3_art_path}")
-                    print("\nStory script validated and locked into master run manifest.")
-                    print("\n👉 NEXT STEP: Generate Director Plan, Visual Critic Audit & Images (S05 -> S07)")
-                    print("Execute CLI Command:")
-                    print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s05_director_plan --to s07_image_gen")
-                    print("\n[Image Generation Instructions]:")
-                    print(f"Bulk prompts saved in: {paths.root / 'bulk_image_prompts.txt'}")
-                    print(f"Generate authentic images and place in: {paths.composite_seeds_dir}")
-                    print("Or execute skill /vf-image-gen in Antigravity UI.")
-                    print("=" * 75 + "\n")
-                    try:
-                        from app.services.telegram_buttons import send_hg2_story_audited
-                        w_num = int(w_count) if isinstance(w_count, (int, float)) or (isinstance(w_count, str) and w_count.isdigit()) else 0
-                        d_num = float(est_dur) if isinstance(est_dur, (int, float)) or (isinstance(est_dur, str) and est_dur.replace('.', '', 1).isdigit()) else 0.0
-                        send_hg2_story_audited(
-                            task_id=effective_run_id,
-                            title=str(title_disp),
-                            total_words=w_num,
-                            est_duration_s=d_num,
-                            audit_score="PASS",
-                            preset=preset_name,
-                            next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s05_director_plan --to s07_image_gen",
-                            bulk_prompts_file=str(paths.root / "bulk_image_prompts.txt"),
-                        )
-                    except Exception as _tg_err:
-                        logger.warning(f"[HG2] Telegram notification notice: {_tg_err}")
-                    return 0
-
-            # ------------------------------------------------------------------
-            # HUMAN GATE 3: After Image Generation (S07 Image Gen)
-            # ------------------------------------------------------------------
-            if stage == StageID.S7_IMAGE_GEN and effective_human_gates and (only_target_idx is None or only_target_idx == 6):
-                if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 6 or only_target_idx == 6:
-                    total_imgs = len(_artifact.payload.get("images", [])) if isinstance(_artifact.payload, dict) else 0
-                    ms_dir = paths.root / "master_sheets"
-                    sys_sheet = ms_dir / "master_sheet_system.html"
-                    scenes_sheet = ms_dir / "master_sheet_scenes.html"
-                    dashboard = ms_dir / "master_sheet_dashboard.html"
-                    print("\n" + "=" * 75)
-                    print("🛑 [HUMAN GATE 3 REACHED: IMAGE ASSETS & MASTER SCENE SHEETS VERIFIED]")
-                    print("=" * 75)
-                    print(f"🖼️ Composite Seeds:    {total_imgs} authentic images verified in {paths.composite_seeds_dir}")
-                    print(f"📐 Master System Sheet: {sys_sheet if sys_sheet.exists() else ms_dir / 'master_sheet_system.html'}")
-                    print(f"🎬 Scene Storyboards:   {scenes_sheet if scenes_sheet.exists() else ms_dir / 'master_sheet_scenes.html'}")
-                    print(f"📊 Master Dashboard:    {dashboard if dashboard.exists() else ms_dir / 'master_sheet_dashboard.html'}")
-                    print("🛡️ Visual Checklist:   100% authentic editorial illustrations, 0% placeholders (Rule 118 & 121)")
-                    print("\nAll composite image assets and master storyboards verified on disk.")
-                    print("\n👉 NEXT STEP 1: Generate Omni Demo Video (First 2 Scenes Hook)")
-                    print("Execute CLI Command:")
-                    print(f"python scripts/flow_video_dispatcher.py --episode {effective_run_id} --model omni --limit 2")
-                    print(f"(Or run pilot: python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --pilot)")
-                    print("\n👉 NEXT STEP 2: Approve & Render Full Master Video")
-                    print("Execute CLI Command:")
-                    print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s08_video_gen --to s11_qc --upload-youtube")
-                    print("=" * 75 + "\n")
-                    try:
-                        from app.services.telegram_buttons import send_hg3_images_verified
-                        send_hg3_images_verified(
-                            task_id=effective_run_id,
-                            image_count=total_imgs,
-                            preset=preset_name,
-                            next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --pilot",
-                            composite_dir=str(paths.composite_seeds_dir),
-                            master_sheet_dir=str(ms_dir),
-                        )
-                    except Exception as _tg_err:
-                        logger.warning(f"[HG3] Telegram notification notice: {_tg_err}")
-                    return 0
-
-            # ------------------------------------------------------------------
-            # HUMAN GATE 5: Master Video QC Passed -> YouTube Unlisted Upload
-            # ------------------------------------------------------------------
-            if stage == StageID.S11_QC and upload_youtube:
-                final_video = paths.final_render_dir / "final.mp4"
-                if not final_video.exists():
-                    final_video = paths.root / "10_render" / "final.mp4"
-                yt_res = execute_youtube_upload(ctx, final_video)
-                print("\n" + "=" * 75)
-                print("🎉 [HUMAN GATE 5 REACHED: MASTER VIDEO VERIFIED & UPLOADED TO YOUTUBE]")
-                print("=" * 75)
-                print(f"🎥 Master MP4 Video:   {final_video}")
-                print("🛡️ QC Verdict:         PASS (ALL GATES PASSED)")
-                print("🔒 YouTube Privacy:    UNLISTED")
-                print(f"🆔 Video ID:           {yt_res.get('id', 'N/A')}")
-                print(f"🔗 Video URL:          {yt_res.get('url', 'N/A')}")
-                print(f"📌 Video Title:        {yt_res.get('title', 'N/A')}")
-                print("=" * 75 + "\n")
                 try:
-                    from app.services.telegram_buttons import send_hg5_youtube_published
-                    send_hg5_youtube_published(
-                        task_id=effective_run_id,
-                        video_id=yt_res.get('id', 'N/A'),
-                        video_url=yt_res.get('url', 'N/A'),
-                        title=yt_res.get('title', 'N/A'),
-                        privacy="unlisted",
-                        market=manifest.market
-                    )
-                except Exception as _tg_err:
-                    logger.warning(f"[HG5] Telegram notification notice: {_tg_err}")
+                    print(f"   ✅ PASS (Artifact emitted: {art_path.name})")
+                except (BrokenPipeError, OSError):
+                    pass
 
-        except GateError as ge:
-            manifest.mark(stage, "failed", error=str(ge))
-            manifest.save_atomic(paths)
-            print(f"\n❌ [GATE BLOCKED at {stage_name}]: {ge}")
-            print(f"   Details: {ge.details}")
-            print(f"   Resume command: python -m orchestrator.run_pipeline --run-id {effective_run_id} --from {stage_name}")
-            return 1
+                # ------------------------------------------------------------------
+                # HUMAN GATE 1: After Candidate Selection (S01 Ideation)
+                # ------------------------------------------------------------------
+                if stage == StageID.S1_IDEATION and effective_human_gates and (only_target_idx is None or only_target_idx == 0):
+                    if (start_idx == 0 or only_target_idx == 0) and (effective_to is None or resolve_stage_index(effective_to, stage_list) == 0):
+                        payload = _artifact.payload if isinstance(_artifact.payload, dict) else {}
+                        topic_display = ctx.topic or payload.get("topic") or payload.get("title_working") or effective_run_id
+                        print("\n" + "=" * 75)
+                        print("🛑 [HUMAN GATE 1 REACHED: CANDIDATE SELECTION APPROVED]")
+                        print("=" * 75)
+                        print(f"📌 Candidate Topic:    {topic_display}")
+                        print(f"🌍 Target Market:      {manifest.market}")
+                        print(f"🧭 Track Preset:       {preset_name}")
+                        print(f"📁 Workspace:          {paths.root}")
+                        print(f"📄 Manifest:           {paths.manifest_file}")
+                        print("\nCandidate confirmed and locked into master run manifest.")
+                        print("\n👉 NEXT STEP: Generate Story Research, Script & Critic Audit (S02 -> S04)")
+                        print("Execute CLI Command:")
+                        print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s02_research --to s04_critic_script")
+                        print("=" * 75 + "\n")
+                        try:
+                            from app.services.telegram_buttons import send_hg1_candidate_selected
+                            send_hg1_candidate_selected(
+                                task_id=effective_run_id,
+                                topic=str(topic_display),
+                                market=manifest.market,
+                                preset=preset_name,
+                                viability_score=payload.get("viability_score"),
+                                specific_angle=payload.get("specific_angle"),
+                                competitor_gap=payload.get("competitor_gap"),
+                                next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s02_research --to s04_critic_script",
+                            )
+                        except Exception as _tg_err:
+                            logger.warning(f"[HG1] Telegram notification notice: {_tg_err}")
+                        return 0
 
-        except Exception as ex:
-            manifest.mark(stage, "failed", error=str(ex))
-            manifest.save_atomic(paths)
-            print(f"\n❌ [UNEXPECTED ERROR at {stage_name}]: {ex}")
-            import traceback
-            traceback.print_exc()
-            print(f"   Resume command: python -m orchestrator.run_pipeline --run-id {effective_run_id} --from {stage_name}")
-            return 1
+                # ------------------------------------------------------------------
+                # HUMAN GATE 2: After Story Generation & Audit (S04 Critic Script)
+                # ------------------------------------------------------------------
+                if stage == StageID.S4_CRITIC_SCRIPT and effective_human_gates and (only_target_idx is None or only_target_idx == 3):
+                    if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 3 or only_target_idx == 3:
+                        s3_art_path = paths.artifact_file(StageID.S3_SCRIPT.value)
+                        s3_info = {}
+                        if s3_art_path.exists():
+                            try:
+                                s3_info = json.loads(s3_art_path.read_text(encoding="utf-8")).get("payload", {})
+                            except Exception:
+                                pass
+                        title_disp = s3_info.get("title") or ctx.topic or effective_run_id
+                        w_count = s3_info.get("total_words", "N/A")
+                        est_dur = s3_info.get("est_duration_s", "N/A")
+                        print("\n" + "=" * 75)
+                        print("🛑 [HUMAN GATE 2 REACHED: STORY SCRIPT GENERATED & AUDITED]")
+                        print("=" * 75)
+                        print(f"📖 Story Title:        {title_disp}")
+                        print(f"📊 Word Count:         {w_count} words (Preset target: 450-750 words, 180-300s)")
+                        print(f"⏱️ Estimated Duration: {est_dur}s")
+                        print("🛡️ Script Audit:       PASS (Dual Critic Council Rule 444 & 445)")
+                        print(f"📄 Script Artifact:    {s3_art_path}")
+                        print("\nStory script validated and locked into master run manifest.")
+                        print("\n👉 NEXT STEP: Generate Director Plan, Visual Critic Audit & Images (S05 -> S07)")
+                        print("Execute CLI Command:")
+                        print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s05_director_plan --to s07_image_gen")
+                        print("\n[Image Generation Instructions]:")
+                        print(f"Bulk prompts saved in: {paths.root / 'bulk_image_prompts.txt'}")
+                        print(f"Generate authentic images and place in: {paths.composite_seeds_dir}")
+                        print("Or execute skill /vf-image-gen in Antigravity UI.")
+                        print("=" * 75 + "\n")
+                        try:
+                            from app.services.telegram_buttons import send_hg2_story_audited
+                            w_num = int(w_count) if isinstance(w_count, (int, float)) or (isinstance(w_count, str) and w_count.isdigit()) else 0
+                            d_num = float(est_dur) if isinstance(est_dur, (int, float)) or (isinstance(est_dur, str) and est_dur.replace('.', '', 1).isdigit()) else 0.0
+                            send_hg2_story_audited(
+                                task_id=effective_run_id,
+                                title=str(title_disp),
+                                total_words=w_num,
+                                est_duration_s=d_num,
+                                audit_score="PASS",
+                                preset=preset_name,
+                                next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s05_director_plan --to s07_image_gen",
+                                bulk_prompts_file=str(paths.root / "bulk_image_prompts.txt"),
+                            )
+                        except Exception as _tg_err:
+                            logger.warning(f"[HG2] Telegram notification notice: {_tg_err}")
+                        return 0
 
-    print("\n" + "=" * 75)
-    if end_idx == len(stage_list) - 1 and only_target_idx is None and start_idx == 0:
-        print("🏆 ALL 11 PIPELINE STAGES COMPLETED SUCCESSFULLY!")
-        print(f"📄 Master Manifest:     {paths.manifest_file}")
-        print(f"🎥 Master Video Asset:  {paths.final_render_dir / 'final.mp4'}")
-        if not upload_youtube:
-            print("\n👉 To upload unlisted to YouTube (Human Gate 5):")
-            print(f"Execute: python -m orchestrator.run_pipeline --run-id {effective_run_id} --upload-youtube")
-    else:
-        executed_desc = stage_list[only_target_idx].value.upper() if only_target_idx is not None else f"{stage_list[start_idx].value.upper()} ➔ {stage_list[end_idx].value.upper()}"
-        print(f"🏆 PIPELINE SUB-RUN COMPLETED: [{executed_desc}]")
-        print(f"📄 Master Manifest:     {paths.manifest_file}")
-    print("=" * 75 + "\n")
-    return 0
+                # ------------------------------------------------------------------
+                # HUMAN GATE 3: After Image Generation (S07 Image Gen)
+                # ------------------------------------------------------------------
+                if stage == StageID.S7_IMAGE_GEN and effective_human_gates and (only_target_idx is None or only_target_idx == 6):
+                    if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 6 or only_target_idx == 6:
+                        total_imgs = len(_artifact.payload.get("images", [])) if isinstance(_artifact.payload, dict) else 0
+                        ms_dir = paths.root / "master_sheets"
+                        sys_sheet = ms_dir / "master_sheet_system.html"
+                        scenes_sheet = ms_dir / "master_sheet_scenes.html"
+                        dashboard = ms_dir / "master_sheet_dashboard.html"
+                        print("\n" + "=" * 75)
+                        print("🛑 [HUMAN GATE 3 REACHED: IMAGE ASSETS & MASTER SCENE SHEETS VERIFIED]")
+                        print("=" * 75)
+                        print(f"🖼️ Composite Seeds:    {total_imgs} authentic images verified in {paths.composite_seeds_dir}")
+                        print(f"📐 Master System Sheet: {sys_sheet if sys_sheet.exists() else ms_dir / 'master_sheet_system.html'}")
+                        print(f"🎬 Scene Storyboards:   {scenes_sheet if scenes_sheet.exists() else ms_dir / 'master_sheet_scenes.html'}")
+                        print(f"📊 Master Dashboard:    {dashboard if dashboard.exists() else ms_dir / 'master_sheet_dashboard.html'}")
+                        print("🛡️ Visual Checklist:   100% authentic editorial illustrations, 0% placeholders (Rule 118 & 121)")
+                        print("\nAll composite image assets and master storyboards verified on disk.")
+                        print("\n👉 NEXT STEP 1: Generate Omni Demo Video (First 2 Scenes Hook)")
+                        print("Execute CLI Command:")
+                        print(f"python scripts/flow_video_dispatcher.py --episode {effective_run_id} --model omni --limit 2")
+                        print(f"(Or run pilot: python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --pilot)")
+                        print("\n👉 NEXT STEP 2: Approve & Render Full Master Video")
+                        print("Execute CLI Command:")
+                        print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s08_video_gen --to s11_qc --upload-youtube")
+                        print("=" * 75 + "\n")
+                        try:
+                            from app.services.telegram_buttons import send_hg3_images_verified
+                            send_hg3_images_verified(
+                                task_id=effective_run_id,
+                                image_count=total_imgs,
+                                preset=preset_name,
+                                next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --pilot",
+                                composite_dir=str(paths.composite_seeds_dir),
+                                master_sheet_dir=str(ms_dir),
+                            )
+                        except Exception as _tg_err:
+                            logger.warning(f"[HG3] Telegram notification notice: {_tg_err}")
+                        return 0
+
+                # ------------------------------------------------------------------
+                # HUMAN GATE 5: Master Video QC Passed -> YouTube Unlisted Upload
+                # ------------------------------------------------------------------
+                if stage == StageID.S11_QC and upload_youtube:
+                    final_video = paths.final_render_dir / "final.mp4"
+                    if not final_video.exists():
+                        final_video = paths.root / "10_render" / "final.mp4"
+                    yt_res = execute_youtube_upload(ctx, final_video)
+                    print("\n" + "=" * 75)
+                    print("🎉 [HUMAN GATE 5 REACHED: MASTER VIDEO VERIFIED & UPLOADED TO YOUTUBE]")
+                    print("=" * 75)
+                    print(f"🎥 Master MP4 Video:   {final_video}")
+                    print("🛡️ QC Verdict:         PASS (ALL GATES PASSED)")
+                    print("🔒 YouTube Privacy:    UNLISTED")
+                    print(f"🆔 Video ID:           {yt_res.get('id', 'N/A')}")
+                    print(f"🔗 Video URL:          {yt_res.get('url', 'N/A')}")
+                    print(f"📌 Video Title:        {yt_res.get('title', 'N/A')}")
+                    print("=" * 75 + "\n")
+                    try:
+                        from app.services.telegram_buttons import send_hg5_youtube_published
+                        send_hg5_youtube_published(
+                            task_id=effective_run_id,
+                            video_id=yt_res.get('id', 'N/A'),
+                            video_url=yt_res.get('url', 'N/A'),
+                            title=yt_res.get('title', 'N/A'),
+                            privacy="unlisted",
+                            market=manifest.market
+                        )
+                    except Exception as _tg_err:
+                        logger.warning(f"[HG5] Telegram notification notice: {_tg_err}")
+
+            except GateError as ge:
+                manifest.mark(stage, "failed", error=str(ge))
+                manifest.save_atomic(paths)
+                print(f"\n❌ [GATE BLOCKED at {stage_name}]: {ge}")
+                print(f"   Details: {ge.details}")
+                print(f"   Resume command: python -m orchestrator.run_pipeline --run-id {effective_run_id} --from {stage_name}")
+                return 1
+
+            except Exception as ex:
+                manifest.mark(stage, "failed", error=str(ex))
+                manifest.save_atomic(paths)
+                print(f"\n❌ [UNEXPECTED ERROR at {stage_name}]: {ex}")
+                import traceback
+                traceback.print_exc()
+                print(f"   Resume command: python -m orchestrator.run_pipeline --run-id {effective_run_id} --from {stage_name}")
+                return 1
+
+        print("\n" + "=" * 75)
+        if end_idx == len(stage_list) - 1 and only_target_idx is None and start_idx == 0:
+            print("🏆 ALL 11 PIPELINE STAGES COMPLETED SUCCESSFULLY!")
+            print(f"📄 Master Manifest:     {paths.manifest_file}")
+            print(f"🎥 Master Video Asset:  {paths.final_render_dir / 'final.mp4'}")
+            if not upload_youtube:
+                print("\n👉 To upload unlisted to YouTube (Human Gate 5):")
+                print(f"Execute: python -m orchestrator.run_pipeline --run-id {effective_run_id} --upload-youtube")
+        else:
+            executed_desc = stage_list[only_target_idx].value.upper() if only_target_idx is not None else f"{stage_list[start_idx].value.upper()} ➔ {stage_list[end_idx].value.upper()}"
+            print(f"🏆 PIPELINE SUB-RUN COMPLETED: [{executed_desc}]")
+            print(f"📄 Master Manifest:     {paths.manifest_file}")
+        print("=" * 75 + "\n")
+        return 0
 
 
 def main():

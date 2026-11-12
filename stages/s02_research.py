@@ -372,7 +372,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     ),
                     EvidenceClaim(
                         claim_id="C002",
-                        claim=f"Commercial agreements and contractual data licensing structures were executed by {antagonist_name}: {s1_scheme}",
+                        claim=f"Commercial agreements and operational risk mechanisms were executed by {antagonist_name}: {s1_scheme}",
                         source_url="https://www.sec.gov",
                         source_type="regulator",
                         date="2024-03-01",
@@ -399,7 +399,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     ),
                     EvidenceClaim(
                         claim_id="C005",
-                        claim=f"Civil litigation and regulatory complaints alleged unauthorized content harvesting and circumvention of digital perimeter controls surrounding {topic_name}.",
+                        claim=f"Civil litigation and regulatory complaints alleged material governance failures and breach of internal compliance controls surrounding {topic_name}.",
                         source_url="https://www.courtlistener.com",
                         source_type="court",
                         date="2024-11-15",
@@ -408,7 +408,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     ),
                     EvidenceClaim(
                         claim_id="C006",
-                        claim=f"Formal judicial petitions charged commercial counterparties and automated networks with systematic contract breaches related to {topic_name}.",
+                        claim=f"Formal judicial petitions charged counterparties and responsible entities with systematic statutory and contractual breaches related to {topic_name}.",
                         source_url="https://www.courtlistener.com",
                         source_type="court",
                         date="2025-01-20",
@@ -427,11 +427,11 @@ def run(ctx: RunContext) -> StageArtifact:
                 ]
                 events = [
                     TimelineEvent(date="2024-02-15", event=f"Initial filings and disclosures registered for {topic_name}.", claim_ids=["C001"]),
-                    TimelineEvent(date="2024-03-01", event=f"Major commercial agreements and data frameworks enacted by {antagonist_name}.", claim_ids=["C002"]),
+                    TimelineEvent(date="2024-03-01", event=f"Major commercial agreements and operational frameworks enacted by {antagonist_name}.", claim_ids=["C002"]),
                     TimelineEvent(date="2024-05-20", event=f"Market reaction and trading volatility accelerate surrounding {topic_name}.", claim_ids=["C003"]),
                     TimelineEvent(date="2024-08-10", event="Supervisory inquiries initiated regarding operational dependencies.", claim_ids=["C004"]),
-                    TimelineEvent(date="2024-11-15", event="Civil complaints allege unlawful circumvention and unauthorized scraping.", claim_ids=["C005"]),
-                    TimelineEvent(date="2025-01-20", event="Federal court dockets document breach-of-contract charges.", claim_ids=["C006"]),
+                    TimelineEvent(date="2024-11-15", event="Civil complaints allege governance and compliance control failures.", claim_ids=["C005"]),
+                    TimelineEvent(date="2025-01-20", event="Federal court dockets document statutory and breach-of-contract charges.", claim_ids=["C006"]),
                     TimelineEvent(date="2025-06-30", event="Final enforcement decrees, settlements, and institutional reforms concluded.", claim_ids=["C007"]),
                 ]
             return claims, events
@@ -604,7 +604,46 @@ def run(ctx: RunContext) -> StageArtifact:
                 timeline = []
 
         if not ledger:
-            ledger, timeline = _build_generic_evidence_ledger(topic, s1_art.payload)
+            if not ctx.dry_run:
+                if grounding_intel and grounding_intel.get("claims"):
+                    from app.services.story_provenance_engine import (
+                        classify_claim_provenance as _classify_g_fallback,
+                    )
+
+                    for idx_g, gc in enumerate(grounding_intel.get("claims", [])[:8], start=1):
+                        prov_g = _classify_g_fallback(gc, market=market)
+                        cid_g = f"C{idx_g:03d}"
+                        ledger.append(EvidenceClaim(
+                            claim_id=cid_g,
+                            claim=prov_g.get("claim") or str(gc.get("claim") or f"Documented record on {topic}"),
+                            source_url=prov_g.get("source_url") or str(gc.get("source_url") or ""),
+                            source_name=prov_g.get("source_name") or str(gc.get("source") or ""),
+                            source_type=prov_g.get("source_type", "press"),
+                            doc_type=prov_g.get("doc_type", "unknown"),
+                            speaker=prov_g.get("speaker"),
+                            date=prov_g.get("date") or gc.get("date"),
+                            legal_status=prov_g.get("legal_status", "alleged"),
+                            procedural_status=prov_g.get("procedural_status", "unknown"),
+                            verification_status=prov_g.get("verification_status", "unverified_secondary"),
+                            evidence_tier=prov_g.get("evidence_tier", "secondary"),
+                            causal_role=prov_g.get("causal_role", "unknown"),
+                            scope=prov_g.get("scope"),
+                            mechanism=gc.get("mechanism"),
+                            act_target=gc.get("act_target"),
+                            confidence=prov_g.get("confidence", "low"),
+                        ))
+                        timeline.append(TimelineEvent(
+                            date=str(prov_g.get("date") or "2026-01-01"),
+                            event=str(prov_g.get("claim") or "")[:140],
+                            claim_ids=[cid_g],
+                        ))
+                else:
+                    raise RuntimeError(
+                        "[S02_RESEARCH] Live research failed and no grounding_intel claims are available; "
+                        "refusing to fabricate verified_primary claims in production (Rule 118)."
+                    )
+            else:
+                ledger, timeline = _build_generic_evidence_ledger(topic, s1_art.payload)
 
         # Build dynamic factsheet and competitor vacuums anchored in S1 payload
         s1_scheme = s1_art.payload.get("scheme_mechanism_summary") or f"Systemic mechanisms and operational dependencies underlying {topic}."

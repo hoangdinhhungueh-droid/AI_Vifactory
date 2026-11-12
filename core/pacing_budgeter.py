@@ -49,15 +49,15 @@ DOCUDRAMA_MAX_WPM: float = 135.0
 DOCUDRAMA_TARGET_WPM: float = 125.0
 DOCUDRAMA_WORDS_PER_SEC: float = round(DOCUDRAMA_TARGET_WPM / 60.0, 4)  # ~2.0833 words/s
 
-# Docudrama Speech Rates across markets (clinical investigative tempo)
+# Docudrama Speech Rates across markets (clinical investigative tempo, calibrated via Edge-TTS + ffprobe)
 DOCUDRAMA_SPEECH_RATES: Dict[str, float] = {
-    "KR": 4.17,  # Syllables per second (~250 syllables/min docudrama tempo)
-    "KO": 4.17,
-    "JA": 6.0,   # Characters per second (~360 chars/min)
-    "JP": 6.0,
-    "EN": DOCUDRAMA_WORDS_PER_SEC,  # ~2.0833 words/s (125.0 WPM)
-    "VN": 2.5,   # Words per second (~150 words/min)
-    "VI": 2.5,
+    "KR": 5.0,   # Syllables per second (~300 syllables/min; empirically 5.10 syl/s on ko-KR-InJoonNeural +0%)
+    "KO": 5.0,
+    "JA": 6.3,   # Characters per second (~378 chars/min; empirically 6.44 chars/s on ja-JP-KeitaNeural +0%)
+    "JP": 6.3,
+    "EN": DOCUDRAMA_WORDS_PER_SEC,  # ~2.0833 words/s (125.0 WPM; empirically 2.11 w/s on en-US-ChristopherNeural -8%)
+    "VN": 3.75,  # Words per second (~225 words/min; empirically 3.85 w/s on vi-VN-NamMinhNeural +0%)
+    "VI": 3.75,
 }
 
 # Acceptable variance ranges for QA Auditing

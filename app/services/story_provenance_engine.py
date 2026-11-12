@@ -1274,8 +1274,8 @@ def extract_claim_elements(claim_text: str) -> Dict[str, Any]:
     all_loc_metrics_pool: List[str] = []
     metric_pat = (
         r"(?:\d+\s*/\s*\d+|\d+\s*분의\s*\d+|\d+\s*分の\s*\d+|"
-        r"[$€£¥₩₫]\s*\d[\d,]*(?:\.\d+)?\s*(?:[TBMK]|billion|million|trillion|thousand|십억\s*달러|백만\s*달러|조\s*원|조|억\s*원|억)?|"
-        r"\d[\d,]*(?:\.\d+)?\s*(?:%|퍼센트|パーセント|phần trăm|십억\s*달러|백만\s*달러|십억|백만|十億ドル|百万ドル|十億|百万|tỷ\s*USD|triệu\s*USD|billion|million|trillion|basis\s*points|bps|cents|조\s*원|조|억\s*원|억|만\s*원|만|원|명|건|곳|배|万円|円|件|tỷ|triệu|nghìn|đồng|USD|KRW|JPY|VND)?)"
+        r"[$€£¥₩₫]\s*\d[\d,]*(?:\.\d+)?\s*(?:trillion|billion|million|thousand|[TBMK]\b|십억\s*달러|백만\s*달러|조\s*원|조|억\s*원|억)?|"
+        r"\d[\d,]*(?:\.\d+)?\s*(?:%|퍼센트|パーセント|phần trăm|십억\s*달러|백만\s*달러|십억|백만|十億ドル|百万ドル|十億|百万|tỷ\s*USD|triệu\s*USD|trillion|billion|million|basis\s*points|bps|cents|조\s*원|조|억\s*원|억|만\s*원|만|원|명|건|곳|배|万円|円|件|tỷ|triệu|nghìn|đồng|USD|KRW|JPY|VND)?)"
     )
     for lang_m in ("KR", "JA", "VN"):
         loc = localize_dates_and_metrics(text, lang_m)
