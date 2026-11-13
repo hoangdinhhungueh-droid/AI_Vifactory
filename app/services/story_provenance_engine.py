@@ -159,11 +159,11 @@ def is_reputable_press_domain(url: str, source_name: str = "") -> bool:
     wire_names = (
         "reuters", "associated press", "ap news", "bloomberg", "financial times", "wsj",
         "wall street journal", "new york times", "washington post", "cnbc", "bbc", "guardian",
-        "npr", "pbs", "propublica", "economist",
-        "nikkei", "nhk", "kyodo", "asahi", "yomiuri", "mainichi", "jiji", "日本経済新聞", "朝日新聞", "読売新聞", "毎日新聞", "共同通信",
+        "npr", "pbs", "propublica", "economist", "politico", "time", "fortune", "forbes",
+        "nikkei", "nhk", "kyodo", "asahi", "yomiuri", "mainichi", "jiji", "日本経済新聞", "朝日新聞", "読売新聞", "毎日新聞", "共同通信", "時事通信",
         "yonhap", "연합뉴스", "kbs", "mbc", "sbs", "ytn", "jtbc", "경향신문", "한겨레", "조선비즈", "동아일보",
         "한국경제", "매일경제", "조선일보", "중앙일보", "서울경제", "머니투데이", "이데일리", "뉴스1", "뉴시스", "한국일보", "세계일보", "국민일보",
-        "vnexpress", "tuổi trẻ", "tuoi tre", "thanh niên", "thanh nien", "ttxvn", "vietnamplus", "vtv", "vov", "lao động", "nhân dân",
+        "vnexpress", "tuổi trẻ", "tuoi tre", "thanh niên", "thanh nien", "ttxvn", "vietnamplus", "vtv", "vov", "lao động", "nhân dân", "tiền phong", "tien phong", "dân trí", "dan tri",
     )
     return any(w in s_low for w in wire_names)
 
@@ -173,14 +173,24 @@ def is_official_portal_name(source_name: str = "") -> bool:
     s_low = (source_name or "").lower()
     if not s_low:
         return False
+    if re.search(r"\b(?:sec|doj|ftc|irs|gao|cbo)\b", s_low):
+        return True
     portal_markers = (
-        "대한민국 정책브리핑", "정책브리핑", "korea.kr", "국토교통부", "금융위원회", "금융감독원",
-        "법무부", "대검찰청", "대법원", "감사원", "공정거래위원회", "보건복지부", "기획재정부",
+        "대한민국 정책브리핑", "정책브리핑", "korea.kr", "국토교통부", "국토부", "금융위원회", "금융위", "금융감독원", "금감원",
+        "법무부", "대검찰청", "검찰청", "대법원", "감사원", "공정거래위원회", "공정위", "보건복지부", "기획재정부", "기재부",
+        "경찰청", "국세청", "관세청", "조달청", "통계청", "한국은행", "행정안전부", "행안부", "고용노동부",
+        "산업통상자원부", "산자부", "환경부", "중소벤처기업부", "중기부", "법원", "검찰",
         "u.s. department of justice", "department of justice", "justice department",
         "centers for medicare", "federal register", "securities and exchange commission",
-        "federal trade commission", "inspector general", "supreme court",
+        "federal trade commission", "inspector general", "supreme court", "white house",
+        "department of", "ministry of", "bureau of industry and security", "bureau of",
+        "internal revenue service", "federal reserve",
         "金融庁", "総務省", "法務省", "国土交通省", "経済産業省", "厚生労働省", "公正取引委員会", "最高裁判所",
+        "日本銀行", "日銀", "内閣府", "財務省", "警察庁", "消費者庁", "裁判所", "検察",
         "bộ tài chính", "bộ công an", "ngân hàng nhà nước", "thanh tra chính phủ", "cổng thông tin chính phủ",
+        "bản tin chính phủ", "chính phủ", "bộ xây dựng", "bộ giao thông", "bộ kế hoạch", "bộ công thương",
+        "tổng cục thuế", "tổng cục thống kê", "ủy ban chứng khoán", "ubck", "tòa án", "viện kiểm sát",
+        ".gov", ".go.kr", ".go.jp", ".gov.vn",
     )
     return any(p in s_low for p in portal_markers)
 
@@ -319,22 +329,24 @@ def classify_claim_provenance(
         "省", "庁", "内閣", "bộ ", "chính phủ", "quốc hội",
     )) or bool(re.search(r"\b(?:ministry|department|parliament|congress|cabinet)\b", src_low))
 
+    is_official_portal = is_official_portal_name(source_name)
+
     if is_primary_url and any(x in source_url.lower() for x in ("court", "scourt", "justice")):
         source_type = "court"
     elif is_court_source and not is_reputable_press:
         source_type = "court"
     elif is_regulator_source and not is_reputable_press:
         source_type = "regulator"
-    elif (is_gov_source or is_primary_url) and not is_reputable_press:
+    elif (is_gov_source or is_primary_url or is_official_portal) and not is_reputable_press:
         source_type = "gov"
-    else:
+    elif is_reputable_press:
         source_type = "press"
+    else:
+        source_type = raw_claim.get("source_type") or "press"
 
     # Refine doc_type & procedural_status
     if doc_type == "unknown":
-        if is_rss:
-            doc_type = "rss_snippet"
-        elif has_judgment:
+        if has_judgment:
             doc_type = "court_judgment"
         elif has_indictment:
             doc_type = "indictment"
@@ -344,10 +356,14 @@ def classify_claim_provenance(
             doc_type = "statute"
         elif has_audit_report:
             doc_type = "audit_report"
-        elif is_regulator_source or is_gov_source or is_primary_url:
-            doc_type = "regulatory_notice" if is_regulator_source else "gov_report"
-        elif source_type == "press":
+        elif is_regulator_source or is_gov_source or is_primary_url or is_official_portal:
+            doc_type = "regulatory_notice" if (is_regulator_source or is_official_portal) else "gov_report"
+        elif is_reputable_press:
             doc_type = "news_article"
+        elif source_type == "press":
+            doc_type = "rss_snippet" if is_rss else "news_article"
+        elif is_rss:
+            doc_type = "rss_snippet"
         else:
             doc_type = "commentary"
 
@@ -382,16 +398,17 @@ def classify_claim_provenance(
             speaker = "journalist"
 
     # 3. Verification status & tier calibration (Anti-RSS-Elevation Invariant)
-    explicit_primary_flag = raw_ver == "verified_primary" and is_primary_url
+    explicit_primary_flag = raw_ver == "verified_primary" and (is_primary_url or is_official_portal)
     if explicit_primary_flag:
         verification_status = "verified_primary"
     elif has_speculative:
         verification_status = "speculative"
-    elif is_primary_url and raw_conf in ("verified", "high", ""):
+    elif (is_primary_url or is_official_portal) and raw_conf in ("verified", "high", ""):
         verification_status = "verified_primary"
     elif is_rss:
-        # RSS aggregator text/links NEVER become verified_primary automatically
-        if raw_conf == "verified" and is_reputable_press:
+        if is_official_portal:
+            verification_status = "verified_primary"
+        elif raw_conf == "verified" and is_reputable_press:
             verification_status = "corroborated_secondary"
         else:
             verification_status = "unverified_secondary"
@@ -438,7 +455,7 @@ def classify_claim_provenance(
     elif verification_status == "verified_primary":
         confidence = "medium"
     elif verification_status == "corroborated_secondary":
-        confidence = "medium" if (has_proposed_bill or is_rss or not norm_date) else "high"
+        confidence = "medium" if (has_proposed_bill or (is_rss and not is_reputable_press) or not norm_date) else "high"
     elif verification_status == "unverified_secondary":
         confidence = "medium" if (norm_date and is_reputable_press) else "low"
     else:
@@ -446,22 +463,24 @@ def classify_claim_provenance(
 
     # 6. Credibility & Knowledge Verification Hierarchy
     # ("verified_fact" > "official_regulation" > "press_allegation" > "unconfirmed_claim")
+    is_anonymous_rss = is_rss and not is_official_portal and not (is_reputable_press and verification_status == "corroborated_secondary")
+
     if (
         (doc_type in ("court_judgment", "audit_report") or procedural_status == "final_judgment" or has_acquittal)
         and verification_status in ("verified_primary", "corroborated_secondary")
-    ) or (source_type in ("court", "regulator", "gov") and verification_status == "verified_primary" and legal_status in ("fact", "convicted", "settled") and not is_rss):
+    ) or (source_type == "court" and verification_status == "verified_primary" and legal_status in ("fact", "convicted", "settled") and not is_anonymous_rss):
         credibility_tier = "verified_fact"
     elif (
         doc_type in ("statute", "regulatory_notice", "gov_report")
         or procedural_status == "legislative_enacted"
-        or (source_type in ("regulator", "gov") and verification_status in ("verified_primary", "corroborated_secondary") and legal_status not in ("alleged", "charged") and not is_rss)
+        or (source_type in ("regulator", "gov") and verification_status in ("verified_primary", "corroborated_secondary") and legal_status not in ("alleged", "charged") and not is_anonymous_rss)
     ):
         credibility_tier = "official_regulation"
     elif (
         source_type in ("press", "court", "regulator", "gov")
         or doc_type in ("news_article", "indictment", "criminal_complaint")
         or legal_status in ("charged", "alleged")
-    ) and verification_status in ("corroborated_secondary", "verified_primary") and not has_speculative and not is_rss:
+    ) and verification_status in ("corroborated_secondary", "verified_primary") and not has_speculative and not is_anonymous_rss:
         credibility_tier = "press_allegation"
     else:
         credibility_tier = "unconfirmed_claim"
@@ -472,7 +491,7 @@ def classify_claim_provenance(
         or verification_status in ("unverified_secondary", "speculative")
         or doc_type in ("proposed_bill", "rss_snippet")
         or procedural_status in ("bill_proposed", "speculation")
-        or is_rss
+        or is_anonymous_rss
     )
 
     if raw_role in ("primary_catalyst", "transmission_mechanism", "background_context"):
@@ -533,13 +552,19 @@ def resolve_claim_credibility_tier(claim_dict: Dict[str, Any]) -> str:
     ls = str(claim_dict.get("legal_status") or "alleged").lower()
     ps = str(claim_dict.get("procedural_status") or "unknown").lower()
     url = str(claim_dict.get("source_url") or "")
+    src = str(claim_dict.get("source_name") or claim_dict.get("source") or "").strip().lower()
     is_rss = is_rss_or_aggregator_url(url)
+    is_official = is_official_portal_name(src) or is_primary_official_domain(url)
+    is_rep = is_reputable_press_domain(url, src)
+
+    is_anonymous_rss = is_rss and not is_official and not (is_rep and ver == "corroborated_secondary")
 
     if (
         ver in ("unverified_secondary", "speculative")
-        or is_rss
+        or is_anonymous_rss
         or ps in ("bill_proposed", "speculation")
-        or dt in ("proposed_bill", "rss_snippet")
+        or dt in ("proposed_bill",)
+        or (dt == "rss_snippet" and not is_official and not is_rep)
     ):
         return "unconfirmed_claim"
 
@@ -549,7 +574,7 @@ def resolve_claim_credibility_tier(claim_dict: Dict[str, Any]) -> str:
             and (
                 dt in ("court_judgment", "audit_report")
                 or ps == "final_judgment"
-                or (st in ("court", "regulator", "gov") and ver == "verified_primary")
+                or (st == "court" and ver in ("verified_primary", "corroborated_secondary"))
             )
             and ls in ("fact", "convicted", "settled")
         ):
@@ -572,7 +597,7 @@ def resolve_claim_credibility_tier(claim_dict: Dict[str, Any]) -> str:
     if (
         (dt in ("court_judgment", "audit_report") or ps == "final_judgment")
         and ver in ("verified_primary", "corroborated_secondary")
-    ) or (st in ("court", "regulator", "gov") and ver == "verified_primary" and ls in ("fact", "convicted", "settled")):
+    ) or (st == "court" and ver in ("verified_primary", "corroborated_secondary") and ls in ("fact", "convicted", "settled")):
         return "verified_fact"
     elif (
         dt in ("statute", "regulatory_notice", "gov_report")
@@ -702,6 +727,8 @@ def corroborate_evidence_ledger(
                 c_i["confidence"] = "medium"
             if is_official_portal_name(src_i) and str(c_i.get("source_type", "press")).lower() == "press":
                 c_i["source_type"] = "gov"
+            if str(c_i.get("doc_type", "")).lower() in ("unknown", "rss_snippet"):
+                c_i["doc_type"] = "news_article"
 
             # Re-evaluate credibility tier upon multi-outlet corroboration
             dt_i = str(c_i.get("doc_type") or "unknown").lower()
@@ -730,9 +757,9 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "press_charge": ["보도된 기소 내용에 따르면", "기소 보도", "보도에 따르면", "언론 보도에 따르면", "혐의를 받고 있", "공개된 혐의"],
         "alleged_regulator": ["규제 당국에 따르면", "당국에 따르면", "당국의 조사", "감독 당국", "정부 발표에 따르면", "발표에 따르면", "공식 발표", "발표했다", "보고서에 따르면", "조사 결과", "공식 분석", "분석 자료", "관계 기관", "공식 자료", "공정거래위원회", "금융감독원", "관계 당국"],
         "audit_finding": ["감사 보고서", "감사원", "감사 결과", "조사 결과", "실태조사", "점검 결과", "보고서에 따르면", "공식 감사"],
-        "alleged": ["언론 보도에 따르면", "보도 설명에 따르면", "보도에 따르면", "공개된 보도", "의혹이 제기", "주장에 따르면", "것으로 알려졌", "것으로 전해졌"],
+        "alleged": ["언론 보도에 따르면", "보도 설명에 따르면", "보도에 따르면", "공개된 보도", "의혹이 제기", "주장에 따르면", "것으로 알려졌", "것으로 전해졌", "취재 보도", "보도를 보면", "보도된 경위", "취재 결과"],
         "settled": ["합의했", "합의하며", "합의로 종결", "책임을 인정하지 않", "인정하지 않고 합의", "동의의결"],
-        "unverified": ["아직 최종", "아직 확인", "아직 사실관계", "미확인", "초기 보도", "확인되지 않은 보도", "초기 문건"],
+        "unverified": ["아직 최종", "아직 확인", "아직 사실관계", "미확인", "초기 보도", "확인되지 않은 보도", "초기 문건", "검증 전", "확인 전"],
         "proposed": ["추진", "검토", "예정", "발의", "초안", "방침"],
     },
     "JA": {
@@ -741,11 +768,11 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "indictment": ["起訴状によれば", "起訴状の指摘によれば", "検察によれば", "検察の発表", "検察の起訴状", "起訴内容"],
         "criminal_complaint": ["告訴状によれば", "訴状によれば", "訴状の主張によれば", "告訴内容", "申立て"],
         "press_charge": ["報道された起訴内容", "起訴に関する報道", "報道によれば", "報じられた"],
-        "alleged_regulator": ["当局の調査によれば", "規制当局によれば", "当局によれば", "監督当局", "発表によれば", "公表によれば", "報告によれば", "報告書によれば", "機関分析", "公的機関", "公表資料", "分析によ", "公的記録", "日本銀行", "日銀", "金融庁", "公正取引委員会", "国土交通省", "監督機関", "公表分析資料"],
+        "alleged_regulator": ["当局の調査によれば", "規制当局によれば", "当局によれば", "監督当局", "発表によれば", "公表によれば", "報告によれば", "報告書によれば", "機関分析", "公的機関", "公表資料", "公的資料", "分析によ", "公的記録", "日本銀行", "日銀", "金融庁", "公正取引委員会", "国土交通省", "監督機関", "公表分析資料"],
         "audit_finding": ["監査報告書によれば", "監査結果によれば", "調査結果によれば", "監査報告", "報告書によれば", "検査報告", "公式監査記録"],
-        "alleged": ["報道によれば", "公表報道", "報じられた", "疑惑", "とされ", "主張によれば", "見られ"],
+        "alleged": ["報道によれば", "公表報道", "報じられた", "疑惑", "とされ", "主張によれば", "見られ", "取材によれば"],
         "settled": ["和解し", "認めないまま和解", "違法性を認めることなく和解", "課徴金納付"],
-        "unverified": ["未確認", "初期報道", "初期段階", "確認前の報道", "裏付け前"],
+        "unverified": ["未確認", "初期報道", "初期段階", "確認前の報道", "裏付け前", "公的確認前"],
         "proposed": ["検討", "予定", "案", "方針"],
     },
     "VN": {
@@ -754,11 +781,11 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "indictment": ["theo cáo trạng", "cáo trạng của viện kiểm sát", "cơ quan công tố cáo buộc", "cáo trạng của cơ quan công tố", "hồ sơ truy tố"],
         "criminal_complaint": ["theo đơn kiện", "theo đơn tố cáo", "hồ sơ khởi kiện", "đơn tố cáo và hồ sơ khởi kiện", "nội dung đơn khởi kiện"],
         "press_charge": ["theo thông tin báo chí về quyết định truy tố", "quyết định truy tố", "truy tố được truyền thông", "theo thông tin báo chí", "theo báo chí", "bị cáo buộc theo"],
-        "alleged_regulator": ["theo cơ quan chức năng", "cơ quan quản lý", "theo thanh tra", "ủy ban giám sát", "theo công bố", "theo báo cáo", "theo báo cáo phân tích", "phân tích chính thức", "phân tích từ cơ quan chuyên môn", "quyết định xử phạt", "kết luận xử lý"],
+        "alleged_regulator": ["theo cơ quan chức năng", "cơ quan quản lý", "theo thanh tra", "ủy ban giám sát", "theo công bố", "theo báo cáo", "theo báo cáo phân tích", "phân tích chính thức", "phân tích từ cơ quan chuyên môn", "cơ quan chuyên môn", "quyết định xử phạt", "kết luận xử lý", "kết luận từ cơ quan chuyên môn"],
         "audit_finding": ["theo báo cáo kiểm toán", "kết luận thanh tra", "báo cáo thanh tra", "kiểm toán xác định", "kết quả thanh tra", "kiểm toán độc lập", "kết quả kiểm tra chính thức"],
-        "alleged": ["theo thông tin báo chí", "cáo buộc", "được cho là", "theo báo chí", "nghi vấn", "cho rằng", "thông tin báo chí phản ánh", "nguồn tin truyền thông", "ghi nhận từ các cơ quan báo chí"],
+        "alleged": ["theo thông tin báo chí", "cáo buộc", "được cho là", "theo báo chí", "nghi vấn", "cho rằng", "thông tin báo chí phản ánh", "nguồn tin truyền thông", "ghi nhận từ các cơ quan báo chí", "phản ánh từ báo chí", "phương tiện truyền thông", "đăng tải trên báo chí", "tường thuật của báo chí"],
         "settled": ["dàn xếp", "hòa giải", "không thừa nhận"],
-        "unverified": ["chưa kiểm chứng", "bước đầu", "chưa được xác minh", "nguồn tin ban đầu"],
+        "unverified": ["chưa kiểm chứng", "bước đầu", "chưa được xác minh", "nguồn tin ban đầu", "chưa có kết luận"],
         "proposed": ["dự thảo", "đề xuất", "dự kiến", "xem xét", "định hướng chính sách"],
     },
     "EN": {
@@ -774,12 +801,12 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "according to the justice department", "according to federal",
             "regulators allege", "regulatory inquiry", "justice department",
             "department of justice", "federal allegations", "enforcement order", "commission announced",
-            "regulatory findings", "regulators documented",
+            "regulatory findings", "regulators documented", "oversight agencies", "regulatory records",
         ],
         "audit_finding": ["according to the audit report", "inspector general found", "audit exhibits show", "audit findings", "audit report notes", "audit exhibits", "official audit"],
-        "alleged": ["according to press reports", "allegedly", "alleged", "claimed", "according to", "reportedly", "published media accounts", "public reporting"],
+        "alleged": ["according to press reports", "allegedly", "alleged", "claimed", "according to", "reportedly", "published media accounts", "public reporting", "media reporting", "published reporting", "press investigations", "published accounts"],
         "settled": ["settled without admitting", "consent decree", "agreed to pay without admitting"],
-        "unverified": ["unverified", "preliminary reports", "initial reports", "early reports", "yet to be verified"],
+        "unverified": ["unverified", "preliminary reports", "initial reports", "early reports", "yet to be verified", "unconfirmed", "unconfirmed reports", "early unverified"],
         "proposed": ["proposed", "draft", "under consideration", "planned", "pending regulatory", "proposals"],
     },
 }
@@ -832,6 +859,8 @@ def expected_qualifier_bucket(
             return "proposed"
         if vs in ("unverified_secondary", "speculative"):
             return "unverified"
+        if ls == "fact" and vs == "verified_primary":
+            return "fact"
         return "alleged_regulator"
 
     # Judicial court proceedings
@@ -863,7 +892,7 @@ def expected_qualifier_bucket(
         return "press_charge"
     if ps == "bill_proposed" or dt == "proposed_bill":
         return "proposed"
-    if vs in ("unverified_secondary", "speculative") or dt == "rss_snippet":
+    if vs in ("unverified_secondary", "speculative") or (dt == "rss_snippet" and vs != "corroborated_secondary"):
         return "unverified"
     if ls == "alleged":
         return "alleged"
@@ -936,23 +965,31 @@ def route_legal_qualifier(
     unverified_variants = {
         "KR": [
             "아직 최종 검증 전인 초기 보도에 따르면,",
+            "추가 검증이 진행 중인 초기 보도에 의하면,",
             "초기 보도 단계의 미확인 기록에 따르면,",
-            "아직 사실관계가 최종 확인되지 않은 초기 보도에 따르면,",
+            "독립적인 사실 확인 전인 초기 보도에 따르면,",
+            "공식 확인 전 단계의 초기 보도 내용에 의하면,",
         ],
         "JA": [
             "未確認の初期報道によれば、",
             "未確認段階の初期報道によれば、",
-            "未確認の初期情報によれば、",
+            "独立検証前の未確認報道によれば、",
+            "裏付け前の未確認初期情報によれば、",
+            "公的確認前の未確認初期報道によれば、",
         ],
         "VN": [
             "Theo thông tin báo chí bước đầu chưa kiểm chứng,",
-            "Theo nguồn tin ban đầu chưa được xác minh,",
+            "Theo các ghi nhận ban đầu chưa kiểm chứng đang được làm rõ,",
+            "Theo nguồn tin ban đầu chưa kiểm chứng,",
             "Theo phản ánh bước đầu chưa kiểm chứng,",
+            "Theo các phản ánh ban đầu chưa kiểm chứng,",
         ],
         "EN": [
             "According to unverified preliminary reports,",
             "According to initial reports yet to be verified,",
             "According to early unverified reports,",
+            "Pending independent corroboration, early unverified coverage reflects that,",
+            "According to preliminary unconfirmed reports,",
         ],
     }
 
@@ -964,9 +1001,9 @@ def route_legal_qualifier(
             "criminal_complaint": ["고발장·소장에 따르면,", "제출된 소장 내용에 따르면,", "원고 측 고발장에 의하면,"],
             "press_charge": ["보도된 기소 내용에 따르면,", "기소 보도 내용에 의하면,", "언론에 공개된 혐의에 따르면,"],
             "proposed": ["아직 시행 확정 전인 추진 계획에 따르면,", "정부 입법·추진안에 따르면,", "초안 검토 단계의 안에 따르면,"],
-            "alleged_regulator": ["규제 당국에 따르면,", "감독 당국의 조사에 따르면,", "관계 당국 공식 발표에 따르면,"],
+            "alleged_regulator": ["규제 당국에 따르면,", "감독 당국의 조사에 따르면,", "관계 당국 공식 발표에 따르면,", "관계 기관 조사에 의하면,", "당국 공식 자료에 따르면,"],
             "audit_finding": ["감사 보고서 및 점검 결과에 따르면,", "감사원 조사 결과에 따르면,", "공식 감사 기록에 의하면,"],
-            "alleged": ["언론 보도에 따르면,", "공개된 보도 내용에 따르면,", "보도 설명에 따르면,"],
+            "alleged": ["언론 보도에 따르면,", "취재 보도에 의하면,", "공개된 보도 내용에 따르면,", "당시 언론 보도를 보면,", "보도된 경위를 보면,", "언론 취재 결과에 따르면,"],
         },
         "JA": {
             "final_judgment": ["裁判所の確定判決によれば、", "裁判所の判決によれば、", "司法判断によれば、"],
@@ -975,9 +1012,9 @@ def route_legal_qualifier(
             "criminal_complaint": ["告訴状・訴状の主張によれば、", "提出された訴状によれば、", "原告側の申立てによれば、"],
             "press_charge": ["報道された起訴内容によれば、", "起訴に関する報道によれば、", "報じられた訴因によれば、"],
             "proposed": ["検討・予定段階の公表案によれば、", "予定されている推進計画によれば、", "公表された骨子案によれば、"],
-            "alleged_regulator": ["当局の調査によれば、", "規制当局の公表によれば、", "監督機関の指摘によれば、"],
+            "alleged_regulator": ["当局の調査によれば、", "規制当局の公表によれば、", "監督機関の指摘によれば,", "関係機関の発表によれば、", "公的資料の記録によれば、"],
             "audit_finding": ["監査報告書によれば、", "検査報告の指摘によれば、", "公式監査記録によれば、"],
-            "alleged": ["報道によれば、", "公表報道の内容によれば、", "報じられた経緯によれば、"],
+            "alleged": ["報道によれば、", "各社の取材によれば、", "報じられた内容によれば、", "当時の報道によれば、", "メディアの取材によれば、", "公開報道によれば、"],
         },
         "VN": {
             "final_judgment": ["Theo phán quyết của tòa án,", "Theo bản án đã có hiệu lực,", "Theo quyết định của cơ quan xét xử,"],
@@ -986,9 +1023,9 @@ def route_legal_qualifier(
             "criminal_complaint": ["Theo đơn tố cáo và hồ sơ khởi kiện,", "Theo đơn kiện gửi cơ quan thẩm quyền,", "Theo nội dung đơn khởi kiện,"],
             "press_charge": ["Theo thông tin báo chí về quyết định truy tố,", "Báo chí phản ánh về các quyết định truy tố,", "Theo nội dung truy tố được truyền thông công bố,"],
             "proposed": ["Theo đề xuất đang trong quá trình xem xét,", "Theo phương án dự thảo đang hoàn thiện,", "Theo định hướng chính sách đang lấy ý kiến,"],
-            "alleged_regulator": ["Theo cơ quan chức năng,", "Theo cơ quan quản lý và giám sát,", "Theo công bố của cơ quan thanh tra,"],
+            "alleged_regulator": ["Theo cơ quan chức năng,", "Theo cơ quan quản lý và giám sát,", "Theo công bố của cơ quan thanh tra,", "Theo kết luận từ cơ quan chuyên môn,", "Theo ghi nhận của các cơ quan quản lý,"],
             "audit_finding": ["Theo kết luận thanh tra và kiểm toán,", "Báo cáo kiểm toán độc lập chỉ rõ,", "Theo kết quả kiểm tra chính thức,"],
-            "alleged": ["Theo thông tin báo chí phản ánh,", "Theo các nguồn tin truyền thông công bố,", "Theo ghi nhận từ các cơ quan báo chí,"],
+            "alleged": ["Theo thông tin báo chí phản ánh,", "Theo các nguồn tin truyền thông,", "Theo phản ánh từ báo chí,", "Ghi nhận từ các phương tiện truyền thông,", "Theo thông tin đăng tải trên báo chí,", "Theo tường thuật của báo chí,"],
         },
         "EN": {
             "final_judgment": ["According to the court ruling,", "According to final judicial findings,", "As ruled by the court,"],
@@ -997,9 +1034,9 @@ def route_legal_qualifier(
             "criminal_complaint": ["According to the complaint,", "According to the civil lawsuit filing,", "As alleged in the complaint,"],
             "press_charge": ["According to press reports on the charges,", "As reported in charging coverage,", "Press accounts of the proceedings note,"],
             "proposed": ["Under the proposed draft framework,", "According to preliminary policy proposals,", "Under the pending regulatory plan,"],
-            "alleged_regulator": ["According to regulatory filings,", "According to official regulatory findings,", "As regulators documented in filings,"],
+            "alleged_regulator": ["According to regulatory filings,", "According to official regulatory findings,", "As regulators documented in filings,", "According to findings by oversight agencies,", "Regulatory records establish that,"],
             "audit_finding": ["According to the audit report,", "Audit exhibits and findings establish,", "As documented in official audit exhibits,"],
-            "alleged": ["According to press reports,", "According to published media accounts,", "Public reporting reflects that,"],
+            "alleged": ["According to press reports,", "Media reporting reflects that,", "According to news coverage at the time,", "Published reporting indicates that,", "Press investigations documented that,", "As reported in published accounts,"],
         },
     }
 
@@ -1028,6 +1065,34 @@ def route_legal_qualifier(
 
     if not prefix:
         return body
+
+    # Strip redundant introductory framing from body if prefix already provides attribution
+    if m == "KR":
+        body = re.sub(
+            r"^(?:초기 기록을 보면|기초 자료를 살펴보면|관련 기록의 앞부분은|구조와 경위를 따져보면|자료상의 흐름을 보면|관련 문건은|후속 단계의 기록에는|공개된 후속 문건에서도|관련 자료는|사후 정리 자료에는|마무리 단계의 기록 역시|전체 기록을 종합하면)\s*",
+            "",
+            body,
+        )
+    elif m == "EN":
+        body = re.sub(
+            r"^(?:Early in the documented timeline, records show that|Initial entries in the dossier demonstrate that|Behind the institutional facade,|At the outset of the transaction history, documentation reveals how|Within the operational details, filings show that|Tracing the documented sequence reveals how|Detailed exhibits confirm that|Forensic audit records uncover that|At the critical escalation point, evidence established that|Subsequent official proceedings documented that|Inspection findings confirmed|Later evidentiary disclosures placed|In the post-event resolution, documentation records that|Following the documented enforcement actions, filings confirm that|Across the concluding evidentiary record, findings establish that|In the final institutional assessment,)\s*",
+            "",
+            body,
+            flags=re.IGNORECASE,
+        )
+    elif m == "VN":
+        body = re.sub(
+            r"^(?:Trong giai đoạn đầu của hồ sơ,\s*việc|Các dữ liệu khởi đầu cho thấy|Những ghi chép mở đầu xác nhận việc|Khi xem xét chi tiết cơ chế,\s*việc|Phân tích chuỗi dòng tiền cho thấy|Theo trình tự dữ liệu công bố,|Ở bước ngoặt điều tra tiếp theo,\s*hồ sơ xác định việc|Các ghi nhận công khai sau đó cho thấy|Hồ sơ điều tra giai đoạn này ghi nhận|Trong phần tổng kết hồ sơ,\s*tài liệu nêu rõ việc|Các kết luận sau sự kiện tiếp tục khẳng định|Nhìn lại toàn bộ chuỗi chứng cứ,\s*hồ sơ chỉ rõ việc)\s*",
+            "",
+            body,
+            flags=re.IGNORECASE,
+        )
+    elif m == "JA":
+        body = re.sub(
+            r"^(?:初期の記録では、|経緯の出発点として、資料は|基礎資料の記述によれば、|発端部分の文書には、|初期段階の資料でも、|構造や仕組みに関する記録では、|詳細な文書をたどると、|関連資料の該当箇所では、|取引と制度の面からは、|記録上の推移を見ると、|その後の局面の資料には、|変化が表面化した段階では、|後続の公表記録においても、|推移を追った文書では、|一連の記録の後半には、|事後の整理資料では、|その後の経過をまとめた記録は、|一連の末尾にあたる文書でも、|総括部分の記述においては、|記録全体を通じて、)\s*",
+            "",
+            body,
+        )
 
     if m in ("EN", "VN") and prefix.endswith(","):
         first_word = body.split(" ", 1)[0].strip(",.:;\"'").lower()
@@ -1869,10 +1934,10 @@ def check_market_entity_appropriateness(
 # ==============================================================================
 
 _UNVERIFIED_ATTRIBUTION_HINTS: Dict[str, List[str]] = {
-    "KR": ["보도", "알려졌", "전해졌", "미확인", "초기", "제기", "추정", "주장", "의혹"],
+    "KR": ["보도", "알려졌", "전해졌", "미확인", "초기", "제기", "추정", "주장", "의혹", "검증 전", "확인 전"],
     "JA": ["報道", "伝えられ", "未確認", "初期", "指摘", "疑い", "推測"],
-    "VN": ["báo chí", "chưa kiểm chứng", "bước đầu", "cho rằng", "cáo buộc", "nghi vấn", "dự kiến"],
-    "EN": ["report", "reportedly", "unverified", "preliminary", "alleg", "claim", "estimate", "according to"],
+    "VN": ["báo chí", "chưa kiểm chứng", "bước đầu", "cho rằng", "cáo buộc", "nghi vấn", "dự kiến", "xác minh"],
+    "EN": ["report", "reportedly", "unverified", "preliminary", "alleg", "claim", "estimate", "according to", "unconfirmed", "corroboration"],
 }
 
 _NEGATIVE_POLARITY_TERMS = {
@@ -1942,13 +2007,13 @@ def audit_statement_claim_alignment(
                 substantive_covered.add(cid)
 
             if b_id.startswith("B1"):
-                if ver in ("verified_primary", "corroborated_secondary") and cred in ("verified_fact", "official_regulation"):
+                if ver in ("verified_primary", "corroborated_secondary") and cred in ("verified_fact", "official_regulation", "press_allegation"):
                     beat1_has_verified_anchor = True
                 elif (ver in ("unverified_secondary", "speculative") or cred == "unconfirmed_claim") and idx < 2:
                     # Opening hook premise built solely on unverified / unconfirmed claim
                     if not any(
                         str(ledger_by_id[oc].get("verification_status")) in ("verified_primary", "corroborated_secondary")
-                        and resolve_claim_credibility_tier(ledger_by_id[oc]) in ("verified_fact", "official_regulation")
+                        and resolve_claim_credibility_tier(ledger_by_id[oc]) in ("verified_fact", "official_regulation", "press_allegation")
                         for oc in cids
                     ):
                         beat1_unverified_elevation = True
@@ -2009,7 +2074,7 @@ def audit_statement_claim_alignment(
 
     has_any_verified = any(
         str(c.get("verification_status")) in ("verified_primary", "corroborated_secondary")
-        and resolve_claim_credibility_tier(c) in ("verified_fact", "official_regulation")
+        and resolve_claim_credibility_tier(c) in ("verified_fact", "official_regulation", "press_allegation")
         for c in ledger_by_id.values()
     )
     if not b1_lines or not has_any_verified:

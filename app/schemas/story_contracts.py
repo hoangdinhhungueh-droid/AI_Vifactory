@@ -138,11 +138,14 @@ class EvidenceClaim(BaseModel):
             return data
         out = dict(data)
         from app.services.story_provenance_engine import (
+            is_official_portal_name,
             is_primary_official_domain,
+            is_reputable_press_domain,
             is_rss_or_aggregator_url,
         )
 
         src_url = str(out.get("source_url") or "")
+        src_name = str(out.get("source_name") or out.get("source") or "").strip()
         src_type = str(out.get("source_type") or "press").lower()
         doc_type = str(out.get("doc_type") or "unknown").lower()
         proc_status = str(out.get("procedural_status") or "unknown").lower()
@@ -150,21 +153,40 @@ class EvidenceClaim(BaseModel):
         conf_supplied = "confidence" in out and out.get("confidence") is not None
         ver_supplied = "verification_status" in out and out.get("verification_status") is not None
         is_rss = is_rss_or_aggregator_url(src_url)
+        is_official = is_official_portal_name(src_name) or is_primary_official_domain(src_url)
+        is_rep = is_reputable_press_domain(src_url, src_name)
 
         if is_rss:
-            if not ver_supplied or out.get("verification_status") == "verified_primary":
-                out["verification_status"] = "unverified_secondary"
-            if out.get("evidence_tier") == "primary":
+            if is_official:
+                out["source_type"] = "gov" if src_type not in ("court", "regulator") else src_type
+                if out.get("doc_type") in ("unknown", "rss_snippet"):
+                    out["doc_type"] = "regulatory_notice"
+                out["verification_status"] = "verified_primary"
+                out["evidence_tier"] = "primary"
+                if not conf_supplied:
+                    out["confidence"] = "high"
+                if out.get("credibility_tier") in ("unconfirmed_claim", None, ""):
+                    out["credibility_tier"] = "official_regulation"
+            elif is_rep and out.get("verification_status") == "corroborated_secondary":
+                if out.get("doc_type") in ("unknown", "rss_snippet"):
+                    out["doc_type"] = "news_article"
                 out["evidence_tier"] = "secondary"
-            if not conf_supplied or out.get("confidence") == "high":
-                out["confidence"] = "medium"
-            out["credibility_tier"] = "unconfirmed_claim"
-            # Unverified RSS rumors cannot serve as primary catalyst
-            if out.get("causal_role") == "primary_catalyst":
-                out["causal_role"] = "background_context"
+                if out.get("credibility_tier") in ("unconfirmed_claim", None, ""):
+                    out["credibility_tier"] = "press_allegation"
+            else:
+                if not ver_supplied or out.get("verification_status") == "verified_primary":
+                    out["verification_status"] = "unverified_secondary"
+                if out.get("evidence_tier") == "primary":
+                    out["evidence_tier"] = "secondary"
+                if not conf_supplied or out.get("confidence") == "high":
+                    out["confidence"] = "medium"
+                out["credibility_tier"] = "unconfirmed_claim"
+                # Unverified RSS rumors cannot serve as primary catalyst
+                if out.get("causal_role") == "primary_catalyst":
+                    out["causal_role"] = "background_context"
         elif not ver_supplied:
             if src_type in ("court", "regulator", "gov"):
-                if is_primary_official_domain(src_url):
+                if is_primary_official_domain(src_url) or is_official:
                     out["verification_status"] = "verified_primary"
                     out.setdefault("evidence_tier", "primary")
                 else:
@@ -183,12 +205,15 @@ class EvidenceClaim(BaseModel):
         ver_stat = str(out.get("verification_status", "unverified_secondary"))
         supplied_tier = out.get("credibility_tier")
 
+        is_anonymous_rss = is_rss and not is_official and not (is_rep and ver_stat == "corroborated_secondary")
+
         # Invariant 1: Unverified/speculative/RSS claims can NEVER be verified_fact or official_regulation
         if (
             ver_stat in ("unverified_secondary", "speculative")
-            or is_rss
+            or is_anonymous_rss
             or proc_status in ("bill_proposed", "speculation")
-            or doc_type in ("proposed_bill", "rss_snippet")
+            or doc_type in ("proposed_bill",)
+            or (doc_type == "rss_snippet" and not is_official and not is_rep)
         ):
             out["credibility_tier"] = "unconfirmed_claim"
         elif supplied_tier == "verified_fact":
@@ -198,7 +223,7 @@ class EvidenceClaim(BaseModel):
                 and (
                     doc_type in ("court_judgment", "audit_report")
                     or proc_status == "final_judgment"
-                    or (src_type in ("court", "regulator", "gov") and ver_stat == "verified_primary")
+                    or (src_type == "court" and ver_stat == "verified_primary")
                 )
                 and legal_status in ("fact", "convicted", "settled")
             ):
@@ -231,7 +256,7 @@ class EvidenceClaim(BaseModel):
             if (
                 (doc_type in ("court_judgment", "audit_report") or proc_status == "final_judgment")
                 and ver_stat in ("verified_primary", "corroborated_secondary")
-            ) or (src_type in ("court", "regulator", "gov") and ver_stat == "verified_primary" and legal_status in ("fact", "convicted", "settled") and not is_rss):
+            ) or (src_type == "court" and ver_stat == "verified_primary" and legal_status in ("fact", "convicted", "settled") and not is_rss):
                 out["credibility_tier"] = "verified_fact"
             elif (
                 doc_type in ("statute", "regulatory_notice", "gov_report")

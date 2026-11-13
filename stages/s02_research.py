@@ -647,8 +647,9 @@ def run(ctx: RunContext) -> StageArtifact:
 
                 from app.services.story_provenance_engine import (
                     classify_claim_provenance as _classify_llm_claim,
-                )
-                from app.services.story_provenance_engine import (
+                    is_official_portal_name as _is_official_portal,
+                    is_primary_official_domain as _is_primary_url,
+                    is_reputable_press_domain as _is_reputable_press,
                     is_rss_or_aggregator_url as _is_rss_url,
                 )
 
@@ -663,11 +664,38 @@ def run(ctx: RunContext) -> StageArtifact:
                     prov_c = _classify_llm_claim(c_dict, market=market)
                     # Cross-check against grounding_intel URL provenance if matching source_url is RSS
                     src_url = prov_c.get("source_url") or c.get("source_url") or ""
-                    if _is_rss_url(src_url) or any(
+                    if not src_url and g_claims_raw:
+                        for gc in g_claims_raw:
+                            if gc.get("source") and str(gc.get("source")).lower() in str(prov_c.get("source_name", "")).lower():
+                                src_url = str(gc.get("source_url") or "")
+                                if src_url:
+                                    break
+
+                    src_name_check = str(prov_c.get("source_name") or c.get("source") or "").strip()
+                    is_off_portal = _is_official_portal(src_name_check) or _is_primary_url(src_url)
+                    is_rep_press = _is_reputable_press(src_url, src_name_check)
+
+                    is_rss_hit = _is_rss_url(src_url) or any(
                         _is_rss_url(str(gc.get("source_url", "")))
-                        and str(gc.get("source", "")).lower() in str(prov_c.get("source_name", "")).lower()
+                        and str(gc.get("source", "")).strip().lower() in src_name_check.lower()
                         for gc in g_claims_raw
-                    ):
+                    )
+
+                    if is_off_portal:
+                        prov_c["source_type"] = "gov" if prov_c.get("source_type") not in ("court", "regulator") else prov_c.get("source_type")
+                        if prov_c.get("doc_type") in ("unknown", "rss_snippet"):
+                            prov_c["doc_type"] = "regulatory_notice"
+                        prov_c["verification_status"] = "verified_primary"
+                        prov_c["evidence_tier"] = "primary"
+                        if prov_c.get("credibility_tier") in ("unconfirmed_claim", None, ""):
+                            prov_c["credibility_tier"] = "official_regulation"
+                        prov_c["confidence"] = "high"
+                    elif is_rep_press:
+                        prov_c["source_type"] = "press"
+                        if prov_c.get("doc_type") in ("unknown", "rss_snippet"):
+                            prov_c["doc_type"] = "news_article"
+                    elif is_rss_hit:
+                        # Genuinely unverified anonymous RSS snippet or unknown aggregator
                         prov_c["verification_status"] = "unverified_secondary"
                         prov_c["evidence_tier"] = "secondary"
                         prov_c["credibility_tier"] = "unconfirmed_claim"
@@ -807,6 +835,8 @@ def run(ctx: RunContext) -> StageArtifact:
                 ledger[idx_c].evidence_tier = c_dict.get("evidence_tier", ledger[idx_c].evidence_tier)
                 ledger[idx_c].confidence = c_dict.get("confidence", ledger[idx_c].confidence)
                 ledger[idx_c].source_type = c_dict.get("source_type", ledger[idx_c].source_type)
+                if c_dict.get("doc_type") and c_dict.get("doc_type") != "unknown":
+                    ledger[idx_c].doc_type = c_dict.get("doc_type")
 
             ledger.sort(
                 key=lambda x: (

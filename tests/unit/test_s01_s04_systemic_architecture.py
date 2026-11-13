@@ -1120,12 +1120,23 @@ def test_systemic_s01_money_null_court_bucket_corroboration_and_bounds():
     )
     assert "press reports" not in out_doj.lower(), out_doj
 
-    # 3. Cross-outlet corroboration promotes multi-outlet reputable RSS claims without promoting RSS to verified_primary
+    # 3. Official government portal under RSS wrapper must be recognized as verified_primary
+    gov_rss = classify_claim_provenance({
+        "claim_id": "G001",
+        "claim": "국토교통부가 2026년 11월 13일 최소보장제 시행을 공식 발표했다.",
+        "source": "대한민국 정책브리핑",
+        "source_url": "https://news.google.com/rss/articles/111",
+    }, market="KR")
+    assert gov_rss["verification_status"] == "verified_primary"
+    assert gov_rss["credibility_tier"] == "official_regulation"
+    assert gov_rss["source_type"] == "gov"
+
+    # Cross-outlet corroboration promotes multi-outlet reputable press RSS claims to corroborated_secondary
     multi_rss = [
         classify_claim_provenance({
             "claim_id": "C001",
-            "claim": "국토교통부가 2026년 11월 13일 최소보장제 시행을 공식 발표했다.",
-            "source": "대한민국 정책브리핑",
+            "claim": "경향신문 보도에 따르면 국토교통부가 최소보장제 시행을 발표했다.",
+            "source": "경향신문",
             "source_url": "https://news.google.com/rss/articles/111",
         }, market="KR"),
         classify_claim_provenance({

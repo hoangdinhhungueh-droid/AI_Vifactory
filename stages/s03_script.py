@@ -272,18 +272,43 @@ def _localized_topic_label(topic: str, market: str) -> str:
     return " ".join(words[:5]) if len(words) > 5 else t
 
 
+def _to_kr_attributive(clause: str) -> str:
+    """Normalize a Korean factual clause to attach cleanly to noun heads (사실, 점, 내용, 정황)."""
+    c = (clause or "").strip().rstrip(". ")
+    if not c:
+        return c
+    c = re.sub(r"(?:있습니다|있었다)$", "있다는", c)
+    c = re.sub(r"(?:없습니다|없었다)$", "없다는", c)
+    c = re.sub(r"(?:했습니다|하였다)$", "했다는", c)
+    c = re.sub(r"(?:됐습니다|되었다)$", "됐다는", c)
+    c = re.sub(r"(?:였습니다|이었으며|이었고)$", "였다는", c)
+    c = re.sub(r"입니다$", "라는", c)
+    c = re.sub(r"습니다$", "다는", c)
+    c = re.sub(r"했다$", "했다는", c)
+    c = re.sub(r"됐다$", "됐다는", c)
+    c = re.sub(r"였다$", "였다는", c)
+    c = re.sub(r"있다$", "있다는", c)
+    c = re.sub(r"없다$", "없다는", c)
+    c = re.sub(r"이다$", "이라는", c)
+    if c.endswith("다"):
+        c = c[:-1] + "다는"
+    elif not c.endswith(("다는", "라는", "은", "는", "인", "된", "한", "울", "를")):
+        c = f"{c}라는"
+    return c
+
+
 def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode: bool = False) -> str:
     """Bound clause length cleanly for beat tempo without bisecting parentheticals or dropping metrics."""
     clean = re.sub(r"\s+", " ", (text or "").strip()).rstrip(".。")
-    # Strip trailing formal KR/JA endings cleanly if embedded inside a longer sentence
+    # Clean trailing formal polite endings if embedded inside a longer sentence
     if market == "KR":
-        clean = re.sub(r"(?:있습니다|습니다|입니다|였다|했다|됐다|다)$", "", clean).strip(" ,;:")
-        cap = 26 if hook_mode else 44
+        clean = re.sub(r"(?:있습니다|습니다|입니다)$", "", clean).strip(" ,;:")
+        cap = 20 if hook_mode else 50
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
         head = clauses[0] if clauses else clean
-        if not hook_mode and 8 <= len(head) <= cap:
+        if not hook_mode and 10 <= len(head) <= cap:
             trimmed = head
         else:
             words = clean.split()
@@ -501,46 +526,48 @@ def _render_claim_sentence(
         if role_slot == "hook_catalyst":
             raw = f"{loc_topic}, {fact}."
         elif role_slot == "hook_scale":
-            raw = f"수치는 {fact}."
+            raw = f"집계된 수치는 {fact}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean) <= 14 and _localized_topic_label(cq_clean, "KR") == cq_clean[:14]) else "왜 못 막았을까?"
             raw = f"{q_short} {fact}."
-        elif role_slot == "setup":
-            frames = [
-                f"초기 기록을 보면 {fact} 내용이 확인됩니다.",
-                f"{fact} 사실이 드러나며 초기 거래 구조의 출발점이 됐습니다.",
-                f"기초 자료를 살펴보면 {fact} 점이 적시돼 있습니다.",
-                f"{fact} 대목은 후속 사태를 부른 구조적 배경으로 꼽힙니다.",
-                f"관련 기록의 앞부분은 {fact} 사실을 전합니다.",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "mechanism":
-            frames = [
-                f"구조와 경위를 따져보면 {fact} 점이 기록에 남았습니다.",
-                f"{fact} 정황은 자금 흐름과 제도적 허점을 구체적으로 보여줍니다.",
-                f"관련 문건은 {fact} 대목을 구체적으로 짚고 있습니다.",
-                f"{fact} 내역이 연속적으로 집행되며 재무적 위험을 키웠습니다.",
-                f"자료상의 흐름을 보면 {fact} 점이 핵심 연결고리로 꼽힙니다.",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "crack":
-            frames = [
-                f"후속 단계의 기록에는 {fact} 내용이 올라와 있습니다.",
-                f"{fact} 사실이 공표되면서 사안은 본격적인 수사와 감독 단계로 전환됐습니다.",
-                f"공개된 후속 문건에서도 {fact} 내용이 확인됩니다.",
-                f"{fact} 정황이 입증되며 기존의 설명은 설득력을 잃었습니다.",
-                f"관련 자료는 {fact} 점을 중대한 전환점으로 전합니다.",
-            ]
-            raw = frames[v_idx]
         else:
-            frames = [
-                f"사후 정리 자료에는 {fact} 점이 남아 있습니다.",
-                f"{fact} 결과는 제도적 보완과 시장 전반에 중요한 교훈을 남겼습니다.",
-                f"마무리 단계의 기록 역시 {fact} 점을 전하고 있습니다.",
-                f"{fact} 사실은 향후 유사 피해를 막기 위한 기준선이 됐습니다.",
-                f"전체 기록을 종합하면 {fact} 대목이 핵심 결론으로 남습니다.",
-            ]
-            raw = frames[v_idx]
+            fact_attr = _to_kr_attributive(fact)
+            if role_slot == "setup":
+                frames = [
+                    f"초기 기록을 보면 {fact_attr} 내용이 확인됩니다.",
+                    f"{fact_attr} 사실이 드러나며 초기 거래 구조의 출발점이 됐습니다.",
+                    f"기초 자료를 살펴보면 {fact_attr} 점이 적시돼 있습니다.",
+                    f"{fact_attr} 대목은 후속 사태를 부른 구조적 배경으로 꼽힙니다.",
+                    f"관련 기록의 앞부분은 {fact_attr} 사실을 전합니다.",
+                ]
+                raw = frames[v_idx]
+            elif role_slot == "mechanism":
+                frames = [
+                    f"구조와 경위를 따져보면 {fact_attr} 점이 기록에 남았습니다.",
+                    f"{fact_attr} 정황은 자금 흐름과 제도적 허점을 구체적으로 보여줍니다.",
+                    f"관련 문건은 {fact_attr} 대목을 구체적으로 짚고 있습니다.",
+                    f"{fact_attr} 내역이 연속적으로 집행되며 재무적 위험을 키웠습니다.",
+                    f"자료상의 흐름을 보면 {fact_attr} 점이 핵심 연결고리로 꼽힙니다.",
+                ]
+                raw = frames[v_idx]
+            elif role_slot == "crack":
+                frames = [
+                    f"후속 단계의 기록에는 {fact_attr} 내용이 올라와 있습니다.",
+                    f"{fact_attr} 사실이 공표되면서 사안은 본격적인 수사와 감독 단계로 전환됐습니다.",
+                    f"공개된 후속 문건에서도 {fact_attr} 내용이 확인됩니다.",
+                    f"{fact_attr} 정황이 입증되며 기존의 설명은 설득력을 잃었습니다.",
+                    f"관련 자료는 {fact_attr} 점을 중대한 전환점으로 전합니다.",
+                ]
+                raw = frames[v_idx]
+            else:
+                frames = [
+                    f"사후 정리 자료에는 {fact_attr} 점이 남아 있습니다.",
+                    f"{fact_attr} 결과는 제도적 보완과 시장 전반에 중요한 교훈을 남겼습니다.",
+                    f"마무리 단계의 기록 역시 {fact_attr} 점을 전하고 있습니다.",
+                    f"{fact_attr} 사실은 향후 유사 피해를 막기 위한 기준선이 됐습니다.",
+                    f"전체 기록을 종합하면 {fact_attr} 대목이 핵심 결론으로 남습니다.",
+                ]
+                raw = frames[v_idx]
 
     elif m == "JA":
         if role_slot == "hook_catalyst":
