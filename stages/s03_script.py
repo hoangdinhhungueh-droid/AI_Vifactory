@@ -1206,6 +1206,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                     speaker=c_dict_q.get("speaker"),
                                     procedural_status=str(c_dict_q.get("procedural_status", "unknown")),
                                     verification_status=str(c_dict_q.get("verification_status", "corroborated_secondary")),
+                                    slot_idx=l_idx,
                                 )
                                 if bkt != "settled":
                                     applied_prefix_bucket = True
