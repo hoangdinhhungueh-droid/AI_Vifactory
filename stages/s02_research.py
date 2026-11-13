@@ -672,33 +672,35 @@ def run(ctx: RunContext) -> StageArtifact:
                                     break
 
                     src_name_check = str(prov_c.get("source_name") or c.get("source") or "").strip()
-                    is_off_portal = _is_official_portal(src_name_check) or _is_primary_url(src_url)
-                    is_rep_press = _is_reputable_press(src_url, src_name_check)
+                    src_clean = re.sub(r"\(.*?\)", "", src_name_check).strip()
+                    is_off_portal = _is_official_portal(src_name_check) or _is_official_portal(src_clean) or _is_primary_url(src_url)
+                    is_rep_press = _is_reputable_press(src_url, src_name_check) or _is_reputable_press(src_url, src_clean)
 
                     is_rss_hit = _is_rss_url(src_url) or any(
                         _is_rss_url(str(gc.get("source_url", "")))
-                        and str(gc.get("source", "")).strip().lower() in src_name_check.lower()
+                        and (
+                            str(gc.get("source", "")).strip().lower() in src_name_check.lower()
+                            or str(gc.get("source", "")).strip().lower() in src_clean.lower()
+                        )
                         for gc in g_claims_raw
                     )
 
                     if is_off_portal:
                         prov_c["source_type"] = "gov" if prov_c.get("source_type") not in ("court", "regulator") else prov_c.get("source_type")
-                        if prov_c.get("doc_type") in ("unknown", "rss_snippet"):
-                            prov_c["doc_type"] = "regulatory_notice"
+                        prov_c["doc_type"] = "regulatory_notice"
                         prov_c["verification_status"] = "verified_primary"
                         prov_c["evidence_tier"] = "primary"
-                        if prov_c.get("credibility_tier") in ("unconfirmed_claim", None, ""):
-                            prov_c["credibility_tier"] = "official_regulation"
+                        prov_c["credibility_tier"] = "official_regulation"
                         prov_c["confidence"] = "high"
                     elif is_rep_press:
                         prov_c["source_type"] = "press"
-                        if prov_c.get("doc_type") in ("unknown", "rss_snippet"):
-                            prov_c["doc_type"] = "news_article"
+                        prov_c["doc_type"] = "news_article"
                     elif is_rss_hit:
                         # Genuinely unverified anonymous RSS snippet or unknown aggregator
                         prov_c["verification_status"] = "unverified_secondary"
                         prov_c["evidence_tier"] = "secondary"
                         prov_c["credibility_tier"] = "unconfirmed_claim"
+                        prov_c["confidence"] = "low"
                         if prov_c.get("causal_role") == "primary_catalyst":
                             prov_c["causal_role"] = "background_context"
 

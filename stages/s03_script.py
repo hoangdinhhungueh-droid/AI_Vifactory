@@ -309,6 +309,12 @@ def _to_kr_attributive(clause: str) -> str:
     for pat, rep in repls:
         if re.search(pat, c):
             return re.sub(pat, rep, c)
+    if c.endswith("것으로"):
+        return c[:-3] + "것이라는"
+    if c.endswith("부풀려지다"):
+        return c[:-2] + "부풀려졌다는"
+    if c.endswith("부풀려졌다"):
+        return c[:-2] + "부풀려졌다는"
     if c.endswith("다"):
         return c[:-1] + "다는"
     if c.endswith(("다는", "라는", "은", "는", "인", "된", "한", "울", "를")):
@@ -319,6 +325,10 @@ def _to_kr_attributive(clause: str) -> str:
         return f"{c} 발생했다는"
     if c.endswith("공식"):
         return f"{c} 발표했다는"
+    if c.endswith(("으로", "로")):
+        return f"{c} 알려졌다는"
+    if c.endswith("전국"):
+        return f"{c}적으로 시행된다는"
     return f"{c}라는"
 
 
@@ -330,8 +340,11 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|의혹이\s*보도되었다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다|의혹이\s*제기되었다)$"
         clean = re.sub(pat_kr, r"\1", clean)
         clean = re.sub(r"(?:보도되었다|보도됐다|알려졌다|전해졌다)$", "", clean).strip()
+        clean = re.sub(r"([가-힣]+)한\s*것으로$", r"\1했다", clean)
+        clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
+        clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
 
-        cap = 20 if hook_mode else 85
+        cap = 28 if hook_mode else 85
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
@@ -358,10 +371,10 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
                 break
         if not buf:
             buf = clean[:cap]
-        if not hook_mode and not buf.endswith("다"):
+        if not buf.endswith("다"):
             if len(buf.split()) < len(words):
                 next_w = words[len(buf.split())]
-                if next_w.endswith("다") and len(f"{buf} {next_w}") <= cap + 12:
+                if next_w.endswith("다") and len(f"{buf} {next_w}") <= cap + 16:
                     buf = f"{buf} {next_w}"
         trimmed = buf
         if trimmed.count("(") > trimmed.count(")"):
@@ -562,6 +575,7 @@ def _render_claim_sentence(
         cid = "C001"
         fact = _format_claim_fact(topic, m, topic, hook_mode=hook_mode)
         ls, st, dt, sp, ps, vs = "alleged", "press", "unknown", None, "unknown", "unverified_secondary"
+        cred_t = "unconfirmed_claim"
     else:
         get_attr = (lambda k, d="": claim_obj.get(k, d)) if isinstance(claim_obj, dict) else (lambda k, d="": getattr(claim_obj, k, d))
         cid = str(get_attr("claim_id", "C001"))
@@ -572,6 +586,7 @@ def _render_claim_sentence(
         sp = get_attr("speaker", None)
         ps = str(get_attr("procedural_status", "unknown") or "unknown")
         vs = str(get_attr("verification_status", "corroborated_secondary") or "corroborated_secondary")
+        cred_t = str(get_attr("credibility_tier", "") or "")
 
     bucket = expected_qualifier_bucket(
         legal_status=ls,
@@ -580,6 +595,7 @@ def _render_claim_sentence(
         speaker=sp,
         procedural_status=ps,
         verification_status=vs,
+        credibility_tier=cred_t,
     )
 
     # Keep central question concise in Beat 1 so hook never spills over 25s
@@ -588,38 +604,86 @@ def _render_claim_sentence(
 
     if m == "KR":
         if role_slot == "hook_catalyst":
-            raw = f"{loc_topic}, {fact}."
+            if fact.endswith(("했다", "된다", "한다", "였다", "왔다", "졌다")):
+                raw = f"{fact[:-1]}했습니다."
+            elif fact.endswith("다"):
+                raw = f"{fact[:-1]}습니다."
+            elif loc_topic and loc_topic not in fact:
+                raw = f"{loc_topic}, {fact}."
+            else:
+                raw = f"{fact} 시행을 발표했습니다."
         elif role_slot == "hook_scale":
-            raw = f"집계된 수치는 {fact}."
+            if fact.endswith(("했다", "된다", "한다", "였다", "왔다", "졌다")):
+                raw = f"집계된 수치는 {fact[:-1]}했습니다."
+            elif fact.endswith("다"):
+                raw = f"집계된 수치는 {fact[:-1]}습니다."
+            else:
+                raw = f"집계된 수치는 {fact}."
         elif role_slot == "hook_paradox":
-            q_short = cq_clean if (cq_clean and len(cq_clean) <= 14 and _localized_topic_label(cq_clean, "KR") == cq_clean[:14]) else "왜 못 막았을까?"
+            q_short = cq_clean if (cq_clean and 6 <= len(cq_clean) <= 16 and not cq_clean.endswith("?")) else "왜 못 막았을까?"
+            if not q_short.endswith("?"):
+                q_short += "?"
             raw = f"{q_short} {fact}."
         else:
             fact_attr = _to_kr_attributive(fact)
             if bucket == "alleged_regulator":
-                p_opts = ["정부 및 관계 당국 발표에 따르면, ", "공식 발표 자료에 따르면, ", "관계 기관의 공식 발표에 따르면, ", "당국의 공식 분석 자료를 보면, ", "정부의 공식 발표에 따르면, "]
+                p_opts = ["정부 발표에 따르면, ", "관계 기관 공식 자료에 따르면, ", "규제 당국의 공식 발표에 따르면, ", "정부 및 관계 당국에 따르면, ", "당국의 공식 분석 자료를 보면, "]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 방안이 마련됐습니다.", f"{fact_attr} 일정이 공식 발표됐습니다.", f"{fact_attr} 지침이 공지됐습니다.", f"{fact_attr} 계획이 전달됐습니다.", f"{fact_attr} 내용이 공개됐습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 절차가 진행된다고 전했습니다.", f"{fact_attr} 지원 방침이 마련됐다고 공표했습니다.", f"{fact_attr} 방식이 적용된다고 설명했습니다.", f"{fact_attr} 기준을 수립했다고 밝혔습니다.", f"{fact_attr} 구조로 운영된다고 전했습니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 사안이 집중 검토 대상에 올랐습니다.", f"{fact_attr} 쟁점에 대해 추가 지침을 발표했습니다.", f"{fact_attr} 문제점이 당국 보고서에 적시됐습니다.", f"{fact_attr} 배경을 두고 공식 조사가 착수됐습니다.", f"{fact_attr} 대목이 규제 심의에 부쳐졌습니다."]
+                else:
+                    tails = [f"{fact_attr} 후속 대책이 추진되고 있습니다.", f"{fact_attr} 제도 개선이 과제로 제시됐습니다.", f"{fact_attr} 시행 결과가 보고됐습니다.", f"{fact_attr} 대책이 시장에 미친 영향이 평가됐습니다.", f"{fact_attr} 조치가 공식 마무리 단계에 들어섰습니다."]
             elif bucket == "unverified":
-                p_opts = ["아직 확인 전 단계의 초기 보도에 따르면, ", "검증 전 단계의 취재 자료를 보면, ", "초기 미확인 보도 내용에는 ", "추가 확인 전 단계지만, ", "초기 문건에 따르면 아직 최종 확인 전이나, "]
+                p_opts = ["아직 확인 전 단계의 초기 보도에 따르면, ", "검증 전 단계의 취재 자료를 보면, ", "초기 미확인 보도 내용에는, ", "추가 확인 전 단계지만, ", "초기 문건에 따르면 아직 최종 확인 전이나, "]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 의혹이 초기에 제기됐습니다.", f"{fact_attr} 주장이 일부 보도로 전해졌습니다.", f"{fact_attr} 정황이 초기 자료에 언급됐습니다.", f"{fact_attr} 대목이 미확인 상태로 다뤄졌습니다.", f"{fact_attr} 소식이 초기에 전해진 바 있습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 거래 방식이었다는 의혹이 보도됐습니다.", f"{fact_attr} 정황이 있었다는 주장이 제기됐습니다.", f"{fact_attr} 수법이 쓰였다는 의혹이 전해졌습니다.", f"{fact_attr} 의혹이 사안의 전개 과정으로 지목됐습니다.", f"{fact_attr} 내용이 비공식 문건에 기재됐습니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 의혹이 추가 보도로 번졌습니다.", f"{fact_attr} 혐의가 제기되며 논란이 커졌습니다.", f"{fact_attr} 대목이 새로운 의혹으로 제기됐습니다.", f"{fact_attr} 정황을 두고 진위 공방이 이어졌습니다.", f"{fact_attr} 내용이 논란의 초점으로 부각됐습니다."]
+                else:
+                    tails = [f"{fact_attr} 의혹에 대해 진상 조사가 요구되고 있습니다.", f"{fact_attr} 주장이 향후 검증 과제로 남았습니다.", f"{fact_attr} 대목이 남긴 파장이 거론되고 있습니다.", f"{fact_attr} 내용의 사실관계 규명이 필요하다는 지적이 나옵니다.", f"{fact_attr} 의혹이 제도적 경각심을 불러일으키고 있습니다."]
             elif bucket in ("indictment", "court_record"):
-                p_opts = ["검찰 공소장에 따르면, ", "법원 접수 기록에 따르면, ", "검찰 수사 및 공소 내용에 따르면, ", "법원에 제출된 기록을 보면, ", "공소장에 따르면, "]
+                p_opts = ["검찰 공소장에 따르면, ", "법원 접수 기록에 따르면, ", "검찰 수사 및 공소 내용에 따르면, ", "법원에 제출된 기록을 보면, ", "공소 사실에 의하면, "]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 혐의가 공소장에 적시됐습니다.", f"{fact_attr} 정황이 수사 기록에 포함됐습니다.", f"{fact_attr} 사실이 접수 문건에 나타납니다.", f"{fact_attr} 행위가 기소 내용에 포함됐습니다.", f"{fact_attr} 대목이 공소 사실의 발단으로 기재됐습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 방식으로 범행이 이뤄졌다고 공소장에 적시됐습니다.", f"{fact_attr} 정황이 수사 결과로 지목됐습니다.", f"{fact_attr} 혐의가 핵심 기소 사유로 명시됐습니다.", f"{fact_attr} 과정이 범행 수법으로 법원에 제출됐습니다.", f"{fact_attr} 내용이 공소 범죄사실로 다뤄집니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 혐의가 재판에서 주요 쟁점으로 떠올랐습니다.", f"{fact_attr} 정황을 두고 공방이 벌어졌습니다.", f"{fact_attr} 대목이 혐의 입증의 분수령으로 지목됐습니다.", f"{fact_attr} 내용이 피고인의 핵심 범죄사실로 다뤄집니다.", f"{fact_attr} 사실이 수사 기록에서 집중 조명됐습니다."]
+                else:
+                    tails = [f"{fact_attr} 혐의에 대한 사법적 심리가 이어지고 있습니다.", f"{fact_attr} 기소 사실이 중요한 법적 선례로 평가됩니다.", f"{fact_attr} 대목이 공소 유지의 핵심으로 남았습니다.", f"{fact_attr} 내용이 형사 책임의 판단 근거로 거론됩니다.", f"{fact_attr} 사실이 엄정한 처벌의 필요성으로 지적됩니다."]
             elif bucket == "final_judgment":
-                p_opts = ["법원 판결에 따르면, ", "법원의 확정 판결을 보면, ", "사법부 판단에 따르면, ", "확정 판결에 따르면, ", "법원 판결문에 따르면, "]
+                p_opts = ["법원 확정 판결에 따르면, ", "법원 판결에 따르면, ", "사법부 판단에 따르면, ", "판결문에 의하면, ", "유죄 확정 판결에 따르면, "]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 유죄가 인정됐습니다.", f"{fact_attr} 사실이 확정 선고됐습니다.", f"{fact_attr} 책임이 법원에서 판시됐습니다.", f"{fact_attr} 내용이 확정 사실로 인정됐습니다.", f"{fact_attr} 사실이 판결문에 명시됐습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 구조가 위법 행위로 판시됐습니다.", f"{fact_attr} 행위가 유죄의 근거로 인정됐습니다.", f"{fact_attr} 수법이 판결문에서 불법으로 적시됐습니다.", f"{fact_attr} 방식이 법적 책임을 묻는 주된 사유로 인정됐습니다.", f"{fact_attr} 과정이 불법적인 것으로 판결에 기록됐습니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 사안에 유죄 판결이 내려졌습니다.", f"{fact_attr} 사실에 대해 법원은 배상 책임을 인정했습니다.", f"{fact_attr} 대목이 판결에서 엄중히 처벌됐습니다.", f"{fact_attr} 행위가 위법으로 확정 선고됐습니다.", f"{fact_attr} 점이 판결 이유에서 명백히 인정됐습니다."]
+                else:
+                    tails = [f"{fact_attr} 판결이 확정되며 법적 판단이 종결됐습니다.", f"{fact_attr} 사법 판단이 시장에 중요한 경종을 울렸습니다.", f"{fact_attr} 판결이 피해 구제의 법적 근거가 됐습니다.", f"{fact_attr} 확정 판결은 제도 개선의 중대한 기준이 됐습니다.", f"{fact_attr} 결론이 사법적 최종 판단으로 남았습니다."]
             elif bucket == "criminal_complaint":
                 p_opts = ["제출된 고발장에 따르면, ", "고소장 내용에 따르면, ", "소장을 통해 제기된 바에 따르면, ", "고발장에 의하면, ", "제출된 소장에 따르면, "]
+                tails = [f"{fact_attr} 주장이 소장에 기재됐습니다.", f"{fact_attr} 내용이 고발장에 포함됐습니다.", f"{fact_attr} 의혹에 대해 수사가 의뢰됐습니다.", f"{fact_attr} 혐의를 밝혀달라는 청구가 제기됐습니다.", f"{fact_attr} 사실을 조사해달라는 소장이 접수됐습니다."]
             elif bucket == "proposed":
                 p_opts = ["추진 중인 정책 방침에 따르면, ", "입법 추진 초안에 따르면, ", "당국의 정책 검토 자료를 보면, ", "발의된 법안 초안에 따르면, ", "제도 추진 계획에 따르면, "]
-            else:
-                p_opts = ["초기 언론 보도에 따르면, ", "공개된 취재 자료를 보면, ", "사안의 출발점에서 언론 취재를 보면, ", "초기 보도된 경위를 살펴보면, ", "취재 보도에 따르면, "]
+                tails = [f"{fact_attr} 방안이 추진되고 있습니다.", f"{fact_attr} 법안이 입법 예고됐습니다.", f"{fact_attr} 정책이 도입될 예정입니다.", f"{fact_attr} 제도 신설이 검토되고 있습니다.", f"{fact_attr} 대책이 마련될 계획입니다."]
+            else:  # alleged (press reporting)
+                p_opts = ["언론 보도에 따르면, ", "취재 보도에 의하면, ", "공개된 보도 내용에 따르면, ", "보도된 경위를 보면, ", "언론 취재 결과에 따르면, "]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 정황이 취재로 드러났습니다.", f"{fact_attr} 사실이 언론을 통해 보도됐습니다.", f"{fact_attr} 소식이 언론 취재로 알려졌습니다.", f"{fact_attr} 내용이 초기에 집중 보도됐습니다.", f"{fact_attr} 대목이 언론 보도로 전해졌습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 거래 구조였다고 보도됐습니다.", f"{fact_attr} 정황이 언론을 통해 알려졌습니다.", f"{fact_attr} 과정이 구체적으로 취재 보도됐습니다.", f"{fact_attr} 수법이 쓰였다고 언론은 전했습니다.", f"{fact_attr} 사실이 보도의 주요 내용으로 다뤄졌습니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 정황이 새롭게 보도됐습니다.", f"{fact_attr} 쟁점이 언론 취재로 수면 위에 올랐습니다.", f"{fact_attr} 대목이 논란의 중심에 섰다고 보도됐습니다.", f"{fact_attr} 사실이 후속 보도에서 집중 조명됐습니다.", f"{fact_attr} 내용이 파장을 일으켰다고 언론은 전했습니다."]
+                else:
+                    tails = [f"{fact_attr} 사실이 주요 보도 내용으로 제시됐습니다.", f"{fact_attr} 대목이 시장에 남긴 영향으로 보도됐습니다.", f"{fact_attr} 내용이 제도적 반성의 계기로 거론됐습니다.", f"{fact_attr} 사실이 언론에서 주요 교훈으로 지적됐습니다.", f"{fact_attr} 점이 후속 취재의 핵심 과제로 남았습니다."]
 
             pfx = p_opts[v_idx]
-            if role_slot == "setup":
-                tails = [f"{fact_attr} 점이 드러났습니다.", f"{fact_attr} 정황이 초기 배경으로 전해집니다.", f"{fact_attr} 대목이 확인됐습니다.", f"{fact_attr} 내용이 기초 사실로 다뤄집니다.", f"{fact_attr} 사실이 앞부분에 나타납니다."]
-            elif role_slot == "mechanism":
-                tails = [f"{fact_attr} 점이 거래 구조의 세부 내역으로 전해집니다.", f"{fact_attr} 정황이 구체적인 과정으로 보도됐습니다.", f"{fact_attr} 내용이 거래 방식의 한 축으로 확인됩니다.", f"{fact_attr} 대목이 사안의 전개 과정으로 지목됐습니다.", f"{fact_attr} 사실이 기록의 중요한 부분으로 다뤄집니다."]
-            elif role_slot == "crack":
-                tails = [f"{fact_attr} 정황이 새롭게 드러났습니다.", f"{fact_attr} 사실이 주요 쟁점으로 떠올랐습니다.", f"{fact_attr} 대목이 논란의 중심에 선 것으로 확인됩니다.", f"{fact_attr} 내용이 중요한 전환점으로 다뤄집니다.", f"{fact_attr} 점이 후속 국면에서 집중 조명됐습니다."]
-            else:
-                tails = [f"{fact_attr} 점이 핵심 과제로 남았습니다.", f"{fact_attr} 사실이 주요 결론으로 제시됩니다.", f"{fact_attr} 대목이 시장에 남긴 영향으로 전해집니다.", f"{fact_attr} 내용이 제도적 반성의 계기로 꼽힙니다.", f"{fact_attr} 사실이 주요 교훈으로 정리되고 있습니다."]
             raw = f"{pfx}{tails[v_idx]}"
 
     elif m == "JA":
@@ -826,33 +890,58 @@ def _build_grounded_story_beats(
     b2_source = pools["backgrounds"] or verified_pool or all_claims
     b3_source = pools["mechanisms"] or verified_pool or all_claims
     b4_source = (pools["catalysts"] + pools["unverified_pool"]) or all_claims
-    b5_source = verified_pool[::-1] + pools["unverified_pool"] or all_claims
+    b5_source = (
+        [c for c in verified_pool if c not in pools["catalysts"]]
+        + pools["unverified_pool"]
+        + pools["backgrounds"]
+        or all_claims
+    )
 
     # Deterministic claim cursor to maximize unique coverage across the entire ledger (>= 70%)
-    used_ids: List[str] = []
-    pick_cursor = [0]
+    claim_counts: Dict[str, int] = {}
+    recent_picks: List[str] = []
 
-    def _pick_claim(preferred: List[Any], restrict_to_preferred: bool = False) -> Any:
+    def _get_cid(cand: Any) -> str:
+        return cand.get("claim_id") if isinstance(cand, dict) else getattr(cand, "claim_id", "")
+
+    def _pick_claim(
+        preferred: List[Any],
+        restrict_to_preferred: bool = False,
+        disallow_cids: Optional[Set[str]] = None,
+    ) -> Any:
         if not all_claims:
             return None
+        disallowed = set(disallow_cids or set())
+
+        # 1. Unused claims from preferred pool
         for cand in preferred:
-            cid = cand.get("claim_id") if isinstance(cand, dict) else getattr(cand, "claim_id", None)
-            if cid and cid not in used_ids:
-                used_ids.append(cid)
+            cid = _get_cid(cand)
+            if cid and cid not in disallowed and claim_counts.get(cid, 0) == 0:
+                claim_counts[cid] = claim_counts.get(cid, 0) + 1
+                recent_picks.append(cid)
                 return cand
-        if restrict_to_preferred and preferred:
-            idx_c = pick_cursor[0]
-            pick_cursor[0] += 1
-            return preferred[idx_c % len(preferred)]
-        for cand in all_claims:
-            cid = cand.get("claim_id") if isinstance(cand, dict) else getattr(cand, "claim_id", None)
-            if cid and cid not in used_ids:
-                used_ids.append(cid)
-                return cand
-        pool = preferred or all_claims
-        idx_c = pick_cursor[0]
-        pick_cursor[0] += 1
-        return pool[idx_c % len(pool)]
+
+        # 2. Unused claims from all_claims
+        if not restrict_to_preferred:
+            for cand in all_claims:
+                cid = _get_cid(cand)
+                if cid and cid not in disallowed and claim_counts.get(cid, 0) == 0:
+                    claim_counts[cid] = claim_counts.get(cid, 0) + 1
+                    recent_picks.append(cid)
+                    return cand
+
+        # 3. If all claims used, pick least frequently used claim that wasn't used in last 2 picks
+        pool = preferred if (restrict_to_preferred and preferred) else all_claims
+        eligible = [c for c in pool if _get_cid(c) not in disallowed and _get_cid(c) not in recent_picks[-2:]]
+        if not eligible:
+            eligible = [c for c in pool if _get_cid(c) not in disallowed] or pool
+
+        sorted_eligible = sorted(eligible, key=lambda c: claim_counts.get(_get_cid(c), 0))
+        chosen = sorted_eligible[0]
+        cid = _get_cid(chosen)
+        claim_counts[cid] = claim_counts.get(cid, 0) + 1
+        recent_picks.append(cid)
+        return chosen
 
     visual_hooks_seq = [
         "stat_hero", "stamp", "magnifier", "red_thread",
@@ -907,11 +996,22 @@ def _build_grounded_story_beats(
 
     raw_beats: List[Tuple[str, float, List[Any]]] = []
     vh_idx = 0
+    b1_catalyst_cid: Optional[str] = None
     for beat_id, dur_s, slots in beat_specs:
         beat_lines: List[StorySceneLine] = []
         is_hook_beat = beat_id.startswith("B1")
+        is_aftermath = beat_id.startswith("B5")
         for l_idx, (role_slot, src_pool) in enumerate(slots, start=1):
-            c_obj = _pick_claim(src_pool, restrict_to_preferred=(is_hook_beat and bool(verified_pool)))
+            disallowed: Set[str] = set()
+            if is_aftermath and b1_catalyst_cid:
+                disallowed.add(b1_catalyst_cid)
+            c_obj = _pick_claim(
+                src_pool,
+                restrict_to_preferred=(is_hook_beat and bool(verified_pool)),
+                disallow_cids=disallowed,
+            )
+            if is_hook_beat and l_idx == 1:
+                b1_catalyst_cid = _get_cid(c_obj)
             txt, cids = _render_claim_sentence(
                 c_obj,
                 market=m,
@@ -944,6 +1044,39 @@ def _build_grounded_story_beats(
     if b1_dur > 24.0 and len(raw_beats[0][2]) > 3:
         while b1_dur > 24.0 and len(raw_beats[0][2]) > 3:
             raw_beats[0][2].pop()
+            b1_dur = float(
+                estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
+            )
+    if b1_dur > 24.0:
+        for idx in (2, 1, 0):
+            if b1_dur <= 24.0:
+                break
+            ln_cur = raw_beats[0][2][idx]
+            cur_t = ln_cur.text
+            if len(cur_t) > 22:
+                clauses = [c.strip() for c in re.split(r"[;—]|,\s+", cur_t) if c.strip()]
+                if len(clauses) > 1 and len(clauses[0]) >= 12:
+                    c_cand = clauses[0]
+                    if m == "KR" and not c_cand.endswith((".", "!", "?", "다", "요", "죠")):
+                        c_cand += " 발표됐습니다."
+                    elif not c_cand.endswith((".", "!", "?")):
+                        c_cand += "."
+                    ln_cur.text = c_cand
+                else:
+                    w_list = cur_t.split()
+                    shrunk = ""
+                    for w in w_list:
+                        cand = f"{shrunk} {w}".strip()
+                        if len(cand) <= 20:
+                            shrunk = cand
+                        else:
+                            break
+                    if shrunk:
+                        if m == "KR" and not shrunk.endswith((".", "!", "?", "다", "요", "죠")):
+                            shrunk += " 발표됐습니다."
+                        elif not shrunk.endswith((".", "!", "?")):
+                            shrunk += "."
+                        ln_cur.text = shrunk
             b1_dur = float(
                 estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
             )

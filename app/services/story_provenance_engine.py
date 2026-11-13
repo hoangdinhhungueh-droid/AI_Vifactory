@@ -156,6 +156,7 @@ def is_reputable_press_domain(url: str, source_name: str = "") -> bool:
         if any(host == dom or host.endswith("." + dom) for dom in _REPUTABLE_PRESS_DOMAINS):
             return True
     s_low = (source_name or "").lower()
+    s_clean = re.sub(r"\(.*?\)", "", s_low).strip()
     wire_names = (
         "reuters", "associated press", "ap news", "bloomberg", "financial times", "wsj",
         "wall street journal", "new york times", "washington post", "cnbc", "bbc", "guardian",
@@ -163,9 +164,10 @@ def is_reputable_press_domain(url: str, source_name: str = "") -> bool:
         "nikkei", "nhk", "kyodo", "asahi", "yomiuri", "mainichi", "jiji", "日本経済新聞", "朝日新聞", "読売新聞", "毎日新聞", "共同通信", "時事通信",
         "yonhap", "연합뉴스", "kbs", "mbc", "sbs", "ytn", "jtbc", "경향신문", "한겨레", "조선비즈", "동아일보",
         "한국경제", "매일경제", "조선일보", "중앙일보", "서울경제", "머니투데이", "이데일리", "뉴스1", "뉴시스", "한국일보", "세계일보", "국민일보",
+        "chosun", "chosunbiz", "donga", "joongang", "hankyoreh", "kyunghyang", "hankook", "maeil", "seoul economic",
         "vnexpress", "tuổi trẻ", "tuoi tre", "thanh niên", "thanh nien", "ttxvn", "vietnamplus", "vtv", "vov", "lao động", "nhân dân", "tiền phong", "tien phong", "dân trí", "dan tri",
     )
-    return any(w in s_low for w in wire_names)
+    return any(w in s_low or w in s_clean for w in wire_names)
 
 
 def is_official_portal_name(source_name: str = "") -> bool:
@@ -175,8 +177,10 @@ def is_official_portal_name(source_name: str = "") -> bool:
         return False
     if re.search(r"\b(?:sec|doj|ftc|irs|gao|cbo)\b", s_low):
         return True
+    s_clean = re.sub(r"\(.*?\)", "", s_low).strip()
     portal_markers = (
-        "대한민국 정책브리핑", "정책브리핑", "korea.kr", "국토교통부", "국토부", "금융위원회", "금융위", "금융감독원", "금감원",
+        "대한민국 정책브리핑", "정책브리핑", "korea policy briefing", "government briefing", "korea.kr",
+        "국토교통부", "국토부", "금융위원회", "금융위", "금융감독원", "금감원",
         "법무부", "대검찰청", "검찰청", "대법원", "감사원", "공정거래위원회", "공정위", "보건복지부", "기획재정부", "기재부",
         "경찰청", "국세청", "관세청", "조달청", "통계청", "한국은행", "행정안전부", "행안부", "고용노동부",
         "산업통상자원부", "산자부", "환경부", "중소벤처기업부", "중기부", "법원", "검찰",
@@ -192,7 +196,7 @@ def is_official_portal_name(source_name: str = "") -> bool:
         "tổng cục thuế", "tổng cục thống kê", "ủy ban chứng khoán", "ubck", "tòa án", "viện kiểm sát",
         ".gov", ".go.kr", ".go.jp", ".gov.vn",
     )
-    return any(p in s_low for p in portal_markers)
+    return any(p in s_low or p in s_clean for p in portal_markers)
 
 
 def extract_normalized_date(date_raw: Optional[str], claim_text: str = "") -> Optional[str]:
@@ -345,7 +349,7 @@ def classify_claim_provenance(
         source_type = raw_claim.get("source_type") or "press"
 
     # Refine doc_type & procedural_status
-    if doc_type == "unknown":
+    if doc_type in ("unknown", "rss_snippet"):
         if has_judgment:
             doc_type = "court_judgment"
         elif has_indictment:
@@ -361,7 +365,7 @@ def classify_claim_provenance(
         elif is_reputable_press:
             doc_type = "news_article"
         elif source_type == "press":
-            doc_type = "rss_snippet" if is_rss else "news_article"
+            doc_type = "rss_snippet" if (is_rss and not is_reputable_press) else "news_article"
         elif is_rss:
             doc_type = "rss_snippet"
         else:
@@ -471,9 +475,9 @@ def classify_claim_provenance(
     ) or (source_type == "court" and verification_status == "verified_primary" and legal_status in ("fact", "convicted", "settled") and not is_anonymous_rss):
         credibility_tier = "verified_fact"
     elif (
-        doc_type in ("statute", "regulatory_notice", "gov_report")
+        (doc_type in ("statute", "regulatory_notice", "gov_report") and not is_anonymous_rss)
         or procedural_status == "legislative_enacted"
-        or (source_type in ("regulator", "gov") and verification_status in ("verified_primary", "corroborated_secondary") and legal_status not in ("alleged", "charged") and not is_anonymous_rss)
+        or (source_type in ("regulator", "gov") and verification_status in ("verified_primary", "corroborated_secondary") and not is_anonymous_rss)
     ):
         credibility_tier = "official_regulation"
     elif (
@@ -755,11 +759,11 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "indictment": ["공소장에 따르면", "공소장에 의하면", "검찰 공소장", "검찰에 따르면", "검찰 조사", "검찰 기소", "기소 내용에 따르면", "기소장에 따르면", "기소장 기재", "공소 사실"],
         "criminal_complaint": ["고발장에 따르면", "고소장에 따르면", "소장에 따르면", "고발 내용에 따르면", "소장을 통해", "제출된 소장", "고발장에 의하면"],
         "press_charge": ["보도된 기소 내용에 따르면", "기소 보도", "보도에 따르면", "언론 보도에 따르면", "혐의를 받고 있", "공개된 혐의"],
-        "alleged_regulator": ["규제 당국에 따르면", "당국에 따르면", "당국의 조사", "감독 당국", "정부 발표에 따르면", "발표에 따르면", "공식 발표", "발표했다", "보고서에 따르면", "조사 결과", "공식 분석", "분석 자료", "관계 기관", "공식 자료", "공정거래위원회", "금융감독원", "관계 당국"],
+        "alleged_regulator": ["규제 당국에 따르면", "당국에 따르면", "당국의 조사", "감독 당국", "정부 발표에 따르면", "정부 및 관계 당국", "정부의 공식 발표", "관계 기관의 공식 발표", "공식 발표 자료", "발표에 따르면", "공식 발표", "발표했다", "보고서에 따르면", "조사 결과", "공식 분석", "당국의 공식 분석", "분석 자료", "관계 기관", "공식 자료", "공정거래위원회", "금융감독원", "관계 당국"],
         "audit_finding": ["감사 보고서", "감사원", "감사 결과", "조사 결과", "실태조사", "점검 결과", "보고서에 따르면", "공식 감사"],
-        "alleged": ["언론 보도에 따르면", "보도 설명에 따르면", "보도에 따르면", "공개된 보도", "의혹이 제기", "주장에 따르면", "것으로 알려졌", "것으로 전해졌", "취재 보도", "보도를 보면", "보도된 경위", "취재 결과"],
+        "alleged": ["언론 보도에 따르면", "보도 설명에 따르면", "보도에 따르면", "보도에 의하면", "보도 내용에 따르면", "보도 내용에는", "공개된 보도", "의혹이 제기", "주장에 따르면", "것으로 알려졌", "것으로 전해졌", "취재 보도", "보도를 보면", "보도된 경위", "취재 결과", "취재 자료", "취재를 보면", "취재에 따르면", "언론 취재", "보도됐다", "보도된", "알려졌다", "전해졌다"],
         "settled": ["합의했", "합의하며", "합의로 종결", "책임을 인정하지 않", "인정하지 않고 합의", "동의의결"],
-        "unverified": ["아직 최종", "아직 확인", "아직 사실관계", "미확인", "초기 보도", "확인되지 않은 보도", "초기 문건", "검증 전", "확인 전"],
+        "unverified": ["아직 최종", "아직 확인", "아직 사실관계", "미확인", "초기 보도", "확인되지 않은 보도", "초기 문건", "검증 전", "확인 전", "미확인 보도", "확인 전 단계", "검증 전 단계", "초기 미확인", "추가 확인 전", "초기 보도 내용", "초기 자료"],
         "proposed": ["추진", "검토", "예정", "발의", "초안", "방침"],
     },
     "JA": {
@@ -839,6 +843,7 @@ def expected_qualifier_bucket(
     speaker: Optional[str] = None,
     procedural_status: str = "unknown",
     verification_status: str = "corroborated_secondary",
+    credibility_tier: Optional[str] = None,
 ) -> str:
     """Resolve the single canonical qualifier bucket from full legal & provenance metadata."""
     ls = (legal_status or "alleged").lower()
@@ -847,6 +852,7 @@ def expected_qualifier_bucket(
     sp = (speaker or "").lower()
     ps = (procedural_status or "unknown").lower()
     vs = (verification_status or "unverified_secondary").lower()
+    cred = (credibility_tier or "").lower()
 
     if ls == "settled":
         return "settled"
@@ -857,9 +863,9 @@ def expected_qualifier_bucket(
             return "audit_finding"
         if ps == "bill_proposed" or dt == "proposed_bill":
             return "proposed"
-        if vs in ("unverified_secondary", "speculative"):
+        if vs in ("unverified_secondary", "speculative") and cred == "unconfirmed_claim":
             return "unverified"
-        if ls == "fact" and vs == "verified_primary":
+        if ls == "fact" and vs == "verified_primary" and cred == "verified_fact":
             return "fact"
         return "alleged_regulator"
 
@@ -892,7 +898,9 @@ def expected_qualifier_bucket(
         return "press_charge"
     if ps == "bill_proposed" or dt == "proposed_bill":
         return "proposed"
-    if vs in ("unverified_secondary", "speculative") or (dt == "rss_snippet" and vs != "corroborated_secondary"):
+    if vs == "corroborated_secondary" or cred == "press_allegation":
+        return "alleged"
+    if vs in ("unverified_secondary", "speculative") or dt == "rss_snippet" or cred == "unconfirmed_claim":
         return "unverified"
     if ls == "alleged":
         return "alleged"
