@@ -277,24 +277,49 @@ def _to_kr_attributive(clause: str) -> str:
     c = (clause or "").strip().rstrip(". ")
     if not c:
         return c
-    c = re.sub(r"(?:있습니다|있었다)$", "있다는", c)
-    c = re.sub(r"(?:없습니다|없었다)$", "없다는", c)
-    c = re.sub(r"(?:했습니다|하였다)$", "했다는", c)
-    c = re.sub(r"(?:됐습니다|되었다)$", "됐다는", c)
-    c = re.sub(r"(?:였습니다|이었으며|이었고)$", "였다는", c)
-    c = re.sub(r"입니다$", "라는", c)
-    c = re.sub(r"습니다$", "다는", c)
-    c = re.sub(r"했다$", "했다는", c)
-    c = re.sub(r"됐다$", "됐다는", c)
-    c = re.sub(r"였다$", "였다는", c)
-    c = re.sub(r"있다$", "있다는", c)
-    c = re.sub(r"없다$", "없다는", c)
-    c = re.sub(r"이다$", "이라는", c)
+    repls = [
+        (r"(?:있습니다|있었다)$", "있다는"),
+        (r"(?:없습니다|없었다)$", "없다는"),
+        (r"(?:했습니다|하였다)$", "했다는"),
+        (r"(?:됐습니다|되었다)$", "됐다는"),
+        (r"(?:였습니다|이었으며|이었고)$", "였다는"),
+        (r"입니다$", "라는"),
+        (r"습니다$", "다는"),
+        (r"했다$", "했다는"),
+        (r"됐다$", "됐다는"),
+        (r"였다$", "였다는"),
+        (r"있다$", "있다는"),
+        (r"없다$", "없다는"),
+        (r"이다$", "이라는"),
+        (r"한다$", "한다는"),
+        (r"된다$", "된다는"),
+        (r"달한다$", "달한다는"),
+        (r"나타났다$", "나타났다는"),
+        (r"중단됐다$", "중단됐다는"),
+        (r"시작된다$", "시작된다는"),
+        (r"지원한다$", "지원한다는"),
+        (r"전가했다$", "전가했다는"),
+        (r"제공한다$", "제공한다는"),
+        (r"이르렀다$", "이르렀다는"),
+        (r"정지된다$", "정지된다는"),
+        (r"마련했다$", "마련했다는"),
+        (r"설치했다$", "설치했다는"),
+        (r"회피했다$", "회피했다는"),
+    ]
+    for pat, rep in repls:
+        if re.search(pat, c):
+            return re.sub(pat, rep, c)
     if c.endswith("다"):
-        c = c[:-1] + "다는"
-    elif not c.endswith(("다는", "라는", "은", "는", "인", "된", "한", "울", "를")):
-        c = f"{c}라는"
-    return c
+        return c[:-1] + "다는"
+    if c.endswith(("다는", "라는", "은", "는", "인", "된", "한", "울", "를")):
+        if c.endswith(("을", "를")):
+            return f"{c} 추진했다는"
+        return c
+    if c.endswith(("이", "가")):
+        return f"{c} 발생했다는"
+    if c.endswith("공식"):
+        return f"{c} 발표했다는"
+    return f"{c}라는"
 
 
 def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode: bool = False) -> str:
@@ -302,24 +327,43 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     clean = re.sub(r"\s+", " ", (text or "").strip()).rstrip(".。")
     # Clean trailing formal polite endings if embedded inside a longer sentence
     if market == "KR":
-        clean = re.sub(r"(?:있습니다|습니다|입니다)$", "", clean).strip(" ,;:")
-        cap = 20 if hook_mode else 50
+        pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|의혹이\s*보도되었다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다|의혹이\s*제기되었다)$"
+        clean = re.sub(pat_kr, r"\1", clean)
+        clean = re.sub(r"(?:보도되었다|보도됐다|알려졌다|전해졌다)$", "", clean).strip()
+
+        cap = 20 if hook_mode else 85
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
-        head = clauses[0] if clauses else clean
-        if not hook_mode and 10 <= len(head) <= cap:
-            trimmed = head
-        else:
-            words = clean.split()
-            buf = ""
-            for w in words:
-                cand = f"{buf} {w}".strip()
-                if len(cand) <= cap:
-                    buf = cand
-                else:
+        if len(clauses) > 1:
+            head = clauses[0]
+            conj_repls = [
+                (r"하고$", "했다"), (r"하며$", "했다"), (r"되어$", "됐다"),
+                (r"되고$", "된다"), (r"이고$", "이다"), (r"으며$", "었다"), (r"고$", "다")
+            ]
+            for c_pat, c_rep in conj_repls:
+                if re.search(c_pat, head):
+                    head = re.sub(c_pat, c_rep, head)
                     break
-            trimmed = buf if len(buf) >= 6 else clean[:cap].rstrip()
+            if len(head) <= cap and head.endswith("다"):
+                return head
+
+        words = clean.split()
+        buf = ""
+        for w in words:
+            cand = f"{buf} {w}".strip()
+            if len(cand) <= cap:
+                buf = cand
+            else:
+                break
+        if not buf:
+            buf = clean[:cap]
+        if not hook_mode and not buf.endswith("다"):
+            if len(buf.split()) < len(words):
+                next_w = words[len(buf.split())]
+                if next_w.endswith("다") and len(f"{buf} {next_w}") <= cap + 12:
+                    buf = f"{buf} {next_w}"
+        trimmed = buf
         if trimmed.count("(") > trimmed.count(")"):
             trimmed = trimmed[: trimmed.rfind("(")].strip(" ,;:")
         anchors = (elems.get("metrics", []) + elems.get("dates", []))
@@ -330,8 +374,9 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         return trimmed.strip(" ,;:")
 
     if market == "JA":
-        clean = re.sub(r"(?:しました|でした|います|である|した|だ)$", "", clean).strip(" 、,")
-        cap = 26 if hook_mode else 58
+        pat_ja = r"(?:と(?:報じられた|伝えられた|報じられている|発表された)|との(?:報道|発表)があった)$"
+        clean = re.sub(pat_ja, "", clean).strip(" 、,")
+        cap = 22 if hook_mode else 85
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—、,：:]", clean) if c.strip()]
@@ -356,7 +401,14 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
                 trimmed = f"{a0}の{trimmed}".strip()
         return trimmed
 
-    word_cap = (8 if hook_mode else 16) if market == "VN" else (7 if hook_mode else 14)
+    word_cap = (7 if hook_mode else 22) if market == "VN" else (7 if hook_mode else 20)
+    if market == "VN":
+        pat_vn = r"(?:theo thông tin báo chí|được báo chí phản ánh|theo các nguồn tin ban đầu|theo thông tin được công bố)$"
+        clean = re.sub(pat_vn, "", clean).strip(" ,;:")
+    elif market == "EN":
+        pat_en = r",?\s*(?:according to (?:media|press|news) reports|as reported in (?:media|press) accounts|media reports indicate)\.?$"
+        clean = re.sub(pat_en, "", clean, flags=re.IGNORECASE).strip(" ,;:")
+
     words = clean.split()
     if len(words) <= word_cap:
         return clean
@@ -366,7 +418,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     ):
         word_cap += 1
     # Avoid severing multi-word capitalized entities at word boundary
-    while word_cap < len(words) and word_cap < 18 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
+    while word_cap < len(words) and word_cap < 24 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
         word_cap += 1
     trimmed = " ".join(words[:word_cap]).rstrip(",;:")
     if trimmed.count("(") > trimmed.count(")"):
@@ -498,7 +550,10 @@ def _render_claim_sentence(
     """Construct an authentic investigative narrative sentence anchored directly in `claim_obj`
     with provenance-matched legal & verification qualification and non-repetitive framing.
     """
-    from app.services.story_provenance_engine import normalize_market_code
+    from app.services.story_provenance_engine import (
+        expected_qualifier_bucket,
+        normalize_market_code,
+    )
 
     m = normalize_market_code(market)
     hook_mode = role_slot.startswith("hook_")
@@ -518,6 +573,15 @@ def _render_claim_sentence(
         ps = str(get_attr("procedural_status", "unknown") or "unknown")
         vs = str(get_attr("verification_status", "corroborated_secondary") or "corroborated_secondary")
 
+    bucket = expected_qualifier_bucket(
+        legal_status=ls,
+        source_type=st,
+        doc_type=dt,
+        speaker=sp,
+        procedural_status=ps,
+        verification_status=vs,
+    )
+
     # Keep central question concise in Beat 1 so hook never spills over 25s
     cq_clean = re.sub(r"\s+", " ", (central_question or "").strip())
     v_idx = slot_idx % 5
@@ -532,42 +596,31 @@ def _render_claim_sentence(
             raw = f"{q_short} {fact}."
         else:
             fact_attr = _to_kr_attributive(fact)
-            if role_slot == "setup":
-                frames = [
-                    f"초기 기록을 보면 {fact_attr} 내용이 확인됩니다.",
-                    f"{fact_attr} 사실이 드러나며 초기 거래 구조의 출발점이 됐습니다.",
-                    f"기초 자료를 살펴보면 {fact_attr} 점이 적시돼 있습니다.",
-                    f"{fact_attr} 대목은 후속 사태를 부른 구조적 배경으로 꼽힙니다.",
-                    f"관련 기록의 앞부분은 {fact_attr} 사실을 전합니다.",
-                ]
-                raw = frames[v_idx]
-            elif role_slot == "mechanism":
-                frames = [
-                    f"구조와 경위를 따져보면 {fact_attr} 점이 기록에 남았습니다.",
-                    f"{fact_attr} 정황은 자금 흐름과 제도적 허점을 구체적으로 보여줍니다.",
-                    f"관련 문건은 {fact_attr} 대목을 구체적으로 짚고 있습니다.",
-                    f"{fact_attr} 내역이 연속적으로 집행되며 재무적 위험을 키웠습니다.",
-                    f"자료상의 흐름을 보면 {fact_attr} 점이 핵심 연결고리로 꼽힙니다.",
-                ]
-                raw = frames[v_idx]
-            elif role_slot == "crack":
-                frames = [
-                    f"후속 단계의 기록에는 {fact_attr} 내용이 올라와 있습니다.",
-                    f"{fact_attr} 사실이 공표되면서 사안은 본격적인 수사와 감독 단계로 전환됐습니다.",
-                    f"공개된 후속 문건에서도 {fact_attr} 내용이 확인됩니다.",
-                    f"{fact_attr} 정황이 입증되며 기존의 설명은 설득력을 잃었습니다.",
-                    f"관련 자료는 {fact_attr} 점을 중대한 전환점으로 전합니다.",
-                ]
-                raw = frames[v_idx]
+            if bucket == "alleged_regulator":
+                p_opts = ["정부 및 관계 당국 발표에 따르면, ", "공식 발표 자료에 따르면, ", "관계 기관의 공식 발표에 따르면, ", "당국의 공식 분석 자료를 보면, ", "정부의 공식 발표에 따르면, "]
+            elif bucket == "unverified":
+                p_opts = ["아직 확인 전 단계의 초기 보도에 따르면, ", "검증 전 단계의 취재 자료를 보면, ", "초기 미확인 보도 내용에는 ", "추가 확인 전 단계지만, ", "초기 문건에 따르면 아직 최종 확인 전이나, "]
+            elif bucket in ("indictment", "court_record"):
+                p_opts = ["검찰 공소장에 따르면, ", "법원 접수 기록에 따르면, ", "검찰 수사 및 공소 내용에 따르면, ", "법원에 제출된 기록을 보면, ", "공소장에 따르면, "]
+            elif bucket == "final_judgment":
+                p_opts = ["법원 판결에 따르면, ", "법원의 확정 판결을 보면, ", "사법부 판단에 따르면, ", "확정 판결에 따르면, ", "법원 판결문에 따르면, "]
+            elif bucket == "criminal_complaint":
+                p_opts = ["제출된 고발장에 따르면, ", "고소장 내용에 따르면, ", "소장을 통해 제기된 바에 따르면, ", "고발장에 의하면, ", "제출된 소장에 따르면, "]
+            elif bucket == "proposed":
+                p_opts = ["추진 중인 정책 방침에 따르면, ", "입법 추진 초안에 따르면, ", "당국의 정책 검토 자료를 보면, ", "발의된 법안 초안에 따르면, ", "제도 추진 계획에 따르면, "]
             else:
-                frames = [
-                    f"사후 정리 자료에는 {fact_attr} 점이 남아 있습니다.",
-                    f"{fact_attr} 결과는 제도적 보완과 시장 전반에 중요한 교훈을 남겼습니다.",
-                    f"마무리 단계의 기록 역시 {fact_attr} 점을 전하고 있습니다.",
-                    f"{fact_attr} 사실은 향후 유사 피해를 막기 위한 기준선이 됐습니다.",
-                    f"전체 기록을 종합하면 {fact_attr} 대목이 핵심 결론으로 남습니다.",
-                ]
-                raw = frames[v_idx]
+                p_opts = ["초기 언론 보도에 따르면, ", "공개된 취재 자료를 보면, ", "사안의 출발점에서 언론 취재를 보면, ", "초기 보도된 경위를 살펴보면, ", "취재 보도에 따르면, "]
+
+            pfx = p_opts[v_idx]
+            if role_slot == "setup":
+                tails = [f"{fact_attr} 점이 드러났습니다.", f"{fact_attr} 정황이 초기 배경으로 전해집니다.", f"{fact_attr} 대목이 확인됐습니다.", f"{fact_attr} 내용이 기초 사실로 다뤄집니다.", f"{fact_attr} 사실이 앞부분에 나타납니다."]
+            elif role_slot == "mechanism":
+                tails = [f"{fact_attr} 점이 거래 구조의 세부 내역으로 전해집니다.", f"{fact_attr} 정황이 구체적인 과정으로 보도됐습니다.", f"{fact_attr} 내용이 거래 방식의 한 축으로 확인됩니다.", f"{fact_attr} 대목이 사안의 전개 과정으로 지목됐습니다.", f"{fact_attr} 사실이 기록의 중요한 부분으로 다뤄집니다."]
+            elif role_slot == "crack":
+                tails = [f"{fact_attr} 정황이 새롭게 드러났습니다.", f"{fact_attr} 사실이 주요 쟁점으로 떠올랐습니다.", f"{fact_attr} 대목이 논란의 중심에 선 것으로 확인됩니다.", f"{fact_attr} 내용이 중요한 전환점으로 다뤄집니다.", f"{fact_attr} 점이 후속 국면에서 집중 조명됐습니다."]
+            else:
+                tails = [f"{fact_attr} 점이 핵심 과제로 남았습니다.", f"{fact_attr} 사실이 주요 결론으로 제시됩니다.", f"{fact_attr} 대목이 시장에 남긴 영향으로 전해집니다.", f"{fact_attr} 내용이 제도적 반성의 계기로 꼽힙니다.", f"{fact_attr} 사실이 주요 교훈으로 정리되고 있습니다."]
+            raw = f"{pfx}{tails[v_idx]}"
 
     elif m == "JA":
         if role_slot == "hook_catalyst":
@@ -577,42 +630,30 @@ def _render_claim_sentence(
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean) <= 16) else "なぜ止められたはずが放置されたか。"
             raw = f"{q_short} {fact}。"
-        elif role_slot == "setup":
-            frames = [
-                f"初期の記録では、{fact}という点が記されています。",
-                f"経緯の出発点として、資料は{fact}と伝えています。",
-                f"基礎資料の記述によれば、{fact}という経緯があります。",
-                f"発端部分の文書には、{fact}との内容が含まれています。",
-                f"初期段階の資料でも、{fact}という点が確認できます。",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "mechanism":
-            frames = [
-                f"構造や仕組みに関する記録では、{fact}と示されています。",
-                f"詳細な文書をたどると、{fact}という記述が続きます。",
-                f"関連資料の該当箇所では、{fact}との点が挙げられています。",
-                f"取引と制度の面からは、{fact}という実態が記されています。",
-                f"記録上の推移を見ると、{fact}という流れが確認できます。",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "crack":
-            frames = [
-                f"その後の局面の資料には、{fact}という内容が記されています。",
-                f"変化が表面化した段階では、{fact}との点が見られます。",
-                f"後続の公表記録においても、{fact}という事実が挙げられています。",
-                f"推移を追った文書では、{fact}という展開が示されています。",
-                f"一連の記録の後半には、{fact}との記述があります。",
-            ]
-            raw = frames[v_idx]
         else:
-            frames = [
-                f"事後の整理資料では、{fact}という点が残されています。",
-                f"その後の経過をまとめた記録は、{fact}と伝えています。",
-                f"一連の末尾にあたる文書でも、{fact}との内容が続きます。",
-                f"総括部分の記述においては、{fact}という点が挙げられます。",
-                f"記録全体を通じて、{fact}という状況が記されています。",
-            ]
-            raw = frames[v_idx]
+            if bucket == "alleged_regulator":
+                p_opts = ["当局の発表によれば、", "公表資料によれば、", "監督当局の報告書によれば、", "公的機関の公表資料によれば、", "当局の公表によれば、"]
+            elif bucket == "unverified":
+                p_opts = ["未確認の初期報道によれば、", "確認前の報道段階ですが、", "公的確認前の初期報道では、", "未確認の資料によれば、", "初期報道の記述によれば、"]
+            elif bucket in ("indictment", "court_record"):
+                p_opts = ["起訴状によれば、", "裁判所の記録によれば、", "検察の起訴状によれば、", "法廷記録によれば、", "起訴状の指摘によれば、"]
+            elif bucket == "final_judgment":
+                p_opts = ["裁判所の確定判決によれば、", "確定判決によれば、", "裁判所の判決によれば、", "有罪判決の記録によれば、", "確定判決の記述によれば、"]
+            elif bucket == "criminal_complaint":
+                p_opts = ["訴状によれば、", "告訴状によれば、", "訴状の主張によれば、", "提出された訴状によれば、", "告訴内容によれば、"]
+            else:
+                p_opts = ["報道によれば、", "取材によれば、", "公表報道によれば、", "報じられた経緯によれば、", "取材報道の記述によれば、"]
+
+            pfx = p_opts[v_idx]
+            if role_slot == "setup":
+                tails = [f"{fact}という点が初期から伝えられています。", f"{fact}との経緯が基礎資料に記されています。", f"{fact}という点が発端の文書で確認できます。", f"{fact}との内容が初期段階の記録に残されています。", f"{fact}という事実が資料の冒頭に挙げられています。"]
+            elif role_slot == "mechanism":
+                tails = [f"{fact}という実態が仕組みの記録に示されています。", f"{fact}との流れが取引の文書で確認できます。", f"{fact}という記述が詳細な記録に続きます。", f"{fact}との点が制度上の該当箇所に挙げられています。", f"{fact}という経緯が推移を追った文書に示されています。"]
+            elif role_slot == "crack":
+                tails = [f"{fact}という内容が後続局面の資料に記されています。", f"{fact}との点が変化の表面化段階で見られます。", f"{fact}という事実が後続の公表記録に挙げられています。", f"{fact}との展開が一連の記録後半に示されています。", f"{fact}という事態が関係資料の後半で確認されます。"]
+            else:
+                tails = [f"{fact}という点が事後の整理資料に残されています。", f"{fact}との内容が経過をまとめた記録に続きます。", f"{fact}という状況が一連の末尾文書に記されています。", f"{fact}との事実が総括部分の記述に挙げられます。", f"{fact}という教訓が記録全体の結びとして残ります。"]
+            raw = f"{pfx}{tails[v_idx]}"
 
     elif m == "VN":
         if role_slot == "hook_catalyst":
@@ -622,42 +663,30 @@ def _render_claim_sentence(
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Vì sao cảnh báo bị bỏ qua?"
             raw = f"{q_short} {fact}."
-        elif role_slot == "setup":
-            frames = [
-                f"Trong giai đoạn đầu của hồ sơ, việc {fact} đã được tài liệu ghi nhận rõ.",
-                f"{fact}, đặt nền tảng ban đầu cho toàn bộ chuỗi giao dịch.",
-                f"Các dữ liệu khởi đầu cho thấy {fact}, mở ra diễn biến phức tạp tiếp theo.",
-                f"{fact}, tạo tiền đề cho các diễn biến tiếp theo.",
-                f"Những ghi chép mở đầu xác nhận việc {fact} trước khi sự việc mở rộng.",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "mechanism":
-            frames = [
-                f"Khi xem xét chi tiết cơ chế, việc {fact} được tài liệu ghi nhận cụ thể.",
-                f"{fact}, làm gia tăng đáng kể áp lực tài chính trong giai đoạn này.",
-                f"Phân tích chuỗi dòng tiền cho thấy {fact}, tạo nút thắt lớn cho thanh khoản.",
-                f"{fact}, tạo ra kẽ hở lớn trong quản lý và giám sát.",
-                f"Theo trình tự dữ liệu công bố, {fact} là mắt xích trực tiếp dẫn đến sai phạm.",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "crack":
-            frames = [
-                f"Ở bước ngoặt điều tra tiếp theo, hồ sơ xác định việc {fact} có dấu hiệu bất thường.",
-                f"{fact}, dẫn tới các biện pháp xử lý và can thiệp từ cơ quan chức năng.",
-                f"Các ghi nhận công khai sau đó cho thấy {fact}, buộc các bên phải vào cuộc.",
-                f"{fact}, phơi bày toàn bộ sai phạm trong quản trị.",
-                f"Hồ sơ điều tra giai đoạn này ghi nhận {fact} như một chứng cứ then chốt.",
-            ]
-            raw = frames[v_idx]
         else:
-            frames = [
-                f"Trong phần tổng kết hồ sơ, tài liệu nêu rõ việc {fact} đã để lại tổn thất lớn.",
-                f"{fact}, để lại hệ quả pháp lý và nghĩa vụ tài chính kéo dài.",
-                f"Các kết luận sau sự kiện tiếp tục khẳng định {fact} là bài học quản trị đắt giá.",
-                f"{fact}, trở thành bài học cảnh báo sâu sắc cho thị trường.",
-                f"Nhìn lại toàn bộ chuỗi chứng cứ, hồ sơ chỉ rõ việc {fact} khó có thể đảo ngược.",
-            ]
-            raw = frames[v_idx]
+            if bucket == "alleged_regulator":
+                p_opts = ["Theo cơ quan chức năng, ", "Theo báo cáo từ cơ quan quản lý, ", "Theo kết luận từ cơ quan chuyên môn, ", "Theo công bố của cơ quan thanh tra, ", "Theo ghi nhận của các cơ quan quản lý, "]
+            elif bucket == "unverified":
+                p_opts = ["Theo thông tin bước đầu chưa kiểm chứng, ", "Nguồn tin ban đầu chưa có kết luận chính thức cho biết ", "Theo phản ánh ban đầu chưa xác minh, ", "Theo các nguồn tin bước đầu chưa được xác minh, ", "Thông tin ban đầu chưa kiểm chứng phản ánh "]
+            elif bucket in ("indictment", "court_record"):
+                p_opts = ["Theo cáo trạng của cơ quan công tố, ", "Theo hồ sơ tại tòa án, ", "Theo tài liệu tố tụng thụ lý, ", "Theo cáo trạng, ", "Hồ sơ truy tố chính thức ghi nhận "]
+            elif bucket == "final_judgment":
+                p_opts = ["Theo phán quyết của tòa án, ", "Theo bản án đã có hiệu lực, ", "Tòa án tuyên ", "Theo quyết định của cơ quan xét xử, ", "Bản án của tòa khẳng định "]
+            elif bucket == "criminal_complaint":
+                p_opts = ["Theo đơn kiện gửi cơ quan thẩm quyền, ", "Theo đơn tố cáo và hồ sơ khởi kiện, ", "Theo nội dung đơn khởi kiện, ", "Hồ sơ khởi kiện ghi nhận ", "Theo đơn kiện, "]
+            else:
+                p_opts = ["Theo thông tin báo chí phản ánh, ", "Theo các nguồn tin truyền thông, ", "Theo phản ánh từ báo chí, ", "Ghi nhận từ các phương tiện truyền thông, ", "Theo tường thuật của báo chí, "]
+
+            pfx = p_opts[v_idx]
+            if role_slot == "setup":
+                tails = [f"việc {fact} đã được tài liệu ghi nhận rõ.", f"{fact}, đặt nền tảng ban đầu cho toàn bộ chuỗi giao dịch.", f"dữ liệu khởi đầu cho thấy {fact}, mở ra diễn biến phức tạp tiếp theo.", f"{fact}, tạo tiền đề cho các diễn biến tiếp theo.", f"những ghi chép mở đầu xác nhận việc {fact} trước khi sự việc mở rộng."]
+            elif role_slot == "mechanism":
+                tails = [f"khi xem xét chi tiết cơ chế, việc {fact} được tài liệu ghi nhận cụ thể.", f"{fact}, thể hiện áp lực tài chính trong giai đoạn này.", f"phân tích chuỗi dòng tiền cho thấy {fact}, tạo nút thắt lớn cho thanh khoản.", f"{fact}, tạo ra kẽ hở trong quản lý và giám sát.", f"theo trình tự dữ liệu công bố, {fact} là mắt xích dẫn đến sai phạm."]
+            elif role_slot == "crack":
+                tails = [f"ở bước ngoặt điều tra tiếp theo, hồ sơ xác định việc {fact} có dấu hiệu bất thường.", f"{fact}, dẫn tới các biện pháp xử lý và can thiệp từ cơ quan chức năng.", f"các ghi nhận công khai sau đó cho thấy {fact}, buộc các bên phải vào cuộc.", f"{fact}, phơi bày sai phạm trong quản trị.", f"hồ sơ điều tra giai đoạn này ghi nhận việc {fact} như một chứng cứ then chốt."]
+            else:
+                tails = [f"trong phần tổng kết hồ sơ, tài liệu nêu rõ việc {fact} đã để lại tổn thất lớn.", f"{fact}, để lại hệ quả pháp lý và nghĩa vụ tài chính kéo dài.", f"các kết luận sau sự kiện tiếp tục khẳng định việc {fact} là bài học quản trị đắt giá.", f"{fact}, trở thành bài học cảnh báo sâu sắc cho thị trường.", f"nhìn lại toàn bộ chuỗi chứng cứ, hồ sơ chỉ rõ việc {fact} khó có thể đảo ngược."]
+            raw = f"{pfx}{tails[v_idx]}"
 
     else:  # EN
         if role_slot == "hook_catalyst":
@@ -667,42 +696,90 @@ def _render_claim_sentence(
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Why did early oversight fail?"
             raw = f"{q_short} {fact}."
-        elif role_slot == "setup":
-            frames = [
-                f"Early in the documented timeline, records show that {fact}, establishing the starting point.",
-                f"{fact}, establishing the foundational baseline of the arrangement.",
-                f"Initial entries in the dossier demonstrate that {fact}, initiating the sequence.",
-                f"Behind the institutional facade, {fact}, as reflected in opening filings.",
-                f"At the outset of the transaction history, documentation reveals how {fact} unfolded.",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "mechanism":
-            frames = [
-                f"Within the operational details, filings show that {fact}, creating structural friction.",
-                f"{fact}, which accelerated the structural distortion across the network.",
-                f"Tracing the documented sequence reveals how {fact}, compounding financial exposures.",
-                f"Detailed exhibits confirm that {fact}, directly compounding financial risks.",
-                f"Forensic audit records uncover that {fact}, exposing critical operational gaps.",
-            ]
-            raw = frames[v_idx]
-        elif role_slot == "crack":
-            frames = [
-                f"At the critical escalation point, evidence established that {fact}, triggering scrutiny.",
-                f"{fact}, precipitating formal regulatory and investigative intervention.",
-                f"Subsequent official proceedings documented that {fact}, challenging earlier disclosures.",
-                f"Inspection findings confirmed {fact}, dismantling the prior narrative.",
-                f"Later evidentiary disclosures placed {fact} at the center of the inquest.",
-            ]
-            raw = frames[v_idx]
         else:
-            frames = [
-                f"In the post-event resolution, documentation records that {fact}, leaving lasting obligations.",
-                f"{fact}, leaving systemic liabilities across the sector.",
-                f"Following the documented enforcement actions, filings confirm that {fact}, reshaping oversight.",
-                f"Across the concluding evidentiary record, findings establish that {fact}, underscoring systemic risk.",
-                f"In the final institutional assessment, {fact}, serving as an enduring market warning.",
-            ]
-            raw = frames[v_idx]
+            if bucket == "alleged_regulator":
+                p_opts = [
+                    "According to regulatory filings, ",
+                    "Regulatory records establish that ",
+                    "According to official findings, ",
+                    "As regulators documented in filings, ",
+                    "Official regulatory disclosures note that ",
+                ]
+            elif bucket == "unverified":
+                p_opts = [
+                    "According to preliminary unconfirmed reports, ",
+                    "Early unverified reports suggest that ",
+                    "Initial reports pending verification indicate that ",
+                    "According to unconfirmed accounts at the time, ",
+                    "Early reporting reflects unverified claims that ",
+                ]
+            elif bucket in ("indictment", "court_record"):
+                p_opts = [
+                    "According to the indictment, ",
+                    "According to court records, ",
+                    "Charging documents state that ",
+                    "According to official docket filings, ",
+                    "Judicial records reflect that ",
+                ]
+            elif bucket == "final_judgment":
+                p_opts = [
+                    "According to the court ruling, ",
+                    "As ruled by the court, ",
+                    "According to final judicial findings, ",
+                    "The court ruled that ",
+                    "Judicial findings establish that ",
+                ]
+            elif bucket == "criminal_complaint":
+                p_opts = [
+                    "According to the complaint, ",
+                    "As alleged in the complaint, ",
+                    "According to the civil lawsuit filing, ",
+                    "The complaint alleges that ",
+                    "Lawsuit filings allege that ",
+                ]
+            else:  # alleged (press)
+                p_opts = [
+                    "According to press reports, ",
+                    "Media reporting reflects that ",
+                    "Published reporting indicates that ",
+                    "Press investigations documented that ",
+                    "As reported in published accounts, ",
+                ]
+
+            pfx = p_opts[v_idx]
+            if role_slot == "setup":
+                tails = [
+                    f"{fact}, establishing the initial sequence.",
+                    f"{fact}, marking the foundational baseline of the arrangement.",
+                    f"{fact}, appearing in opening documentation.",
+                    f"{fact}, framing the early operational history.",
+                    f"{fact}, as detailed in initial investigative entries.",
+                ]
+            elif role_slot == "mechanism":
+                tails = [
+                    f"{fact}, creating documented structural friction.",
+                    f"{fact}, which accelerated subsequent operational exposure.",
+                    f"{fact}, compounding institutional financial liabilities.",
+                    f"{fact}, operating across the transaction network.",
+                    f"{fact}, exposing key execution vulnerabilities.",
+                ]
+            elif role_slot == "crack":
+                tails = [
+                    f"{fact}, precipitating formal investigative scrutiny.",
+                    f"{fact}, emerging at a critical evidentiary turning point.",
+                    f"{fact}, challenging previous institutional representations.",
+                    f"{fact}, shifting the inquest into active review.",
+                    f"{fact}, placed at the center of the inquiry.",
+                ]
+            else:
+                tails = [
+                    f"{fact}, leaving lasting systemic obligations.",
+                    f"{fact}, recognized as an enduring structural lesson.",
+                    f"{fact}, reshaping subsequent regulatory oversight.",
+                    f"{fact}, documented across the concluding assessment.",
+                    f"{fact}, serving as a key market warning.",
+                ]
+            raw = f"{pfx}{tails[v_idx]}"
 
     qualified = _apply_legal_qualifier(
         raw,
