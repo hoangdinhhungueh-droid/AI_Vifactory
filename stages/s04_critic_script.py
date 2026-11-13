@@ -568,7 +568,6 @@ def run(ctx: RunContext) -> StageArtifact:
         # Active LLM Critic Evaluation via model_gateway (Live Runs Only)
         # ------------------------------------------------------------------
         det_duration_ok = bool(duration_ok)
-        det_claims_ok = bool(claims_ok)
         llm_verdict = None
         llm_score = None
         llm_feedback: List[str] = []

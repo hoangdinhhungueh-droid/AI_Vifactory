@@ -12,10 +12,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import math
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, Scene, StageArtifact, StageID
@@ -1360,6 +1359,8 @@ def run(ctx: RunContext) -> StageArtifact:
 
                             from app.services.story_provenance_engine import (
                                 expected_qualifier_bucket as _exp_bucket,
+                            )
+                            from app.services.story_provenance_engine import (
                                 line_matches_expected_qualifier as _pre_match_qual,
                             )
 

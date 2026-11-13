@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -647,9 +648,17 @@ def run(ctx: RunContext) -> StageArtifact:
 
                 from app.services.story_provenance_engine import (
                     classify_claim_provenance as _classify_llm_claim,
+                )
+                from app.services.story_provenance_engine import (
                     is_official_portal_name as _is_official_portal,
+                )
+                from app.services.story_provenance_engine import (
                     is_primary_official_domain as _is_primary_url,
+                )
+                from app.services.story_provenance_engine import (
                     is_reputable_press_domain as _is_reputable_press,
+                )
+                from app.services.story_provenance_engine import (
                     is_rss_or_aggregator_url as _is_rss_url,
                 )
 
