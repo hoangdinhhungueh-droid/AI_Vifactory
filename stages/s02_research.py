@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -661,6 +660,9 @@ def run(ctx: RunContext) -> StageArtifact:
                 from app.services.story_provenance_engine import (
                     is_rss_or_aggregator_url as _is_rss_url,
                 )
+                from app.services.story_provenance_engine import (
+                    resolve_true_publisher as _resolve_true_publisher,
+                )
 
                 # Index grounding URLs/claims so LLM cannot launder an RSS claim into verified_primary
                 g_claims_raw = grounding_intel.get("claims", []) if grounding_intel else []
@@ -681,18 +683,20 @@ def run(ctx: RunContext) -> StageArtifact:
                                     break
 
                     src_name_check = str(prov_c.get("source_name") or c.get("source") or "").strip()
-                    src_clean = re.sub(r"\(.*?\)", "", src_name_check).strip()
-                    is_off_portal = _is_official_portal(src_name_check) or _is_official_portal(src_clean) or _is_primary_url(src_url)
-                    is_rep_press = _is_reputable_press(src_url, src_name_check) or _is_reputable_press(src_url, src_clean)
+                    pub_res = _resolve_true_publisher(src_name_check, src_url)
+                    src_clean = pub_res["true_source_name"]
+                    prov_c["source_name"] = src_clean
+                    is_off_portal = pub_res["is_official"] or _is_official_portal(src_name_check) or _is_official_portal(src_clean) or _is_primary_url(src_url)
+                    is_rep_press = pub_res["is_reputable_press"] or _is_reputable_press(src_url, src_name_check) or _is_reputable_press(src_url, src_clean)
 
-                    is_rss_hit = _is_rss_url(src_url) or any(
+                    is_rss_hit = (pub_res["is_aggregator"] or _is_rss_url(src_url) or any(
                         _is_rss_url(str(gc.get("source_url", "")))
                         and (
                             str(gc.get("source", "")).strip().lower() in src_name_check.lower()
                             or str(gc.get("source", "")).strip().lower() in src_clean.lower()
                         )
                         for gc in g_claims_raw
-                    )
+                    )) and not is_off_portal and not is_rep_press
 
                     if is_off_portal:
                         if any(x in (src_url + src_name_check).lower() for x in ("justice.gov", "department of justice", "antitrust division")):
@@ -710,6 +714,10 @@ def run(ctx: RunContext) -> StageArtifact:
                         prov_c["source_type"] = "press"
                         if prov_c.get("doc_type") in ("unknown", "rss_snippet", None, ""):
                             prov_c["doc_type"] = "news_article"
+                        if prov_c.get("verification_status") != "verified_primary":
+                            prov_c["verification_status"] = "corroborated_secondary"
+                            prov_c["evidence_tier"] = "secondary"
+                            prov_c["credibility_tier"] = "press_allegation" if prov_c.get("legal_status") == "alleged" else "corroborated_secondary_report"
                     elif is_rss_hit:
                         # Genuinely unverified anonymous RSS snippet or unknown aggregator
                         prov_c["verification_status"] = "unverified_secondary"

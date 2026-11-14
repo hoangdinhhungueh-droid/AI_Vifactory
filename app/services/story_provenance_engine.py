@@ -188,7 +188,7 @@ def is_official_portal_name(source_name: str = "") -> bool:
         "centers for medicare", "federal register", "securities and exchange commission",
         "federal trade commission", "inspector general", "supreme court", "white house",
         "department of", "ministry of", "bureau of industry and security", "bureau of",
-        "internal revenue service", "federal reserve",
+        "internal revenue service", "federal reserve", "european commission", "eu commission", "ec.europa.eu",
         "金融庁", "総務省", "法務省", "国土交通省", "経済産業省", "厚生労働省", "公正取引委員会", "最高裁判所",
         "日本銀行", "日銀", "内閣府", "財務省", "警察庁", "消費者庁", "裁判所", "検察",
         "bộ tài chính", "bộ công an", "ngân hàng nhà nước", "thanh tra chính phủ", "cổng thông tin chính phủ",
@@ -197,6 +197,45 @@ def is_official_portal_name(source_name: str = "") -> bool:
         ".gov", ".go.kr", ".go.jp", ".gov.vn",
     )
     return any(p in s_low or p in s_clean for p in portal_markers)
+
+
+def resolve_true_publisher(source_name: str, source_url: str = "") -> Dict[str, Any]:
+    """Resolve genuine publisher entity, stripping aggregator noise (Google News, RSS wrappers),
+    and classifying whether the true publisher is an official portal, reputable press, or aggregator.
+    """
+    s_raw = (source_name or "").strip()
+    u_raw = (source_url or "").strip()
+
+    cleaned_name = re.sub(
+        r"\s*(?:\(via\s+Google\s+News\)|\(Google\s+News\)|\bvia\s+Google\s+News\b|-?\s*Google\s+News|\(RSS\)|\[RSS\])",
+        "",
+        s_raw,
+        flags=re.IGNORECASE,
+    ).strip(" -—:|")
+    if not cleaned_name:
+        cleaned_name = s_raw or (urlparse(u_raw).netloc if u_raw else "Unknown Source")
+
+    is_rss = is_rss_or_aggregator_url(u_raw)
+    is_primary_dom = is_primary_official_domain(u_raw)
+    is_off_portal = is_official_portal_name(cleaned_name) or is_primary_dom
+    is_rep_press = is_reputable_press_domain(u_raw, cleaned_name)
+
+    if is_off_portal:
+        publisher_type = "official_portal"
+    elif is_rep_press:
+        publisher_type = "reputable_press"
+    elif is_rss:
+        publisher_type = "aggregator_rss"
+    else:
+        publisher_type = "general_web"
+
+    return {
+        "true_source_name": cleaned_name,
+        "publisher_type": publisher_type,
+        "is_official": is_off_portal,
+        "is_reputable_press": is_rep_press,
+        "is_aggregator": is_rss,
+    }
 
 
 def extract_normalized_date(date_raw: Optional[str], claim_text: str = "") -> Optional[str]:
@@ -250,10 +289,15 @@ def classify_claim_provenance(
     src_low = source_name.lower()
     combined_low = f"{src_low} {text_low}"
 
-    # 1. URL & RSS Aggregator Gate: RSS wrappers cannot self-certify as verified_primary
-    is_rss = is_rss_or_aggregator_url(source_url)
-    is_primary_url = is_primary_official_domain(source_url)
-    is_reputable_press = is_reputable_press_domain(source_url, source_name)
+    # 1. True Publisher Resolution: strip aggregator wrappers & classify genuine origin
+    pub_info = resolve_true_publisher(source_name, source_url)
+    true_source_name = pub_info["true_source_name"]
+    source_name = true_source_name
+    src_low = source_name.lower()
+    combined_low = f"{src_low} {text_low}"
+    is_rss = pub_info["is_aggregator"]
+    is_primary_url = pub_info["is_official"]
+    is_reputable_press = pub_info["is_reputable_press"]
 
     # 2. Detect document type, speaker, procedural status & legal status from structured cues + content
     doc_type = raw_doc if raw_doc and raw_doc != "unknown" else "unknown"
@@ -850,6 +894,12 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "official regulatory disclosures", "regulatory disclosures",
             "as regulators documented", "regulatory records establish",
             "according to official regulatory findings",
+            "commission stated", "commission stated that", "european commission stated",
+            "investigated conduct", "regulators stated", "regulatory investigation",
+            "investigated by regulators", "inquiry into", "regulators investigated",
+            "investigated by the commission", "commission investigated", "oversight investigation",
+            "investigation included", "investigation into", "regulatory inquiry",
+            "regulatory statements", "official statements",
         ],
         "audit_finding": [
             "according to the audit report", "inspector general found", "audit exhibits show",
@@ -1141,6 +1191,25 @@ def route_legal_qualifier(
             "EN": ["According to official analysis,", "Official analysis indicates that,"],
         }
         var_list = analysis_prefixes.get(m, analysis_prefixes["EN"])
+        prefix = var_list[slot_idx % len(var_list)]
+    elif bucket == "alleged_regulator" and (
+        (legal_status or "").lower() == "alleged"
+        or (procedural_status or "").lower() in ("investigation", "inquiry")
+        or (doc_type or "").lower() in ("press_release", "regulatory_notice")
+    ):
+        investigation_prefixes = {
+            "KR": ["규제 당국에 따르면,", "당국의 조사 및 공표에 따르면,", "감독 당국의 조사 내용에 의하면,"],
+            "JA": ["当局の調査によれば、", "当局の調査発表によれば、", "規制当局の公表によれば、"],
+            "VN": ["Theo cơ quan chức năng,", "Theo thông báo điều tra của cơ quan quản lý,", "Theo ghi nhận từ cơ quan chức năng,"],
+            "EN": [
+                "According to regulatory statements,",
+                "Regulators investigating the matter stated that,",
+                "As regulators noted in investigation disclosures,",
+                "According to the regulatory investigation,",
+                "Official regulatory announcements indicated that,",
+            ],
+        }
+        var_list = investigation_prefixes.get(m, investigation_prefixes["EN"])
         prefix = var_list[slot_idx % len(var_list)]
     else:
         var_list = prefix_variants_table.get(m, prefix_variants_table["EN"]).get(bucket, [""])
@@ -2096,9 +2165,11 @@ def audit_statement_claim_alignment(
                 is_ver_anchor = (
                     ver in ("verified_primary", "corroborated_secondary")
                     and (
-                        cred in ("verified_fact", "official_regulation", "press_allegation")
-                        or str(cl.get("source_type")) in ("court", "regulator", "gov")
-                        or str(cl.get("doc_type")) in ("statute", "court_judgment", "regulatory_notice", "gov_report", "audit_report")
+                        cred in ("verified_fact", "official_regulation", "press_allegation", "corroborated_secondary_report", "verified_event", "investigative_report")
+                        or str(cl.get("source_type")) in ("court", "regulator", "gov", "official", "wire", "reputable_press")
+                        or str(cl.get("doc_type")) in ("statute", "court_judgment", "regulatory_notice", "gov_report", "audit_report", "press_release", "case_page", "court_record", "docket", "indictment", "administrative_rule")
+                        or str(cl.get("legal_status")) in ("fact", "convicted", "settled", "charged")
+                        or str(cl.get("procedural_status")) in ("reported_event", "legislative_enacted", "convicted", "settled", "enforcement_action")
                     )
                 )
                 if is_ver_anchor:
@@ -2108,9 +2179,11 @@ def audit_statement_claim_alignment(
                     if not any(
                         str(ledger_by_id[oc].get("verification_status")) in ("verified_primary", "corroborated_secondary")
                         and (
-                            resolve_claim_credibility_tier(ledger_by_id[oc]) in ("verified_fact", "official_regulation", "press_allegation")
-                            or str(ledger_by_id[oc].get("source_type")) in ("court", "regulator", "gov")
-                            or str(ledger_by_id[oc].get("doc_type")) in ("statute", "court_judgment", "regulatory_notice", "gov_report", "audit_report")
+                            resolve_claim_credibility_tier(ledger_by_id[oc]) in ("verified_fact", "official_regulation", "press_allegation", "corroborated_secondary_report", "verified_event", "investigative_report")
+                            or str(ledger_by_id[oc].get("source_type")) in ("court", "regulator", "gov", "official", "wire", "reputable_press")
+                            or str(ledger_by_id[oc].get("doc_type")) in ("statute", "court_judgment", "regulatory_notice", "gov_report", "audit_report", "press_release", "case_page", "court_record", "docket", "indictment", "administrative_rule")
+                            or str(ledger_by_id[oc].get("legal_status")) in ("fact", "convicted", "settled", "charged")
+                            or str(ledger_by_id[oc].get("procedural_status")) in ("reported_event", "legislative_enacted", "convicted", "settled", "enforcement_action")
                         )
                         for oc in cids
                     ):
