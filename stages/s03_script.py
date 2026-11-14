@@ -263,12 +263,12 @@ def _localized_topic_label(topic: str, market: str) -> str:
     if m == "VN":
         if len(VN_DIACRITIC_RE.findall(t)) >= 2 and len(en_words) <= 3:
             words = t.split()
-            return " ".join(words[:5]) if len(words) > 5 else t
+            return " ".join(words[:8]) if len(words) > 8 else t
         tr = translate_claim_to_market_clause(t, "VN", "vụ việc này")
         words = tr.split()
-        return " ".join(words[:5]) if len(words) > 5 else (tr or "vụ việc này")
+        return " ".join(words[:8]) if len(words) > 8 else (tr or "vụ việc này")
     words = t.split()
-    return " ".join(words[:5]) if len(words) > 5 else t
+    return " ".join(words[:8]) if len(words) > 8 else t
 
 
 def _to_kr_attributive(clause: str) -> str:
@@ -331,6 +331,28 @@ def _to_kr_attributive(clause: str) -> str:
     return f"{c}라는"
 
 
+def _to_kr_honorific(text: str) -> str:
+    """Normalize a Korean clause to end cleanly in polite formal honorific (습니다/입니다) without duplication."""
+    t_clean = (text or "").strip().rstrip(". ")
+    if t_clean.endswith(("습니다", "입니다")):
+        return f"{t_clean}."
+    subs = [
+        (r"했다$", "했습니다."),
+        (r"됐다$", "됐습니다."),
+        (r"이다$", "입니다."),
+        (r"한다$", "합니다."),
+        (r"된다$", "됩니다."),
+        (r"였다$", "였습니다."),
+        (r"왔다$", "왔습니다."),
+        (r"졌다$", "졌습니다."),
+        (r"다$", "습니다."),
+    ]
+    for pat, rep in subs:
+        if re.search(pat, t_clean):
+            return re.sub(pat, rep, t_clean)
+    return f"{t_clean}."
+
+
 def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode: bool = False) -> str:
     """Bound clause length cleanly for beat tempo without bisecting parentheticals or dropping metrics."""
     clean = re.sub(r"\s+", " ", (text or "").strip()).rstrip(".。")
@@ -343,7 +365,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
         clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
 
-        cap = 28 if hook_mode else 85
+        cap = 45 if hook_mode else 85
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
@@ -388,7 +410,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     if market == "JA":
         pat_ja = r"(?:と(?:報じられた|伝えられた|報じられている|発表された)|との(?:報道|発表)があった)$"
         clean = re.sub(pat_ja, "", clean).strip(" 、,")
-        cap = 22 if hook_mode else 85
+        cap = 35 if hook_mode else 85
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—、,：:]", clean) if c.strip()]
@@ -411,9 +433,25 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             a0 = anchors[0]
             if len(a0) <= 18 and len(trimmed) + len(a0) + 2 <= cap + 14:
                 trimmed = f"{a0}の{trimmed}".strip()
+
+        # Repair severed Japanese verb stems caused by character cap trimming
+        if re.search(r"してい$", trimmed):
+            trimmed += "ます"
+        elif re.search(r"され$", trimmed):
+            trimmed += "ました"
+        elif re.search(r"行われ$", trimmed):
+            trimmed += "ました"
+        elif re.search(r"確認され$", trimmed):
+            trimmed += "ました"
+        elif re.search(r"認められ$", trimmed):
+            trimmed += "ました"
+        elif re.search(r"明らかになっ$", trimmed):
+            trimmed += "た"
+        elif re.search(r"[がはをにでともへのや]$", trimmed):
+            trimmed = trimmed.rstrip("がはをにでともへのや")
         return trimmed
 
-    word_cap = (7 if hook_mode else 22) if market == "VN" else (7 if hook_mode else 20)
+    word_cap = (14 if hook_mode else 24) if market == "VN" else (12 if hook_mode else 22)
     if market == "VN":
         pat_vn = r"(?:theo thông tin báo chí|được báo chí phản ánh|theo các nguồn tin ban đầu|theo thông tin được công bố)$"
         clean = re.sub(pat_vn, "", clean).strip(" ,;:")
@@ -430,8 +468,22 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     ):
         word_cap += 1
     # Avoid severing multi-word capitalized entities at word boundary
-    while word_cap < len(words) and word_cap < 24 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
+    while word_cap < len(words) and word_cap < 26 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
         word_cap += 1
+
+    # Avoid leaving dangling prepositions, conjunctions, or articles at the end of the sentence
+    dangling_words = {
+        "the", "a", "an", "of", "in", "to", "for", "with", "and", "or", "by",
+        "from", "as", "at", "whose", "which", "that", "their", "its", "into",
+    }
+    while word_cap < len(words) and words[word_cap - 1].lower().rstrip(".,;:") in dangling_words:
+        word_cap += 1
+
+    # Avoid slicing off direct object of key transitive verbs (prohibits, requires, discusses, mandates)
+    transitive_verbs = {"prohibits", "prohibit", "requires", "require", "mandates", "mandate", "discusses", "establishes", "forbids", "bars"}
+    if word_cap < len(words) and words[word_cap - 1].lower().rstrip(".,;:") in transitive_verbs:
+        word_cap = min(len(words), word_cap + 3)
+
     trimmed = " ".join(words[:word_cap]).rstrip(",;:")
     if trimmed.count("(") > trimmed.count(")"):
         trimmed = trimmed[: trimmed.rfind("(")].strip(" ,;:")
@@ -603,26 +655,59 @@ def _render_claim_sentence(
 
     if m == "KR":
         if role_slot == "hook_catalyst":
-            if fact.endswith(("했다", "된다", "한다", "였다", "왔다", "졌다")):
-                raw = f"{fact[:-1]}했습니다."
-            elif fact.endswith("다"):
-                raw = f"{fact[:-1]}습니다."
-            elif loc_topic and loc_topic not in fact:
-                raw = f"{loc_topic}, {fact}."
+            if bucket == "final_judgment":
+                raw = f"{loc_topic}의 중대한 국면에서, 법원 확정 판결에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "audit_finding":
+                raw = f"{loc_topic}의 발단에서, 감사원 감사 보고서에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "indictment":
+                raw = f"{loc_topic} 사안에서, 검찰 공소장에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "court_record":
+                raw = f"{loc_topic} 사안에서, 법원 접수 기록에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "alleged_regulator":
+                raw = f"{loc_topic} 사안에서, 정부 및 관계 당국에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "settled":
+                raw = f"{loc_topic} 사안은 책임을 인정하지 않고 합의로 종결됐습니다: {_to_kr_honorific(fact)}"
+            elif bucket == "unverified":
+                raw = f"초기 미확인 보도 내용에는 {loc_topic} 사안과 관련하여 {_to_kr_honorific(fact)}"
             else:
-                raw = f"{fact} 시행을 발표했습니다."
+                raw = f"{loc_topic}, {_to_kr_honorific(fact)}" if loc_topic and loc_topic not in fact else _to_kr_honorific(fact)
         elif role_slot == "hook_scale":
-            if fact.endswith(("했다", "된다", "한다", "였다", "왔다", "졌다")):
-                raw = f"집계된 수치는 {fact[:-1]}했습니다."
-            elif fact.endswith("다"):
-                raw = f"집계된 수치는 {fact[:-1]}습니다."
+            if bucket == "final_judgment":
+                raw = f"법원 확정 판결에 적시된 수치는 {_to_kr_honorific(fact)}"
+            elif bucket == "audit_finding":
+                raw = f"감사원 감사 보고서에 적시된 수치는 {_to_kr_honorific(fact)}"
+            elif bucket == "indictment":
+                raw = f"검찰 공소장에 적시된 수치는 {_to_kr_honorific(fact)}"
+            elif bucket == "court_record":
+                raw = f"법원 접수 기록에 적시된 수치는 {_to_kr_honorific(fact)}"
+            elif bucket == "alleged_regulator":
+                raw = f"규제 당국에 따르면, 집계된 수치는 {_to_kr_honorific(fact)}"
+            elif bucket == "settled":
+                raw = f"합의 종결된 수치는 {_to_kr_honorific(fact)} (잘못을 인정하지 않고 합의됨)."
+            elif bucket == "unverified":
+                raw = f"초기 미확인 보도에 집계된 수치는 {_to_kr_honorific(fact)}"
             else:
-                raw = f"집계된 수치는 {fact}."
+                raw = f"집계된 수치는 {_to_kr_honorific(fact)}"
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and 6 <= len(cq_clean) <= 16 and not cq_clean.endswith("?")) else "왜 못 막았을까?"
             if not q_short.endswith("?"):
                 q_short += "?"
-            raw = f"{q_short} {fact}."
+            if bucket == "final_judgment" and not any(p in fact for p in ["판결", "유죄", "선고"]):
+                raw = f"{q_short} 법원 판결에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "audit_finding" and not any(p in fact for p in ["감사", "보고서"]):
+                raw = f"{q_short} 감사 보고서에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "indictment" and not any(p in fact for p in ["공소", "기소"]):
+                raw = f"{q_short} 검찰 공소장에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "court_record" and not any(p in fact for p in ["법원", "기록"]):
+                raw = f"{q_short} 법원 접수 기록에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "alleged_regulator" and not any(p in fact for p in ["당국", "발표", "조사"]):
+                raw = f"{q_short} 규제 당국에 따르면, {_to_kr_honorific(fact)}"
+            elif bucket == "settled" and "합의" not in fact:
+                raw = f"{q_short} {_to_kr_honorific(fact)} (책임을 인정하지 않고 합의됨)."
+            elif bucket == "unverified" and "미확인" not in fact:
+                raw = f"{q_short} 초기 미확인 보도에 따르면, {_to_kr_honorific(fact)}"
+            else:
+                raw = f"{q_short} {_to_kr_honorific(fact)}"
         else:
             fact_attr = _to_kr_attributive(fact)
             if bucket == "alleged_regulator":
@@ -635,6 +720,16 @@ def _render_claim_sentence(
                     tails = [f"{fact_attr} 사안이 집중 검토 대상에 올랐습니다.", f"{fact_attr} 쟁점에 대해 추가 지침을 발표했습니다.", f"{fact_attr} 문제점이 당국 보고서에 적시됐습니다.", f"{fact_attr} 배경을 두고 공식 조사가 착수됐습니다.", f"{fact_attr} 대목이 규제 심의에 부쳐졌습니다."]
                 else:
                     tails = [f"{fact_attr} 후속 대책이 추진되고 있습니다.", f"{fact_attr} 제도 개선이 과제로 제시됐습니다.", f"{fact_attr} 시행 결과가 보고됐습니다.", f"{fact_attr} 대책이 시장에 미친 영향이 평가됐습니다.", f"{fact_attr} 조치가 공식 마무리 단계에 들어섰습니다."]
+            elif bucket == "audit_finding":
+                p_opts = ["감사 보고서에 따르면, ", "감사원 감사 보고서에 따르면, ", "공식 감사 및 점검 결과에 따르면, ", "감사 결과에 의하면, ", "공식 감사 기록에 의하면, "]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 사실이 감사 결과 적발됐습니다.", f"{fact_attr} 정황이 점검 보고서에 기재됐습니다.", f"{fact_attr} 대목이 감사에서 확인됐습니다.", f"{fact_attr} 내용이 공식 감사 자료에 명시됐습니다.", f"{fact_attr} 점이 점검 결과 지적됐습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 부정 정황이 감사 보고서에 적시됐습니다.", f"{fact_attr} 내역이 정밀 점검을 통해 드러났습니다.", f"{fact_attr} 수법이 감사 결과 지적됐습니다.", f"{fact_attr} 방식이 감사원의 주요 적발 사항에 포함됐습니다.", f"{fact_attr} 정황이 공식 감사 기록에 남겨졌습니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 문제점이 감사 결과 공식 지적됐습니다.", f"{fact_attr} 대목을 둘러싼 감사가 심층 진행됐습니다.", f"{fact_attr} 쟁점에 대해 추가 감사 결과가 보고됐습니다.", f"{fact_attr} 사실이 감사 보고서의 핵심 쟁점으로 떠올랐습니다.", f"{fact_attr} 정황이 감사원의 처분 요구로 이어졌습니다."]
+                else:
+                    tails = [f"{fact_attr} 사실은 감사원의 시정 요구 사항으로 남았습니다.", f"{fact_attr} 결과는 영구적인 제도 개선 권고로 이어졌습니다.", f"{fact_attr} 점검 결과는 향후 행정 감사의 기준으로 남았습니다.", f"{fact_attr} 적발 내용은 제도적 보완 과제로 기록됐습니다.", f"{fact_attr} 감사는 기관 경각심을 일깨운 사례로 평가됩니다."]
             elif bucket == "unverified":
                 p_opts = ["아직 확인 전 단계의 초기 보도에 따르면, ", "검증 전 단계의 취재 자료를 보면, ", "초기 미확인 보도 내용에는, ", "추가 확인 전 단계지만, ", "초기 문건에 따르면 아직 최종 확인 전이나, "]
                 if role_slot == "setup":
@@ -645,8 +740,8 @@ def _render_claim_sentence(
                     tails = [f"{fact_attr} 의혹이 추가 보도로 번졌습니다.", f"{fact_attr} 혐의가 제기되며 논란이 커졌습니다.", f"{fact_attr} 대목이 새로운 의혹으로 제기됐습니다.", f"{fact_attr} 정황을 두고 진위 공방이 이어졌습니다.", f"{fact_attr} 내용이 논란의 초점으로 부각됐습니다."]
                 else:
                     tails = [f"{fact_attr} 의혹에 대해 진상 조사가 요구되고 있습니다.", f"{fact_attr} 주장이 향후 검증 과제로 남았습니다.", f"{fact_attr} 대목이 남긴 파장이 거론되고 있습니다.", f"{fact_attr} 내용의 사실관계 규명이 필요하다는 지적이 나옵니다.", f"{fact_attr} 의혹이 제도적 경각심을 불러일으키고 있습니다."]
-            elif bucket in ("indictment", "court_record"):
-                p_opts = ["검찰 공소장에 따르면, ", "법원 접수 기록에 따르면, ", "검찰 수사 및 공소 내용에 따르면, ", "법원에 제출된 기록을 보면, ", "공소 사실에 의하면, "]
+            elif bucket == "indictment":
+                p_opts = ["검찰 공소장에 따르면, ", "공소 사실에 의하면, ", "검찰 수사 및 공소 내용에 따르면, ", "기소장에 따르면, ", "검찰 기소 내용에 의하면, "]
                 if role_slot == "setup":
                     tails = [f"{fact_attr} 혐의가 공소장에 적시됐습니다.", f"{fact_attr} 정황이 수사 기록에 포함됐습니다.", f"{fact_attr} 사실이 접수 문건에 나타납니다.", f"{fact_attr} 행위가 기소 내용에 포함됐습니다.", f"{fact_attr} 대목이 공소 사실의 발단으로 기재됐습니다."]
                 elif role_slot == "mechanism":
@@ -655,6 +750,16 @@ def _render_claim_sentence(
                     tails = [f"{fact_attr} 혐의가 재판에서 주요 쟁점으로 떠올랐습니다.", f"{fact_attr} 정황을 두고 공방이 벌어졌습니다.", f"{fact_attr} 대목이 혐의 입증의 분수령으로 지목됐습니다.", f"{fact_attr} 내용이 피고인의 핵심 범죄사실로 다뤄집니다.", f"{fact_attr} 사실이 수사 기록에서 집중 조명됐습니다."]
                 else:
                     tails = [f"{fact_attr} 혐의에 대한 사법적 심리가 이어지고 있습니다.", f"{fact_attr} 기소 사실이 중요한 법적 선례로 평가됩니다.", f"{fact_attr} 대목이 공소 유지의 핵심으로 남았습니다.", f"{fact_attr} 내용이 형사 책임의 판단 근거로 거론됩니다.", f"{fact_attr} 사실이 엄정한 처벌의 필요성으로 지적됩니다."]
+            elif bucket == "court_record":
+                p_opts = ["법원 접수 기록에 따르면, ", "법원 문건에 따르면, ", "사법 기록에 따르면, ", "재판부 접수 기록에 따르면, ", "법원에 제출된 기록을 보면, "]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 내용이 법원 접수 문건에 나타납니다.", f"{fact_attr} 정황이 사법 기록에 포함됐습니다.", f"{fact_attr} 사실이 접수 문건에 나타납니다.", f"{fact_attr} 내용이 법원 제출 문건에 명시됐습니다.", f"{fact_attr} 대목이 재판부 접수 기록에 기재됐습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 구조가 법원 제출 기록에 적시됐습니다.", f"{fact_attr} 정황이 재판부 문건으로 제출됐습니다.", f"{fact_attr} 사실이 핵심 사법 기록으로 다뤄집니다.", f"{fact_attr} 과정이 법원에 증거로 제출됐습니다.", f"{fact_attr} 내용이 법원 기록으로 확인됩니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 사안이 재판부의 집중 심리 대상에 올랐습니다.", f"{fact_attr} 정황을 두고 법정 공방이 벌어졌습니다.", f"{fact_attr} 대목이 법원 접수 기록에서 부각됐습니다.", f"{fact_attr} 내용이 법정 심리의 초점이 됐습니다.", f"{fact_attr} 사실이 사법 기록에서 확인됐습니다."]
+                else:
+                    tails = [f"{fact_attr} 기록은 사법적 심리의 핵심 자료로 남았습니다.", f"{fact_attr} 문건은 중요한 법원 접수 선례로 평가됩니다.", f"{fact_attr} 대목이 재판 기록의 핵심으로 남았습니다.", f"{fact_attr} 내용은 사법 판단의 근거 자료로 거론됩니다.", f"{fact_attr} 사실이 법원 기록의 결론으로 확인됩니다."]
             elif bucket == "final_judgment":
                 p_opts = ["법원 확정 판결에 따르면, ", "법원 판결에 따르면, ", "사법부 판단에 따르면, ", "판결문에 의하면, ", "유죄 확정 판결에 따르면, "]
                 if role_slot == "setup":
@@ -668,9 +773,28 @@ def _render_claim_sentence(
             elif bucket == "criminal_complaint":
                 p_opts = ["제출된 고발장에 따르면, ", "고소장 내용에 따르면, ", "소장을 통해 제기된 바에 따르면, ", "고발장에 의하면, ", "제출된 소장에 따르면, "]
                 tails = [f"{fact_attr} 주장이 소장에 기재됐습니다.", f"{fact_attr} 내용이 고발장에 포함됐습니다.", f"{fact_attr} 의혹에 대해 수사가 의뢰됐습니다.", f"{fact_attr} 혐의를 밝혀달라는 청구가 제기됐습니다.", f"{fact_attr} 사실을 조사해달라는 소장이 접수됐습니다."]
+            elif bucket == "settled":
+                p_opts = ["관계 기관과의 합의 내용에 따르면, ", "공식 합의 및 조정 기록을 보면, ", "과징금 납부와 함께 이뤄진 합의에 따르면, ", "행정 제재 및 합의 종결 기록에 따르면, ", "당사자 간 합의 종결 내용에 의하면, "]
+                tails = [f"{fact_attr} 사안은 책임을 인정하지 않고 합의로 종결됐습니다.", f"{fact_attr} 절차는 과징금 납부와 함께 종결됐습니다.", f"{fact_attr} 조치는 당사자 간 합의로 마무리됐습니다.", f"{fact_attr} 사안은 동의의결 및 합의를 거쳐 종결됐습니다.", f"{fact_attr} 분쟁은 공식 조정을 거쳐 합의 종결됐습니다."]
             elif bucket == "proposed":
                 p_opts = ["추진 중인 정책 방침에 따르면, ", "입법 추진 초안에 따르면, ", "당국의 정책 검토 자료를 보면, ", "발의된 법안 초안에 따르면, ", "제도 추진 계획에 따르면, "]
                 tails = [f"{fact_attr} 방안이 추진되고 있습니다.", f"{fact_attr} 법안이 입법 예고됐습니다.", f"{fact_attr} 정책이 도입될 예정입니다.", f"{fact_attr} 제도 신설이 검토되고 있습니다.", f"{fact_attr} 대책이 마련될 계획입니다."]
+            elif bucket == "fact":
+                p_opts = [
+                    "현행 법령 및 규정에 따르면, ",
+                    "공식 시행 법령에 따르면, ",
+                    "제도적 기준과 법률에 따르면, ",
+                    "관련 법령의 규정에 따라, ",
+                    "확립된 행정 기준에 따르면, ",
+                ]
+                if role_slot == "setup":
+                    tails = [f"{fact_attr} 기준이 법적으로 확립됐습니다.", f"{fact_attr} 원칙이 법령에 명시됐습니다.", f"{fact_attr} 제도가 공식 시행에 들어갔습니다.", f"{fact_attr} 규정이 기본 뼈대로 마련됐습니다.", f"{fact_attr} 체계가 현장에서 작동하기 시작했습니다."]
+                elif role_slot == "mechanism":
+                    tails = [f"{fact_attr} 구조가 법적 테두리 안에서 작동했습니다.", f"{fact_attr} 요건이 제도적으로 적용됐습니다.", f"{fact_attr} 원칙에 따라 실무 처리가 이뤄졌습니다.", f"{fact_attr} 규정이 핵심 준수 기준으로 기능했습니다.", f"{fact_attr} 방식으로 법령상 절차가 규정됐습니다."]
+                elif role_slot == "crack":
+                    tails = [f"{fact_attr} 규정의 준수 여부가 핵심 쟁점으로 떠올랐습니다.", f"{fact_attr} 법적 의무를 둘러싼 조사가 본격화됐습니다.", f"{fact_attr} 기준이 감독 당국의 집중 점검 대상이 됐습니다.", f"{fact_attr} 규정의 적용 한계가 드러났습니다.", f"{fact_attr} 대목이 감사와 조사의 초점이 됐습니다."]
+                else:
+                    tails = [f"{fact_attr} 규정은 시장의 영구적 제도적 교훈으로 남았습니다.", f"{fact_attr} 법령이 향후 제도 개선의 출발점이 됐습니다.", f"{fact_attr} 기준이 향후 재발 방지의 기준으로 확립됐습니다.", f"{fact_attr} 규범이 시장 참여자들의 핵심 의무로 재확인됐습니다.", f"{fact_attr} 교훈이 지속적인 규제 지침으로 이어지고 있습니다."]
             else:  # alleged (press reporting)
                 p_opts = ["언론 보도에 따르면, ", "취재 보도에 의하면, ", "공개된 보도 내용에 따르면, ", "보도된 경위를 보면, ", "언론 취재 결과에 따르면, "]
                 if role_slot == "setup":
@@ -687,23 +811,80 @@ def _render_claim_sentence(
 
     elif m == "JA":
         if role_slot == "hook_catalyst":
-            raw = f"急激な市場の危機は{fact}で表面化。"
+            if bucket == "final_judgment":
+                raw = f"{loc_topic}の重大な局面において、裁判所の確定判決によれば、{fact}。"
+            elif bucket == "audit_finding":
+                raw = f"{loc_topic}の発端において、監査報告書によれば、{fact}。"
+            elif bucket == "indictment":
+                raw = f"急激な市場の危機において、起訴状の指摘によれば、{fact}。"
+            elif bucket == "court_record":
+                raw = f"{loc_topic}をめぐり、裁判所の記録によれば、{fact}。"
+            elif bucket == "alleged_regulator":
+                raw = f"{loc_topic}をめぐり、当局の公表によれば、{fact}。"
+            elif bucket == "settled":
+                raw = f"{loc_topic}をめぐり、違法性を認めることなく和解に至りました：{fact}。"
+            elif bucket == "unverified":
+                raw = f"未確認の初期報道によれば、{loc_topic}に関して{fact}。"
+            else:
+                raw = f"{loc_topic}をめぐり、{fact}。" if loc_topic and loc_topic not in fact else f"{fact}。"
         elif role_slot == "hook_scale":
-            raw = f"規模は{fact}に達した。"
+            if bucket == "final_judgment":
+                raw = f"確定判決の記録によれば、規模は{fact}。"
+            elif bucket == "audit_finding":
+                raw = f"監査報告書の指摘によれば、規模は{fact}。"
+            elif bucket == "indictment":
+                raw = f"起訴状の指摘によれば、規模は{fact}。"
+            elif bucket == "court_record":
+                raw = f"裁判所の記録によれば、規模は{fact}。"
+            elif bucket == "alleged_regulator":
+                raw = f"当局の公表資料によれば、規模は{fact}。"
+            elif bucket == "settled":
+                raw = f"合意規模として、{fact}（違法性を認めることなく和解）。"
+            elif bucket == "unverified":
+                raw = f"未確認の初期報道によれば、規模は{fact}。"
+            else:
+                raw = f"確認された規模として、{fact}。"
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean) <= 16) else "なぜ止められたはずが放置されたか。"
-            raw = f"{q_short} {fact}。"
+            if not q_short.endswith(("か。", "？", "?")):
+                q_short = f"{q_short.rstrip(' 。')}か。"
+            if bucket == "final_judgment" and not any(p in fact for p in ["判決", "確定"]):
+                raw = f"{q_short} 裁判所の判決によれば、{fact}。"
+            elif bucket == "audit_finding" and not any(p in fact for p in ["監査", "検査"]):
+                raw = f"{q_short} 監査報告書によれば、{fact}。"
+            elif bucket == "indictment" and not any(p in fact for p in ["起訴", "検察"]):
+                raw = f"{q_short} 起訴状によれば、{fact}。"
+            elif bucket == "court_record" and not any(p in fact for p in ["裁判所", "記録"]):
+                raw = f"{q_short} 裁判所の記録によれば、{fact}。"
+            elif bucket == "alleged_regulator" and not any(p in fact for p in ["当局", "公表"]):
+                raw = f"{q_short} 当局の公表によれば、{fact}。"
+            elif bucket == "settled" and "和解" not in fact:
+                raw = f"{q_short} {fact}（違法性を認めることなく和解）。"
+            elif bucket == "unverified" and "未確認" not in fact:
+                raw = f"{q_short} 未確認の初期報道によれば、{fact}。"
+            else:
+                raw = f"{q_short} {fact}。"
         else:
             if bucket == "alleged_regulator":
                 p_opts = ["当局の発表によれば、", "公表資料によれば、", "監督当局の報告書によれば、", "公的機関の公表資料によれば、", "当局の公表によれば、"]
+            elif bucket == "audit_finding":
+                p_opts = ["監査報告書によれば、", "検査報告の指摘によれば、", "公式監査記録によれば、", "第三者委員会の監査報告書によれば、", "監査結果によれば、"]
             elif bucket == "unverified":
                 p_opts = ["未確認の初期報道によれば、", "確認前の報道段階ですが、", "公的確認前の初期報道では、", "未確認の資料によれば、", "初期報道の記述によれば、"]
-            elif bucket in ("indictment", "court_record"):
-                p_opts = ["起訴状によれば、", "裁判所の記録によれば、", "検察の起訴状によれば、", "法廷記録によれば、", "起訴状の指摘によれば、"]
+            elif bucket == "indictment":
+                p_opts = ["起訴状によれば、", "起訴状の指摘によれば、", "検察の起訴状によれば、", "検察の発表によれば、", "公判提出の起訴状によれば、"]
+            elif bucket == "court_record":
+                p_opts = ["裁判所の記録によれば、", "法廷記録によれば、", "裁判所に提出された記録によれば、", "裁判所記録によれば、", "公判記録によれば、"]
             elif bucket == "final_judgment":
                 p_opts = ["裁判所の確定判決によれば、", "確定判決によれば、", "裁判所の判決によれば、", "有罪判決の記録によれば、", "確定判決の記述によれば、"]
             elif bucket == "criminal_complaint":
                 p_opts = ["訴状によれば、", "告訴状によれば、", "訴状の主張によれば、", "提出された訴状によれば、", "告訴内容によれば、"]
+            elif bucket == "settled":
+                p_opts = ["違法性を認めることなく成立した和解によれば、", "公表された和解合意によれば、", "課徴金納付と和解の記録によれば、", "当事者間の合意終結によれば、", "合意に基づく和解によれば、"]
+            elif bucket == "proposed":
+                p_opts = ["検討・予定段階の公表案によれば、", "予定されている推進計画によれば、", "公表された骨子案によれば、", "制度改革の検討資料によれば、", "推進方針の公表内容によれば、"]
+            elif bucket == "fact":
+                p_opts = ["現行の法令及び規定によれば、", "施行法令の定めに従い、", "制度上の法規範によれば、", "公的基準の定めに従って、", "確立された法制度の枠組みでは、"]
             else:
                 p_opts = ["報道によれば、", "取材によれば、", "公表報道によれば、", "報じられた経緯によれば、", "取材報道の記述によれば、"]
 
@@ -720,23 +901,80 @@ def _render_claim_sentence(
 
     elif m == "VN":
         if role_slot == "hook_catalyst":
-            raw = f"Trong cuộc khủng hoảng {loc_topic}, {fact}."
+            if bucket == "final_judgment":
+                raw = f"Bước ngoặt trong {loc_topic}: Theo phán quyết của tòa án, {fact}."
+            elif bucket == "audit_finding":
+                raw = f"Trong cuộc thanh tra {loc_topic}: Theo kết luận thanh tra, {fact}."
+            elif bucket == "indictment":
+                raw = f"Trong cuộc khủng hoảng {loc_topic}, Theo cáo trạng của cơ quan công tố, {fact}."
+            elif bucket == "court_record":
+                raw = f"Trong vụ việc {loc_topic}: Theo hồ sơ tại tòa án, {fact}."
+            elif bucket == "alleged_regulator":
+                raw = f"Trong vụ việc {loc_topic}: Theo cơ quan chức năng, {fact}."
+            elif bucket == "settled":
+                raw = f"Vụ việc {loc_topic} khép lại bằng thỏa thuận dàn xếp: {fact}."
+            elif bucket == "unverified":
+                raw = f"Theo thông tin bước đầu chưa kiểm chứng về {loc_topic}: {fact}."
+            else:
+                raw = f"Trong bối cảnh {loc_topic}, {fact}." if loc_topic and loc_topic not in fact else f"{fact}."
         elif role_slot == "hook_scale":
-            raw = f"Quy mô xác nhận: {fact}."
+            if bucket == "final_judgment":
+                raw = f"Theo bản án có hiệu lực, quy mô xác nhận: {fact}."
+            elif bucket == "audit_finding":
+                raw = f"Báo cáo kiểm toán xác định quy mô: {fact}."
+            elif bucket == "indictment":
+                raw = f"Hồ sơ truy tố xác nhận quy mô: {fact}."
+            elif bucket == "court_record":
+                raw = f"Theo hồ sơ tại tòa án, quy mô xác nhận: {fact}."
+            elif bucket == "alleged_regulator":
+                raw = f"Theo cơ quan quản lý, quy mô xác nhận: {fact}."
+            elif bucket == "settled":
+                raw = f"Quy mô xử lý xác nhận: {fact} (dàn xếp mà không thừa nhận sai phạm)."
+            elif bucket == "unverified":
+                raw = f"Theo phản ánh ban đầu chưa kiểm chứng, quy mô ước tính: {fact}."
+            else:
+                raw = f"Quy mô xác nhận: {fact}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Vì sao cảnh báo bị bỏ qua?"
-            raw = f"{q_short} {fact}."
+            if not q_short.endswith("?"):
+                q_short += "?"
+            if bucket == "final_judgment" and not any(p in fact for p in ["tòa", "phán quyết", "bản án"]):
+                raw = f"{q_short} Theo phán quyết của tòa án, {fact}."
+            elif bucket == "audit_finding" and not any(p in fact for p in ["kiểm toán", "thanh tra"]):
+                raw = f"{q_short} Theo kết luận thanh tra, {fact}."
+            elif bucket == "indictment" and not any(p in fact for p in ["truy tố", "cáo trạng"]):
+                raw = f"{q_short} Theo cáo trạng của cơ quan công tố, {fact}."
+            elif bucket == "court_record" and not any(p in fact for p in ["tòa án", "hồ sơ tại tòa"]):
+                raw = f"{q_short} Theo hồ sơ tại tòa án, {fact}."
+            elif bucket == "alleged_regulator" and not any(p in fact for p in ["cơ quan", "thanh tra", "công bố"]):
+                raw = f"{q_short} Theo cơ quan chức năng, {fact}."
+            elif bucket == "settled" and not any(p in fact for p in ["dàn xếp", "hòa giải"]):
+                raw = f"{q_short} {fact} (thỏa thuận dàn xếp không thừa nhận sai phạm)."
+            elif bucket == "unverified" and "chưa kiểm chứng" not in fact:
+                raw = f"{q_short} Theo thông tin bước đầu chưa kiểm chứng, {fact}."
+            else:
+                raw = f"{q_short} {fact}."
         else:
             if bucket == "alleged_regulator":
                 p_opts = ["Theo cơ quan chức năng, ", "Theo báo cáo từ cơ quan quản lý, ", "Theo kết luận từ cơ quan chuyên môn, ", "Theo công bố của cơ quan thanh tra, ", "Theo ghi nhận của các cơ quan quản lý, "]
+            elif bucket == "audit_finding":
+                p_opts = ["Theo báo cáo kiểm toán, ", "Theo kết luận thanh tra và kiểm toán, ", "Báo cáo kiểm toán độc lập chỉ rõ, ", "Theo kết quả kiểm tra chính thức, ", "Kết luận thanh tra của cơ quan quản lý nêu rõ, "]
             elif bucket == "unverified":
                 p_opts = ["Theo thông tin bước đầu chưa kiểm chứng, ", "Nguồn tin ban đầu chưa có kết luận chính thức cho biết ", "Theo phản ánh ban đầu chưa xác minh, ", "Theo các nguồn tin bước đầu chưa được xác minh, ", "Thông tin ban đầu chưa kiểm chứng phản ánh "]
-            elif bucket in ("indictment", "court_record"):
-                p_opts = ["Theo cáo trạng của cơ quan công tố, ", "Theo hồ sơ tại tòa án, ", "Theo tài liệu tố tụng thụ lý, ", "Theo cáo trạng, ", "Hồ sơ truy tố chính thức ghi nhận "]
+            elif bucket == "indictment":
+                p_opts = ["Theo cáo trạng của cơ quan công tố, ", "Theo cáo trạng, ", "Cáo trạng của viện kiểm sát chỉ rõ, ", "Theo hồ sơ truy tố, ", "Cơ quan công tố cáo buộc, "]
+            elif bucket == "court_record":
+                p_opts = ["Theo hồ sơ tại tòa án, ", "Theo tài liệu tố tụng thụ lý, ", "Theo hồ sơ lưu trữ tại tòa, ", "Theo hồ sơ tòa án, ", "Theo tài liệu nộp tại tòa án, "]
             elif bucket == "final_judgment":
                 p_opts = ["Theo phán quyết của tòa án, ", "Theo bản án đã có hiệu lực, ", "Tòa án tuyên ", "Theo quyết định của cơ quan xét xử, ", "Bản án của tòa khẳng định "]
             elif bucket == "criminal_complaint":
                 p_opts = ["Theo đơn kiện gửi cơ quan thẩm quyền, ", "Theo đơn tố cáo và hồ sơ khởi kiện, ", "Theo nội dung đơn khởi kiện, ", "Hồ sơ khởi kiện ghi nhận ", "Theo đơn kiện, "]
+            elif bucket == "settled":
+                p_opts = ["Theo thỏa thuận dàn xếp mà không thừa nhận sai phạm, ", "Theo biên bản hòa giải và xử lý vi phạm, ", "Thỏa thuận dàn xếp chính thức ghi nhận, ", "Theo kết quả hòa giải đã được xác lập, ", "Biên bản xử lý hành chính và dàn xếp ghi rõ, "]
+            elif bucket == "proposed":
+                p_opts = ["Theo đề xuất đang trong quá trình xem xét, ", "Theo phương án dự thảo đang hoàn thiện, ", "Theo định hướng chính sách đang lấy ý kiến, ", "Dự thảo chính sách mới đề xuất, ", "Phương án cải cách thể chế dự kiến, "]
+            elif bucket == "fact":
+                p_opts = ["Theo quy định pháp luật hiện hành, ", "Theo chuẩn mực pháp lý và thể chế, ", "Căn cứ khung pháp lý có hiệu lực, ", "Theo quy chuẩn pháp lý chính thức, ", "Hệ thống pháp luật quy định rõ "]
             else:
                 p_opts = ["Theo thông tin báo chí phản ánh, ", "Theo các nguồn tin truyền thông, ", "Theo phản ánh từ báo chí, ", "Ghi nhận từ các phương tiện truyền thông, ", "Theo tường thuật của báo chí, "]
 
@@ -753,12 +991,59 @@ def _render_claim_sentence(
 
     else:  # EN
         if role_slot == "hook_catalyst":
-            raw = f"Crisis trigger in {loc_topic}: {fact}."
+            if bucket == "final_judgment":
+                raw = f"Critical turning point in {loc_topic}: According to the court ruling, {fact}."
+            elif bucket == "audit_finding":
+                raw = f"Crisis trigger in {loc_topic}: According to the audit report, {fact}."
+            elif bucket == "indictment":
+                raw = f"Crisis trigger in {loc_topic}: According to the indictment, {fact}."
+            elif bucket == "court_record":
+                raw = f"Crisis trigger in {loc_topic}: According to court records, {fact}."
+            elif bucket == "alleged_regulator":
+                raw = f"Crisis trigger in {loc_topic}: According to regulatory filings, {fact}."
+            elif bucket == "settled":
+                raw = f"{loc_topic} concluded under terms of settlement: {fact}."
+            elif bucket == "unverified":
+                raw = f"According to preliminary unconfirmed reports regarding {loc_topic}: {fact}."
+            else:
+                raw = f"Crisis trigger in {loc_topic}: {fact}." if loc_topic and loc_topic not in fact else f"Crisis trigger: {fact}."
         elif role_slot == "hook_scale":
-            raw = f"Verified scale: {fact}."
+            if bucket == "final_judgment":
+                raw = f"Judicial findings establish documented scale: {fact}."
+            elif bucket == "audit_finding":
+                raw = f"Audit findings establish documented scale: {fact}."
+            elif bucket == "indictment":
+                raw = f"Charging documents state documented scale: {fact}."
+            elif bucket == "court_record":
+                raw = f"According to court records, documented scale reached: {fact}."
+            elif bucket == "alleged_regulator":
+                raw = f"Regulatory filings establish documented scale: {fact}."
+            elif bucket == "settled":
+                raw = f"Documented scale under resolved terms: {fact} (settled without admitting wrongdoing)."
+            elif bucket == "unverified":
+                raw = f"Early unverified reports suggest documented scale: {fact}."
+            else:
+                raw = f"Verified scale: {fact}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Why did early oversight fail?"
-            raw = f"{q_short} {fact}."
+            if not q_short.endswith("?"):
+                q_short += "?"
+            if bucket == "final_judgment" and not any(p in fact.lower() for p in ["court", "ruling", "verdict"]):
+                raw = f"{q_short} According to the court ruling, {fact}."
+            elif bucket == "audit_finding" and not any(p in fact.lower() for p in ["audit", "inspector general"]):
+                raw = f"{q_short} According to the audit report, {fact}."
+            elif bucket == "indictment" and not any(p in fact.lower() for p in ["indictment", "prosecutors", "charging"]):
+                raw = f"{q_short} Charging documents state that {fact}."
+            elif bucket == "court_record" and not any(p in fact.lower() for p in ["court records", "docket", "filings"]):
+                raw = f"{q_short} According to court records, {fact}."
+            elif bucket == "alleged_regulator" and not any(p in fact.lower() for p in ["regulatory", "regulators", "filings"]):
+                raw = f"{q_short} According to regulatory filings, {fact}."
+            elif bucket == "settled" and "settled" not in fact.lower():
+                raw = f"{q_short} {fact} (settled without admitting wrongdoing)."
+            elif bucket == "unverified" and "unverified" not in fact.lower():
+                raw = f"{q_short} Early unverified reports suggest that {fact}."
+            else:
+                raw = f"{q_short} {fact}."
         else:
             if bucket == "alleged_regulator":
                 p_opts = [
@@ -768,6 +1053,14 @@ def _render_claim_sentence(
                     "As regulators documented in filings, ",
                     "Official regulatory disclosures note that ",
                 ]
+            elif bucket == "audit_finding":
+                p_opts = [
+                    "According to the audit report, ",
+                    "Audit exhibits and findings establish, ",
+                    "As documented in official audit exhibits, ",
+                    "The official audit examination revealed that ",
+                    "Audits uncovered records showing that ",
+                ]
             elif bucket == "unverified":
                 p_opts = [
                     "According to preliminary unconfirmed reports, ",
@@ -776,13 +1069,21 @@ def _render_claim_sentence(
                     "According to unconfirmed accounts at the time, ",
                     "Early reporting reflects unverified claims that ",
                 ]
-            elif bucket in ("indictment", "court_record"):
+            elif bucket == "indictment":
                 p_opts = [
                     "According to the indictment, ",
-                    "According to court records, ",
                     "Charging documents state that ",
+                    "Prosecutors alleged in the indictment that ",
+                    "According to formal charging documents, ",
+                    "The indictment alleges that ",
+                ]
+            elif bucket == "court_record":
+                p_opts = [
+                    "According to court records, ",
                     "According to official docket filings, ",
                     "Judicial records reflect that ",
+                    "Court filings indicate that ",
+                    "Docket records reflect that ",
                 ]
             elif bucket == "final_judgment":
                 p_opts = [
@@ -799,6 +1100,30 @@ def _render_claim_sentence(
                     "According to the civil lawsuit filing, ",
                     "The complaint alleges that ",
                     "Lawsuit filings allege that ",
+                ]
+            elif bucket == "settled":
+                p_opts = [
+                    "Under the terms of the settlement, ",
+                    "Settlement disclosures establish that ",
+                    "Without admitting wrongdoing, the parties agreed that ",
+                    "Under the resolved consent decree, ",
+                    "Official settlement records indicate that ",
+                ]
+            elif bucket == "proposed":
+                p_opts = [
+                    "Under the proposed draft framework, ",
+                    "According to preliminary policy proposals, ",
+                    "Under the pending regulatory plan, ",
+                    "Draft administrative rules propose that ",
+                    "Initial policy frameworks under consideration suggest that ",
+                ]
+            elif bucket == "fact":
+                p_opts = [
+                    "Under established law, ",
+                    "As codified in official regulations, ",
+                    "Statutory provisions establish that ",
+                    "Under the governing regulatory framework, ",
+                    "Official administrative standards establish that ",
                 ]
             else:  # alleged (press)
                 p_opts = [
@@ -844,18 +1169,7 @@ def _render_claim_sentence(
                 ]
             raw = f"{pfx}{tails[v_idx]}"
 
-    qualified = _apply_legal_qualifier(
-        raw,
-        legal_status=ls,
-        market=m,
-        source_type=st,
-        doc_type=dt,
-        speaker=sp,
-        procedural_status=ps,
-        verification_status=vs,
-        slot_idx=slot_idx,
-    )
-    return qualified, [cid]
+    return raw, [cid]
 
 
 def _build_grounded_story_beats(
@@ -1053,29 +1367,64 @@ def _build_grounded_story_beats(
             ln_cur = raw_beats[0][2][idx]
             cur_t = ln_cur.text
             if len(cur_t) > 22:
-                clauses = [c.strip() for c in re.split(r"[;—]|,\s+", cur_t) if c.strip()]
-                if len(clauses) > 1 and len(clauses[0]) >= 12:
-                    c_cand = clauses[0]
-                    if m == "KR" and not c_cand.endswith((".", "!", "?", "다", "요", "죠")):
-                        c_cand += " 발표됐습니다."
-                    elif not c_cand.endswith((".", "!", "?")):
-                        c_cand += "."
-                    ln_cur.text = c_cand
+                if idx == 2 and any(sep in cur_t for sep in ("?", "？", "か。")):
+                    sep_used = "か。" if "か。" in cur_t else ("？" if "？" in cur_t else "?")
+                    q_part, _, rem = cur_t.partition(sep_used)
+                    q_text = f"{q_part.strip()}{sep_used}"
+                    if m == "JA":
+                        rem_clauses = [c.strip(" 、") for c in re.split(r"[、,]", rem) if c.strip(" 、")]
+                        rem_shrunk = rem_clauses[0][:20].rstrip(" 、") if rem_clauses else rem[:20].rstrip(" 、")
+                        if rem_shrunk and not rem_shrunk.endswith(("。", "！", "？")):
+                            rem_shrunk += "。"
+                        ln_cur.text = f"{q_text} {rem_shrunk}".strip()
+                    else:
+                        rem_words = rem.strip().split()
+                        rem_shrunk = " ".join(rem_words[:8]).rstrip(" ,;:")
+                        if rem_shrunk and not rem_shrunk.endswith((".", "!", "?")):
+                            rem_shrunk += "."
+                        ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                 else:
-                    w_list = cur_t.split()
-                    shrunk = ""
-                    for w in w_list:
-                        cand = f"{shrunk} {w}".strip()
-                        if len(cand) <= 20:
-                            shrunk = cand
+                    paren_match = re.search(r"\s*(\([^()]+\))\s*[.。!?]?$", cur_t)
+                    paren_suffix = paren_match.group(1) if paren_match else ""
+                    main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
+
+                    if m in ("EN", "VN"):
+                        words = main_body.split()
+                        cap_words = 12 if len(words) > 14 else len(words)
+                        shrunk_main = " ".join(words[:cap_words]).rstrip(" ,;:")
+                        if paren_suffix:
+                            ln_cur.text = f"{shrunk_main} {paren_suffix}."
                         else:
-                            break
-                    if shrunk:
-                        if m == "KR" and not shrunk.endswith((".", "!", "?", "다", "요", "죠")):
-                            shrunk += " 발표됐습니다."
-                        elif not shrunk.endswith((".", "!", "?")):
-                            shrunk += "."
-                        ln_cur.text = shrunk
+                            if not shrunk_main.endswith((".", "!", "?")):
+                                shrunk_main += "."
+                            ln_cur.text = shrunk_main
+                    elif m == "JA":
+                        clauses = [c.strip(" 、") for c in re.split(r"[;—、,]", main_body) if c.strip(" 、")]
+                        shrunk_main = clauses[0][:26].rstrip(" 、がはをにでともへのや") if clauses else main_body[:26].rstrip(" 、がはをにでともへのや")
+                        if re.search(r"してい$", shrunk_main):
+                            shrunk_main += "ます"
+                        elif re.search(r"され$", shrunk_main):
+                            shrunk_main += "ました"
+                        elif re.search(r"行われ$", shrunk_main):
+                            shrunk_main += "ました"
+                        elif re.search(r"確認され$", shrunk_main):
+                            shrunk_main += "ました"
+                        elif re.search(r"認められ$", shrunk_main):
+                            shrunk_main += "ました"
+                        if paren_suffix:
+                            ln_cur.text = f"{shrunk_main}{paren_suffix}。"
+                        else:
+                            if not shrunk_main.endswith(("。", "！", "？")):
+                                shrunk_main += "。"
+                            ln_cur.text = shrunk_main
+                    else:  # KR
+                        clauses = [c.strip() for c in re.split(r"[;—]|,\s+", main_body) if c.strip()]
+                        shrunk_main = clauses[0] if (len(clauses) > 1 and len(clauses[0]) >= 16) else " ".join(main_body.split()[:9])
+                        shrunk_main = _to_kr_honorific(shrunk_main).rstrip(".")
+                        if paren_suffix:
+                            ln_cur.text = f"{shrunk_main} {paren_suffix}."
+                        else:
+                            ln_cur.text = f"{shrunk_main}."
             b1_dur = float(
                 estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
             )

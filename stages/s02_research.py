@@ -695,15 +695,21 @@ def run(ctx: RunContext) -> StageArtifact:
                     )
 
                     if is_off_portal:
-                        prov_c["source_type"] = "gov" if prov_c.get("source_type") not in ("court", "regulator") else prov_c.get("source_type")
-                        prov_c["doc_type"] = "regulatory_notice"
+                        if any(x in (src_url + src_name_check).lower() for x in ("justice.gov", "department of justice", "antitrust division")):
+                            prov_c["source_type"] = "regulator" if "antitrust" in (src_url + src_name_check).lower() else "gov"
+                        else:
+                            prov_c["source_type"] = "gov" if prov_c.get("source_type") not in ("court", "regulator") else prov_c.get("source_type")
+                        if prov_c.get("doc_type") in ("unknown", "rss_snippet", None, ""):
+                            prov_c["doc_type"] = "regulatory_notice"
                         prov_c["verification_status"] = "verified_primary"
                         prov_c["evidence_tier"] = "primary"
-                        prov_c["credibility_tier"] = "official_regulation"
+                        if prov_c.get("credibility_tier") in ("unconfirmed_claim", None, ""):
+                            prov_c["credibility_tier"] = "official_regulation"
                         prov_c["confidence"] = "high"
                     elif is_rep_press:
                         prov_c["source_type"] = "press"
-                        prov_c["doc_type"] = "news_article"
+                        if prov_c.get("doc_type") in ("unknown", "rss_snippet", None, ""):
+                            prov_c["doc_type"] = "news_article"
                     elif is_rss_hit:
                         # Genuinely unverified anonymous RSS snippet or unknown aggregator
                         prov_c["verification_status"] = "unverified_secondary"
@@ -716,8 +722,10 @@ def run(ctx: RunContext) -> StageArtifact:
                     # Preserve explicit valid legal_status only when provenance supports it
                     llm_ls = str(c.get("legal_status", "")).lower()
                     st = prov_c["legal_status"]
-                    if llm_ls in ("convicted", "charged", "settled", "alleged") and prov_c["verification_status"] != "unverified_secondary":
+                    if llm_ls in ("charged", "settled", "alleged") and prov_c["verification_status"] != "unverified_secondary":
                         st = llm_ls
+                    elif llm_ls == "convicted" and prov_c.get("doc_type") == "court_judgment":
+                        st = "convicted"
                     elif prov_c["verification_status"] == "unverified_secondary" and llm_ls == "fact":
                         st = "alleged"
 
