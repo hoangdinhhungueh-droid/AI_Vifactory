@@ -1035,7 +1035,7 @@ def _render_claim_sentence(
                         f"정부 공식 발표에 따른 제도 개선 과정에서, {fact_h}",
                         f"관계 당국 발표에 따른 사후 대책 단계에서, {fact_h}",
                         f"정부 및 관계 기관의 제도 보완 국면에서, {fact_h}",
-                        f"당국 발표에 따른 피해 회복 추진 과정에서, {fact_h}",
+                        f"당국 공식 발표에 따른 피해 회복 추진 과정에서, {fact_h}",
                         f"공식 발표에 나타난 재발 방지 대책 단계에서, {fact_h}",
                     ]
                     raw = reg_aftermath[v_idx]
@@ -1044,7 +1044,7 @@ def _render_claim_sentence(
                         f"감사원 감사 보고서에 따른 점검 단계에서, {fact_h}",
                         f"공식 감사 결과에 따른 사후 시정 국면에서, {fact_h}",
                         f"감사 보고서에 나타난 제도 개선 과정에서, {fact_h}",
-                        f"사후 감사 및 점검에 따른 보완 단계에서, {fact_h}",
+                        f"감사 결과 및 점검에 따른 보완 단계에서, {fact_h}",
                         f"감사원 점검 기록에 따른 관리 감독 국면에서, {fact_h}",
                     ]
                     raw = audit_aftermath[v_idx]

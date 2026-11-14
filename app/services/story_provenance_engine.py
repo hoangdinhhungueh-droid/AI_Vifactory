@@ -946,16 +946,26 @@ def _qualifier_pattern_matches(pattern: str, text: str, market: str) -> bool:
     m = normalize_market_code(market)
     if m == "KR":
         if pattern == "소장에 따르면":
-            return bool(re.search(r"(?<![공기])소장에\s*따르면", text))
+            return bool(re.search(r"(?<![공기])소장에\s*(?:따르면|따른)", text))
         if pattern == "소장을 통해":
             return bool(re.search(r"(?<![공기])소장을\s*통해", text))
-        return pattern in text
+        if pattern in text:
+            return True
+        if "따르면" in pattern and pattern.replace("따르면", "따른") in text:
+            return True
+        if "의하면" in pattern and pattern.replace("의하면", "의한") in text:
+            return True
+        return False
     if m == "JA":
         if pattern == "訴状によれば":
-            return bool(re.search(r"(?<!起)訴状によれば", text))
+            return bool(re.search(r"(?<!起)訴状に(?:よれば|よる)", text))
         if pattern == "訴状の主張によれば":
-            return bool(re.search(r"(?<!起)訴状の主張によれば", text))
-        return pattern in text
+            return bool(re.search(r"(?<!起)訴状の主張に(?:よれば|よる)", text))
+        if pattern in text:
+            return True
+        if "によれば" in pattern and pattern.replace("によれば", "による") in text:
+            return True
+        return False
     return pattern.lower() in text.lower()
 
 
