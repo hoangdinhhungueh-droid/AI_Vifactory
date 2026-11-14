@@ -32,11 +32,20 @@ Every Beat MUST be decomposed into crisp, TTS-calibrated 3-to-5 second lines (ta
    - `final_judgment` / `convicted`: State judgment directly (`법원 확정 판결에 따르면` / `裁判所の確定判決によれば` / `Theo phán quyết của tòa án` / `According to the court ruling`).
    - `indictment` (prosecutor): `검찰 공소장에 따르면` / `起訴状の指摘によれば` / `Theo cáo trạng của cơ quan công tố` / `According to court filings`.
    - `criminal_complaint` (plaintiff/victim): `고발장·소장에 따르면` / `告訴状・訴状の主張によれば` / `Theo đơn tố cáo và hồ sơ khởi kiện` / `According to the complaint` (NEVER misattribute a civil/criminal complaint to a prosecutor indictment!).
-   - `press` / `news_article` / `unverified_secondary`: Qualify explicitly as preliminary media reporting using varied natural docudrama framing (e.g. reported speech endings `~한 것으로 보도됐습니다` / `~한 것으로 전해졌습니다` or varied leads like `당시 언론 취재에 따르면`, `취재 보도에 의하면`; JA: `報道によれば` / `~と報じられました`; VN: `theo thông tin báo chí phản ánh` / `ghi nhận từ báo chí`; EN: `according to published reporting` / `press accounts note`). NEVER repeat the identical qualifier boilerplate across lines. NEVER misattribute press snippets to regulators or prosecutors.
+   - `official_regulation` / `statute` / `gov_announcement`: Attribute to official announcements or statutes (`정부 발표에 따르면` / `관계 당국에 따르면` / `공식 발표 자료에 따르면` / `According to regulatory filings`). NEVER invent non-existent regulatory investigations (`감독 당국의 조사` is forbidden unless the claim explicitly describes a formal supervisory probe).
+   - `press` / `corroborated_secondary`: Qualify as reporting (`보도에 따르면` / `언론 보도를 보면` / `당시 보도에 따르면` / `according to published reports`).
+   - `unconfirmed_claim` / `unverified_secondary` (RSS snippets): Attribute ONLY as preliminary/unconfirmed reports (`초기 보도에 따르면` / `확인되지 않은 보도에 따르면` / `일부 보도에 따르면` / `전해진 바에 따르면` / `According to preliminary unconfirmed reports`). NEVER elevate them into formal investigative findings (`언론사 취재 결과`, `취재 결과`, `조사 결과` are strictly forbidden for unconfirmed snippets).
    - `bill_proposed`: Qualify explicitly as proposed/pending (`시행 확정 전인 추진 계획` / `検討・予定段階` / `đang xem xét` / `proposed`).
    - `settled`: Append non-admission settlement clause (`(공식적인 잘못을 인정하지 않고 합의됨)` / `(違法性を認めることなく和解)` / `(dàn xếp mà không thừa nhận hành vi sai trái)` / `(settled without admitting wrongdoing)`).
-3. Use standard Arabic numerals (`2025`, `11`, `30%`, `9,317`) and target-language entities appropriate to the assigned `Target Market`. Avoid foreign/mixed prose leaks or out-of-market institutional names not in the ledger.
-4. Visual hooks: Every line must specify `stat_hero`, `stamp`, `ruler_measure`, `compass_arc`, `cutout`, `red_thread`, `magnifier`, `scissors_cut`, or `grease_pencil`.
+3. **Anti-Repetitive Template Filler (Gate 5)**:
+   - DO NOT start consecutive lines with boilerplate reporting openers (e.g. repeating `보도에 따르면,` / `취재 보도에 의하면,`). Alternate sentence structures naturally!
+   - Only lines introducing a new allegation require an attribution qualifier. Background context, structural mechanisms, questions, and narrative transitions should be stated directly and authoritatively.
+   - Include at least ONE short, punchy 2-6 word Pattern Interrupt line in Beat 2, Beat 3, and Beat 4 (e.g. `경고는 무시됐습니다.`, `장부는 비어 있었습니다.`, `The warning was ignored.`, `Cảnh báo bị phớt lờ.`) without any attribution prefix.
+4. **Causal Discipline & Predicate Softening (Gate 10 & Rule 130)**:
+   - NEVER assert macro causal leaps (e.g. `the public bore the cost`, `손실은 공공으로 이전됐다`, `청구서는 국가로 향했다`) unless a cited claim explicitly proves that causal consequence.
+   - For analytical findings or allegations, use softened reported verbs (`~라는 분석입니다`, `~로 전해졌습니다`, `~것으로 알려졌습니다`), NEVER definitive past tense (`~넘겼습니다`, `~했습니다`).
+5. Use standard Arabic numerals (`2025`, `11`, `30%`, `9,317`) and target-language entities appropriate to the assigned `Target Market`. Avoid foreign/mixed prose leaks or out-of-market institutional names not in the ledger.
+6. Visual hooks: Every line must specify `stat_hero`, `stamp`, `ruler_measure`, `compass_arc`, `cutout`, `red_thread`, `magnifier`, `scissors_cut`, or `grease_pencil`.
 
 ## Output Schema Requirements
 Produce pure valid JSON matching the following contract:
