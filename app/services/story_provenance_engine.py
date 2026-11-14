@@ -1012,8 +1012,10 @@ def expected_qualifier_bucket(
             return "audit_finding"
         if vs in ("unverified_secondary", "speculative") and cred == "unconfirmed_claim":
             return "unverified"
+        if dt in ("press_release", "briefing", "official_statement", "gov_report", "news_release"):
+            return "alleged_regulator"
         if ls == "fact" and (vs in ("verified_primary", "corroborated_secondary") or cred in ("verified_fact", "official_regulation")):
-            return "fact"
+            return "alleged_regulator" if dt in ("press_release", "news_article", "briefing") else "fact"
         if dt in ("guidance", "regulatory_notice") and ls in ("fact", "neutral"):
             return "fact"
         return "alleged_regulator"

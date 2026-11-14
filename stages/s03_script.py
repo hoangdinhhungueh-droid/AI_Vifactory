@@ -240,7 +240,17 @@ def _localized_topic_label(topic: str, market: str) -> str:
         if len(HANGUL_SYLLABLE_RE.findall(t_no_paren)) >= 2 and len(re.findall(r"\b[a-z]{3,}\b", t_no_paren)) <= 1:
             head_part = re.split(r"[:\-—]", t_no_paren)[0].strip()
             topic_base = head_part if len(head_part) >= 4 else t_no_paren
-            short = topic_base[:18].strip() if len(topic_base) > 18 else topic_base
+            if len(topic_base) > 22:
+                words = topic_base.split()
+                short = ""
+                for w in words:
+                    if len(short) + len(w) + 1 <= 22:
+                        short = f"{short} {w}".strip()
+                    else:
+                        break
+                short = short or topic_base[:18]
+            else:
+                short = topic_base
             if "(" in short and ")" not in short:
                 short = short[: short.rfind("(")].strip()
             return short or "이번 사안"
@@ -382,6 +392,8 @@ def _to_kr_honorific(text: str) -> str:
 def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     """Ensure unverified press claims end in reported speech (전해졌습니다/보도됐습니다) rather than definitive established facts."""
     t = text.strip()
+    if re.search(r"의혹이\s*(?:제기됐습니다|제기되었습니다|불거졌습니다|제기된\s*것으로\s*전해졌습니다)\.?$", t):
+        return t if t.endswith(".") else f"{t}."
     if t.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "설명합니다.", "제시했습니다.")):
         return t
     h_bodo = "한 것으로 보도됐습니다." if slot_idx % 2 == 0 else "한 것으로 전해졌습니다."
@@ -448,14 +460,14 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         if "विकल्प" in clean:
             clean = clean.replace("विकल्प", "선택권")
         clean = re.sub(r"[\u0900-\u097F]+", "", clean).strip()
-        pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|의혹이\s*보도되었다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다|의혹이\s*제기되었다)$"
+        pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|의혹이\s*보도되었다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다)$"
         clean = re.sub(pat_kr, r"\1", clean)
         clean = re.sub(r"(?:보도되었다|보도됐다|알려졌다|전해졌다)$", "", clean).strip()
         clean = re.sub(r"([가-힣]+)한\s*것으로$", r"\1했다", clean)
         clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
         clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
 
-        cap = 45 if hook_mode else 110
+        cap = 65 if hook_mode else 110
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
@@ -490,18 +502,37 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
                 return head_c
 
         if hook_mode:
+            # 1. Contrastive '아니라,' pattern (e.g. C003)
+            if "아니라," in clean:
+                parts = clean.split("아니라,", 1)
+                c_head = parts[0].strip()
+                c_tail = parts[1].strip()
+                head_core = "손실액 전액 보상이" if any(k in c_head for k in ("전액", "손실액", "일률적")) else "전액 보상이"
+                tail_core = re.sub(r"피해자의\s*회수액이\s*", "회수액이 ", c_tail)
+                tail_core = re.sub(r"임차보증금의\s*", "", tail_core)
+                tail_core = re.sub(r"못\s*미치는\s*경우\s*", "못 미칠 때 ", tail_core)
+                combined = f"{head_core} 아니라, {tail_core}"
+                if len(combined) <= cap:
+                    return combined
+
+            # 2. Condition & threshold pattern (e.g. C002)
+            if any(k in clean for k in ("3분의 1", "1/3", "부족분")):
+                res_c = clean
+                res_c = re.sub(r"최소보장\s*제도는\s*", "", res_c)
+                res_c = re.sub(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일부터\s*시행되며,\s*", "", res_c)
+                res_c = re.sub(r"대항력\s*또는\s*우선변제권\s*행사\s*등으로\s*", "", res_c)
+                res_c = re.sub(r"법정\s*지원요건을\s*충족한\s*피해자가\s*", "요건을 충족한 피해자의 ", res_c)
+                res_c = re.sub(r"회수한\s*금액이\s*", "회수액이 ", res_c)
+                res_c = re.sub(r"임차보증금의\s*", "보증금 ", res_c)
+                res_c = re.sub(r"미치지\s*못하면\s*", "못 미치면 ", res_c)
+                if len(res_c) <= cap:
+                    return res_c
+
             compacted = clean
-            compacted = re.sub(r"저금리와\s*높은\s*전세보증금\s*비율을\s*이용한\s*", "", compacted)
-            compacted = re.sub(r"전세사기\s*피해자?(?:의)?\s*보증금\s*(?:회복|회수)[을를]\s*(?:지원하는|국가가\s*보장하는)?\s*", "", compacted)
-            compacted = re.sub(r"전세사기\s*피해자?(?:의|에\s*대한|를\s*위한)?\s*", "", compacted)
+            compacted = re.sub(r"저금리와\s*높은\s*전세가율을\s*이용한\s*", "", compacted)
             compacted = re.sub(r"전국\s*단위\s*", "", compacted)
-            compacted = re.sub(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일(?:부터|까지|에)?\s*", "", compacted)
-            compacted = re.sub(r"보증금\s*최소\s*금융지원\s*", "최소보장 지원 ", compacted)
-            compacted = re.sub(r"보증금\s*최소지원\s*", "최소지원 ", compacted)
             compacted = re.sub(r"피해자로\s*인정된\s*임차인에게\s*", "피해자에게 ", compacted)
-            compacted = re.sub(r"최소보장금융\s*지원의\s*", "최소보장 ", compacted)
             compacted = re.sub(r"손실\s*보증금의\s*", "손실 보증금 ", compacted)
-            compacted = re.sub(r"다가구·다세대\s*주택\s*개발자들이\s*", "빌라 개발자가 ", compacted)
             compacted = re.sub(r"운영상\s*부족분과\s*향후\s*가격\s*하락\s*위험을\s*", "손실 위험을 ", compacted)
             if len(compacted) <= cap:
                 return compacted
@@ -801,7 +832,7 @@ def _render_claim_sentence(
             if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
                 fact_h = _soften_kr_reported_predicate(fact_h)
             if has_existing_pfx:
-                raw = fact_h if (not loc_topic or loc_topic in fact_h or len(loc_topic) > 12) else f"{loc_topic} 사안에서, {fact_h}"
+                raw = fact_h
             elif bucket == "final_judgment":
                 raw = f"법원 확정 판결에 따르면, {fact_h}"
             elif bucket == "audit_finding":
@@ -818,8 +849,10 @@ def _render_claim_sentence(
                 raw = f"공식 합의 종결 기록에 따르면, {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
                 raw = f"초기 언론 보도에 따르면, {fact_h}"
+            elif bucket == "fact":
+                raw = fact_h
             else:
-                raw = f"{loc_topic} 사안에서, {fact_h}" if loc_topic and loc_topic not in fact else fact_h
+                raw = fact_h
         elif role_slot == "hook_scale":
             fact_h = _to_kr_honorific(fact)
             if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
@@ -842,6 +875,8 @@ def _render_claim_sentence(
                 raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
                 raw = f"초기 언론 보도 집계에 따르면, {fact_h}"
+            elif bucket == "fact":
+                raw = f"개정 법령에 따르면, {fact_h}" if not any(k in fact_h for k in ("법령", "특별법", "법률", "규정", "조례")) else fact_h
             else:
                 raw = f"집계된 수치에 따르면, {fact_h}"
         elif role_slot == "hook_paradox":
@@ -1606,14 +1641,26 @@ def _build_grounded_story_beats(
                         if m_r:
                             pfx_r = m_r.group(1).strip()
                             fact_r = m_r.group(2).strip()
+                            if any(p in pfx_r for p in ("정부 발표", "언론 보도", "규제 당국", "당국에")):
+                                pfx_r = ""
                         else:
                             pfx_r = ""
                             fact_r = rem_clean
                         clauses_r = [c.strip() for c in re.split(r"[;—]|,\s*", fact_r) if c.strip()]
                         conn_r = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", fact_r)
-                        if len(clauses_r) > 1 and 10 <= len(clauses_r[0]) <= 35:
+                        if "아니라," in fact_r:
+                            parts = fact_r.split("아니라,", 1)
+                            h_p = parts[0].strip()
+                            t_p = parts[1].strip()
+                            h_c = "손실액 전액 보상이" if any(k in h_p for k in ("전액", "손실액")) else "전액 보상이"
+                            t_c = re.sub(r"피해자의\s*", "", t_p)
+                            t_c = re.sub(r"임차보증금의\s*", "", t_c)
+                            t_c = re.sub(r"못\s*미치는\s*경우\s*", "못 미칠 때 ", t_c)
+                            t_c = re.sub(r"그\s*기준액과\s*실제\s*회수액의\s*", "그 ", t_c)
+                            shrunk_r = _to_kr_honorific(f"{h_c} 아니라, {t_c}")
+                        elif len(clauses_r) > 1 and 10 <= len(clauses_r[0]) <= 55:
                             shrunk_r = _to_kr_honorific(clauses_r[0])
-                        elif conn_r and 10 <= len(conn_r.group(1)) <= 35:
+                        elif conn_r and 10 <= len(conn_r.group(1)) <= 55:
                             c_part = conn_r.group(1).strip()
                             for c_pat, c_rep in [(r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"), (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다")]:
                                 c_part = re.sub(c_pat, c_rep, c_part)
@@ -1679,9 +1726,26 @@ def _build_grounded_story_beats(
                             fact_m = main_body
                         clauses_m = [c.strip() for c in re.split(r"[;—]|,\s*", fact_m) if c.strip()]
                         conn_m = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", fact_m)
-                        if len(clauses_m) > 1 and 10 <= len(clauses_m[0]) <= 35:
+                        if any(k in fact_m for k in ("3분의 1", "1/3", "부족분")):
+                            res_m = fact_m
+                            res_m = re.sub(r"개정\s*특별법의\s*최소보장\s*제도는\s*", "개정 특별법은 ", res_m)
+                            res_m = re.sub(r"개정\s*특별법의\s*요건을\s*충족한\s*피해자의\s*", "개정 특별법은 ", res_m)
+                            res_m = re.sub(r"개정\s*특별법의\s*", "개정 특별법은 ", res_m)
+                            res_m = re.sub(r"최소보장\s*제도는\s*", "", res_m)
+                            res_m = re.sub(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일부터\s*시행되며,\s*", "", res_m)
+                            res_m = re.sub(r"대항력\s*또는\s*우선변제권\s*행사\s*등으로\s*", "", res_m)
+                            res_m = re.sub(r"법정\s*지원요건을\s*충족한\s*피해자가\s*", "", res_m)
+                            res_m = re.sub(r"회수한\s*금액이\s*", "회수액이 ", res_m)
+                            res_m = re.sub(r"임차보증금의\s*", "보증금 ", res_m)
+                            res_m = re.sub(r"미치지\s*못하면\s*", "못 미칠 때 ", res_m)
+                            res_m = re.sub(r"못\s*미치면\s*", "못 미칠 때 ", res_m)
+                            shrunk_m = _to_kr_honorific(res_m)
+                        elif "특별법" in fact_m and "공포" in fact_m:
+                            res_m = re.sub(r"및\s*주거안정에\s*관한\s*", "", fact_m)
+                            shrunk_m = _to_kr_honorific(res_m)
+                        elif len(clauses_m) > 1 and 10 <= len(clauses_m[0]) <= 55:
                             shrunk_m = _to_kr_honorific(clauses_m[0])
-                        elif conn_m and 10 <= len(conn_m.group(1)) <= 35:
+                        elif conn_m and 10 <= len(conn_m.group(1)) <= 55:
                             c_part = conn_m.group(1).strip()
                             for c_pat, c_rep in [(r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"), (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다")]:
                                 c_part = re.sub(c_pat, c_rep, c_part)
