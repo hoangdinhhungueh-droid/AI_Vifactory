@@ -466,13 +466,29 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             if len(head) <= cap and head.endswith("다"):
                 return head
 
+        conn_m = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+(.*)$", clean)
+        if conn_m:
+            head_c = conn_m.group(1).strip()
+            for c_pat, c_rep in [
+                (r"되어$", "됐다"), (r"(?:되면서|되므로)$", "됐다"),
+                (r"(?:하면서|하므로)$", "했다"), (r"하여$", "했다"),
+                (r"하고$", "했다"), (r"되고$", "된다"),
+            ]:
+                if re.search(c_pat, head_c):
+                    head_c = re.sub(c_pat, c_rep, head_c)
+                    break
+            if len(head_c) <= cap and head_c.endswith("다"):
+                return head_c
+
         if hook_mode:
             compacted = clean
             compacted = re.sub(r"저금리와\s*높은\s*전세보증금\s*비율을\s*이용한\s*", "", compacted)
-            compacted = re.sub(r"전세사기\s*피해자의\s*보증금\s*(?:회복|회수)를\s*(?:지원하는|국가가\s*보장하는)\s*", "", compacted)
-            compacted = re.sub(r"전세사기\s*피해자\s*", "", compacted)
-            compacted = re.sub(r"전세사기\s*피해자에\s*대한\s*", "", compacted)
+            compacted = re.sub(r"전세사기\s*피해자?(?:의)?\s*보증금\s*(?:회복|회수)[을를]\s*(?:지원하는|국가가\s*보장하는)?\s*", "", compacted)
+            compacted = re.sub(r"전세사기\s*피해자?(?:의|에\s*대한|를\s*위한)?\s*", "", compacted)
+            compacted = re.sub(r"전국\s*단위\s*", "", compacted)
+            compacted = re.sub(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일(?:부터|까지|에)?\s*", "", compacted)
             compacted = re.sub(r"보증금\s*최소\s*금융지원\s*", "최소보장 지원 ", compacted)
+            compacted = re.sub(r"보증금\s*최소지원\s*", "최소지원 ", compacted)
             compacted = re.sub(r"피해자로\s*인정된\s*임차인에게\s*", "피해자에게 ", compacted)
             compacted = re.sub(r"최소보장금융\s*지원의\s*", "최소보장 ", compacted)
             compacted = re.sub(r"손실\s*보증금의\s*", "손실 보증금 ", compacted)
@@ -480,6 +496,13 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             compacted = re.sub(r"운영상\s*부족분과\s*향후\s*가격\s*하락\s*위험을\s*", "손실 위험을 ", compacted)
             if len(compacted) <= cap:
                 return compacted
+            conn_comp = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", compacted)
+            if conn_comp:
+                head_comp = conn_comp.group(1).strip()
+                for c_pat, c_rep in [(r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"), (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다")]:
+                    head_comp = re.sub(c_pat, c_rep, head_comp)
+                if len(head_comp) <= cap and head_comp.endswith("다"):
+                    return head_comp
 
         trimmed = clean
         if trimmed.count("(") > trimmed.count(")"):
@@ -1575,8 +1598,14 @@ def _build_grounded_story_beats(
                             pfx_r = ""
                             fact_r = rem_clean
                         clauses_r = [c.strip() for c in re.split(r"[;—]|,\s*", fact_r) if c.strip()]
-                        if len(clauses_r) > 1 and len(clauses_r[0]) >= 10:
+                        conn_r = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", fact_r)
+                        if len(clauses_r) > 1 and 10 <= len(clauses_r[0]) <= 35:
                             shrunk_r = _to_kr_honorific(clauses_r[0])
+                        elif conn_r and 10 <= len(conn_r.group(1)) <= 35:
+                            c_part = conn_r.group(1).strip()
+                            for c_pat, c_rep in [(r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"), (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다")]:
+                                c_part = re.sub(c_pat, c_rep, c_part)
+                            shrunk_r = _to_kr_honorific(c_part)
                         else:
                             r_words = fact_r.split()
                             if len(r_words) > 7:
@@ -1637,8 +1666,14 @@ def _build_grounded_story_beats(
                             pfx_m = ""
                             fact_m = main_body
                         clauses_m = [c.strip() for c in re.split(r"[;—]|,\s*", fact_m) if c.strip()]
-                        if len(clauses_m) > 1 and len(clauses_m[0]) >= 10:
+                        conn_m = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", fact_m)
+                        if len(clauses_m) > 1 and 10 <= len(clauses_m[0]) <= 35:
                             shrunk_m = _to_kr_honorific(clauses_m[0])
+                        elif conn_m and 10 <= len(conn_m.group(1)) <= 35:
+                            c_part = conn_m.group(1).strip()
+                            for c_pat, c_rep in [(r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"), (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다")]:
+                                c_part = re.sub(c_pat, c_rep, c_part)
+                            shrunk_m = _to_kr_honorific(c_part)
                         else:
                             m_words = fact_m.split()
                             if len(m_words) > 7:
