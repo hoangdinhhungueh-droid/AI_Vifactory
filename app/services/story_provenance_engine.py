@@ -470,12 +470,23 @@ def classify_claim_provenance(
             speaker = "journalist"
 
     # 3. Verification status & tier calibration (Anti-RSS-Elevation Invariant)
+    has_press_lead = any(k in text_low for k in (
+        "보도에 따르면", "언론에 따르면", "취재에 따르면", "보도됐다", "전해졌다",
+        "according to reports", "according to press", "according to media", "as reported",
+        "報道によれば", "報道によると", "theo báo", "báo chí phản ánh"
+    ))
+    if has_press_lead and source_type == "gov" and not is_court_source:
+        source_type = "press"
+        speaker = "journalist"
+        if doc_type in ("regulatory_notice", "gov_report"):
+            doc_type = "news_article"
+
     has_unconfirmed_text = any(k in combined_low for k in (
         "remains unconfirmed", "unconfirmed", "without proving collusion",
         "확인되지 않", "확인되지 않았", "확정되지 않", "입증되지 않", "미확인",
         "確認されていない", "立証されていない", "chưa được xác nhận", "chưa kiểm chứng",
     ))
-    explicit_primary_flag = raw_ver == "verified_primary" and (is_primary_url or is_official_portal) and not has_unconfirmed_text
+    explicit_primary_flag = raw_ver == "verified_primary" and (is_primary_url or is_official_portal) and not has_unconfirmed_text and not has_press_lead
     if (
         has_unconfirmed_text
         or has_speculative
@@ -489,16 +500,16 @@ def classify_claim_provenance(
         verification_status = "verified_primary"
     elif has_speculative:
         verification_status = "speculative"
-    elif (is_primary_url or is_official_portal) and raw_conf in ("verified", "high", "") and not has_unconfirmed_text:
+    elif (is_primary_url or is_official_portal) and raw_conf in ("verified", "high", "") and not has_unconfirmed_text and not has_press_lead:
         verification_status = "verified_primary"
     elif is_rss:
-        if is_official_portal and not has_unconfirmed_text:
+        if is_official_portal and not has_unconfirmed_text and not has_press_lead:
             verification_status = "verified_primary"
-        elif raw_conf == "verified" and is_reputable_press:
+        elif (raw_conf == "verified" or has_press_lead) and (is_reputable_press or is_official_portal):
             verification_status = "corroborated_secondary"
         else:
             verification_status = "unverified_secondary"
-    elif is_reputable_press and raw_conf == "verified":
+    elif is_reputable_press and (raw_conf == "verified" or has_press_lead):
         verification_status = "corroborated_secondary"
     elif raw_ver in ("corroborated_secondary", "unverified_secondary", "speculative"):
         verification_status = raw_ver
@@ -843,9 +854,9 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "press_charge": ["보도된 기소 내용에 따르면", "기소 보도", "보도에 따르면", "언론 보도에 따르면", "혐의를 받고 있", "공개된 혐의"],
         "alleged_regulator": ["규제 당국에 따르면", "당국에 따르면", "당국의 조사", "감독 당국", "정부 발표에 따르면", "정부 및 관계 당국", "정부의 공식 발표", "관계 기관의 공식 발표", "공식 발표 자료", "발표에 따르면", "공식 발표", "발표했다", "보고서에 따르면", "조사 결과", "공식 분석", "당국의 공식 분석", "분석 자료", "관계 기관", "공식 자료", "공정거래위원회", "금융감독원", "관계 당국"],
         "audit_finding": ["감사 보고서", "감사원", "감사 결과", "조사 결과", "실태조사", "점검 결과", "보고서에 따르면", "공식 감사", "감사원 감사 보고서"],
-        "alleged": ["언론 보도에 따르면", "보도 설명에 따르면", "보도에 따르면", "보도에 의하면", "보도 내용에 따르면", "보도 내용에는", "공개된 보도", "의혹이 제기", "주장에 따르면", "것으로 알려졌", "것으로 전해졌", "취재 보도", "보도를 보면", "보도된 경위", "취재 결과", "취재 자료", "취재를 보면", "취재에 따르면", "언론 취재", "보도됐다", "보도된", "알려졌다", "전해졌다"],
+        "alleged": ["언론 보도에 따르면", "보도 설명에 따르면", "보도에 따르면", "보도에 의하면", "보도 내용에 따르면", "보도 내용에는", "공개된 보도", "의혹이 제기", "주장에 따르면", "것으로 알려졌", "것으로 전해졌", "취재 보도", "보도를 보면", "보도된 경위", "취재 결과", "취재 자료", "취재를 보면", "취재에 따르면", "언론 취재", "보도됐다", "보도된", "알려졌다", "전해졌다", "보도는", "보도 집계", "언론에 따르면"],
         "settled": ["합의했", "합의하며", "합의로 종결", "책임을 인정하지 않", "인정하지 않고 합의", "동의의결", "합의 종결", "합의 종결됐", "과징금 납부와 함께", "잘못을 인정하지 않고 합의"],
-        "unverified": ["아직 최종", "아직 확인", "아직 사실관계", "미확인", "초기 보도", "확인되지 않은 보도", "초기 문건", "검증 전", "확인 전", "미확인 보도", "확인 전 단계", "검증 전 단계", "초기 미확인", "추가 확인 전", "초기 보도 내용", "초기 자료"],
+        "unverified": ["아직 최종", "아직 확인", "아직 사실관계", "미확인", "초기 보도", "확인되지 않은 보도", "초기 문건", "검증 전", "확인 전", "미확인 보도", "확인 전 단계", "검증 전 단계", "초기 미확인", "추가 확인 전", "초기 보도 내용", "초기 자료", "보도에 따르면", "보도 집계에 따르면", "언론 보도에 따르면", "취재 보도에 의하면", "취재에 따르면", "보도는", "언론사 취재", "보도된 것으로 전해졌", "보도된 것으로 알려졌", "보도됐습니다", "전해졌습니다", "언론 보도 내용", "언론 보도 내용에는", "보도 내용", "보도 내용에 따르면", "보도 내용에는", "보도된 사실관계", "보도된 사실관계에 따르면", "사실관계에 따르면", "언론사 취재 결과", "취재 결과", "취재 결과에 따르면", "언론 취재 결과"],
         "proposed": ["추진", "검토", "예정", "발의", "초안", "방침"],
     },
     "JA": {
@@ -856,7 +867,7 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "press_charge": ["報道された起訴内容", "起訴に関する報道", "報道によれば", "報じられた"],
         "alleged_regulator": ["当局の調査によれば", "規制当局によれば", "当局によれば", "監督当局", "発表によれば", "公表によれば", "報告によれば", "報告書によれば", "機関分析", "公的機関", "公表資料", "公的資料", "分析によ", "公的記録", "日本銀行", "日銀", "金融庁", "公正取引委員会", "国土交通省", "監督機関", "公表分析資料"],
         "audit_finding": ["監査報告書によれば", "監査結果によれば", "調査結果によれば", "監査報告", "報告書によれば", "検査報告", "公式監査記録", "第三者委員会の監査報告書", "監査報告書", "会計検査"],
-        "alleged": ["報道によれば", "公表報道", "報じられた", "疑惑", "とされ", "主張によれば", "見られ", "取材によれば"],
+        "alleged": ["報道によれば", "公表報道", "報じられた", "疑惑", "とされ", "主張によれば", "見られ", "取材によれば", "取材報道", "取材報道の記述によれば", "取材報道によれば", "各社の取材", "メディアの取材"],
         "settled": ["和解し", "認めないまま和解", "違法性を認めることなく和解", "課徴金納付", "和解合意", "和解により", "合意終結", "和解に至りました", "和解"],
         "unverified": ["未確認", "初期報道", "初期段階", "確認前の報道", "裏付け前", "公的確認前"],
         "proposed": ["検討", "予定", "案", "方針"],
@@ -1104,11 +1115,11 @@ def route_legal_qualifier(
 
     unverified_variants = {
         "KR": [
-            "초기 보도에 따르면,",
-            "초기 문건에 따르면,",
-            "초기 보도 내용에 의하면,",
-            "초기 자료에 따르면,",
-            "미확인 보도에 따르면,",
+            "언론 보도에 따르면,",
+            "취재 보도에 의하면,",
+            "언론 보도 내용에는,",
+            "보도된 사실관계에 따르면,",
+            "언론사 취재 결과에 따르면,",
         ],
         "JA": [
             "未確認の初期報道によれば、",
@@ -2093,7 +2104,7 @@ def check_market_entity_appropriateness(
 # ==============================================================================
 
 _UNVERIFIED_ATTRIBUTION_HINTS: Dict[str, List[str]] = {
-    "KR": ["보도", "알려졌", "전해졌", "미확인", "초기", "제기", "추정", "주장", "의혹", "검증 전", "확인 전"],
+    "KR": ["보도", "알려졌", "전해졌", "미확인", "초기", "제기", "추정", "주장", "의혹", "검증 전", "확인 전", "취재", "언론", "결과"],
     "JA": ["報道", "伝えられ", "未確認", "初期", "指摘", "疑い", "推測"],
     "VN": ["báo chí", "chưa kiểm chứng", "bước đầu", "cho rằng", "cáo buộc", "nghi vấn", "dự kiến", "xác minh"],
     "EN": ["report", "reportedly", "unverified", "preliminary", "alleg", "claim", "estimate", "according to", "unconfirmed", "corroboration"],

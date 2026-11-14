@@ -373,10 +373,35 @@ def _to_kr_honorific(text: str) -> str:
                 return t_clean[:-1] + "습니다."
 
     # 3. Strip trailing grammatical particles before attaching copula입니다.
-    t_clean = re.sub(r"(?:은|는|을|를|의|로|으로|에|에서)$", "", t_clean).strip()
+    t_clean = re.sub(r"(?:은|는|을|를|의|로|으로|에|에서|와|과|이|가)$", "", t_clean).strip()
     if re.search(r"[가-힣0-9a-zA-Z]$", t_clean):
         return f"{t_clean}입니다."
     return f"{t_clean}."
+
+
+def _soften_kr_reported_predicate(text: str) -> str:
+    """Ensure unverified press claims end in reported speech (전해졌습니다/보도됐습니다) rather than definitive established facts."""
+    t = text.strip()
+    if t.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "설명합니다.", "제시했습니다.")):
+        return t
+    repls = [
+        (r"마련했습니다\.$", "마련한 것으로 전해졌습니다."),
+        (r"모집했습니다\.$", "모집한 것으로 보도됐습니다."),
+        (r"정체됐습니다\.$", "정체된 것으로 전해졌습니다."),
+        (r"이르렀습니다\.$", "이른 것으로 보도됐습니다."),
+        (r"지원했습니다\.$", "지원한 것으로 알려졌습니다."),
+        (r"설치했습니다\.$", "설치한 것으로 보도됐습니다."),
+        (r"작동했습니다\.$", "작동한 것으로 전해졌습니다."),
+        (r"전가했습니다\.$", "전가한 것으로 보도됐습니다."),
+        (r"제공했습니다\.$", "제공한 것으로 전해졌습니다."),
+        (r"회피했습니다\.$", "회피한 것으로 보도됐습니다."),
+        (r"했습니다\.$", "한 것으로 보도됐습니다."),
+        (r"됐습니다\.$", "된 것으로 전해졌습니다."),
+    ]
+    for pat, rep in repls:
+        if re.search(pat, t):
+            return re.sub(pat, rep, t)
+    return t
 
 
 def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode: bool = False) -> str:
@@ -394,7 +419,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
         clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
 
-        cap = 70 if hook_mode else 110
+        cap = 55 if hook_mode else 110
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
@@ -684,9 +709,15 @@ def _render_claim_sentence(
     v_idx = slot_idx % 5
 
     if m == "KR":
+        has_existing_pfx = bool(re.search(
+            r"^(?:[가-힣A-Za-z0-9·\s]+(?:보도에 따르면|보도에 의하면|보도는|취재에 따르면|기사에 따르면|보도 내용에 따르면|발표에 따르면|공소장에 따르면|판결에 따르면|기록에 따르면)|보도에 따르면|취재에 따르면|공개된 보도)",
+            fact
+        ))
         if role_slot == "hook_catalyst":
             fact_h = _to_kr_honorific(fact)
-            if bucket == "final_judgment":
+            if has_existing_pfx:
+                raw = fact_h if (not loc_topic or loc_topic in fact_h or len(loc_topic) > 12) else f"{loc_topic} 사안에서, {fact_h}"
+            elif bucket == "final_judgment":
                 raw = f"{loc_topic}의 중대한 국면에서, 법원 확정 판결에 따르면, {fact_h}"
             elif bucket == "audit_finding":
                 raw = f"{loc_topic}의 발단에서, 감사원 감사 보고서에 따르면, {fact_h}"
@@ -695,18 +726,20 @@ def _render_claim_sentence(
             elif bucket == "court_record":
                 raw = f"{loc_topic} 사안에서, 법원 접수 기록에 따르면, {fact_h}"
             elif bucket == "alleged_regulator":
-                raw = f"{loc_topic} 사안에서, 정부 및 관계 당국에 따르면, {fact_h}"
+                raw = f"{loc_topic} 사안에서, 정부 발표에 따르면, {fact_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
                 raw = f"{loc_topic} 사안에서, 언론 보도에 따르면, {fact_h}"
             elif bucket == "settled":
                 raw = f"{loc_topic} 사안은 책임을 인정하지 않고 합의로 종결됐습니다: {fact_h}"
             elif bucket == "unverified":
-                raw = f"초기 보도에 따르면, {loc_topic} 사안과 관련하여 {fact_h}"
+                raw = f"언론 보도에 따르면, {loc_topic} 사안과 관련하여 {fact_h}"
             else:
                 raw = f"{loc_topic} 사안에서, {fact_h}" if loc_topic and loc_topic not in fact else fact_h
         elif role_slot == "hook_scale":
             fact_h = _to_kr_honorific(fact)
-            if bucket == "final_judgment":
+            if has_existing_pfx:
+                raw = fact_h
+            elif bucket == "final_judgment":
                 raw = f"법원 확정 판결에 적시된 수치에 따르면, {fact_h}"
             elif bucket == "audit_finding":
                 raw = f"감사원 감사 보고서에 적시된 수치에 따르면, {fact_h}"
@@ -717,11 +750,11 @@ def _render_claim_sentence(
             elif bucket == "alleged_regulator":
                 raw = f"규제 당국에 따르면, 집계된 수치는 {fact_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"언론 보도에 집계된 수치에 따르면, {fact_h}"
+                raw = f"언론 보도 집계에 따르면, {fact_h}"
             elif bucket == "settled":
                 raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"초기 보도에 집계된 수치는 {fact_h}"
+                raw = f"언론 보도 집계에 따르면, {fact_h}"
             else:
                 raw = f"집계된 수치에 따르면, {fact_h}"
         elif role_slot == "hook_paradox":
@@ -729,7 +762,9 @@ def _render_claim_sentence(
             q_short = cq_clean if (cq_clean and 6 <= len(cq_clean) <= 16 and not cq_clean.endswith("?")) else "왜 못 막았을까?"
             if not q_short.endswith("?"):
                 q_short += "?"
-            if bucket == "final_judgment" and not any(p in fact for p in ["판결", "유죄", "선고"]):
+            if has_existing_pfx:
+                raw = f"{q_short} {fact_h}"
+            elif bucket == "final_judgment" and not any(p in fact for p in ["판결", "유죄", "선고"]):
                 raw = f"{q_short} 법원 판결에 따르면, {fact_h}"
             elif bucket == "audit_finding" and not any(p in fact for p in ["감사", "보고서"]):
                 raw = f"{q_short} 감사 보고서에 따르면, {fact_h}"
@@ -744,7 +779,7 @@ def _render_claim_sentence(
             elif bucket == "settled" and "합의" not in fact:
                 raw = f"{q_short} {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified" and "보도" not in fact:
-                raw = f"{q_short} 초기 보도에 따르면, {fact_h}"
+                raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
             else:
                 raw = f"{q_short} {fact_h}"
         else:
@@ -753,7 +788,7 @@ def _render_claim_sentence(
             elif bucket == "audit_finding":
                 p_opts = ["감사 보고서에 따르면, ", "감사원 감사 보고서에 따르면, ", "공식 감사 및 점검 결과에 따르면, ", "감사 결과에 의하면, ", "공식 감사 기록에 의하면, "]
             elif bucket == "unverified":
-                p_opts = ["초기 보도에 따르면, ", "초기 문건에 따르면, ", "초기 보도 내용에는, ", "초기 자료에 따르면, ", "미확인 보도에 따르면, "]
+                p_opts = ["언론 보도에 따르면, ", "취재 보도에 의하면, ", "언론 보도 내용에는, ", "보도된 사실관계에 따르면, ", "언론사 취재 결과에 따르면, "]
             elif bucket == "indictment":
                 p_opts = ["검찰 공소장에 따르면, ", "공소 사실에 의하면, ", "검찰 수사 및 공소 내용에 따르면, ", "기소장에 따르면, ", "검찰 기소 내용에 의하면, "]
             elif bucket == "court_record":
@@ -777,8 +812,11 @@ def _render_claim_sentence(
             else:  # alleged (press reporting)
                 p_opts = ["언론 보도에 따르면, ", "취재 보도에 의하면, ", "공개된 보도 내용에 따르면, ", "보도된 경위를 보면, ", "언론 취재 결과에 따르면, "]
 
-            pfx = p_opts[v_idx]
+            pfx = "" if has_existing_pfx else p_opts[v_idx]
             fact_h = _to_kr_honorific(fact)
+            if vs == "unverified_secondary" and bucket in ("unverified", "alleged"):
+                fact_h = _soften_kr_reported_predicate(fact_h)
+
             if role_slot == "aftermath":
                 aftermath_framings = [
                     f"피해 회복과 제도 보완 국면에서, {fact_h}",
@@ -787,7 +825,7 @@ def _render_claim_sentence(
                     f"제도적 평가와 시장 감시 과정에서, {fact_h}",
                     f"후속 조사와 제도 개선 논의에서, {fact_h}",
                 ]
-                raw = f"{pfx}{aftermath_framings[v_idx]}"
+                raw = aftermath_framings[v_idx] if (has_existing_pfx or not pfx) else f"{pfx}{aftermath_framings[v_idx]}"
             elif bucket == "settled":
                 raw = f"{pfx}{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
             else:
@@ -1182,11 +1220,11 @@ def _build_grounded_story_beats(
     )
     b2_source = pools["backgrounds"] or verified_pool or all_claims
     b3_source = pools["mechanisms"] or verified_pool or all_claims
-    b4_source = (pools["catalysts"] + pools["unverified_pool"]) or all_claims
+    b4_source = (pools["unverified_pool"] + pools["mechanisms"] + pools["catalysts"]) or all_claims
     b5_source = (
-        [c for c in verified_pool if c not in pools["catalysts"]]
-        + pools["unverified_pool"]
+        [c for c in pools["unverified_pool"] if c not in pools["mechanisms"]]
         + pools["backgrounds"]
+        + [c for c in verified_pool if c not in pools["catalysts"]]
         or all_claims
     )
 
@@ -1296,12 +1334,24 @@ def _build_grounded_story_beats(
         is_aftermath = beat_id.startswith("B5")
         for l_idx, (role_slot, src_pool) in enumerate(slots, start=1):
             disallowed: Set[str] = set()
-            if is_aftermath:
+            used_in_prior = {
+                cid
+                for b_prior in raw_beats
+                for ln_p in b_prior[2]
+                for cid in (ln_p.claim_ids or [])
+            }
+            unused_in_pool = [c for c in src_pool if _get_cid(c) and _get_cid(c) not in used_in_prior]
+            if unused_in_pool:
+                disallowed.update(used_in_prior)
+            elif is_aftermath:
                 if b1_catalyst_cid:
                     disallowed.add(b1_catalyst_cid)
-                for b_prior in raw_beats[:2]:
+                for b_prior in raw_beats[:3]:
                     for ln_p in b_prior[2]:
                         disallowed.update(ln_p.claim_ids or [])
+            elif not is_hook_beat:
+                if b1_catalyst_cid:
+                    disallowed.add(b1_catalyst_cid)
             c_obj = _pick_claim(
                 src_pool,
                 restrict_to_preferred=(is_hook_beat and bool(verified_pool)),
@@ -1344,6 +1394,11 @@ def _build_grounded_story_beats(
             b1_dur = float(
                 estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
             )
+    if b1_dur > 24.0 and m == "KR":
+        raw_beats[0][2][0].text = re.sub(r"^[가-힣0-9a-zA-Z\s]+ 사안에서,\s*", "", raw_beats[0][2][0].text)
+        b1_dur = float(
+            estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
+        )
     if b1_dur > 24.0:
         for idx in (2, 1, 0):
             if b1_dur <= 24.0:
@@ -1363,28 +1418,19 @@ def _build_grounded_story_beats(
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     elif m == "KR":
                         rem_clean = rem.strip()
-                        c_idx = rem_clean.find(",")
-                        if c_idx != -1 and c_idx < len(rem_clean) - 8:
-                            pfx_r = rem_clean[:c_idx + 1].strip()
-                            fact_r = rem_clean[c_idx + 1:].strip()
-                            r_words = fact_r.split()
-                            if len(r_words) > 5:
-                                if r_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
-                                    shrunk_r = f"{' '.join(r_words[:3])} {r_words[-1]}"
-                                else:
-                                    shrunk_r = _to_kr_honorific(f"{' '.join(r_words[:3])} {r_words[-1]}")
-                            else:
-                                shrunk_r = _to_kr_honorific(fact_r)
-                            rem_shrunk = f"{pfx_r} {shrunk_r}"
+                        m_r = re.search(r"^(.*?(?:따르면|의하면|보면|기록에서|사안에서|자료에서|보고서에서|결과에서),)\s*(.*)$", rem_clean)
+                        if m_r:
+                            pfx_r = m_r.group(1).strip()
+                            fact_r = m_r.group(2).strip()
                         else:
-                            r_words = rem_clean.split()
-                            if len(r_words) > 6:
-                                if r_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
-                                    rem_shrunk = f"{' '.join(r_words[:4])} {r_words[-1]}"
-                                else:
-                                    rem_shrunk = _to_kr_honorific(f"{' '.join(r_words[:4])} {r_words[-1]}")
-                            else:
-                                rem_shrunk = _to_kr_honorific(rem_clean)
+                            pfx_r = ""
+                            fact_r = rem_clean
+                        r_words = fact_r.split()
+                        if len(r_words) > 4:
+                            shrunk_r = _to_kr_honorific(' '.join(r_words[:4]).rstrip(" ,;:"))
+                        else:
+                            shrunk_r = _to_kr_honorific(fact_r)
+                        rem_shrunk = f"{pfx_r} {shrunk_r}".strip()
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     else:
                         rem_words = rem.strip().split()
@@ -1427,28 +1473,19 @@ def _build_grounded_story_beats(
                                 shrunk_main += "。"
                             ln_cur.text = shrunk_main
                     else:  # KR
-                        comma_idx = cur_t.rfind(",")
-                        if comma_idx != -1 and comma_idx < len(cur_t) - 8:
-                            pfx_m = cur_t[:comma_idx + 1].strip()
-                            fact_m = cur_t[comma_idx + 1:].strip()
-                            m_words = fact_m.split()
-                            if len(m_words) > 5:
-                                if m_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
-                                    shrunk_m = f"{' '.join(m_words[:3])} {m_words[-1]}"
-                                else:
-                                    shrunk_m = _to_kr_honorific(f"{' '.join(m_words[:3])} {m_words[-1]}")
-                            else:
-                                shrunk_m = _to_kr_honorific(fact_m)
-                            shrunk_main = f"{pfx_m} {shrunk_m}"
+                        m_m = re.search(r"^(.*?(?:따르면|의하면|보면|기록에서|사안에서|자료에서|보고서에서|결과에서),)\s*(.*)$", main_body)
+                        if m_m:
+                            pfx_m = m_m.group(1).strip()
+                            fact_m = m_m.group(2).strip()
                         else:
-                            m_words = cur_t.split()
-                            if len(m_words) > 6:
-                                if m_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
-                                    shrunk_main = f"{' '.join(m_words[:4])} {m_words[-1]}"
-                                else:
-                                    shrunk_main = _to_kr_honorific(f"{' '.join(m_words[:4])} {m_words[-1]}")
-                            else:
-                                shrunk_main = _to_kr_honorific(cur_t)
+                            pfx_m = ""
+                            fact_m = main_body
+                        m_words = fact_m.split()
+                        if len(m_words) > 4:
+                            shrunk_m = _to_kr_honorific(' '.join(m_words[:4]).rstrip(" ,;:"))
+                        else:
+                            shrunk_m = _to_kr_honorific(fact_m)
+                        shrunk_main = f"{pfx_m} {shrunk_m}".strip()
                         if paren_suffix:
                             ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                         else:

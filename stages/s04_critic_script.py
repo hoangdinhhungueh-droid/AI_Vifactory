@@ -51,7 +51,7 @@ def _detect_repetitive_explainer_filler(lines: List[Dict[str, Any]], topic: Opti
 
     unique_cids = {str(cid) for ln in lines for cid in (ln.get("claim_ids") or []) if cid}
     # Allow unavoidable reuse when claims are expanded to target video duration
-    tail_threshold = max(4, math.ceil(len(texts) / max(1, len(unique_cids))) + 1)
+    tail_threshold = max(4, math.ceil(len(texts) / max(1, len(unique_cids))) + 2)
 
     # Check if identical normalized sentence tails (>= 18 chars) repeat beyond threshold across script
     tails = [re.sub(r"\s+", " ", t[-26:]) for t in cleaned_for_tails if len(t) >= 26]

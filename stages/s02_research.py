@@ -704,7 +704,14 @@ def run(ctx: RunContext) -> StageArtifact:
                         for gc in g_claims_raw
                     )) and not is_off_portal and not is_rep_press
 
-                    if is_off_portal:
+                    claim_text_check = str(prov_c.get("claim", "")).strip().lower()
+                    has_press_lead = any(k in claim_text_check for k in (
+                        "보도에 따르면", "언론에 따르면", "취재에 따르면", "보도됐다", "전해졌다",
+                        "according to reports", "according to press", "according to media", "as reported",
+                        "報道によれば", "報道によると", "theo báo", "báo chí phản ánh"
+                    ))
+
+                    if is_off_portal and not has_press_lead:
                         if any(x in (src_url + src_name_check).lower() for x in ("justice.gov", "department of justice", "antitrust division")):
                             prov_c["source_type"] = "regulator" if "antitrust" in (src_url + src_name_check).lower() else "gov"
                         else:
@@ -716,14 +723,15 @@ def run(ctx: RunContext) -> StageArtifact:
                         if prov_c.get("credibility_tier") in ("unconfirmed_claim", None, ""):
                             prov_c["credibility_tier"] = "official_regulation"
                         prov_c["confidence"] = "high"
-                    elif is_rep_press:
+                    elif is_rep_press or (is_off_portal and has_press_lead):
                         prov_c["source_type"] = "press"
                         if prov_c.get("doc_type") in ("unknown", "rss_snippet", None, ""):
                             prov_c["doc_type"] = "news_article"
-                        if prov_c.get("verification_status") != "verified_primary":
-                            prov_c["verification_status"] = "corroborated_secondary"
-                            prov_c["evidence_tier"] = "secondary"
-                            prov_c["credibility_tier"] = "press_allegation" if prov_c.get("legal_status") == "alleged" else "corroborated_secondary_report"
+                        prov_c["verification_status"] = "corroborated_secondary"
+                        prov_c["evidence_tier"] = "secondary"
+                        prov_c["credibility_tier"] = "press_allegation" if prov_c.get("legal_status") == "alleged" else "corroborated_secondary_report"
+                        if has_press_lead:
+                            prov_c["legal_status"] = "alleged"
                     elif is_rss_hit:
                         # Genuinely unverified anonymous RSS snippet or unknown aggregator
                         prov_c["verification_status"] = "unverified_secondary"
