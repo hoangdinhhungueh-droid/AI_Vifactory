@@ -406,6 +406,9 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     d_bodo = "된 것으로 전해졌습니다." if slot_idx % 2 == 0 else "된 것으로 보도됐습니다."
     su_bodo = "수 있는 것으로 전해졌습니다." if slot_idx % 2 == 0 else "수 있는 것으로 보도됐습니다."
     repls = [
+        (r"머물렀습니다\.$", "머문 것으로 전해졌습니다."),
+        (r"그쳤습니다\.$", "그친 것으로 전해졌습니다."),
+        (r"시작됐습니다\.$", "시작된 것으로 전해졌습니다."),
         (r"마련했습니다\.$", "마련한 것으로 전해졌습니다."),
         (r"모집했습니다\.$", "모집한 것으로 보도됐습니다."),
         (r"정체됐습니다\.$", "정체된 것으로 전해졌습니다."),
@@ -443,6 +446,7 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
         (r"합니다\.$", "하는 것으로 전해졌습니다."),
         (r"입니다\.$", "인 것으로 전해졌습니다."),
         (r"됩니다\.$", "되는 것으로 전해졌습니다."),
+        (r"([았었였했됐졌왔뒀썼렀쳤났맞])습니다\.$", r"\1던 것으로 전해졌습니다."),
         (r"었습니다\.$", "었던 것으로 보도됐습니다."),
         (r"았습니다\.$", "았던 것으로 보도됐습니다."),
         (r"였습니다\.$", "였던 것으로 보도됐습니다."),
@@ -480,28 +484,41 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         clean = re.sub(r"([가-힣]+)는\s*것으로$", r"\1는다", clean)
 
         if hook_mode:
-            # 1. Catalyst claim (e.g. government announcement / statutory decree)
-            if any(k in clean for k in ("국토교통부", "공식 발표", "최소보장제")):
-                c_clean = clean
-                c_clean = re.sub(r"전세사기\s*피해자의\s*보증금\s*회복을\s*국가가\s*일부\s*보장하는\s*", "피해자 보증금 ", c_clean)
-                c_clean = re.sub(r"최소보장제\s*시행을\s*공식\s*발표했다", "최소보장제를 공식 발표했다", c_clean)
-                c_clean = re.sub(r"시행을\s*공식\s*발표했다", "최소보장제를 공식 발표했다", c_clean)
-                if len(c_clean) <= 45:
-                    return c_clean
+            # Generic Korean hook compaction (Rule 128 / Rule 132 compliant: zero case-study hardcodes)
+            c_cand = clean
 
-            # 2. Scale / date claim (e.g. advance application date)
-            if any(k in clean for k in ("사전 신청", "11월 10일")):
-                c_clean = clean
-                c_clean = re.sub(r"전세사기\s*피해자에\s*대한\s*", "", c_clean)
-                c_clean = re.sub(r"보증금\s*최소\s*재정지원\s*", "지원 ", c_clean)
-                c_clean = re.sub(r"2026년\s*11월\s*10일부터\s*전국에서\s*", "2026년 11월 10일 전국에서 ", c_clean)
-                if len(c_clean) <= 45:
-                    return c_clean
+            # 1. Strip contrastive negative lead: 'A가 아니라 B' -> 'B' (preserves core paradox)
+            if "아니라" in c_cand:
+                b_part = re.sub(r"^.*?아니라,?\s*", "", c_cand)
+                if b_part and len(b_part) <= 45:
+                    subj_m = re.match(r"^([가-힣]+(?:는|은))\s+", c_cand)
+                    if subj_m and not b_part.startswith(subj_m.group(1)):
+                        cand = f"{subj_m.group(1)} {b_part}"
+                        if len(cand) <= 45:
+                            return cand
+                    return b_part
 
-            # 3. Paradox / threshold claim (e.g. 3분의 1 recovery limit)
-            if any(k in clean for k in ("3분의 1", "1/3", "부족분")):
-                if "최소보장제" in clean and "피해자" in clean:
-                    return "지원액은 피해자 손실 보증금의 최소 3분의 1 회복에 머물렀다"
+            # 2. Strip target/topic modifiers: '...에 대한', '...를 위한'
+            c_cand = re.sub(r"^[가-힣]+(?:\s+[가-힣]+)?\s*에\s*대한\s*", "", c_cand)
+            c_cand = re.sub(r"^[가-힣]+(?:\s+[가-힣]+)?\s*을\s*위한\s*", "", c_cand)
+            c_cand = re.sub(r"^[가-힣]+(?:\s+[가-힣]+)?\s*를\s*위한\s*", "", c_cand)
+
+            # 3. Strip long relative clause modifying object: '[Subject]는 ...보장하는/지원하는 [Object]'
+            c_cand = re.sub(r"(?<=[은는이가]\s)[가-힣\s]+?(?:보장하는|지원하는|규정하는|마련하는|추진하는)\s+", "", c_cand)
+
+            # 4. Clean formal action suffixes: '시행을 공식 발표했다' -> '시행을 발표했다'
+            c_cand = re.sub(r"시행을\s*공식\s*발표했다", "시행을 발표했다", c_cand)
+            c_cand = re.sub(r"도입을\s*공식\s*발표했다", "도입을 발표했다", c_cand)
+
+            # 5. Simplify date adverbials: '2026년 11월 10일부터 전국에서' -> '2026년 11월 10일 전국에서'
+            c_cand = re.sub(r"(\d{4}년\s*\d{1,2}월\s*\d{1,2}일)부터\s*전국에서", r"\1 전국에서", c_cand)
+            c_cand = re.sub(r"(\d{4}년\s*\d{1,2}월\s*\d{1,2}일)부터", r"\1", c_cand)
+
+            # 6. Simplify compound modifier padding
+            c_cand = re.sub(r"최소\s*재정지원\s*", "지원 ", c_cand)
+
+            if len(c_cand) <= 45 and c_cand.endswith("다"):
+                return c_cand
 
         cap = 45 if hook_mode else 110
         if len(clean) <= cap:
