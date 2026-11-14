@@ -969,6 +969,47 @@ def _qualifier_pattern_matches(pattern: str, text: str, market: str) -> bool:
     return pattern.lower() in text.lower()
 
 
+def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
+    """Strip leading attribution/qualifier boilerplate from a claim text to prevent double disclaimers.
+    Returns (cleaned_text, detected_prefix).
+    """
+    m = normalize_market_code(market)
+    t = (text or "").strip()
+    if not t:
+        return "", ""
+
+    if m == "KR":
+        pat = r"^[“\"‘']?(?:[가-힣A-Za-z0-9·\s]{2,35}?(?:따르면|의하면|보면|따른|의한)|[가-힣A-Za-z0-9·\s]{2,25}?(?:보고서|공소장|판결문|판결|소장|발표|조사|감사|공시|문건)(?:는|은|에|에서|를\s*통해|로\s*보면|에\s*따르면|에\s*의하면))[”\"’']?[,:]?\s*"
+        match = re.match(pat, t)
+        if match:
+            pfx = match.group(0)
+            return t[len(pfx):].strip(), pfx.strip()
+        return t, ""
+
+    if m == "JA":
+        pat = r"^[“\"‘'「]?(?:[^、,\s]{2,30}?(?:によれば|によると|によりますと|による|の記録では|の指摘では|の発表では|の報告では))[”\"’'」]?[、,:]?\s*"
+        match = re.match(pat, t)
+        if match:
+            pfx = match.group(0)
+            return t[len(pfx):].strip(), pfx.strip()
+        return t, ""
+
+    if m == "VN":
+        pat = r"^[“\"‘']?(?:(?:Theo|Căn cứ|Theo như)\s+[^,:\n]{2,60}?)[”\"’']?[,:;]\s*"
+        match = re.match(pat, t, re.IGNORECASE)
+        if match:
+            pfx = match.group(0)
+            return t[len(pfx):].strip(), pfx.strip()
+        return t, ""
+
+    pat = r"^[“\"‘']?(?:According to\s+[^,:\n]{2,60}?|As\s+[^,:\n]{2,40}?(?:reported|documented|disclosed|revealed)[^,:\n]*?)[”\"’']?[,:;]\s*"
+    match = re.match(pat, t, re.IGNORECASE)
+    if match:
+        pfx = match.group(0)
+        return t[len(pfx):].strip(), pfx.strip()
+    return t, ""
+
+
 def expected_qualifier_bucket(
     legal_status: str,
     source_type: str = "press",
@@ -1127,11 +1168,11 @@ def route_legal_qualifier(
 
     unverified_variants = {
         "KR": [
-            "초기 언론 보도에 따르면,",
-            "확인되지 않은 보도에 따르면,",
-            "미확인 보도 내용에 따르면,",
-            "일부 언론 보도에 따르면,",
-            "전해진 바에 따르면,",
+            "공식 확인 전 초기 보도에 따르면,",
+            "검증 전 초기 언론 보도를 보면,",
+            "추가 검증 전 취재 보도에 따르면,",
+            "미확인 초기 보도에 의하면,",
+            "공식 확인되지 않은 초기 보도를 보면,",
         ],
         "JA": [
             "未確認の初期報道によれば、",
@@ -1275,6 +1316,11 @@ def route_legal_qualifier(
             "",
             body,
         )
+
+    # Strip any existing attribution/qualifier boilerplate from body to prevent double disclaimers
+    body_stripped, body_pfx = strip_attribution_prefix(body, m)
+    if body_pfx:
+        body = body_stripped
 
     if m in ("EN", "VN") and prefix.endswith(","):
         first_word = body.split(" ", 1)[0].strip(",.:;\"'").lower()

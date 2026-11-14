@@ -469,7 +469,7 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
 def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while preserving legal qualifier prefix, subject, metric, and predicate."""
     cand = text.strip().rstrip(". ")
-    pfx_m = re.match(r"^([가-힣0-9a-zA-Z\s·]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에),?\s*)", cand)
+    pfx_m = re.match(r"^([“\"‘']?[가-힣0-9a-zA-Z\s·]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에)[”\"’']?,?\s*)", cand)
     pfx = pfx_m.group(1) if pfx_m else ""
     if pfx:
         cand = cand[len(pfx):].strip()
@@ -494,6 +494,13 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         cand = re.sub(r"([은는이가]\s)[가-힣\s]{2,15}?(?=\d)", r"\1", cand)
 
     if len(cand) > max_chars:
+        cand = re.sub(r"([가-힣]+)하는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1했습니다", cand)
+        cand = re.sub(r"([가-힣]+)되는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됐습니다", cand)
+        cand = re.sub(r"([가-힣]+)인\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1입니다", cand)
+        cand = re.sub(r"([가-힣]+)한\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1했습니다", cand)
+        cand = re.sub(r"([가-힣]+)된\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됐습니다", cand)
+
+    if len(cand) > max_chars:
         clauses = [c.strip() for c in re.split(r"[;—]|,\s*", cand) if c.strip()]
         if len(clauses) > 1 and len(clauses[0]) <= max_chars:
             cand = _to_kr_honorific(clauses[0])
@@ -511,7 +518,10 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
             else:
                 words = cand.split()
                 if len(words) > 5:
-                    cand = " ".join(words[:4] + [words[-1]])
+                    if words[-2] in ("것으로", "바가", "점이", "수", "줄"):
+                        cand = " ".join(words[:3] + words[-2:])
+                    else:
+                        cand = " ".join(words[:4] + [words[-1]])
                     cand = _to_kr_honorific(cand)
 
     cand = re.sub(r"\s+", " ", cand).strip()
@@ -902,6 +912,7 @@ def _render_claim_sentence(
     from app.services.story_provenance_engine import (
         expected_qualifier_bucket,
         normalize_market_code,
+        strip_attribution_prefix,
     )
 
     m = normalize_market_code(market)
@@ -939,165 +950,171 @@ def _render_claim_sentence(
     v_idx = slot_idx % 5
 
     if m == "KR":
-        has_existing_pfx = bool(re.search(
-            r"^(?:[가-힣A-Za-z0-9·\s]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에)|보도에 따르면|취재에 따르면|공개된 보도|전해진 바에 따르면|[가-힣A-Za-z0-9·\s]{2,20}?(?:보고서|공소장|판결문|판결|소장|발표|조사|감사|공시)(?:는|은|에|에서))",
-            fact
-        ))
+        fact_stripped, existing_pfx = strip_attribution_prefix(fact, m)
+        fact_h = _to_kr_honorific(fact)
+        fact_stripped_h = _to_kr_honorific(fact_stripped)
+        if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
+            fact_h = _soften_kr_reported_predicate(fact_h, slot_idx=slot_idx)
+            fact_stripped_h = _soften_kr_reported_predicate(fact_stripped_h, slot_idx=slot_idx)
+
+        has_bucket_qualifier = False
+        if existing_pfx:
+            if bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
+                has_bucket_qualifier = any(p in existing_pfx for p in ["미확인", "검증 전", "확인 전", "공식 확인 전", "추가 검증 전", "공식 확인되지 않은"])
+            elif bucket == "final_judgment":
+                has_bucket_qualifier = any(p in existing_pfx for p in ["판결", "유죄", "선고", "사법부"])
+            elif bucket == "audit_finding":
+                has_bucket_qualifier = any(p in existing_pfx for p in ["감사", "보고서", "점검", "실태조사"])
+            elif bucket == "indictment":
+                has_bucket_qualifier = any(p in existing_pfx for p in ["공소", "기소", "검찰"])
+            elif bucket == "court_record":
+                has_bucket_qualifier = any(p in existing_pfx for p in ["법원", "기록", "문건", "재판부"])
+            elif bucket == "alleged_regulator":
+                has_bucket_qualifier = any(p in existing_pfx for p in ["정부", "당국", "발표", "기관", "국토", "금융", "공정"])
+            elif bucket == "criminal_complaint":
+                has_bucket_qualifier = any(p in existing_pfx for p in ["소장", "고발", "고소"])
+            elif bucket == "settled":
+                has_bucket_qualifier = "합의" in existing_pfx or "합의" in fact
+            elif bucket == "proposed":
+                has_bucket_qualifier = any(p in existing_pfx for p in ["추진", "방침", "초안", "검토", "계획"])
+            elif bucket in ("alleged", "press_charge", "press_allegation"):
+                has_bucket_qualifier = True
+            elif bucket == "fact":
+                has_bucket_qualifier = True
+
         if role_slot == "hook_catalyst":
-            fact_h = _to_kr_honorific(fact)
-            if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
-                fact_h = _soften_kr_reported_predicate(fact_h)
-            if has_existing_pfx:
+            if has_bucket_qualifier:
                 raw = fact_h
             elif bucket == "final_judgment":
-                raw = f"법원 확정 판결에 따르면, {fact_h}"
+                raw = f"법원 확정 판결에 따르면, {fact_stripped_h}"
             elif bucket == "audit_finding":
-                raw = f"감사원 감사 보고서에 따르면, {fact_h}"
+                raw = f"감사원 감사 보고서에 따르면, {fact_stripped_h}"
             elif bucket == "indictment":
-                raw = f"검찰 공소장에 따르면, {fact_h}"
+                raw = f"검찰 공소장에 따르면, {fact_stripped_h}"
             elif bucket == "court_record":
-                raw = f"법원 접수 기록에 따르면, {fact_h}"
+                raw = f"법원 접수 기록에 따르면, {fact_stripped_h}"
             elif bucket == "alleged_regulator":
-                raw = f"정부 발표에 따르면, {fact_h}"
+                raw = f"정부 발표에 따르면, {fact_stripped_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"언론 보도에 따르면, {fact_h}"
+                raw = f"언론 보도에 따르면, {fact_stripped_h}"
             elif bucket == "settled":
-                raw = f"공식 합의 종결 기록에 따르면, {fact_h} (책임을 인정하지 않고 합의됨)."
+                raw = f"공식 합의 종결 기록에 따르면, {fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"공식 확인 전 초기 언론 보도에 따르면, {fact_h}"
+                raw = f"공식 확인 전 초기 언론 보도에 따르면, {fact_stripped_h}"
             elif bucket == "fact":
                 raw = fact_h
             else:
                 raw = fact_h
         elif role_slot == "hook_scale":
-            fact_h = _to_kr_honorific(fact)
-            if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
-                fact_h = _soften_kr_reported_predicate(fact_h)
-            if has_existing_pfx:
+            if has_bucket_qualifier:
                 raw = fact_h
             elif bucket == "final_judgment":
-                raw = f"법원 확정 판결에 적시된 수치에 따르면, {fact_h}"
+                raw = f"법원 확정 판결에 적시된 수치에 따르면, {fact_stripped_h}"
             elif bucket == "audit_finding":
-                raw = f"감사원 감사 보고서에 적시된 수치에 따르면, {fact_h}"
+                raw = f"감사원 감사 보고서에 적시된 수치에 따르면, {fact_stripped_h}"
             elif bucket == "indictment":
-                raw = f"검찰 공소장에 적시된 수치에 따르면, {fact_h}"
+                raw = f"검찰 공소장에 적시된 수치에 따르면, {fact_stripped_h}"
             elif bucket == "court_record":
-                raw = f"법원 접수 기록에 적시된 수치에 따르면, {fact_h}"
+                raw = f"법원 접수 기록에 적시된 수치에 따르면, {fact_stripped_h}"
             elif bucket == "alleged_regulator":
-                raw = f"규제 당국에 따르면, 집계된 수치는 {fact_h}"
+                raw = f"규제 당국에 따르면, 집계된 수치는 {fact_stripped_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"언론 보도를 보면, {fact_h}"
+                raw = f"언론 보도를 보면, {fact_stripped_h}"
             elif bucket == "settled":
-                raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
+                raw = f"합의 종결된 수치는 {fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"공식 확인 전 초기 보도에 나타난 수치를 보면, {fact_h}"
+                raw = f"공식 확인 전 초기 보도에 나타난 수치를 보면, {fact_stripped_h}"
             elif bucket == "fact":
                 raw = f"개정 법령에 따르면, {fact_h}" if not any(k in fact_h for k in ("법령", "특별법", "법률", "규정", "조례")) else fact_h
             else:
-                raw = f"집계된 수치에 따르면, {fact_h}"
+                raw = f"집계된 수치에 따르면, {fact_stripped_h}"
         elif role_slot == "hook_paradox":
-            fact_h = _to_kr_honorific(fact)
-            if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
-                fact_h = _soften_kr_reported_predicate(fact_h)
             q_short = cq_clean.rstrip("?").strip() if (cq_clean and 6 <= len(cq_clean.rstrip("?").strip()) <= 16) else "어디서 균열이 시작됐을까"
             if not q_short.endswith("?"):
                 q_short += "?"
-            if has_existing_pfx:
+            if has_bucket_qualifier:
                 raw = f"{q_short} {fact_h}"
             elif bucket == "final_judgment" and not any(p in fact for p in ["판결", "유죄", "선고"]):
-                raw = f"{q_short} 법원 판결에 따르면, {fact_h}"
+                raw = f"{q_short} 법원 판결에 따르면, {fact_stripped_h}"
             elif bucket == "audit_finding" and not any(p in fact for p in ["감사", "보고서"]):
-                raw = f"{q_short} 감사 보고서에 따르면, {fact_h}"
+                raw = f"{q_short} 감사 보고서에 따르면, {fact_stripped_h}"
             elif bucket == "indictment" and not any(p in fact for p in ["공소", "기소"]):
-                raw = f"{q_short} 검찰 공소장에 따르면, {fact_h}"
+                raw = f"{q_short} 검찰 공소장에 따르면, {fact_stripped_h}"
             elif bucket == "court_record" and not any(p in fact for p in ["법원", "기록"]):
-                raw = f"{q_short} 법원 접수 기록에 따르면, {fact_h}"
+                raw = f"{q_short} 법원 접수 기록에 따르면, {fact_stripped_h}"
             elif bucket == "alleged_regulator":
-                if not any(fact_h.startswith(p) for p in ["정부 발표에 따르면", "규제 당국에 따르면", "당국에 따르면", "공식 발표에 따르면", "관계 기관"]):
-                    raw = f"{q_short} 정부 발표에 따르면, {fact_h}"
-                else:
-                    raw = f"{q_short} {fact_h}"
+                raw = f"{q_short} 정부 발표에 따르면, {fact_stripped_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                if not any(p in fact_h for p in ["보도에 따르면", "취재에 따르면", "보도됐다", "전해졌다", "보도됐습니다", "전해졌습니다"]):
-                    raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
-                else:
-                    raw = f"{q_short} {fact_h}"
+                raw = f"{q_short} 언론 보도에 따르면, {fact_stripped_h}"
             elif bucket == "settled" and "합의" not in fact:
-                raw = f"{q_short} {fact_h} (책임을 인정하지 않고 합의됨)."
+                raw = f"{q_short} {fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                if not any(p in fact_h for p in ["공식 확인 전", "검증 전", "미확인"]):
-                    raw = f"{q_short} 공식 확인 전 초기 보도에 따르면, {fact_h}"
-                else:
-                    raw = f"{q_short} {fact_h}"
+                raw = f"{q_short} 공식 확인 전 초기 보도에 따르면, {fact_stripped_h}"
             else:
-                raw = f"{q_short} {fact_h}"
+                raw = f"{q_short} {fact_stripped_h}"
         else:
-            fact_h = _to_kr_honorific(fact)
-            if vs == "unverified_secondary" or bucket in ("unverified", "alleged", "press_charge"):
-                fact_h = _soften_kr_reported_predicate(fact_h, slot_idx=slot_idx)
-
             if role_slot == "aftermath":
                 if bucket == "alleged_regulator":
                     reg_aftermath = [
-                        f"정부 공식 발표에 따른 제도 개선 과정에서, {fact_h}",
-                        f"관계 당국 발표에 따른 사후 대책 단계에서, {fact_h}",
-                        f"정부 및 관계 기관의 제도 보완 국면에서, {fact_h}",
-                        f"당국 공식 발표에 따른 피해 회복 추진 과정에서, {fact_h}",
-                        f"공식 발표에 나타난 재발 방지 대책 단계에서, {fact_h}",
+                        f"정부 공식 발표에 따른 제도 개선 과정에서, {fact_stripped_h}",
+                        f"관계 당국 발표에 따른 사후 대책 단계에서, {fact_stripped_h}",
+                        f"정부 및 관계 기관의 제도 보완 국면에서, {fact_stripped_h}",
+                        f"당국 공식 발표에 따른 피해 회복 추진 과정에서, {fact_stripped_h}",
+                        f"공식 발표에 나타난 재발 방지 대책 단계에서, {fact_stripped_h}",
                     ]
                     raw = reg_aftermath[v_idx]
                 elif bucket == "audit_finding":
                     audit_aftermath = [
-                        f"감사원 감사 보고서에 따른 점검 단계에서, {fact_h}",
-                        f"공식 감사 결과에 따른 사후 시정 국면에서, {fact_h}",
-                        f"감사 보고서에 나타난 제도 개선 과정에서, {fact_h}",
-                        f"감사 결과 및 점검에 따른 보완 단계에서, {fact_h}",
-                        f"감사원 점검 기록에 따른 관리 감독 국면에서, {fact_h}",
+                        f"감사원 감사 보고서에 따른 점검 단계에서, {fact_stripped_h}",
+                        f"공식 감사 결과에 따른 사후 시정 국면에서, {fact_stripped_h}",
+                        f"감사 보고서에 나타난 제도 개선 과정에서, {fact_stripped_h}",
+                        f"감사 결과 및 점검에 따른 보완 단계에서, {fact_stripped_h}",
+                        f"감사원 점검 기록에 따른 관리 감독 국면에서, {fact_stripped_h}",
                     ]
                     raw = audit_aftermath[v_idx]
                 elif bucket == "indictment":
-                    raw = f"검찰 공소장에 따른 수사 마무리 단계에서, {fact_h}"
+                    raw = f"검찰 공소장에 따른 수사 마무리 단계에서, {fact_stripped_h}"
                 elif bucket == "court_record":
-                    raw = f"법원 접수 기록에 따른 사후 정리 과정에서, {fact_h}"
+                    raw = f"법원 접수 기록에 따른 사후 정리 과정에서, {fact_stripped_h}"
                 elif bucket == "final_judgment":
-                    raw = f"법원 확정 판결에 따른 최종 심판 단계에서, {fact_h}"
+                    raw = f"법원 확정 판결에 따른 최종 심판 단계에서, {fact_stripped_h}"
                 elif bucket == "criminal_complaint":
-                    raw = f"제출된 소장에 따른 법적 검토 단계에서, {fact_h}"
+                    raw = f"제출된 소장에 따른 법적 검토 단계에서, {fact_stripped_h}"
                 elif bucket == "proposed":
-                    raw = f"추진 중인 정책 방침에 따른 제도화 과정에서, {fact_h}"
+                    raw = f"추진 중인 정책 방침에 따른 제도화 과정에서, {fact_stripped_h}"
                 elif bucket == "settled":
-                    raw = f"공식 합의에 따른 제도 보완 국면에서, {fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
+                    raw = f"공식 합의에 따른 제도 보완 국면에서, {fact_stripped_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
                 elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
                     unv_aftermath = [
-                        f"공식 확인 전 초기 보도에 따른 사후 분석에서, {fact_h}",
-                        f"검증 전 보도 내용에 따른 사후 점검 국면에서, {fact_h}",
-                        f"미확인 초기 보도에 따른 사태 수습 논의에서, {fact_h}",
-                        f"추가 검증 전 언론 보도에 따른 후속 과제 검토에서, {fact_h}",
-                        f"공식 확인되지 않은 초기 보도에 따른 사후 평가에서, {fact_h}",
+                        f"공식 확인 전 초기 보도에 따른 사후 분석에서, {fact_stripped_h}",
+                        f"검증 전 보도 내용에 따른 사후 점검 국면에서, {fact_stripped_h}",
+                        f"미확인 초기 보도에 따른 사태 수습 논의에서, {fact_stripped_h}",
+                        f"추가 검증 전 언론 보도에 따른 후속 과제 검토에서, {fact_stripped_h}",
+                        f"공식 확인되지 않은 초기 보도에 따른 사후 평가에서, {fact_stripped_h}",
                     ]
                     raw = unv_aftermath[v_idx]
                 elif bucket in ("alleged", "press_charge"):
                     alleged_aftermath = [
-                        f"언론 보도에 따른 사태 수습 과정에서, {fact_h}",
-                        f"보도에 나타난 피해 구제와 수습 논의에서, {fact_h}",
-                        f"취재를 통해 전해진 사후 대응 과정에서, {fact_h}",
-                        f"언론 취재에 따른 후속 정리 국면에서, {fact_h}",
-                        f"보도에 나타난 제도적 과제와 수습 단계에서, {fact_h}",
+                        f"언론 보도에 따른 사태 수습 과정에서, {fact_stripped_h}",
+                        f"보도에 나타난 피해 구제와 수습 논의에서, {fact_stripped_h}",
+                        f"취재를 통해 전해진 사후 대응 과정에서, {fact_stripped_h}",
+                        f"언론 취재에 따른 후속 정리 국면에서, {fact_stripped_h}",
+                        f"보도에 나타난 제도적 과제와 수습 단계에서, {fact_stripped_h}",
                     ]
                     raw = alleged_aftermath[v_idx]
                 else:
                     aftermath_framings = [
-                        f"피해 회복과 제도 보완 국면에서, {fact_h}",
-                        f"사태 수습과 재발 방지 논의 과정에서, {fact_h}",
-                        f"사후 검증과 구조적 대책 단계에서, {fact_h}",
-                        f"제도적 평가와 시장 감시 과정에서, {fact_h}",
-                        f"후속 조사와 제도 개선 논의에서, {fact_h}",
+                        f"피해 회복과 제도 보완 국면에서, {fact_stripped_h}",
+                        f"사태 수습과 재발 방지 논의 과정에서, {fact_stripped_h}",
+                        f"사후 검증과 구조적 대책 단계에서, {fact_stripped_h}",
+                        f"제도적 평가와 시장 감시 과정에서, {fact_stripped_h}",
+                        f"후속 조사와 제도 개선 논의에서, {fact_stripped_h}",
                     ]
                     raw = aftermath_framings[v_idx]
             elif bucket == "settled":
-                raw = f"{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
+                raw = f"{fact_stripped_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
             elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
-                if has_existing_pfx and any(p in fact_h for p in ["미확인", "검증 전", "확인 전", "공식 확인 전", "추가 검증 전", "공식 확인되지 않은"]):
+                if has_bucket_qualifier:
                     raw = fact_h
                 else:
                     unv_leads = [
@@ -1108,9 +1125,9 @@ def _render_claim_sentence(
                         "공식 확인되지 않은 초기 보도를 보면, ",
                     ]
                     l_idx = slot_idx % len(unv_leads)
-                    raw = f"{unv_leads[l_idx]}{fact_h}"
+                    raw = f"{unv_leads[l_idx]}{fact_stripped_h}"
             elif bucket in ("alleged", "press_charge"):
-                if has_existing_pfx:
+                if has_bucket_qualifier:
                     raw = fact_h
                 else:
                     alleged_leads = [
@@ -1121,31 +1138,31 @@ def _render_claim_sentence(
                         "당시 언론 취재에 따르면, ",
                     ]
                     l_idx = slot_idx % len(alleged_leads)
-                    raw = f"{alleged_leads[l_idx]}{fact_h}"
+                    raw = f"{alleged_leads[l_idx]}{fact_stripped_h}"
             elif bucket == "alleged_regulator":
                 p_opts = ["정부 발표에 따르면, ", "관계 기관 공식 자료에 따르면, ", "규제 당국의 공식 발표에 따르면, ", "정부 및 관계 당국에 따르면, ", "당국의 공식 분석 자료를 보면, "]
-                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+                raw = fact_h if has_bucket_qualifier else f"{p_opts[v_idx]}{fact_stripped_h}"
             elif bucket == "audit_finding":
                 p_opts = ["감사 보고서에 따르면, ", "감사원 감사 보고서에 따르면, ", "공식 감사 및 점검 결과에 따르면, ", "감사 결과에 의하면, ", "공식 감사 기록에 의하면, "]
-                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+                raw = fact_h if has_bucket_qualifier else f"{p_opts[v_idx]}{fact_stripped_h}"
             elif bucket == "indictment":
                 p_opts = ["검찰 공소장에 따르면, ", "공소 사실에 의하면, ", "검찰 수사 및 공소 내용에 따르면, ", "기소장에 따르면, ", "검찰 기소 내용에 의하면, "]
-                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+                raw = fact_h if has_bucket_qualifier else f"{p_opts[v_idx]}{fact_stripped_h}"
             elif bucket == "court_record":
                 p_opts = ["법원 접수 기록에 따르면, ", "법원 문건에 따르면, ", "사법 기록에 따르면, ", "재판부 접수 기록에 따르면, ", "법원에 제출된 기록을 보면, "]
-                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+                raw = fact_h if has_bucket_qualifier else f"{p_opts[v_idx]}{fact_stripped_h}"
             elif bucket == "final_judgment":
                 p_opts = ["법원 확정 판결에 따르면, ", "법원 판결에 따르면, ", "사법부 판단에 따르면, ", "판결문에 의하면, ", "유죄 확정 판결에 따르면, "]
-                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+                raw = fact_h if has_bucket_qualifier else f"{p_opts[v_idx]}{fact_stripped_h}"
             elif bucket == "criminal_complaint":
                 p_opts = ["제출된 고발장에 따르면, ", "고소장 내용에 따르면, ", "소장을 통해 제기된 바에 따르면, ", "고발장에 의하면, ", "제출된 소장에 따르면, "]
-                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+                raw = fact_h if has_bucket_qualifier else f"{p_opts[v_idx]}{fact_stripped_h}"
             elif bucket == "proposed":
                 p_opts = ["추진 중인 정책 방침에 따르면, ", "입법 추진 초안에 따르면, ", "당국의 정책 검토 자료를 보면, ", "발의된 법안 초안에 따르면, ", "제도 추진 계획에 따르면, "]
-                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+                raw = fact_h if has_bucket_qualifier else f"{p_opts[v_idx]}{fact_stripped_h}"
             elif bucket == "fact":
                 rot = slot_idx % 2
-                if has_existing_pfx or rot == 1:
+                if has_bucket_qualifier or rot == 1:
                     raw = fact_h
                 else:
                     p_opts = [
@@ -1155,71 +1172,73 @@ def _render_claim_sentence(
                         "관련 법령의 규정에 따라, ",
                         "확립된 행정 기준에 따르면, ",
                     ]
-                    raw = f"{p_opts[v_idx]}{fact_h}"
+                    raw = f"{p_opts[v_idx]}{fact_stripped_h}"
             else:
                 raw = fact_h
 
     elif m == "JA":
+        fact_stripped, existing_pfx_ja = strip_attribution_prefix(fact, "JA")
+        fact_clean = fact_stripped if existing_pfx_ja else fact
         if role_slot == "hook_catalyst":
             if bucket == "final_judgment":
-                raw = f"{loc_topic}の重大な局面において、裁判所の確定判決によれば、{fact}。"
+                raw = f"{loc_topic}の重大な局面において、裁判所の確定判決によれば、{fact_clean}。"
             elif bucket == "audit_finding":
-                raw = f"{loc_topic}の発端において、監査報告書によれば、{fact}。"
+                raw = f"{loc_topic}の発端において、監査報告書によれば、{fact_clean}。"
             elif bucket == "indictment":
-                raw = f"急激な市場の危機において、起訴状の指摘によれば、{fact}。"
+                raw = f"急激な市場の危機において、起訴状の指摘によれば、{fact_clean}。"
             elif bucket == "court_record":
-                raw = f"{loc_topic}をめぐり、裁判所の記録によれば、{fact}。"
+                raw = f"{loc_topic}をめぐり、裁判所の記録によれば、{fact_clean}。"
             elif bucket == "alleged_regulator":
-                raw = f"{loc_topic}をめぐり、当局の公表によれば、{fact}。"
+                raw = f"{loc_topic}をめぐり、当局の公表によれば、{fact_clean}。"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"{loc_topic}をめぐり、報道によれば、{fact}。"
+                raw = f"{loc_topic}をめぐり、報道によれば、{fact_clean}。"
             elif bucket == "settled":
-                raw = f"{loc_topic}をめぐり、違法性を認めることなく和解に至りました：{fact}。"
+                raw = f"{loc_topic}をめぐり、違法性を認めることなく和解に至りました：{fact_clean}。"
             elif bucket == "unverified":
-                raw = f"未確認の初期報道によれば、{loc_topic}に関して{fact}。"
+                raw = f"未確認の初期報道によれば、{loc_topic}に関して{fact_clean}。"
             else:
-                raw = f"{loc_topic}をめぐり、{fact}。" if loc_topic and loc_topic not in fact else f"{fact}。"
+                raw = f"{loc_topic}をめぐり、{fact_clean}。" if loc_topic and loc_topic not in fact_clean else f"{fact_clean}。"
         elif role_slot == "hook_scale":
             if bucket == "final_judgment":
-                raw = f"確定判決の記録によれば、規模は{fact}。"
+                raw = f"確定判決の記録によれば、規模は{fact_clean}。"
             elif bucket == "audit_finding":
-                raw = f"監査報告書の指摘によれば、規模は{fact}。"
+                raw = f"監査報告書の指摘によれば、規模は{fact_clean}。"
             elif bucket == "indictment":
-                raw = f"起訴状の指摘によれば、規模は{fact}。"
+                raw = f"起訴状の指摘によれば、規模は{fact_clean}。"
             elif bucket == "court_record":
-                raw = f"裁判所の記録によれば、規模は{fact}。"
+                raw = f"裁判所の記録によれば、規模は{fact_clean}。"
             elif bucket == "alleged_regulator":
-                raw = f"当局の公表資料によれば、規模は{fact}。"
+                raw = f"当局の公表資料によれば、規模は{fact_clean}。"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"報道によれば、確認された規模として{fact}。"
+                raw = f"報道によれば、確認された規模として{fact_clean}。"
             elif bucket == "settled":
-                raw = f"合意規模として、{fact}（違法性を認めることなく和解）。"
+                raw = f"合意規模として、{fact_clean}（違法性を認めることなく和解）。"
             elif bucket == "unverified":
-                raw = f"未確認の初期報道によれば、規模は{fact}。"
+                raw = f"未確認の初期報道によれば、規模は{fact_clean}。"
             else:
-                raw = f"確認された規模として、{fact}。"
+                raw = f"確認された規模として、{fact_clean}。"
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean) <= 16) else "どこから綻びが始まったのか。"
             if not q_short.endswith(("か。", "？", "?")):
                 q_short = f"{q_short.rstrip(' 。')}か。"
-            if bucket == "final_judgment" and not any(p in fact for p in ["判決", "確定"]):
-                raw = f"{q_short} 裁判所の判決によれば、{fact}。"
-            elif bucket == "audit_finding" and not any(p in fact for p in ["監査", "検査"]):
-                raw = f"{q_short} 監査報告書によれば、{fact}。"
-            elif bucket == "indictment" and not any(p in fact for p in ["起訴", "検察"]):
-                raw = f"{q_short} 起訴状によれば、{fact}。"
-            elif bucket == "court_record" and not any(p in fact for p in ["裁判所", "記録"]):
-                raw = f"{q_short} 裁判所の記録によれば、{fact}。"
-            elif bucket == "alleged_regulator" and not any(p in fact for p in ["当局", "公表"]):
-                raw = f"{q_short} 当局の公表によれば、{fact}。"
-            elif bucket in ("alleged", "press_allegation", "press_charge") and "報道" not in fact:
-                raw = f"{q_short} 報道によれば、{fact}。"
-            elif bucket == "settled" and "和解" not in fact:
-                raw = f"{q_short} {fact}（違法性を認めることなく和解）。"
-            elif bucket == "unverified" and "未確認" not in fact:
-                raw = f"{q_short} 未確認の初期報道によれば、{fact}。"
+            if bucket == "final_judgment" and not any(p in fact_clean for p in ["判決", "確定"]):
+                raw = f"{q_short} 裁判所の判決によれば、{fact_clean}。"
+            elif bucket == "audit_finding" and not any(p in fact_clean for p in ["監査", "検査"]):
+                raw = f"{q_short} 監査報告書によれば、{fact_clean}。"
+            elif bucket == "indictment" and not any(p in fact_clean for p in ["起訴", "検察"]):
+                raw = f"{q_short} 起訴状によれば、{fact_clean}。"
+            elif bucket == "court_record" and not any(p in fact_clean for p in ["裁判所", "記録"]):
+                raw = f"{q_short} 裁判所の記録によれば、{fact_clean}。"
+            elif bucket == "alleged_regulator" and not any(p in fact_clean for p in ["当局", "公表"]):
+                raw = f"{q_short} 当局の公表によれば、{fact_clean}。"
+            elif bucket in ("alleged", "press_allegation", "press_charge") and "報道" not in fact_clean:
+                raw = f"{q_short} 報道によれば、{fact_clean}。"
+            elif bucket == "settled" and "和解" not in fact_clean:
+                raw = f"{q_short} {fact_clean}（違法性を認めることなく和解）。"
+            elif bucket == "unverified" and "未確認" not in fact_clean:
+                raw = f"{q_short} 未確認の初期報道によれば、{fact_clean}。"
             else:
-                raw = f"{q_short} {fact}。"
+                raw = f"{q_short} {fact_clean}。"
         else:
             if bucket == "alleged_regulator":
                 p_opts = ["当局の発表によれば、", "公表資料によれば、", "監督当局の報告書によれば、", "公的機関の公表資料によれば、", "当局の公表によれば、"]
@@ -1246,76 +1265,78 @@ def _render_claim_sentence(
 
             pfx = p_opts[v_idx]
             if role_slot == "setup":
-                tails = [f"{fact}という点が初期から伝えられています。", f"{fact}との経緯が基礎資料に記されています。", f"{fact}という点が発端の文書で確認できます。", f"{fact}との内容が初期段階の記録に残されています。", f"{fact}という事実が資料の冒頭に挙げられています。"]
+                tails = [f"{fact_clean}という点が初期から伝えられています。", f"{fact_clean}との経緯が基礎資料に記されています。", f"{fact_clean}という点が発端の文書で確認できます。", f"{fact_clean}との内容が初期段階の記録に残されています。", f"{fact_clean}という事実が資料の冒頭に挙げられています。"]
             elif role_slot == "mechanism":
-                tails = [f"{fact}という実態が仕組みの記録に示されています。", f"{fact}との流れが取引の文書で確認できます。", f"{fact}という記述が詳細な記録に続きます。", f"{fact}との点が制度上の該当箇所に挙げられています。", f"{fact}という経緯が推移を追った文書に示されています。"]
+                tails = [f"{fact_clean}という実態が仕組みの記録に示されています。", f"{fact_clean}との流れが取引の文書で確認できます。", f"{fact_clean}という記述が詳細な記録に続きます。", f"{fact_clean}との点が制度上の該当箇所に挙げられています。", f"{fact_clean}という経緯が推移を追った文書に示されています。"]
             elif role_slot == "crack":
-                tails = [f"{fact}という内容が後続局面の資料に記されています。", f"{fact}との点が変化の表面化段階で見られます。", f"{fact}という事実が後続の公表記録に挙げられています。", f"{fact}との展開が一連の記録後半に示されています。", f"{fact}という事態が関係資料の後半で確認されます。"]
+                tails = [f"{fact_clean}という内容が後続局面の資料に記されています。", f"{fact_clean}との点が変化の表面化段階で見られます。", f"{fact_clean}という事実が後続の公表記録に挙げられています。", f"{fact_clean}との展開が一連の記録後半に示されています。", f"{fact_clean}という事態が関係資料の後半で確認されます。"]
             else:
-                tails = [f"{fact}という点が事後の整理資料に残されています。", f"{fact}との内容が経過をまとめた記録に続きます。", f"{fact}という状況が一連の末尾文書に記されています。", f"{fact}との事実が総括部分の記述に挙げられます。", f"{fact}という教訓が記録全体の結びとして残ります。"]
+                tails = [f"{fact_clean}という点が事後の整理資料に残されています。", f"{fact_clean}との内容が経過をまとめた記録に続きます。", f"{fact_clean}という状況が一連の末尾文書に記されています。", f"{fact_clean}との事実が総括部分の記述に挙げられます。", f"{fact_clean}という教訓が記録全体の結びとして残ります。"]
             raw = f"{pfx}{tails[v_idx]}"
 
     elif m == "VN":
+        fact_stripped, existing_pfx_vn = strip_attribution_prefix(fact, "VN")
+        fact_clean = fact_stripped if existing_pfx_vn else fact
         if role_slot == "hook_catalyst":
             if bucket == "final_judgment":
-                raw = f"Bước ngoặt trong {loc_topic}: Theo phán quyết của tòa án, {fact}."
+                raw = f"Bước ngoặt trong {loc_topic}: Theo phán quyết của tòa án, {fact_clean}."
             elif bucket == "audit_finding":
-                raw = f"Trong cuộc thanh tra {loc_topic}: Theo kết luận thanh tra, {fact}."
+                raw = f"Trong cuộc thanh tra {loc_topic}: Theo kết luận thanh tra, {fact_clean}."
             elif bucket == "indictment":
-                raw = f"Trong cuộc khủng hoảng {loc_topic}, Theo cáo trạng của cơ quan công tố, {fact}."
+                raw = f"Trong cuộc khủng hoảng {loc_topic}, Theo cáo trạng của cơ quan công tố, {fact_clean}."
             elif bucket == "court_record":
-                raw = f"Trong vụ việc {loc_topic}: Theo hồ sơ tại tòa án, {fact}."
+                raw = f"Trong vụ việc {loc_topic}: Theo hồ sơ tại tòa án, {fact_clean}."
             elif bucket == "alleged_regulator":
-                raw = f"Trong vụ việc {loc_topic}: Theo cơ quan chức năng, {fact}."
+                raw = f"Trong vụ việc {loc_topic}: Theo cơ quan chức năng, {fact_clean}."
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"Trong bối cảnh {loc_topic}, theo phản ánh của báo chí, {fact}."
+                raw = f"Trong bối cảnh {loc_topic}, theo phản ánh của báo chí, {fact_clean}."
             elif bucket == "settled":
-                raw = f"Vụ việc {loc_topic} khép lại bằng thỏa thuận dàn xếp: {fact}."
+                raw = f"Vụ việc {loc_topic} khép lại bằng thỏa thuận dàn xếp: {fact_clean}."
             elif bucket == "unverified":
-                raw = f"Theo thông tin bước đầu chưa kiểm chứng về {loc_topic}: {fact}."
+                raw = f"Theo thông tin bước đầu chưa kiểm chứng về {loc_topic}: {fact_clean}."
             else:
-                raw = f"Trong bối cảnh {loc_topic}, {fact}." if loc_topic and loc_topic not in fact else f"{fact}."
+                raw = f"Trong bối cảnh {loc_topic}, {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"{fact_clean}."
         elif role_slot == "hook_scale":
             if bucket == "final_judgment":
-                raw = f"Theo bản án có hiệu lực, quy mô xác nhận: {fact}."
+                raw = f"Theo bản án có hiệu lực, quy mô xác nhận: {fact_clean}."
             elif bucket == "audit_finding":
-                raw = f"Báo cáo kiểm toán xác định quy mô: {fact}."
+                raw = f"Báo cáo kiểm toán xác định quy mô: {fact_clean}."
             elif bucket == "indictment":
-                raw = f"Hồ sơ truy tố xác nhận quy mô: {fact}."
+                raw = f"Hồ sơ truy tố xác nhận quy mô: {fact_clean}."
             elif bucket == "court_record":
-                raw = f"Theo hồ sơ tại tòa án, quy mô xác nhận: {fact}."
+                raw = f"Theo hồ sơ tại tòa án, quy mô xác nhận: {fact_clean}."
             elif bucket == "alleged_regulator":
-                raw = f"Theo cơ quan quản lý, quy mô xác nhận: {fact}."
+                raw = f"Theo cơ quan quản lý, quy mô xác nhận: {fact_clean}."
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"Theo thông tin báo chí, quy mô xác nhận: {fact}."
+                raw = f"Theo thông tin báo chí, quy mô xác nhận: {fact_clean}."
             elif bucket == "settled":
-                raw = f"Quy mô xử lý xác nhận: {fact} (dàn xếp mà không thừa nhận sai phạm)."
+                raw = f"Quy mô xử lý xác nhận: {fact_clean} (dàn xếp mà không thừa nhận sai phạm)."
             elif bucket == "unverified":
-                raw = f"Theo phản ánh ban đầu chưa kiểm chứng, quy mô ước tính: {fact}."
+                raw = f"Theo phản ánh ban đầu chưa kiểm chứng, quy mô ước tính: {fact_clean}."
             else:
-                raw = f"Quy mô xác nhận: {fact}."
+                raw = f"Quy mô xác nhận: {fact_clean}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Đâu là nguyên nhân cốt lõi?"
             if not q_short.endswith("?"):
                 q_short += "?"
-            if bucket == "final_judgment" and not any(p in fact for p in ["tòa", "phán quyết", "bản án"]):
-                raw = f"{q_short} Theo phán quyết của tòa án, {fact}."
-            elif bucket == "audit_finding" and not any(p in fact for p in ["kiểm toán", "thanh tra"]):
-                raw = f"{q_short} Theo kết luận thanh tra, {fact}."
-            elif bucket == "indictment" and not any(p in fact for p in ["truy tố", "cáo trạng"]):
-                raw = f"{q_short} Theo cáo trạng của cơ quan công tố, {fact}."
-            elif bucket == "court_record" and not any(p in fact for p in ["tòa án", "hồ sơ tại tòa"]):
-                raw = f"{q_short} Theo hồ sơ tại tòa án, {fact}."
-            elif bucket == "alleged_regulator" and not any(p in fact for p in ["cơ quan", "thanh tra", "công bố"]):
-                raw = f"{q_short} Theo cơ quan chức năng, {fact}."
-            elif bucket in ("alleged", "press_allegation", "press_charge") and "báo chí" not in fact.lower():
-                raw = f"{q_short} Theo thông tin báo chí phản ánh, {fact}."
-            elif bucket == "settled" and not any(p in fact for p in ["dàn xếp", "hòa giải"]):
-                raw = f"{q_short} {fact} (thỏa thuận dàn xếp không thừa nhận sai phạm)."
-            elif bucket == "unverified" and "chưa kiểm chứng" not in fact:
-                raw = f"{q_short} Theo thông tin bước đầu chưa kiểm chứng, {fact}."
+            if bucket == "final_judgment" and not any(p in fact_clean for p in ["tòa", "phán quyết", "bản án"]):
+                raw = f"{q_short} Theo phán quyết của tòa án, {fact_clean}."
+            elif bucket == "audit_finding" and not any(p in fact_clean for p in ["kiểm toán", "thanh tra"]):
+                raw = f"{q_short} Theo kết luận thanh tra, {fact_clean}."
+            elif bucket == "indictment" and not any(p in fact_clean for p in ["truy tố", "cáo trạng"]):
+                raw = f"{q_short} Theo cáo trạng của cơ quan công tố, {fact_clean}."
+            elif bucket == "court_record" and not any(p in fact_clean for p in ["tòa án", "hồ sơ tại tòa"]):
+                raw = f"{q_short} Theo hồ sơ tại tòa án, {fact_clean}."
+            elif bucket == "alleged_regulator" and not any(p in fact_clean for p in ["cơ quan", "thanh tra", "công bố"]):
+                raw = f"{q_short} Theo cơ quan chức năng, {fact_clean}."
+            elif bucket in ("alleged", "press_allegation", "press_charge") and "báo chí" not in fact_clean.lower():
+                raw = f"{q_short} Theo thông tin báo chí phản ánh, {fact_clean}."
+            elif bucket == "settled" and not any(p in fact_clean for p in ["dàn xếp", "hòa giải"]):
+                raw = f"{q_short} {fact_clean} (thỏa thuận dàn xếp không thừa nhận sai phạm)."
+            elif bucket == "unverified" and "chưa kiểm chứng" not in fact_clean:
+                raw = f"{q_short} Theo thông tin bước đầu chưa kiểm chứng, {fact_clean}."
             else:
-                raw = f"{q_short} {fact}."
+                raw = f"{q_short} {fact_clean}."
         else:
             if bucket == "alleged_regulator":
                 p_opts = ["Theo cơ quan chức năng, ", "Theo báo cáo từ cơ quan quản lý, ", "Theo kết luận từ cơ quan chuyên môn, ", "Theo công bố của cơ quan thanh tra, ", "Theo ghi nhận của các cơ quan quản lý, "]
@@ -1342,76 +1363,78 @@ def _render_claim_sentence(
 
             pfx = p_opts[v_idx]
             if role_slot == "setup":
-                tails = [f"việc {fact} đã được tài liệu ghi nhận rõ.", f"{fact}, đặt nền tảng ban đầu cho toàn bộ chuỗi giao dịch.", f"dữ liệu khởi đầu cho thấy {fact}, mở ra diễn biến phức tạp tiếp theo.", f"{fact}, tạo tiền đề cho các diễn biến tiếp theo.", f"những ghi chép mở đầu xác nhận việc {fact} trước khi sự việc mở rộng."]
+                tails = [f"việc {fact_clean} đã được tài liệu ghi nhận rõ.", f"{fact_clean}, đặt nền tảng ban đầu cho toàn bộ chuỗi giao dịch.", f"dữ liệu khởi đầu cho thấy {fact_clean}, mở ra diễn biến phức tạp tiếp theo.", f"{fact_clean}, tạo tiền đề cho các diễn biến tiếp theo.", f"những ghi chép mở đầu xác nhận việc {fact_clean} trước khi sự việc mở rộng."]
             elif role_slot == "mechanism":
-                tails = [f"khi xem xét chi tiết cơ chế, việc {fact} được tài liệu ghi nhận cụ thể.", f"{fact}, thể hiện áp lực tài chính trong giai đoạn này.", f"phân tích chuỗi dòng tiền cho thấy {fact}, tạo nút thắt lớn cho thanh khoản.", f"{fact}, tạo ra kẽ hở trong quản lý và giám sát.", f"theo trình tự dữ liệu công bố, {fact} là mắt xích dẫn đến sai phạm."]
+                tails = [f"khi xem xét chi tiết cơ chế, việc {fact_clean} được tài liệu ghi nhận cụ thể.", f"{fact_clean}, thể hiện áp lực tài chính trong giai đoạn này.", f"phân tích chuỗi dòng tiền cho thấy {fact_clean}, tạo nút thắt lớn cho thanh khoản.", f"{fact_clean}, tạo ra kẽ hở trong quản lý và giám sát.", f"theo trình tự dữ liệu công bố, {fact_clean} là mắt xích dẫn đến sai phạm."]
             elif role_slot == "crack":
-                tails = [f"ở bước ngoặt điều tra tiếp theo, hồ sơ xác định việc {fact} có dấu hiệu bất thường.", f"{fact}, dẫn tới các biện pháp xử lý và can thiệp từ cơ quan chức năng.", f"các ghi nhận công khai sau đó cho thấy {fact}, buộc các bên phải vào cuộc.", f"{fact}, phơi bày sai phạm trong quản trị.", f"hồ sơ điều tra giai đoạn này ghi nhận việc {fact} như một chứng cứ then chốt."]
+                tails = [f"ở bước ngoặt điều tra tiếp theo, hồ sơ xác định việc {fact_clean} có dấu hiệu bất thường.", f"{fact_clean}, dẫn tới các biện pháp xử lý và can thiệp từ cơ quan chức năng.", f"các ghi nhận công khai sau đó cho thấy {fact_clean}, buộc các bên phải vào cuộc.", f"{fact_clean}, phơi bày sai phạm trong quản trị.", f"hồ sơ điều tra giai đoạn này ghi nhận việc {fact_clean} như một chứng cứ then chốt."]
             else:
-                tails = [f"trong phần tổng kết hồ sơ, tài liệu nêu rõ việc {fact} đã để lại tổn thất lớn.", f"{fact}, để lại hệ quả pháp lý và nghĩa vụ tài chính kéo dài.", f"các kết luận sau sự kiện tiếp tục khẳng định việc {fact} là bài học quản trị đắt giá.", f"{fact}, trở thành bài học cảnh báo sâu sắc cho thị trường.", f"nhìn lại toàn bộ chuỗi chứng cứ, hồ sơ chỉ rõ việc {fact} khó có thể đảo ngược."]
+                tails = [f"trong phần tổng kết hồ sơ, tài liệu nêu rõ việc {fact_clean} đã để lại tổn thất lớn.", f"{fact_clean}, để lại hệ quả pháp lý và nghĩa vụ tài chính kéo dài.", f"các kết luận sau sự kiện tiếp tục khẳng định việc {fact_clean} là bài học quản trị đắt giá.", f"{fact_clean}, trở thành bài học cảnh báo sâu sắc cho thị trường.", f"nhìn lại toàn bộ chuỗi chứng cứ, hồ sơ chỉ rõ việc {fact_clean} khó có thể đảo ngược."]
             raw = f"{pfx}{tails[v_idx]}"
 
     else:  # EN
+        fact_stripped, existing_pfx_en = strip_attribution_prefix(fact, "EN")
+        fact_clean = fact_stripped if existing_pfx_en else fact
         if role_slot == "hook_catalyst":
             if bucket == "final_judgment":
-                raw = f"Critical turning point in {loc_topic}: According to the court ruling, {fact}."
+                raw = f"Critical turning point in {loc_topic}: According to the court ruling, {fact_clean}."
             elif bucket == "audit_finding":
-                raw = f"Crisis trigger in {loc_topic}: According to the audit report, {fact}."
+                raw = f"Crisis trigger in {loc_topic}: According to the audit report, {fact_clean}."
             elif bucket == "indictment":
-                raw = f"Crisis trigger in {loc_topic}: According to the indictment, {fact}."
+                raw = f"Crisis trigger in {loc_topic}: According to the indictment, {fact_clean}."
             elif bucket == "court_record":
-                raw = f"Crisis trigger in {loc_topic}: According to court records, {fact}."
+                raw = f"Crisis trigger in {loc_topic}: According to court records, {fact_clean}."
             elif bucket == "alleged_regulator":
-                raw = f"Crisis trigger in {loc_topic}: According to regulatory filings, {fact}."
+                raw = f"Crisis trigger in {loc_topic}: According to regulatory filings, {fact_clean}."
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"Crisis trigger in {loc_topic}: According to press reports, {fact}."
+                raw = f"Crisis trigger in {loc_topic}: According to press reports, {fact_clean}."
             elif bucket == "settled":
-                raw = f"{loc_topic} concluded under terms of settlement: {fact}."
+                raw = f"{loc_topic} concluded under terms of settlement: {fact_clean}."
             elif bucket == "unverified":
-                raw = f"According to preliminary unconfirmed reports regarding {loc_topic}: {fact}."
+                raw = f"According to preliminary unconfirmed reports regarding {loc_topic}: {fact_clean}."
             else:
-                raw = f"Crisis trigger in {loc_topic}: {fact}." if loc_topic and loc_topic not in fact else f"Crisis trigger: {fact}."
+                raw = f"Crisis trigger in {loc_topic}: {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Crisis trigger: {fact_clean}."
         elif role_slot == "hook_scale":
             if bucket == "final_judgment":
-                raw = f"Judicial findings establish documented scale: {fact}."
+                raw = f"Judicial findings establish documented scale: {fact_clean}."
             elif bucket == "audit_finding":
-                raw = f"Audit findings establish documented scale: {fact}."
+                raw = f"Audit findings establish documented scale: {fact_clean}."
             elif bucket == "indictment":
-                raw = f"Charging documents state documented scale: {fact}."
+                raw = f"Charging documents state documented scale: {fact_clean}."
             elif bucket == "court_record":
-                raw = f"According to court records, documented scale reached: {fact}."
+                raw = f"According to court records, documented scale reached: {fact_clean}."
             elif bucket == "alleged_regulator":
-                raw = f"Regulatory filings establish documented scale: {fact}."
+                raw = f"Regulatory filings establish documented scale: {fact_clean}."
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"According to press reports, documented scale reached: {fact}."
+                raw = f"According to press reports, documented scale reached: {fact_clean}."
             elif bucket == "settled":
-                raw = f"Documented scale under resolved terms: {fact} (settled without admitting wrongdoing)."
+                raw = f"Documented scale under resolved terms: {fact_clean} (settled without admitting wrongdoing)."
             elif bucket == "unverified":
-                raw = f"Early unverified reports suggest documented scale: {fact}."
+                raw = f"Early unverified reports suggest documented scale: {fact_clean}."
             else:
-                raw = f"Verified scale: {fact}."
+                raw = f"Verified scale: {fact_clean}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Where did the structural tension begin?"
             if not q_short.endswith("?"):
                 q_short += "?"
-            if bucket == "final_judgment" and not any(p in fact.lower() for p in ["court", "ruling", "verdict"]):
-                raw = f"{q_short} According to the court ruling, {fact}."
-            elif bucket == "audit_finding" and not any(p in fact.lower() for p in ["audit", "inspector general"]):
-                raw = f"{q_short} According to the audit report, {fact}."
-            elif bucket == "indictment" and not any(p in fact.lower() for p in ["indictment", "prosecutors", "charging"]):
-                raw = f"{q_short} Charging documents state that {fact}."
-            elif bucket == "court_record" and not any(p in fact.lower() for p in ["court records", "docket", "filings"]):
-                raw = f"{q_short} According to court records, {fact}."
-            elif bucket == "alleged_regulator" and not any(p in fact.lower() for p in ["regulatory", "regulators", "filings"]):
-                raw = f"{q_short} According to regulatory filings, {fact}."
-            elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact.lower() for p in ["reports", "reported", "press"]):
-                raw = f"{q_short} According to press reports, {fact}."
-            elif bucket == "settled" and "settled" not in fact.lower():
-                raw = f"{q_short} {fact} (settled without admitting wrongdoing)."
-            elif bucket == "unverified" and "unverified" not in fact.lower():
-                raw = f"{q_short} Early unverified reports suggest that {fact}."
+            if bucket == "final_judgment" and not any(p in fact_clean.lower() for p in ["court", "ruling", "verdict"]):
+                raw = f"{q_short} According to the court ruling, {fact_clean}."
+            elif bucket == "audit_finding" and not any(p in fact_clean.lower() for p in ["audit", "inspector general"]):
+                raw = f"{q_short} According to the audit report, {fact_clean}."
+            elif bucket == "indictment" and not any(p in fact_clean.lower() for p in ["indictment", "prosecutors", "charging"]):
+                raw = f"{q_short} Charging documents state that {fact_clean}."
+            elif bucket == "court_record" and not any(p in fact_clean.lower() for p in ["court records", "docket", "filings"]):
+                raw = f"{q_short} According to court records, {fact_clean}."
+            elif bucket == "alleged_regulator" and not any(p in fact_clean.lower() for p in ["regulatory", "regulators", "filings"]):
+                raw = f"{q_short} According to regulatory filings, {fact_clean}."
+            elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact_clean.lower() for p in ["reports", "reported", "press"]):
+                raw = f"{q_short} According to press reports, {fact_clean}."
+            elif bucket == "settled" and "settled" not in fact_clean.lower():
+                raw = f"{q_short} {fact_clean} (settled without admitting wrongdoing)."
+            elif bucket == "unverified" and "unverified" not in fact_clean.lower():
+                raw = f"{q_short} Early unverified reports suggest that {fact_clean}."
             else:
-                raw = f"{q_short} {fact}."
+                raw = f"{q_short} {fact_clean}."
         else:
             if bucket == "alleged_regulator":
                 p_opts = [
@@ -1503,7 +1526,7 @@ def _render_claim_sentence(
                 ]
 
             pfx = p_opts[v_idx]
-            fact_clean = fact.strip().rstrip(". ")
+            fact_clean = fact_clean.strip().rstrip(". ")
             if pfx:
                 if pfx.rstrip().endswith("that") and fact_clean and fact_clean[0].isupper():
                     first_word = fact_clean.split()[0]
