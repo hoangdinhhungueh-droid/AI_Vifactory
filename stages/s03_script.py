@@ -342,7 +342,7 @@ def _to_kr_honorific(text: str) -> str:
         return f"{t_clean}."
 
     # Convert dangling quotation/reported connective endings (e.g. ~마련했다고 -> ~마련했다고 전해졌습니다.)
-    if re.search(r"(?:했다고|됐다고|있다고|없다고|된다고|한다고|다는|라는)$", t_clean):
+    if re.search(r"(?:했다고|됐다고|있다고|없다고|된다고|한다고|다는|라는|것으로|것으로도)$", t_clean):
         return f"{t_clean} 전해졌습니다."
 
     # Convert common mid-sentence conjunctive verbs into declarative past/present stems
@@ -395,8 +395,20 @@ def _soften_kr_reported_predicate(text: str) -> str:
         (r"전가했습니다\.$", "전가한 것으로 보도됐습니다."),
         (r"제공했습니다\.$", "제공한 것으로 전해졌습니다."),
         (r"회피했습니다\.$", "회피한 것으로 보도됐습니다."),
+        (r"발표했습니다\.$", "발표한 것으로 보도됐습니다."),
+        (r"확인됐습니다\.$", "확인된 것으로 보도됐습니다."),
+        (r"추진했습니다\.$", "추진한 것으로 전해졌습니다."),
+        (r"시행됩니다\.$", "시행되는 것으로 보도됐습니다."),
+        (r"시작됩니다\.$", "시작되는 것으로 전해졌습니다."),
+        (r"있었습니다\.$", "있었던 것으로 보도됐습니다."),
+        (r"없었습니다\.$", "없었던 것으로 보도됐습니다."),
+        (r"지원합니다\.$", "지원하는 것으로 전해졌습니다."),
+        (r"제공합니다\.$", "제공하는 것으로 전해졌습니다."),
         (r"했습니다\.$", "한 것으로 보도됐습니다."),
         (r"됐습니다\.$", "된 것으로 전해졌습니다."),
+        (r"합니다\.$", "하는 것으로 전해졌습니다."),
+        (r"입니다\.$", "인 것으로 전해졌습니다."),
+        (r"됩니다\.$", "되는 것으로 전해졌습니다."),
     ]
     for pat, rep in repls:
         if re.search(pat, t):
@@ -419,7 +431,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
         clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
 
-        cap = 40 if hook_mode else 110
+        cap = 45 if hook_mode else 110
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
@@ -428,7 +440,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             conj_repls = [
                 (r"하고$", "했다"), (r"하며$", "했다"), (r"되어$", "됐다"),
                 (r"되고$", "된다"), (r"이고$", "이다"), (r"으며$", "었다"), (r"고$", "다"),
-                (r"지만$", "으나")
+                (r"지만$", "다"), (r"으나$", "다"),
             ]
             for c_pat, c_rep in conj_repls:
                 if re.search(c_pat, head):
@@ -438,11 +450,17 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
                 return head
 
         if hook_mode:
-            k_words = clean.split()
-            if len(k_words) > 7:
-                candidate = " ".join(k_words[:3] + k_words[-3:]).rstrip(" ,;:")
-                if len(candidate) <= cap + 6 and candidate.endswith(("다", "했다", "됐다", "인다", "이다")):
-                    return candidate
+            compacted = clean
+            compacted = re.sub(r"저금리와\s*높은\s*전세보증금\s*비율을\s*이용한\s*", "", compacted)
+            compacted = re.sub(r"전세사기\s*피해자의\s*보증금\s*회복을\s*지원하는\s*", "피해자 지원 ", compacted)
+            compacted = re.sub(r"전세사기\s*피해자에\s*대한\s*", "", compacted)
+            compacted = re.sub(r"피해자로\s*인정된\s*임차인에게\s*", "피해자에게 ", compacted)
+            compacted = re.sub(r"최소보장금융\s*지원의\s*", "최소보장 ", compacted)
+            compacted = re.sub(r"손실\s*보증금의\s*", "손실 보증금 ", compacted)
+            compacted = re.sub(r"다가구·다세대\s*주택\s*개발자들이\s*", "빌라 개발자가 ", compacted)
+            compacted = re.sub(r"운영상\s*부족분과\s*향후\s*가격\s*하락\s*위험을\s*", "손실 위험을 ", compacted)
+            if len(compacted) <= cap:
+                return compacted
 
         trimmed = clean
         if trimmed.count("(") > trimmed.count(")"):
@@ -722,6 +740,8 @@ def _render_claim_sentence(
         ))
         if role_slot == "hook_catalyst":
             fact_h = _to_kr_honorific(fact)
+            if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
+                fact_h = _soften_kr_reported_predicate(fact_h)
             if has_existing_pfx:
                 raw = fact_h if (not loc_topic or loc_topic in fact_h or len(loc_topic) > 12) else f"{loc_topic} 사안에서, {fact_h}"
             elif bucket == "final_judgment":
@@ -744,6 +764,8 @@ def _render_claim_sentence(
                 raw = f"{loc_topic} 사안에서, {fact_h}" if loc_topic and loc_topic not in fact else fact_h
         elif role_slot == "hook_scale":
             fact_h = _to_kr_honorific(fact)
+            if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
+                fact_h = _soften_kr_reported_predicate(fact_h)
             if has_existing_pfx:
                 raw = fact_h
             elif bucket == "final_judgment":
@@ -757,7 +779,7 @@ def _render_claim_sentence(
             elif bucket == "alleged_regulator":
                 raw = f"규제 당국에 따르면, 집계된 수치는 {fact_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"언론 보도 집계에 따르면, {fact_h}"
+                raw = f"집계된 언론 보도를 보면, {fact_h}"
             elif bucket == "settled":
                 raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
@@ -766,6 +788,8 @@ def _render_claim_sentence(
                 raw = f"집계된 수치에 따르면, {fact_h}"
         elif role_slot == "hook_paradox":
             fact_h = _to_kr_honorific(fact)
+            if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
+                fact_h = _soften_kr_reported_predicate(fact_h)
             q_short = cq_clean if (cq_clean and 6 <= len(cq_clean) <= 16 and not cq_clean.endswith("?")) else "왜 못 막았을까?"
             if not q_short.endswith("?"):
                 q_short += "?"
@@ -784,47 +808,17 @@ def _render_claim_sentence(
                     raw = f"{q_short} 정부 발표에 따르면, {fact_h}"
                 else:
                     raw = f"{q_short} {fact_h}"
-            elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact for p in ["보도에 따르면", "취재에 따르면", "보도됐다", "전해졌다"]):
+            elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact for p in ["보도에 따르면", "취재에 따르면", "보도됐다", "전해졌다", "보도됐습니다", "전해졌습니다"]):
                 raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
             elif bucket == "settled" and "합의" not in fact:
                 raw = f"{q_short} {fact_h} (책임을 인정하지 않고 합의됨)."
-            elif bucket == "unverified" and "초기 보도" not in fact:
+            elif bucket == "unverified" and not any(p in fact for p in ["보도", "취재", "보도됐", "전해졌"]):
                 raw = f"{q_short} 초기 언론 보도에 따르면, {fact_h}"
             else:
                 raw = f"{q_short} {fact_h}"
         else:
-            if bucket == "alleged_regulator":
-                p_opts = ["정부 발표에 따르면, ", "관계 기관 공식 자료에 따르면, ", "규제 당국의 공식 발표에 따르면, ", "정부 및 관계 당국에 따르면, ", "당국의 공식 분석 자료를 보면, "]
-            elif bucket == "audit_finding":
-                p_opts = ["감사 보고서에 따르면, ", "감사원 감사 보고서에 따르면, ", "공식 감사 및 점검 결과에 따르면, ", "감사 결과에 의하면, ", "공식 감사 기록에 의하면, "]
-            elif bucket == "unverified":
-                p_opts = ["초기 언론 보도에 따르면, ", "취재 보도에 의하면, ", "언론 보도 내용에는, ", "공개된 초기 보도에 따르면, ", "언론사 취재 보도에 따르면, "]
-            elif bucket == "indictment":
-                p_opts = ["검찰 공소장에 따르면, ", "공소 사실에 의하면, ", "검찰 수사 및 공소 내용에 따르면, ", "기소장에 따르면, ", "검찰 기소 내용에 의하면, "]
-            elif bucket == "court_record":
-                p_opts = ["법원 접수 기록에 따르면, ", "법원 문건에 따르면, ", "사법 기록에 따르면, ", "재판부 접수 기록에 따르면, ", "법원에 제출된 기록을 보면, "]
-            elif bucket == "final_judgment":
-                p_opts = ["법원 확정 판결에 따르면, ", "법원 판결에 따르면, ", "사법부 판단에 따르면, ", "판결문에 의하면, ", "유죄 확정 판결에 따르면, "]
-            elif bucket == "criminal_complaint":
-                p_opts = ["제출된 고발장에 따르면, ", "고소장 내용에 따르면, ", "소장을 통해 제기된 바에 따르면, ", "고발장에 의하면, ", "제출된 소장에 따르면, "]
-            elif bucket == "settled":
-                p_opts = ["관계 기관과의 합의 내용에 따르면, ", "공식 합의 및 조정 기록을 보면, ", "과징금 납부와 함께 이뤄진 합의에 따르면, ", "행정 제재 및 합의 종결 기록에 따르면, ", "당사자 간 합의 종결 내용에 의하면, "]
-            elif bucket == "proposed":
-                p_opts = ["추진 중인 정책 방침에 따르면, ", "입법 추진 초안에 따르면, ", "당국의 정책 검토 자료를 보면, ", "발의된 법안 초안에 따르면, ", "제도 추진 계획에 따르면, "]
-            elif bucket == "fact":
-                p_opts = [
-                    "현행 법령 및 규정에 따르면, ",
-                    "공식 시행 법령에 따르면, ",
-                    "제도적 기준과 법률에 따르면, ",
-                    "관련 법령의 규정에 따라, ",
-                    "확립된 행정 기준에 따르면, ",
-                ]
-            else:  # alleged (press reporting)
-                p_opts = ["언론 보도에 따르면, ", "취재 보도에 의하면, ", "공개된 보도 내용에 따르면, ", "보도된 경위를 보면, ", "언론 취재 결과에 따르면, "]
-
-            pfx = "" if has_existing_pfx else p_opts[v_idx]
             fact_h = _to_kr_honorific(fact)
-            if vs == "unverified_secondary" and bucket in ("unverified", "alleged"):
+            if vs == "unverified_secondary" or bucket in ("unverified", "alleged", "press_charge"):
                 fact_h = _soften_kr_reported_predicate(fact_h)
 
             if role_slot == "aftermath":
@@ -835,11 +829,89 @@ def _render_claim_sentence(
                     f"제도적 평가와 시장 감시 과정에서, {fact_h}",
                     f"후속 조사와 제도 개선 논의에서, {fact_h}",
                 ]
-                raw = aftermath_framings[v_idx] if (has_existing_pfx or not pfx) else f"{pfx}{aftermath_framings[v_idx]}"
+                if has_existing_pfx or bucket in ("alleged", "unverified", "press_charge", "fact"):
+                    raw = aftermath_framings[v_idx]
+                elif bucket == "alleged_regulator":
+                    raw = f"정부 발표에 따르면, {aftermath_framings[v_idx]}"
+                elif bucket == "audit_finding":
+                    raw = f"감사 보고서에 따르면, {aftermath_framings[v_idx]}"
+                elif bucket == "indictment":
+                    raw = f"검찰 공소장에 따르면, {aftermath_framings[v_idx]}"
+                elif bucket == "court_record":
+                    raw = f"법원 접수 기록에 따르면, {aftermath_framings[v_idx]}"
+                elif bucket == "final_judgment":
+                    raw = f"법원 확정 판결에 따르면, {aftermath_framings[v_idx]}"
+                elif bucket == "criminal_complaint":
+                    raw = f"제출된 소장에 따르면, {aftermath_framings[v_idx]}"
+                elif bucket == "proposed":
+                    raw = f"추진 중인 정책 방침에 따르면, {aftermath_framings[v_idx]}"
+                elif bucket == "settled":
+                    raw = f"{aftermath_framings[v_idx].rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
+                else:
+                    raw = aftermath_framings[v_idx]
             elif bucket == "settled":
-                raw = f"{pfx}{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
+                raw = f"{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
+            elif bucket in ("alleged", "unverified", "press_charge"):
+                rot = slot_idx % 3
+                if has_existing_pfx:
+                    raw = fact_h
+                elif rot == 0:
+                    lead_opts = [
+                        "당시 언론 취재에 따르면, ",
+                        "취재 보도에 의하면, ",
+                        "언론 보도 내용에는, ",
+                        "보도된 경위를 보면, ",
+                        "언론 취재 결과에 따르면, ",
+                    ]
+                    raw = f"{lead_opts[v_idx]}{fact_h}"
+                elif rot == 1:
+                    connectors = ["실제로 ", "이 과정에서 ", "나아가 ", "그 결과 ", "한편 "]
+                    raw = f"{connectors[v_idx]}{fact_h}"
+                else:
+                    lead_opts = [
+                        "취재 기록을 보면, ",
+                        "초기 보도에 나타난 바에 따르면, ",
+                        "관련 보도 내용을 살펴보면, ",
+                        "당시 보도에 따르면, ",
+                        "언론 보도 집계에 따르면, ",
+                    ]
+                    raw = f"{lead_opts[v_idx]}{fact_h}"
+            elif bucket == "alleged_regulator":
+                p_opts = ["정부 발표에 따르면, ", "관계 기관 공식 자료에 따르면, ", "규제 당국의 공식 발표에 따르면, ", "정부 및 관계 당국에 따르면, ", "당국의 공식 분석 자료를 보면, "]
+                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+            elif bucket == "audit_finding":
+                p_opts = ["감사 보고서에 따르면, ", "감사원 감사 보고서에 따르면, ", "공식 감사 및 점검 결과에 따르면, ", "감사 결과에 의하면, ", "공식 감사 기록에 의하면, "]
+                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+            elif bucket == "indictment":
+                p_opts = ["검찰 공소장에 따르면, ", "공소 사실에 의하면, ", "검찰 수사 및 공소 내용에 따르면, ", "기소장에 따르면, ", "검찰 기소 내용에 의하면, "]
+                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+            elif bucket == "court_record":
+                p_opts = ["법원 접수 기록에 따르면, ", "법원 문건에 따르면, ", "사법 기록에 따르면, ", "재판부 접수 기록에 따르면, ", "법원에 제출된 기록을 보면, "]
+                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+            elif bucket == "final_judgment":
+                p_opts = ["법원 확정 판결에 따르면, ", "법원 판결에 따르면, ", "사법부 판단에 따르면, ", "판결문에 의하면, ", "유죄 확정 판결에 따르면, "]
+                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+            elif bucket == "criminal_complaint":
+                p_opts = ["제출된 고발장에 따르면, ", "고소장 내용에 따르면, ", "소장을 통해 제기된 바에 따르면, ", "고발장에 의하면, ", "제출된 소장에 따르면, "]
+                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+            elif bucket == "proposed":
+                p_opts = ["추진 중인 정책 방침에 따르면, ", "입법 추진 초안에 따르면, ", "당국의 정책 검토 자료를 보면, ", "발의된 법안 초안에 따르면, ", "제도 추진 계획에 따르면, "]
+                raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
+            elif bucket == "fact":
+                rot = slot_idx % 2
+                if has_existing_pfx or rot == 1:
+                    raw = fact_h
+                else:
+                    p_opts = [
+                        "현행 법령 및 규정에 따르면, ",
+                        "공식 시행 법령에 따르면, ",
+                        "제도적 기준과 법률에 따르면, ",
+                        "관련 법령의 규정에 따라, ",
+                        "확립된 행정 기준에 따르면, ",
+                    ]
+                    raw = f"{p_opts[v_idx]}{fact_h}"
             else:
-                raw = f"{pfx}{fact_h}"
+                raw = fact_h
 
     elif m == "JA":
         if role_slot == "hook_catalyst":
@@ -1928,6 +2000,11 @@ def run(ctx: RunContext) -> StageArtifact:
                                     ok_q, q_msg = _match_qual(ln.text, c_dict, market=market, peer_claims=line_peer_dicts)
                                     if not ok_q:
                                         qual_issues.append(f"{ln.line_id}:{cid}:{q_msg}")
+                    from stages.s04_critic_script import _detect_repetitive_explainer_filler
+                    has_filler = _detect_repetitive_explainer_filler(
+                        [{"text": ln.text, "claim_ids": ln.claim_ids} for _, _, lns in cand_beats],
+                        topic=topic,
+                    )
                     b1_dur_ok = b1_dur <= 24.5
                     b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and b1_dur_ok and not align_res.get("beat1_unverified_elevation"))
                     units_ok = u_min <= cand_units <= u_max
@@ -1939,9 +2016,10 @@ def run(ctx: RunContext) -> StageArtifact:
                         and lang_ok
                         and ent_ok
                         and not qual_issues
+                        and not has_filler
                         and align_res.get("passed", False)
                     )
-                    return passed, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res
+                    return passed, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler
 
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
@@ -1953,10 +2031,12 @@ def run(ctx: RunContext) -> StageArtifact:
                     fallback="claude-v4.1-flash",
                 )
                 llm_beats = _parse_and_build_llm_beats(raw_response)
-                passed_pre, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res = _eval_llm_beats(llm_beats)
+                passed_pre, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler = _eval_llm_beats(llm_beats)
 
                 if not passed_pre:
                     repair_notes: List[str] = []
+                    if has_filler:
+                        repair_notes.append("Repetitive attribution disclaimers or repetitive sentence openings detected. Vary sentence beginnings and qualify assertions naturally in sentence predicates (~한 것으로 보도됐습니다 / ~한 것으로 전해졌습니다).")
                     if not dur_ok or not units_ok:
                         if cand_timing["spoken_units"] < u_min:
                             shortfall = u_min - int(cand_timing["spoken_units"])
@@ -2015,7 +2095,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         fallback="claude-v4.1-flash",
                     )
                     llm_beats_retry = _parse_and_build_llm_beats(raw_retry)
-                    passed_retry, cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r = _eval_llm_beats(llm_beats_retry)
+                    passed_retry, cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r, has_filler_r = _eval_llm_beats(llm_beats_retry)
                     if passed_retry:
                         llm_beats = llm_beats_retry
                         cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok = cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r
