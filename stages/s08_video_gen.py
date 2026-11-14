@@ -407,9 +407,11 @@ def run(ctx: RunContext) -> StageArtifact:
             )
             if is_hermetic_test:
                 try:
+                    target_video.parent.mkdir(parents=True, exist_ok=True)
+                    test_dur = min(float(dur), 2.0)
                     cmd = [
                         ffmpeg_bin, "-y", "-f", "lavfi",
-                        "-i", f"color=c=0xF4F1EA:s=1920x1080:d={dur}:r={fps},noise=alls=20:allf=t+u",
+                        "-i", f"color=c=0xF4F1EA:s=1920x1080:d={test_dur}:r={fps},noise=alls=20:allf=t+u",
                         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                         str(target_video)
                     ]

@@ -111,6 +111,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
             if not tts_success:
                 # Fallback to ffmpeg audio tone (clean valid MP3 stream)
+                audio_file.parent.mkdir(parents=True, exist_ok=True)
                 from vox.ffmpeg_utils import get_ffmpeg_binary
                 ffmpeg_bin = get_ffmpeg_binary()
                 try:

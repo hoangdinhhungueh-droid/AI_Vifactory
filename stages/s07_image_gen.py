@@ -108,6 +108,7 @@ def run(ctx: RunContext) -> StageArtifact:
             elif not target_img.exists():
                 if is_hermetic_test:
                     # Create editorial placeholder frame via PIL ONLY for hermetic unit tests
+                    target_img.parent.mkdir(parents=True, exist_ok=True)
                     try:
                         from PIL import Image, ImageDraw
                         bg_color = "#F4F1EA"

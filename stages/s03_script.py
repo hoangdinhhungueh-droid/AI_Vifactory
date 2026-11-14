@@ -462,6 +462,58 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     return t
 
 
+def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
+    """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while preserving subject, metric, and predicate."""
+    cand = text.strip().rstrip(". ")
+    cand = re.sub(r"^[가-힣0-9a-zA-Z\s·]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에),?\s*", "", cand)
+    cand = re.sub(r"\b\d{4}년\s*", "", cand)
+    cand = re.sub(r"(?:와|과)\s*(?:관련|관계)\s*(?:기관|당국|부처)(?:이|가)?\s*", "가 ", cand)
+    cand = re.sub(r"(?:심사|검토|조사|점검|실사)\s*(?:및|과|와)\s*[가-힣\s]+?절차를\s*", "", cand)
+    cand = re.sub(r"총\s*(\d+[조억만\s]*원)\s*규모(?:의)?\s*", r"\1 ", cand)
+    cand = re.sub(r"(?:진행하고|추진하고|시행하고)\s*있다는\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다)", "추진을 발표했습니다", cand)
+    cand = re.sub(r"(?:다는|라는|고\s*있다는)?\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다|있었다|있었습니다)", "다고 발표했습니다", cand)
+
+    if len(cand) > max_chars:
+        cand = re.sub(r"\b\d{1,2}월\s*\d{1,2}일\s*", "", cand)
+        cand = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*대해\s*", "", cand)
+        cand = re.sub(r"([은는이가]\s)[가-힣\s]{2,20}?(?:과|와)\s+[가-힣\s]{2,20}?(?=\d)", r"\1", cand)
+        cand = re.sub(r"규모\s*[가-힣\s]+?(지원|대책|사업|수사|감사|과징금|환수)", r"\1", cand)
+        cand = re.sub(r"지원\s*대상\s*", "지원 ", cand)
+
+    if len(cand) > max_chars:
+        cand = re.sub(r"([가-힣](?:는|은|가|이))\s+[가-힣0-9a-zA-Z·]{2,15}?(?:에|에게)\s+(?=\d)", r"\1 ", cand)
+        cand = re.sub(r"(\d[가-힣]{1,5}\s(?:이|가|을|를))\s+[가-힣\s]{2,15}?(?:으로|로)\s*", r"\1 ", cand)
+        cand = re.sub(r"(\d[조억만\s]*원)\s*[가-힣\s]{2,15}?(지원|대책|사업|수사|감사|과징금|환수)", r"\1 \2", cand)
+        cand = re.sub(r"([은는이가]\s)[가-힣\s]{2,15}?(?=\d)", r"\1", cand)
+
+    if len(cand) > max_chars:
+        clauses = [c.strip() for c in re.split(r"[;—]|,\s*", cand) if c.strip()]
+        if len(clauses) > 1 and len(clauses[0]) <= max_chars:
+            cand = _to_kr_honorific(clauses[0])
+        else:
+            conn_m = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", cand)
+            if conn_m:
+                c_part = conn_m.group(1).strip()
+                for c_pat, c_rep in [
+                    (r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"),
+                    (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다"),
+                    (r"(?:았지만|었지만)$", "었다"), (r"이지만$", "이다"), (r"지만$", "다")
+                ]:
+                    c_part = re.sub(c_pat, c_rep, c_part)
+                cand = _to_kr_honorific(c_part)
+            else:
+                words = cand.split()
+                if len(words) > 5:
+                    cand = " ".join(words[:4] + [words[-1]])
+                    cand = _to_kr_honorific(cand)
+
+    cand = re.sub(r"\s+", " ", cand).strip()
+    cand = _to_kr_honorific(cand)
+    if not cand.endswith((".", "!", "?")):
+        cand += "."
+    return cand
+
+
 def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode: bool = False) -> str:
     """Bound clause length cleanly for beat tempo without bisecting parentheticals or dropping metrics."""
     clean = re.sub(r"\s+", " ", (text or "").strip()).rstrip(".。")
@@ -477,11 +529,12 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
 
         pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|의혹이\s*보도되었다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다)$"
         clean = re.sub(pat_kr, r"\1", clean)
-        clean = re.sub(r"(?:보도되었다|보도됐다|알려졌다|전해졌다)$", "", clean).strip()
+        clean = re.sub(r"(?:보도되었다|보도됐다|알려졌다|전해졌다|보도됐습니다|전해졌습니다|알려졌습니다)\.?$", "", clean).strip()
         clean = re.sub(r"([가-힣]+)한\s*것으로$", r"\1했다", clean)
         clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
         clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
         clean = re.sub(r"([가-힣]+)는\s*것으로$", r"\1는다", clean)
+        clean = re.sub(r"([가-힣]+)던\s*것으로$", r"\1다", clean)
 
         if hook_mode:
             # Generic Korean hook compaction (Rule 128 / Rule 132 compliant: zero case-study hardcodes)
@@ -514,9 +567,37 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             c_cand = re.sub(r"(\d{4}년\s*\d{1,2}월\s*\d{1,2}일)부터\s*전국에서", r"\1 전국에서", c_cand)
             c_cand = re.sub(r"(\d{4}년\s*\d{1,2}월\s*\d{1,2}일)부터", r"\1", c_cand)
 
-            # 6. Simplify compound modifier padding
-            c_cand = re.sub(r"최소\s*재정지원\s*", "지원 ", c_cand)
+            # Redundant agency padding: 'A와 관련 기관이' -> 'A가'
+            c_cand = re.sub(r"(?:와|과)\s*(?:관련|관계)\s*(?:기관|당국|부처)(?:이|가)?\s*", "가 ", c_cand)
 
+            # Procedural boilerplate: '심사 및 회수 절차를', '조사 및 점검 절차를'
+            c_cand = re.sub(r"(?:심사|검토|조사|점검)\s*(?:및|과|와)\s*[가-힣\s]+?절차를\s*", "", c_cand)
+
+            # Announce predicates: '진행하고 있다는 공식 발표가 나왔다' -> '추진을 발표했다'
+            c_cand = re.sub(r"(?:진행하고|추진하고|시행하고)\s*있다는\s*(?:공식\s*)?발표가\s*나왔다", "추진을 발표했다", c_cand)
+            c_cand = re.sub(r"(?:다는|라는|고\s*있다는)?\s*(?:공식\s*)?발표가\s*(?:나왔다|있었다)", "다고 발표했다", c_cand)
+            c_cand = re.sub(r"총\s*(\d+[조억만\s]*원)\s*규모의\s*", r"\1 규모 ", c_cand)
+
+            # 6. Simplify compound modifier padding
+            c_cand = re.sub(r"최소보장\s*(?:금융지원|재정지원|지원)\s*", "지원 ", c_cand)
+            c_cand = re.sub(r"최소\s*재정지원\s*", "지원 ", c_cand)
+            c_cand = re.sub(r"전국적(?:으로)?\s*", "", c_cand)
+
+            if len(c_cand) <= 45 and c_cand.endswith("다"):
+                return c_cand
+
+            # 7. Strip leading adnominal participle clauses modifying the main subject
+            c_cand = re.sub(r"^[가-힣\s]+?(?:이용한|활용한|통한|바탕으로\s*한|기반으로\s*한|따른)\s+", "", c_cand)
+            if len(c_cand) <= 45 and c_cand.endswith("다"):
+                return c_cand
+
+            # 8. Strip compound modifier noun phrases in predicate
+            c_cand = re.sub(r"(?<=[은는이가]\s)[가-힣\s]+?(?:과|와)\s+", "", c_cand)
+            if len(c_cand) <= 45 and c_cand.endswith("다"):
+                return c_cand
+
+            # 9. Strip year in hook if still exceeding cap
+            c_cand = re.sub(r"\b\d{4}년\s*", "", c_cand)
             if len(c_cand) <= 45 and c_cand.endswith("다"):
                 return c_cand
 
@@ -852,7 +933,7 @@ def _render_claim_sentence(
 
     if m == "KR":
         has_existing_pfx = bool(re.search(
-            r"^(?:[가-힣A-Za-z0-9·\s]+(?:보도에 따르면|보도에 의하면|보도는|취재에 따르면|기사에 따르면|보도 내용에 따르면|발표에 따르면|공소장에 따르면|판결에 따르면|기록에 따르면)|보도에 따르면|취재에 따르면|공개된 보도)",
+            r"^(?:[가-힣A-Za-z0-9·\s]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에)|보도에 따르면|취재에 따르면|공개된 보도|전해진 바에 따르면|[가-힣A-Za-z0-9·\s]{2,20}?(?:보고서|공소장|판결문|판결|소장|발표|조사|감사|공시)(?:는|은|에|에서))",
             fact
         ))
         if role_slot == "hook_catalyst":
@@ -902,7 +983,7 @@ def _render_claim_sentence(
             elif bucket == "settled":
                 raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"초기 언론 보도에 따르면, {fact_h}"
+                raw = f"초기 보도에 나타난 수치를 보면, {fact_h}"
             elif bucket == "fact":
                 raw = f"개정 법령에 따르면, {fact_h}" if not any(k in fact_h for k in ("법령", "특별법", "법률", "규정", "조례")) else fact_h
             else:
@@ -929,12 +1010,18 @@ def _render_claim_sentence(
                     raw = f"{q_short} 정부 발표에 따르면, {fact_h}"
                 else:
                     raw = f"{q_short} {fact_h}"
-            elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact for p in ["보도에 따르면", "취재에 따르면", "보도됐다", "전해졌다", "보도됐습니다", "전해졌습니다"]):
-                raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                if not any(p in fact_h for p in ["보도에 따르면", "취재에 따르면", "보도됐다", "전해졌다", "보도됐습니다", "전해졌습니다"]):
+                    raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
+                else:
+                    raw = f"{q_short} {fact_h}"
             elif bucket == "settled" and "합의" not in fact:
                 raw = f"{q_short} {fact_h} (책임을 인정하지 않고 합의됨)."
-            elif bucket == "unverified" and not any(p in fact for p in ["보도", "취재", "보도됐", "전해졌"]):
-                raw = f"{q_short} 초기 언론 보도에 따르면, {fact_h}"
+            elif bucket == "unverified":
+                if not any(p in fact_h for p in ["보도", "취재", "보도됐", "전해졌"]):
+                    raw = f"{q_short} 초기 보도에 따르면, {fact_h}"
+                else:
+                    raw = f"{q_short} {fact_h}"
             else:
                 raw = f"{q_short} {fact_h}"
         else:
@@ -944,9 +1031,23 @@ def _render_claim_sentence(
 
             if role_slot == "aftermath":
                 if bucket == "alleged_regulator":
-                    raw = f"정부 공식 발표에 따른 제도 개선 과정에서, {fact_h}"
+                    reg_aftermath = [
+                        f"정부 공식 발표에 따른 제도 개선 과정에서, {fact_h}",
+                        f"관계 당국 발표에 따른 사후 대책 단계에서, {fact_h}",
+                        f"정부 및 관계 기관의 제도 보완 국면에서, {fact_h}",
+                        f"당국 발표에 따른 피해 회복 추진 과정에서, {fact_h}",
+                        f"공식 발표에 나타난 재발 방지 대책 단계에서, {fact_h}",
+                    ]
+                    raw = reg_aftermath[v_idx]
                 elif bucket == "audit_finding":
-                    raw = f"감사원 감사 보고서에 따른 점검 단계에서, {fact_h}"
+                    audit_aftermath = [
+                        f"감사원 감사 보고서에 따른 점검 단계에서, {fact_h}",
+                        f"공식 감사 결과에 따른 사후 시정 국면에서, {fact_h}",
+                        f"감사 보고서에 나타난 제도 개선 과정에서, {fact_h}",
+                        f"사후 감사 및 점검에 따른 보완 단계에서, {fact_h}",
+                        f"감사원 점검 기록에 따른 관리 감독 국면에서, {fact_h}",
+                    ]
+                    raw = audit_aftermath[v_idx]
                 elif bucket == "indictment":
                     raw = f"검찰 공소장에 따른 수사 마무리 단계에서, {fact_h}"
                 elif bucket == "court_record":
@@ -960,9 +1061,23 @@ def _render_claim_sentence(
                 elif bucket == "settled":
                     raw = f"공식 합의에 따른 제도 보완 국면에서, {fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
                 elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
-                    raw = f"초기 언론 보도에 따른 사후 평가에서, {fact_h}"
+                    unv_aftermath = [
+                        f"초기 언론 보도에 따른 사후 평가에서, {fact_h}",
+                        f"전해진 보도 내용에 따른 사후 분석 단계에서, {fact_h}",
+                        f"초기 취재 내용에 나타난 사태 수습 과정에서, {fact_h}",
+                        f"일부 언론 보도에 따른 후속 과제 논의에서, {fact_h}",
+                        f"초기 보도에 나타난 사후 점검 국면에서, {fact_h}",
+                    ]
+                    raw = unv_aftermath[v_idx]
                 elif bucket in ("alleged", "press_charge"):
-                    raw = f"언론 보도에 따른 사태 수습 과정에서, {fact_h}"
+                    alleged_aftermath = [
+                        f"언론 보도에 따른 사태 수습 과정에서, {fact_h}",
+                        f"보도에 나타난 피해 구제와 수습 논의에서, {fact_h}",
+                        f"취재를 통해 전해진 사후 대응 과정에서, {fact_h}",
+                        f"언론 취재에 따른 후속 정리 국면에서, {fact_h}",
+                        f"보도에 나타난 제도적 과제와 수습 단계에서, {fact_h}",
+                    ]
+                    raw = alleged_aftermath[v_idx]
                 else:
                     aftermath_framings = [
                         f"피해 회복과 제도 보완 국면에서, {fact_h}",
@@ -1648,35 +1763,8 @@ def _build_grounded_story_beats(
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     elif m == "KR":
                         rem_clean = rem.strip()
-                        m_r = re.search(r"^(.*?(?:따르면|의하면|보면|기록에서|사안에서|자료에서|보고서에서|결과에서),)\s*(.*)$", rem_clean)
-                        if m_r:
-                            pfx_r = m_r.group(1).strip()
-                            fact_r = m_r.group(2).strip()
-                            if any(p in pfx_r for p in ("정부 발표", "언론 보도", "규제 당국", "당국에")):
-                                pfx_r = ""
-                        else:
-                            pfx_r = ""
-                            fact_r = rem_clean
-                        clauses_r = [c.strip() for c in re.split(r"[;—]|,\s*", fact_r) if c.strip()]
-                        conn_r = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", fact_r)
-                        if len(clauses_r) > 1 and 10 <= len(clauses_r[0]) <= 55:
-                            shrunk_r = _to_kr_honorific(clauses_r[0])
-                        elif conn_r and 10 <= len(conn_r.group(1)) <= 55:
-                            c_part = conn_r.group(1).strip()
-                            for c_pat, c_rep in [(r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"), (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다")]:
-                                c_part = re.sub(c_pat, c_rep, c_part)
-                            shrunk_r = _to_kr_honorific(c_part)
-                        else:
-                            r_words = fact_r.split()
-                            if len(r_words) > 5:
-                                head_part = " ".join(r_words[:3])
-                                tail_part = " ".join(r_words[-2:])
-                                head_part = re.sub(r"(?:의|에|에서|과|와|로|으로|를|을)$", "", head_part).strip()
-                                shrunk_r = _to_kr_honorific(f"{head_part} {tail_part}")
-                            else:
-                                shrunk_r = _to_kr_honorific(fact_r)
-                        rem_shrunk = f"{pfx_r} {shrunk_r}".strip()
-                        ln_cur.text = f"{q_text} {rem_shrunk}".strip()
+                        shrunk_r = _compact_kr_hook_line(rem_clean, max_chars=26)
+                        ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     else:
                         rem_words = rem.strip().split()
                         rem_shrunk = " ".join(rem_words[:8]).rstrip(" ,;:")
@@ -1718,39 +1806,35 @@ def _build_grounded_story_beats(
                                 shrunk_main += "。"
                             ln_cur.text = shrunk_main
                     else:  # KR
-                        m_m = re.search(r"^(.*?(?:따르면|의하면|보면|기록에서|사안에서|자료에서|보고서에서|결과에서),)\s*(.*)$", main_body)
-                        if m_m:
-                            pfx_m = m_m.group(1).strip()
-                            fact_m = m_m.group(2).strip()
-                        else:
-                            pfx_m = ""
-                            fact_m = main_body
-                        clauses_m = [c.strip() for c in re.split(r"[;—]|,\s*", fact_m) if c.strip()]
-                        conn_m = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", fact_m)
-                        smart_trimmed = _trim_clause_smart(fact_m, {}, "KR", hook_mode=True)
-                        if len(smart_trimmed) <= 45 and smart_trimmed.endswith(("다", "다.", "다!", "다?")):
-                            shrunk_m = _to_kr_honorific(smart_trimmed)
-                        elif len(clauses_m) > 1 and 10 <= len(clauses_m[0]) <= 55:
-                            shrunk_m = _to_kr_honorific(clauses_m[0])
-                        elif conn_m and 10 <= len(conn_m.group(1)) <= 55:
-                            c_part = conn_m.group(1).strip()
-                            for c_pat, c_rep in [(r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"), (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다")]:
-                                c_part = re.sub(c_pat, c_rep, c_part)
-                            shrunk_m = _to_kr_honorific(c_part)
-                        else:
-                            m_words = fact_m.split()
-                            if len(m_words) > 5:
-                                head_part = " ".join(m_words[:3])
-                                tail_part = " ".join(m_words[-2:])
-                                head_part = re.sub(r"(?:의|에|에서|과|와|로|으로|를|을)$", "", head_part).strip()
-                                shrunk_m = _to_kr_honorific(f"{head_part} {tail_part}")
-                            else:
-                                shrunk_m = _to_kr_honorific(fact_m)
-                        shrunk_main = f"{pfx_m} {shrunk_m}".strip()
+                        shrunk_main = _compact_kr_hook_line(main_body, max_chars=34)
                         if paren_suffix:
                             ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                         else:
                             ln_cur.text = f"{shrunk_main.rstrip('.')}."
+            b1_dur = float(
+                estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
+            )
+
+    if b1_dur > 24.0 and m == "KR":
+        for idx in (2, 1, 0):
+            if b1_dur <= 24.0:
+                break
+            ln_cur = raw_beats[0][2][idx]
+            cur_t = ln_cur.text
+            if idx == 2 and any(sep in cur_t for sep in ("?", "？")):
+                sep_used = "？" if "？" in cur_t else "?"
+                q_part, _, rem = cur_t.partition(sep_used)
+                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=20)
+                ln_cur.text = f"{q_part.strip()}{sep_used} {shrunk_r}".strip()
+            else:
+                paren_match = re.search(r"\s*(\([^()]+\))\s*[.。!?]?$", cur_t)
+                paren_suffix = paren_match.group(1) if paren_match else ""
+                main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
+                shrunk_main = _compact_kr_hook_line(main_body, max_chars=26)
+                if paren_suffix:
+                    ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
+                else:
+                    ln_cur.text = f"{shrunk_main.rstrip('.')}."
             b1_dur = float(
                 estimate_script_speech_duration([ln.text for ln in raw_beats[0][2]], market=m, docudrama_tempo=True)["estimated_duration_sec"]
             )

@@ -42,7 +42,7 @@ DEFAULT_MCP2_TOKEN = os.getenv("VPS_MCP2_TOKEN")
 DEFAULT_CF_ID = os.getenv("CF_ACCESS_CLIENT_ID")
 DEFAULT_CF_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET")
 
-# Primary endpoint is AG (operational), secondary fallback is MCP2
+# Primary endpoint is AG (operational)
 ENDPOINTS = [
     {
         "name": "ag",
