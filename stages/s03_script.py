@@ -469,7 +469,8 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         if hook_mode:
             compacted = clean
             compacted = re.sub(r"저금리와\s*높은\s*전세보증금\s*비율을\s*이용한\s*", "", compacted)
-            compacted = re.sub(r"전세사기\s*피해자의\s*보증금\s*(?:회복|회수)를\s*지원하는\s*", "피해자 지원 ", compacted)
+            compacted = re.sub(r"전세사기\s*피해자의\s*보증금\s*(?:회복|회수)를\s*(?:지원하는|국가가\s*보장하는)\s*", "", compacted)
+            compacted = re.sub(r"전세사기\s*피해자\s*", "", compacted)
             compacted = re.sub(r"전세사기\s*피해자에\s*대한\s*", "", compacted)
             compacted = re.sub(r"보증금\s*최소\s*금융지원\s*", "최소보장 지원 ", compacted)
             compacted = re.sub(r"피해자로\s*인정된\s*임차인에게\s*", "피해자에게 ", compacted)
@@ -847,8 +848,17 @@ def _render_claim_sentence(
                     f"제도적 평가와 시장 감시 과정에서, {fact_h}",
                     f"후속 조사와 제도 개선 논의에서, {fact_h}",
                 ]
-                if has_existing_pfx or bucket in ("alleged", "unverified", "press_charge", "fact"):
+                if has_existing_pfx:
                     raw = aftermath_framings[v_idx]
+                elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
+                    unv_aft_leads = [
+                        "취재 보도에 따르면, ",
+                        "언론 보도 분석에서, ",
+                        "관련 취재 기록을 보면, ",
+                        "당시 언론 보도에 따르면, ",
+                        "언론 취재 결과에 의하면, ",
+                    ]
+                    raw = f"{unv_aft_leads[v_idx % len(unv_aft_leads)]}{aftermath_framings[v_idx]}"
                 elif bucket == "alleged_regulator":
                     raw = f"정부 발표에 따르면, {aftermath_framings[v_idx]}"
                 elif bucket == "audit_finding":
@@ -869,7 +879,23 @@ def _render_claim_sentence(
                     raw = aftermath_framings[v_idx]
             elif bucket == "settled":
                 raw = f"{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
-            elif bucket in ("alleged", "unverified", "press_charge"):
+            elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
+                if has_existing_pfx:
+                    raw = fact_h
+                else:
+                    unv_leads = [
+                        "당시 언론 취재에 따르면, ",
+                        "취재 보도에 의하면, ",
+                        "보도된 사실관계를 보면, ",
+                        "언론사 취재 결과에 따르면, ",
+                        "초기 언론 보도에 따르면, ",
+                        "관련 취재 기록을 보면, ",
+                        "언론에 보도된 경위를 보면, ",
+                        "당시 보도 내용을 살펴보면, ",
+                    ]
+                    l_idx = slot_idx % len(unv_leads)
+                    raw = f"{unv_leads[l_idx]}{fact_h}"
+            elif bucket in ("alleged", "press_charge"):
                 rot = slot_idx % 4
                 if has_existing_pfx:
                     raw = fact_h
@@ -1410,8 +1436,6 @@ def _build_grounded_story_beats(
         ("B4_crack", 60.0, [
             ("crack", b4_source),
             ("crack", b4_source),
-            ("crack", b4_source),
-            ("crack", b4_source),
         ]),
         ("B5_aftermath", 40.8, [
             ("aftermath", b5_source),
@@ -1423,7 +1447,7 @@ def _build_grounded_story_beats(
     # Scale up lines dynamically on larger ledgers so >= 70% of distinct claims are explicitly covered
     total_claims_n = len(all_claims)
     target_lines_total = (
-        max(19, min(26, total_claims_n + 2))
+        max(17, min(26, total_claims_n + 2))
         if total_claims_n <= 24
         else max(24, min(30, int(total_claims_n * 0.72) + 2))
     )
@@ -1463,7 +1487,10 @@ def _build_grounded_story_beats(
             if unused_in_pool:
                 disallowed.update(used_in_prior)
             elif is_aftermath:
-                # In aftermath beat, never repeat the crisis/crack claims from B4
+                # In aftermath beat, never repeat B2 setup/background or B4 crisis claims
+                if len(raw_beats) > 1:
+                    for ln_p in raw_beats[1][2]:
+                        disallowed.update(ln_p.claim_ids or [])
                 if len(raw_beats) > 3:
                     for ln_p in raw_beats[3][2]:
                         disallowed.update(ln_p.claim_ids or [])
