@@ -943,9 +943,7 @@ def _render_claim_sentence(
                 fact_h = _soften_kr_reported_predicate(fact_h, slot_idx=slot_idx)
 
             if role_slot == "aftermath":
-                if any(k in fact_h for k in ("22조", "22조 원", "잠재 손실")):
-                    raw = "초기 언론 보도에 따른 사태 수습 과정에서, 최대 22조 원의 잠재적 위험은 시장의 건전성을 위협하는 구조적 과제로 남게 됐습니다."
-                elif bucket == "alleged_regulator":
+                if bucket == "alleged_regulator":
                     raw = f"정부 공식 발표에 따른 제도 개선 과정에서, {fact_h}"
                 elif bucket == "audit_finding":
                     raw = f"감사원 감사 보고서에 따른 점검 단계에서, {fact_h}"
@@ -1729,28 +1727,9 @@ def _build_grounded_story_beats(
                             fact_m = main_body
                         clauses_m = [c.strip() for c in re.split(r"[;—]|,\s*", fact_m) if c.strip()]
                         conn_m = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", fact_m)
-                        if any(k in fact_m for k in ("3분의 1", "1/3", "부족분")):
-                            res_m = fact_m
-                            res_m = re.sub(r"개정\s*특별법의\s*최소보장\s*제도는\s*", "개정 특별법은 ", res_m)
-                            res_m = re.sub(r"개정\s*특별법의\s*요건을\s*충족한\s*피해자의\s*", "개정 특별법은 ", res_m)
-                            res_m = re.sub(r"개정\s*특별법의\s*", "개정 특별법은 ", res_m)
-                            res_m = re.sub(r"최소보장\s*제도는\s*", "", res_m)
-                            res_m = re.sub(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일부터\s*시행되며,\s*", "", res_m)
-                            res_m = re.sub(r"대항력\s*또는\s*우선변제권\s*행사\s*등으로\s*", "", res_m)
-                            res_m = re.sub(r"법정\s*지원요건을\s*충족한\s*피해자가\s*", "", res_m)
-                            res_m = re.sub(r"회수한\s*금액이\s*", "회수액이 ", res_m)
-                            res_m = re.sub(r"임차보증금의\s*", "보증금 ", res_m)
-                            res_m = re.sub(r"미치지\s*못하면\s*", "못 미칠 때 ", res_m)
-                            res_m = re.sub(r"못\s*미치면\s*", "못 미칠 때 ", res_m)
-                            shrunk_m = _to_kr_honorific(res_m)
-                        elif "특별법" in fact_m and "공포" in fact_m:
-                            res_m = re.sub(r"및\s*주거안정에\s*관한\s*", "", fact_m)
-                            shrunk_m = _to_kr_honorific(res_m)
-                        elif any(k in fact_m for k in ("사전 신청", "11월 10일")):
-                            res_m = fact_m
-                            res_m = re.sub(r"전세사기\s*피해자에\s*대한\s*", "", res_m)
-                            res_m = re.sub(r"보증금\s*최소\s*재정지원\s*", "지원 ", res_m)
-                            shrunk_m = _to_kr_honorific(res_m)
+                        smart_trimmed = _trim_clause_smart(fact_m, {}, "KR", hook_mode=True)
+                        if len(smart_trimmed) <= 45 and smart_trimmed.endswith(("다", "다.", "다!", "다?")):
+                            shrunk_m = _to_kr_honorific(smart_trimmed)
                         elif len(clauses_m) > 1 and 10 <= len(clauses_m[0]) <= 55:
                             shrunk_m = _to_kr_honorific(clauses_m[0])
                         elif conn_m and 10 <= len(conn_m.group(1)) <= 55:
