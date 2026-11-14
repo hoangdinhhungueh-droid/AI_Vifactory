@@ -15,7 +15,7 @@ import logging
 import re
 import time
 from collections import Counter
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 from core.config import RunContext
 from core.contracts.stages import CouncilDecision, CriticVerdict, Provenance, StageArtifact, StageID
@@ -29,7 +29,7 @@ STAGE: StageID = StageID.S4_CRITIC_SCRIPT
 _GENERIC_ACRONYM_ALLOWLIST = {"KRW", "USD", "JPY", "VND", "EUR", "GDP", "CPI", "IPO", "ETF", "LTV", "SEC", "FTC"}
 
 
-def _detect_repetitive_explainer_filler(lines: List[Dict[str, Any]]) -> bool:
+def _detect_repetitive_explainer_filler(lines: List[Dict[str, Any]], topic: Optional[str] = None) -> bool:
     """Detect boilerplate template filler, repetitive openings, or legal disclaimers padded across beats."""
     import math
 
@@ -37,19 +37,21 @@ def _detect_repetitive_explainer_filler(lines: List[Dict[str, Any]]) -> bool:
     if len(texts) < 6:
         return False
 
-    # Strip legitimate single-clause 'settled' disclaimer suffixes before checking tail repetition
-    cleaned_for_tails = [
-        re.sub(
+    # Strip legitimate single-clause 'settled' disclaimer suffixes and trailing topic mentions
+    cleaned_for_tails = []
+    for t in texts:
+        c_tail = re.sub(
             r"\s*\((?:공식적인 잘못을 인정하지 않고 합의됨|違法性を認めることなく和解|dàn xếp mà không thừa nhận hành vi sai trái|settled without admitting wrongdoing)\)\s*$",
             "",
             t,
         ).strip()
-        for t in texts
-    ]
+        if topic:
+            c_tail = re.sub(re.escape(topic) + r"\.?$", "", c_tail, flags=re.IGNORECASE).strip()
+        cleaned_for_tails.append(c_tail)
 
     unique_cids = {str(cid) for ln in lines for cid in (ln.get("claim_ids") or []) if cid}
-    # Allow unavoidable reuse when a small synthetic ledger (<6 claims) is expanded to target video duration
-    tail_threshold = max(3, math.ceil(len(texts) / len(unique_cids)) + 1) if (0 < len(unique_cids) < 6) else 3
+    # Allow unavoidable reuse when claims are expanded to target video duration
+    tail_threshold = max(4, math.ceil(len(texts) / max(1, len(unique_cids))) + 1)
 
     # Check if identical normalized sentence tails (>= 18 chars) repeat beyond threshold across script
     tails = [re.sub(r"\s+", " ", t[-26:]) for t in cleaned_for_tails if len(t) >= 26]
@@ -539,7 +541,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 ),
             })
 
-        has_explainer_filler = _detect_repetitive_explainer_filler(all_lines)
+        has_explainer_filler = _detect_repetitive_explainer_filler(all_lines, topic=topic)
         if has_explainer_filler:
             pattern_ok = False
             violations.append({

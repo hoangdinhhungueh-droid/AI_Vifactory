@@ -451,7 +451,11 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             trimmed = trimmed.rstrip("がはをにでともへのや")
         return trimmed
 
-    word_cap = (14 if hook_mode else 24) if market == "VN" else (12 if hook_mode else 22)
+    if not hook_mode:
+        word_cap = 48
+    else:
+        word_cap = 16 if market in ("VN", "VI") else 14
+
     if market == "VN":
         pat_vn = r"(?:theo thông tin báo chí|được báo chí phản ánh|theo các nguồn tin ban đầu|theo thông tin được công bố)$"
         clean = re.sub(pat_vn, "", clean).strip(" ,;:")
@@ -462,13 +466,18 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     words = clean.split()
     if len(words) <= word_cap:
         return clean
+
+    # Never slice off vital legal qualification clauses starting with 'without'
+    if any(w.lower().rstrip(".,;:") == "without" for w in words):
+        return clean
+
     # Avoid severing a currency/number from its scale unit (e.g. "$172.7" | "million")
     if word_cap < len(words) and words[word_cap].lower().rstrip(".,;:") in (
         "million", "billion", "trillion", "thousand", "percent", "%", "m", "b", "usd", "krw", "jpy", "vnd"
     ):
         word_cap += 1
     # Avoid severing multi-word capitalized entities at word boundary
-    while word_cap < len(words) and word_cap < 26 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
+    while word_cap < len(words) and word_cap < 30 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
         word_cap += 1
 
     # Avoid leaving dangling prepositions, conjunctions, or articles at the end of the sentence
@@ -479,10 +488,16 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     while word_cap < len(words) and words[word_cap - 1].lower().rstrip(".,;:") in dangling_words:
         word_cap += 1
 
-    # Avoid slicing off direct object of key transitive verbs (prohibits, requires, discusses, mandates)
-    transitive_verbs = {"prohibits", "prohibit", "requires", "require", "mandates", "mandate", "discusses", "establishes", "forbids", "bars"}
+    # Avoid slicing off direct object of key transitive or linking verbs
+    transitive_verbs = {
+        "prohibits", "prohibit", "requires", "require", "mandates", "mandate",
+        "discusses", "establishes", "establish", "forbids", "bars",
+        "make", "makes", "making", "create", "creates", "creating",
+        "cause", "causes", "causing", "be", "is", "are", "was", "were", "been",
+        "have", "has", "had", "named", "identify", "identifies", "concerning",
+    }
     if word_cap < len(words) and words[word_cap - 1].lower().rstrip(".,;:") in transitive_verbs:
-        word_cap = min(len(words), word_cap + 3)
+        word_cap = min(len(words), word_cap + 4)
 
     trimmed = " ".join(words[:word_cap]).rstrip(",;:")
     if trimmed.count("(") > trimmed.count(")"):
@@ -1107,7 +1122,7 @@ def _render_claim_sentence(
                     "Settlement disclosures establish that ",
                     "Without admitting wrongdoing, the parties agreed that ",
                     "Under the resolved consent decree, ",
-                    "Official settlement records indicate that ",
+                    "Official settlement disclosures indicate that ",
                 ]
             elif bucket == "proposed":
                 p_opts = [
@@ -1135,39 +1150,17 @@ def _render_claim_sentence(
                 ]
 
             pfx = p_opts[v_idx]
-            if role_slot == "setup":
-                tails = [
-                    f"{fact}, establishing the initial sequence.",
-                    f"{fact}, marking the foundational baseline of the arrangement.",
-                    f"{fact}, appearing in opening documentation.",
-                    f"{fact}, framing the early operational history.",
-                    f"{fact}, as detailed in initial investigative entries.",
-                ]
-            elif role_slot == "mechanism":
-                tails = [
-                    f"{fact}, creating documented structural friction.",
-                    f"{fact}, which accelerated subsequent operational exposure.",
-                    f"{fact}, compounding institutional financial liabilities.",
-                    f"{fact}, operating across the transaction network.",
-                    f"{fact}, exposing key execution vulnerabilities.",
-                ]
-            elif role_slot == "crack":
-                tails = [
-                    f"{fact}, precipitating formal investigative scrutiny.",
-                    f"{fact}, emerging at a critical evidentiary turning point.",
-                    f"{fact}, challenging previous institutional representations.",
-                    f"{fact}, shifting the inquest into active review.",
-                    f"{fact}, placed at the center of the inquiry.",
-                ]
+            fact_clean = fact.strip().rstrip(". ")
+            if pfx:
+                if pfx.rstrip().endswith("that") and fact_clean and fact_clean[0].isupper():
+                    first_word = fact_clean.split()[0]
+                    if not first_word.isupper() and first_word not in (
+                        "European", "American", "Korean", "Japanese", "Vietnamese", "Article", "Under", "Review",
+                    ):
+                        fact_clean = fact_clean[0].lower() + fact_clean[1:]
+                raw = f"{pfx}{fact_clean}."
             else:
-                tails = [
-                    f"{fact}, leaving lasting systemic obligations.",
-                    f"{fact}, recognized as an enduring structural lesson.",
-                    f"{fact}, reshaping subsequent regulatory oversight.",
-                    f"{fact}, documented across the concluding assessment.",
-                    f"{fact}, serving as a key market warning.",
-                ]
-            raw = f"{pfx}{tails[v_idx]}"
+                raw = f"{fact_clean}."
 
     return raw, [cid]
 

@@ -267,12 +267,13 @@ def classify_claim_provenance(
             "not yet ruled", "pending verdict", "awaiting verdict", "before ruling", "no verdict yet",
             "判決前", "確定前", "chưa có phán quyết", "chưa tuyên án",
             "does not identify", "does not contain", "no specific proceeding", "no named", "not identify a",
+            "remains unconfirmed", "unconfirmed",
             "없다", "확인되지 않", "기재되지 않", "존재하지 않",
             "確認されていない", "記載されていない", "存在しない",
             "chưa có", "không có", "không ghi nhận",
         ))
         or bool(re.search(
-            r"(?:does\s+not|did\s+not|no\s+\w+|without\s+(?:a|any)?)\s+(?:itself\s+)?(?:identify|find|contain|allege)?\s*.*?\b(?:judgment|ruling|conviction|verdict|indictment|complaint|penalty|proceeding)\b",
+            r"(?:does\s+not|did\s+not|no\s+\w+|without\s+(?:a|any)?)\b.*?\b(?:identify|find|contain|allege|establish|prove)\b.*?\b(?:judgment|ruling|conviction|verdict|indictment|complaint|penalty|proceeding|charge|cartel|collusion)\b",
             combined_low,
         ))
     )
@@ -316,6 +317,7 @@ def classify_claim_provenance(
     ))
     has_enacted_statute = (
         not has_proposed_bill
+        and not has_judgment_negation
         and any(k in combined_low for k in (
             "법 시행", "법 개정", "시행령", "개정안 통과", "법률 제정", "enacted", "statute", "law took effect",
             "came into force", "改正法施行", "法律", "luật có hiệu lực", "nghị định", "ban hành",
@@ -425,7 +427,17 @@ def classify_claim_provenance(
 
     # 3. Verification status & tier calibration (Anti-RSS-Elevation Invariant)
     explicit_primary_flag = raw_ver == "verified_primary" and (is_primary_url or is_official_portal)
-    if explicit_primary_flag:
+    if (
+        "remains unconfirmed" in combined_low
+        or "without proving collusion" in combined_low
+        or has_speculative
+        or procedural_status == "speculation"
+        or speaker == "analyst"
+    ):
+        verification_status = "speculative"
+        if doc_type == "statute":
+            doc_type = "commentary"
+    elif explicit_primary_flag:
         verification_status = "verified_primary"
     elif has_speculative:
         verification_status = "speculative"
@@ -817,7 +829,12 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
     "EN": {
         "final_judgment": ["according to the court ruling", "court found", "convicted by", "final verdict", "court judgment", "court ruled", "judicial findings", "ruled by the court"],
         "court_record": ["according to court records", "according to docket filings", "court filings indicate", "docket records reflect", "court submissions note", "official docket filings", "judicial records"],
-        "indictment": ["according to the indictment", "according to court filings", "indictment alleges", "prosecutors allege", "prosecutors say", "prosecutors charged", "charging documents state", "charging documents"],
+        "indictment": [
+            "according to the indictment", "according to court filings", "indictment alleges",
+            "the indictment alleges", "prosecutors allege", "prosecutors alleged in the indictment",
+            "prosecutors alleged", "prosecutors say", "prosecutors charged",
+            "charging documents state", "charging documents",
+        ],
         "criminal_complaint": ["according to the complaint", "complaint alleges", "lawsuit alleges", "plaintiff alleges", "lawsuit filing", "alleged in the complaint"],
         "press_charge": ["according to press reports", "according to news reports", "press reports", "reportedly charged", "press reports on the charges", "charging coverage", "press accounts"],
         "alleged_regulator": [
@@ -844,10 +861,14 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "alleged": ["according to press reports", "allegedly", "alleged", "claimed", "according to", "reportedly", "published media accounts", "public reporting", "media reporting", "published reporting", "press investigations", "published accounts"],
         "settled": [
             "settled without admitting", "consent decree", "agreed to pay without admitting",
-            "under the terms of the settlement", "settlement disclosures", "settled",
+            "under the terms of the settlement", "settlement disclosures", "settlement records", "settled",
             "resolved under negotiated consent", "without admitting wrongdoing",
         ],
-        "unverified": ["unverified", "preliminary reports", "initial reports", "early reports", "yet to be verified", "unconfirmed", "unconfirmed reports", "early unverified"],
+        "unverified": [
+            "unverified", "preliminary reports", "initial reports", "early reports",
+            "yet to be verified", "unconfirmed", "unconfirmed reports", "early unverified",
+            "pending verification", "initial reporting",
+        ],
         "proposed": ["proposed", "draft", "under consideration", "planned", "pending regulatory", "proposals"],
     },
 }
@@ -890,6 +911,19 @@ def expected_qualifier_bucket(
     ps = (procedural_status or "unknown").lower()
     vs = (verification_status or "unverified_secondary").lower()
     cred = (credibility_tier or "").lower()
+
+    # 0. Unconfirmed claims, analyst hypotheses, and speculation must NEVER be elevated to official fact, statute, or regulator filings
+    if (
+        cred == "unconfirmed_claim"
+        or ps in ("speculation", "unconfirmed")
+        or vs in ("unverified_secondary", "speculative")
+        or sp == "analyst"
+    ):
+        if ls == "settled":
+            return "settled"
+        if ps == "bill_proposed" or dt == "proposed_bill":
+            return "proposed"
+        return "unverified"
 
     # 1. Legislative proposals & bills under consideration
     if ps == "bill_proposed" or dt == "proposed_bill":
