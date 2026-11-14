@@ -414,6 +414,10 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
         (r"없었습니다\.$", "없었던 것으로 보도됐습니다."),
         (r"있습니다\.$", "있는 것으로 전해졌습니다."),
         (r"없습니다\.$", "없는 것으로 전해졌습니다."),
+        (r"지원받습니다\.$", "지원받는 것으로 알려졌습니다."),
+        (r"지원받았습니다\.$", "지원받았던 것으로 알려졌습니다."),
+        (r"받았습니다\.$", "받았던 것으로 보도됐습니다."),
+        (r"받습니다\.$", "받는 것으로 전해졌습니다."),
         (r"지원합니다\.$", "지원하는 것으로 전해졌습니다."),
         (r"제공합니다\.$", "제공하는 것으로 전해졌습니다."),
         (r"했습니다\.$", h_bodo),
@@ -424,6 +428,11 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
         (r"었습니다\.$", "었던 것으로 보도됐습니다."),
         (r"았습니다\.$", "았던 것으로 보도됐습니다."),
         (r"였습니다\.$", "였던 것으로 보도됐습니다."),
+        (r"왔습니다\.$", "왔던 것으로 전해졌습니다."),
+        (r"갔습니다\.$", "갔던 것으로 전해졌습니다."),
+        (r"났습니다\.$", "났던 것으로 전해졌습니다."),
+        (r"습니다\.$", "는 것으로 전해졌습니다."),
+        (r"ㅂ니다\.$", "는 것으로 전해졌습니다."),
     ]
     for pat, rep in repls:
         if re.search(pat, t):
@@ -647,6 +656,13 @@ def _format_claim_fact(c: Any, market: str, topic: str = "", hook_mode: bool = F
 
     if m == "KR":
         text = _normalize_spoken_korean_numbers(text)
+        _KR_EN_LOANWORDS = [
+            (r"\b[Pp]ackage\b", "지원책"),
+            (r"\b[Pp]lan\b", "계획"),
+            (r"\b[Rr]eport\b", "보고서"),
+        ]
+        for pat, rep in _KR_EN_LOANWORDS:
+            text = re.sub(pat, rep, text)
 
     elems = extract_claim_elements(text)
     hangul_n = len(HANGUL_SYLLABLE_RE.findall(text))
@@ -877,9 +893,9 @@ def _render_claim_sentence(
                     unv_aft_leads = [
                         "취재 보도에 따르면, ",
                         "언론 보도 분석에서, ",
-                        "관련 취재 기록을 보면, ",
+                        "초기 보도 내용에 따르면, ",
                         "당시 언론 보도에 따르면, ",
-                        "언론 취재 결과에 의하면, ",
+                        "일부 언론 보도에 의하면, ",
                     ]
                     raw = f"{unv_aft_leads[v_idx % len(unv_aft_leads)]}{aftermath_framings[v_idx]}"
                 elif bucket == "alleged_regulator":
@@ -907,44 +923,37 @@ def _render_claim_sentence(
                     raw = fact_h
                 else:
                     unv_leads = [
-                        "당시 언론 취재에 따르면, ",
+                        "당시 언론 보도에 따르면, ",
                         "취재 보도에 의하면, ",
                         "보도된 사실관계를 보면, ",
-                        "언론사 취재 결과에 따르면, ",
+                        "일부 언론 보도에 따르면, ",
                         "초기 언론 보도에 따르면, ",
-                        "관련 취재 기록을 보면, ",
+                        "초기 보도 내용에 따르면, ",
                         "언론에 보도된 경위를 보면, ",
                         "당시 보도 내용을 살펴보면, ",
                     ]
                     l_idx = slot_idx % len(unv_leads)
                     raw = f"{unv_leads[l_idx]}{fact_h}"
             elif bucket in ("alleged", "press_charge"):
-                rot = slot_idx % 4
                 if has_existing_pfx:
                     raw = fact_h
-                elif rot == 0:
-                    raw = fact_h
-                elif rot == 1:
-                    connectors = ["실제로 ", "이 과정에서 ", "나아가 ", "그 결과 ", "한편 ", "동시에 ", "이에 따라 ", "주목할 점은 "]
-                    c_idx = slot_idx % len(connectors)
-                    raw = f"{connectors[c_idx]}{fact_h}"
-                elif rot == 2:
-                    lead_opts = [
-                        "취재 기록을 보면, ",
-                        "당시 언론 취재에 따르면, ",
-                        "취재 보도에 의하면, ",
-                        "언론 보도 내용에는, ",
-                        "보도된 경위를 보면, ",
-                        "초기 보도에 나타난 바에 따르면, ",
-                        "관련 보도 내용을 살펴보면, ",
-                        "언론 취재 결과에 따르면, ",
-                    ]
-                    l_idx = slot_idx % len(lead_opts)
-                    raw = f"{lead_opts[l_idx]}{fact_h}"
                 else:
-                    transitions = ["구체적으로 ", "특히 ", "사안의 핵심은 ", "당시 상황에서 ", "더 나아가 "]
-                    t_idx = slot_idx % len(transitions)
-                    raw = f"{transitions[t_idx]}{fact_h}"
+                    alleged_leads = [
+                        "언론 보도에 따르면, ",
+                        "당시 보도 내용을 살펴보면, ",
+                        "취재 보도에 의하면, ",
+                        "보도된 사실관계를 보면, ",
+                        "언론에 보도된 경위를 보면, ",
+                        "당시 언론 취재에 따르면, ",
+                        "관련 보도를 살펴보면, ",
+                        "일부 언론 보도에 따르면, ",
+                        "이 과정에서 나온 언론 보도를 보면, ",
+                        "실제로 당시 언론 보도에 따르면, ",
+                        "한편 보도된 경위를 살펴보면, ",
+                        "동시에 취재 보도에 따르면, ",
+                    ]
+                    l_idx = slot_idx % len(alleged_leads)
+                    raw = f"{alleged_leads[l_idx]}{fact_h}"
             elif bucket == "alleged_regulator":
                 p_opts = ["정부 발표에 따르면, ", "관계 기관 공식 자료에 따르면, ", "규제 당국의 공식 발표에 따르면, ", "정부 및 관계 당국에 따르면, ", "당국의 공식 분석 자료를 보면, "]
                 raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
@@ -1338,6 +1347,9 @@ def _render_claim_sentence(
             else:
                 raw = f"{fact_clean}."
 
+    if m == "KR":
+        raw = re.sub(r"\b[Pp]ackage\b", "지원책", raw)
+        raw = re.sub(r"\b[Pp]lan\b", "계획", raw)
     return raw, [cid]
 
 
@@ -1608,9 +1620,9 @@ def _build_grounded_story_beats(
                             shrunk_r = _to_kr_honorific(c_part)
                         else:
                             r_words = fact_r.split()
-                            if len(r_words) > 7:
-                                head_part = " ".join(r_words[:4])
-                                tail_part = " ".join(r_words[-3:])
+                            if len(r_words) > 5:
+                                head_part = " ".join(r_words[:3])
+                                tail_part = " ".join(r_words[-2:])
                                 head_part = re.sub(r"(?:의|에|에서|과|와|로|으로|를|을)$", "", head_part).strip()
                                 shrunk_r = _to_kr_honorific(f"{head_part} {tail_part}")
                             else:
@@ -1676,9 +1688,9 @@ def _build_grounded_story_beats(
                             shrunk_m = _to_kr_honorific(c_part)
                         else:
                             m_words = fact_m.split()
-                            if len(m_words) > 7:
-                                head_part = " ".join(m_words[:4])
-                                tail_part = " ".join(m_words[-3:])
+                            if len(m_words) > 5:
+                                head_part = " ".join(m_words[:3])
+                                tail_part = " ".join(m_words[-2:])
                                 head_part = re.sub(r"(?:의|에|에서|과|와|로|으로|를|을)$", "", head_part).strip()
                                 shrunk_m = _to_kr_honorific(f"{head_part} {tail_part}")
                             else:
