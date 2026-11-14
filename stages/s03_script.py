@@ -419,7 +419,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
         clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
 
-        cap = 55 if hook_mode else 110
+        cap = 40 if hook_mode else 110
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
@@ -436,6 +436,13 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
                     break
             if len(head) <= cap and head.endswith("다"):
                 return head
+
+        if hook_mode:
+            k_words = clean.split()
+            if len(k_words) > 7:
+                candidate = " ".join(k_words[:3] + k_words[-3:]).rstrip(" ,;:")
+                if len(candidate) <= cap + 6 and candidate.endswith(("다", "했다", "됐다", "인다", "이다")):
+                    return candidate
 
         trimmed = clean
         if trimmed.count("(") > trimmed.count(")"):
@@ -718,21 +725,21 @@ def _render_claim_sentence(
             if has_existing_pfx:
                 raw = fact_h if (not loc_topic or loc_topic in fact_h or len(loc_topic) > 12) else f"{loc_topic} 사안에서, {fact_h}"
             elif bucket == "final_judgment":
-                raw = f"{loc_topic}의 중대한 국면에서, 법원 확정 판결에 따르면, {fact_h}"
+                raw = f"법원 확정 판결에 따르면, {fact_h}"
             elif bucket == "audit_finding":
-                raw = f"{loc_topic}의 발단에서, 감사원 감사 보고서에 따르면, {fact_h}"
+                raw = f"감사원 감사 보고서에 따르면, {fact_h}"
             elif bucket == "indictment":
-                raw = f"{loc_topic} 사안에서, 검찰 공소장에 따르면, {fact_h}"
+                raw = f"검찰 공소장에 따르면, {fact_h}"
             elif bucket == "court_record":
-                raw = f"{loc_topic} 사안에서, 법원 접수 기록에 따르면, {fact_h}"
+                raw = f"법원 접수 기록에 따르면, {fact_h}"
             elif bucket == "alleged_regulator":
-                raw = f"{loc_topic} 사안에서, 정부 발표에 따르면, {fact_h}"
+                raw = f"정부 발표에 따르면, {fact_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"{loc_topic} 사안에서, 언론 보도에 따르면, {fact_h}"
+                raw = f"언론 보도에 따르면, {fact_h}"
             elif bucket == "settled":
-                raw = f"{loc_topic} 사안은 책임을 인정하지 않고 합의로 종결됐습니다: {fact_h}"
+                raw = f"공식 합의 종결 기록에 따르면, {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"언론 보도에 따르면, {loc_topic} 사안과 관련하여 {fact_h}"
+                raw = f"초기 언론 보도에 따르면, {fact_h}"
             else:
                 raw = f"{loc_topic} 사안에서, {fact_h}" if loc_topic and loc_topic not in fact else fact_h
         elif role_slot == "hook_scale":
@@ -754,7 +761,7 @@ def _render_claim_sentence(
             elif bucket == "settled":
                 raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"언론 보도 집계에 따르면, {fact_h}"
+                raw = f"초기 언론 보도 집계에 따르면, {fact_h}"
             else:
                 raw = f"집계된 수치에 따르면, {fact_h}"
         elif role_slot == "hook_paradox":
@@ -772,14 +779,17 @@ def _render_claim_sentence(
                 raw = f"{q_short} 검찰 공소장에 따르면, {fact_h}"
             elif bucket == "court_record" and not any(p in fact for p in ["법원", "기록"]):
                 raw = f"{q_short} 법원 접수 기록에 따르면, {fact_h}"
-            elif bucket == "alleged_regulator" and not any(p in fact for p in ["당국", "발표", "조사"]):
-                raw = f"{q_short} 규제 당국에 따르면, {fact_h}"
+            elif bucket == "alleged_regulator":
+                if not any(fact_h.startswith(p) for p in ["정부 발표에 따르면", "규제 당국에 따르면", "당국에 따르면", "공식 발표에 따르면", "관계 기관"]):
+                    raw = f"{q_short} 정부 발표에 따르면, {fact_h}"
+                else:
+                    raw = f"{q_short} {fact_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact for p in ["보도에 따르면", "취재에 따르면", "보도됐다", "전해졌다"]):
                 raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
             elif bucket == "settled" and "합의" not in fact:
                 raw = f"{q_short} {fact_h} (책임을 인정하지 않고 합의됨)."
-            elif bucket == "unverified" and "보도" not in fact:
-                raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
+            elif bucket == "unverified" and "초기 보도" not in fact:
+                raw = f"{q_short} 초기 언론 보도에 따르면, {fact_h}"
             else:
                 raw = f"{q_short} {fact_h}"
         else:
@@ -788,7 +798,7 @@ def _render_claim_sentence(
             elif bucket == "audit_finding":
                 p_opts = ["감사 보고서에 따르면, ", "감사원 감사 보고서에 따르면, ", "공식 감사 및 점검 결과에 따르면, ", "감사 결과에 의하면, ", "공식 감사 기록에 의하면, "]
             elif bucket == "unverified":
-                p_opts = ["언론 보도에 따르면, ", "취재 보도에 의하면, ", "언론 보도 내용에는, ", "보도된 사실관계에 따르면, ", "언론사 취재 결과에 따르면, "]
+                p_opts = ["초기 언론 보도에 따르면, ", "취재 보도에 의하면, ", "언론 보도 내용에는, ", "공개된 초기 보도에 따르면, ", "언론사 취재 보도에 따르면, "]
             elif bucket == "indictment":
                 p_opts = ["검찰 공소장에 따르면, ", "공소 사실에 의하면, ", "검찰 수사 및 공소 내용에 따르면, ", "기소장에 따르면, ", "검찰 기소 내용에 의하면, "]
             elif bucket == "court_record":
@@ -1207,6 +1217,9 @@ def _build_grounded_story_beats(
     from app.schemas.story_contracts import StorySceneLine
     from app.services.story_provenance_engine import normalize_market_code
 
+    def _get(obj: Any, attr: str, default: Any = "") -> Any:
+        return obj.get(attr, default) if isinstance(obj, dict) else getattr(obj, attr, default)
+
     m = normalize_market_code(market)
     pools = _select_ordered_claims(evidence_ledger)
     all_claims = pools["all_sorted"]
@@ -1222,9 +1235,13 @@ def _build_grounded_story_beats(
     b3_source = pools["mechanisms"] or verified_pool or all_claims
     b4_source = (pools["unverified_pool"] + pools["mechanisms"] + pools["catalysts"]) or all_claims
     b5_source = (
-        [c for c in pools["unverified_pool"] if c not in pools["mechanisms"]]
+        [
+            c for c in verified_pool
+            if _get(c, "causal_role", "") in ("background_context", "transmission_mechanism")
+            or str(_get(c, "source_type", "")) in ("regulator", "gov", "court")
+        ]
         + pools["backgrounds"]
-        + [c for c in verified_pool if c not in pools["catalysts"]]
+        + [c for c in pools["unverified_pool"] if _get(c, "causal_role", "") != "primary_catalyst"]
         or all_claims
     )
 
@@ -1334,24 +1351,35 @@ def _build_grounded_story_beats(
         is_aftermath = beat_id.startswith("B5")
         for l_idx, (role_slot, src_pool) in enumerate(slots, start=1):
             disallowed: Set[str] = set()
+            used_in_current_beat = {
+                cid
+                for ln_c in beat_lines
+                for cid in (ln_c.claim_ids or [])
+            }
+            disallowed.update(used_in_current_beat)
+            if b1_catalyst_cid and not is_hook_beat:
+                disallowed.add(b1_catalyst_cid)
+
             used_in_prior = {
                 cid
                 for b_prior in raw_beats
                 for ln_p in b_prior[2]
                 for cid in (ln_p.claim_ids or [])
             }
-            unused_in_pool = [c for c in src_pool if _get_cid(c) and _get_cid(c) not in used_in_prior]
+            unused_in_pool = [c for c in src_pool if _get_cid(c) and _get_cid(c) not in used_in_prior and _get_cid(c) not in disallowed]
             if unused_in_pool:
                 disallowed.update(used_in_prior)
             elif is_aftermath:
-                if b1_catalyst_cid:
-                    disallowed.add(b1_catalyst_cid)
-                for b_prior in raw_beats[:3]:
-                    for ln_p in b_prior[2]:
+                # In aftermath beat, never repeat the crisis/crack claims from B4
+                if len(raw_beats) > 3:
+                    for ln_p in raw_beats[3][2]:
                         disallowed.update(ln_p.claim_ids or [])
             elif not is_hook_beat:
-                if b1_catalyst_cid:
-                    disallowed.add(b1_catalyst_cid)
+                # If pool exhausted in B2..B4, allow recycling least recently used claims from earlier beats,
+                # but disallow the immediately preceding beat to maintain freshness
+                if raw_beats:
+                    for ln_p in raw_beats[-1][2]:
+                        disallowed.update(ln_p.claim_ids or [])
             c_obj = _pick_claim(
                 src_pool,
                 restrict_to_preferred=(is_hook_beat and bool(verified_pool)),
@@ -1425,11 +1453,15 @@ def _build_grounded_story_beats(
                         else:
                             pfx_r = ""
                             fact_r = rem_clean
-                        r_words = fact_r.split()
-                        if len(r_words) > 4:
-                            shrunk_r = _to_kr_honorific(' '.join(r_words[:4]).rstrip(" ,;:"))
+                        clauses_r = [c.strip() for c in re.split(r"[;—]|,\s*", fact_r) if c.strip()]
+                        if len(clauses_r) > 1 and len(clauses_r[0]) >= 10:
+                            shrunk_r = _to_kr_honorific(clauses_r[0])
                         else:
-                            shrunk_r = _to_kr_honorific(fact_r)
+                            r_words = fact_r.split()
+                            if len(r_words) > 7:
+                                shrunk_r = _to_kr_honorific(" ".join(r_words[:3] + r_words[-3:]))
+                            else:
+                                shrunk_r = _to_kr_honorific(fact_r)
                         rem_shrunk = f"{pfx_r} {shrunk_r}".strip()
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     else:
@@ -1480,11 +1512,15 @@ def _build_grounded_story_beats(
                         else:
                             pfx_m = ""
                             fact_m = main_body
-                        m_words = fact_m.split()
-                        if len(m_words) > 4:
-                            shrunk_m = _to_kr_honorific(' '.join(m_words[:4]).rstrip(" ,;:"))
+                        clauses_m = [c.strip() for c in re.split(r"[;—]|,\s*", fact_m) if c.strip()]
+                        if len(clauses_m) > 1 and len(clauses_m[0]) >= 10:
+                            shrunk_m = _to_kr_honorific(clauses_m[0])
                         else:
-                            shrunk_m = _to_kr_honorific(fact_m)
+                            m_words = fact_m.split()
+                            if len(m_words) > 7:
+                                shrunk_m = _to_kr_honorific(" ".join(m_words[:3] + m_words[-3:]))
+                            else:
+                                shrunk_m = _to_kr_honorific(fact_m)
                         shrunk_main = f"{pfx_m} {shrunk_m}".strip()
                         if paren_suffix:
                             ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
