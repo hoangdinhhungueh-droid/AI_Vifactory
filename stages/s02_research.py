@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -86,9 +87,14 @@ def run(ctx: RunContext) -> StageArtifact:
                               else ("https://chinhphu.vn" if market == "VN" else "https://www.sec.gov"))
                     )
                     source_url = prov_c.get("source_url") or def_src_url
+                    raw_cl_text = str(prov_c.get("claim") or f"Factual evidentiary claim regarding {topic_name}")
+                    if "विकल्प" in raw_cl_text:
+                        raw_cl_text = raw_cl_text.replace("विकल्प", "선택권" if market == "KR" else ("選択肢" if market == "JA" else "lựa chọn"))
+                    raw_cl_text = re.sub(r"[\u0900-\u097F]+", "", raw_cl_text)
+                    raw_cl_text = re.sub(r"\s+", " ", raw_cl_text).strip()
                     claims.append(EvidenceClaim(
                         claim_id=c_id,
-                        claim=prov_c.get("claim") or f"Factual evidentiary claim regarding {topic_name}",
+                        claim=raw_cl_text,
                         source_url=source_url,
                         source_name=prov_c.get("source_name", ""),
                         source_type=prov_c.get("source_type", "press"),
@@ -737,9 +743,15 @@ def run(ctx: RunContext) -> StageArtifact:
                     elif prov_c["verification_status"] == "unverified_secondary" and llm_ls == "fact":
                         st = "alleged"
 
+                    raw_llm_claim = str(prov_c.get("claim") or f"Factual evidentiary claim regarding {topic}")
+                    if "विकल्प" in raw_llm_claim:
+                        raw_llm_claim = raw_llm_claim.replace("विकल्प", "선택권" if market == "KR" else ("選択肢" if market == "JA" else "lựa chọn"))
+                    raw_llm_claim = re.sub(r"[\u0900-\u097F]+", "", raw_llm_claim)
+                    raw_llm_claim = re.sub(r"\s+", " ", raw_llm_claim).strip()
+
                     ledger.append(EvidenceClaim(
                         claim_id=c_id,
-                        claim=prov_c.get("claim") or f"Factual evidentiary claim regarding {topic}",
+                        claim=raw_llm_claim,
                         source_url=src_url,
                         source_name=prov_c.get("source_name", ""),
                         source_type=prov_c.get("source_type", "press"),

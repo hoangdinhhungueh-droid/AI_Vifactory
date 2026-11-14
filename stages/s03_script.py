@@ -334,26 +334,46 @@ def _to_kr_attributive(clause: str) -> str:
 
 
 def _to_kr_honorific(text: str) -> str:
-    """Normalize a Korean clause to end cleanly in polite formal honorific (습니다/입니다) without duplication."""
-    t_clean = (text or "").strip().rstrip(". ")
+    """Normalize a Korean clause to end cleanly in polite formal honorific (습니다/입니다/합니다/됩니다) without duplication or grammatical mangling."""
+    t_clean = re.sub(r"\s+", " ", (text or "").strip()).rstrip(".。")
     if not t_clean:
         return ""
-    if t_clean.endswith(("습니다", "입니다")):
+    if t_clean.endswith(("습니다", "입니다", "합니다", "됩니다", "있습니다", "없습니다")):
         return f"{t_clean}."
-    subs = [
-        (r"했다$", "했습니다."),
-        (r"됐다$", "됐습니다."),
-        (r"이다$", "입니다."),
-        (r"한다$", "합니다."),
-        (r"된다$", "됩니다."),
-        (r"였다$", "였습니다."),
-        (r"왔다$", "왔습니다."),
-        (r"졌다$", "졌습니다."),
-        (r"다$", "습니다."),
-    ]
-    for pat, rep in subs:
-        if re.search(pat, t_clean):
-            return re.sub(pat, rep, t_clean)
+
+    # Convert dangling quotation/reported connective endings (e.g. ~마련했다고 -> ~마련했다고 전해졌습니다.)
+    if re.search(r"(?:했다고|됐다고|있다고|없다고|된다고|한다고|다는|라는)$", t_clean):
+        return f"{t_clean} 전해졌습니다."
+
+    # Convert common mid-sentence conjunctive verbs into declarative past/present stems
+    if re.search(r"(?:하고|하며|되고|되며|이고|이며|이고는|면서)$", t_clean):
+        t_clean = re.sub(r"(?:하고|하며)$", "했다", t_clean)
+        t_clean = re.sub(r"(?:되고|되며)$", "됐다", t_clean)
+        t_clean = re.sub(r"(?:이고|이며)$", "이다", t_clean)
+        t_clean = re.sub(r"면서$", "했다", t_clean)
+
+    # 1. Past tense verbs ending in ㅆ다 (했다, 됐다, 였다, 났다, 쳤다, 겪었다, 받았다, 멈췄다, 부풀려졌다, etc.)
+    if re.search(r"([았었였했됐졌왔뒀썼]다|ㅆ다)$", t_clean):
+        return re.sub(r"다$", "습니다.", t_clean)
+
+    # 2. Plain declarative ending in 다
+    if t_clean.endswith("다") and len(t_clean) >= 2:
+        # 먹는다 / 받는다
+        if t_clean.endswith("는다") and len(t_clean) >= 3:
+            return t_clean[:-3] + t_clean[-3] + "습니다."
+        c = t_clean[-2]
+        if '가' <= c <= '힣':
+            code = ord(c) - 0xAC00
+            jong = code % 28
+            if jong == 4:  # Syllable ending in ㄴ (작동한다 -> 작동합니다., 시행된다 -> 시행됩니다., 이른다 -> 이릅니다.)
+                return t_clean[:-2] + chr(ord(c) + 13) + "니다."
+            elif jong == 0:  # Open vowel syllable (부풀려지다 -> 부풀려집니다., 멈추다 -> 멈춥니다., 보다 -> 봅니다.)
+                return t_clean[:-2] + chr(ord(c) + 17) + "니다."
+            else:  # Consonant ending (먹다 -> 먹습니다., 있다 -> 있습니다.)
+                return t_clean[:-1] + "습니다."
+
+    # 3. Strip trailing grammatical particles before attaching copula입니다.
+    t_clean = re.sub(r"(?:은|는|을|를|의|로|으로|에|에서)$", "", t_clean).strip()
     if re.search(r"[가-힣0-9a-zA-Z]$", t_clean):
         return f"{t_clean}입니다."
     return f"{t_clean}."
@@ -364,6 +384,9 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     clean = re.sub(r"\s+", " ", (text or "").strip()).rstrip(".。")
     # Clean trailing formal polite endings if embedded inside a longer sentence
     if market == "KR":
+        if "विकल्प" in clean:
+            clean = clean.replace("विकल्प", "선택권")
+        clean = re.sub(r"[\u0900-\u097F]+", "", clean).strip()
         pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|의혹이\s*보도되었다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다|의혹이\s*제기되었다)$"
         clean = re.sub(pat_kr, r"\1", clean)
         clean = re.sub(r"(?:보도되었다|보도됐다|알려졌다|전해졌다)$", "", clean).strip()
@@ -371,7 +394,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         clean = re.sub(r"([가-힣]+)된\s*것으로$", r"\1됐다", clean)
         clean = re.sub(r"([가-힣]+)인\s*것으로$", r"\1이다", clean)
 
-        cap = 60 if hook_mode else 85
+        cap = 70 if hook_mode else 110
         if len(clean) <= cap:
             return clean
         clauses = [c.strip() for c in re.split(r"[;—]|,\s+", clean) if c.strip()]
@@ -379,7 +402,8 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             head = clauses[0]
             conj_repls = [
                 (r"하고$", "했다"), (r"하며$", "했다"), (r"되어$", "됐다"),
-                (r"되고$", "된다"), (r"이고$", "이다"), (r"으며$", "었다"), (r"고$", "다")
+                (r"되고$", "된다"), (r"이고$", "이다"), (r"으며$", "었다"), (r"고$", "다"),
+                (r"지만$", "으나")
             ]
             for c_pat, c_rep in conj_repls:
                 if re.search(c_pat, head):
@@ -388,22 +412,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
             if len(head) <= cap and head.endswith("다"):
                 return head
 
-        words = clean.split()
-        buf = ""
-        for w in words:
-            cand = f"{buf} {w}".strip()
-            if len(cand) <= cap:
-                buf = cand
-            else:
-                break
-        if not buf:
-            buf = clean[:cap]
-        if not buf.endswith("다"):
-            if len(buf.split()) < len(words):
-                next_w = words[len(buf.split())]
-                if next_w.endswith("다") and len(f"{buf} {next_w}") <= cap + 16:
-                    buf = f"{buf} {next_w}"
-        trimmed = buf
+        trimmed = clean
         if trimmed.count("(") > trimmed.count(")"):
             trimmed = trimmed[: trimmed.rfind("(")].strip(" ,;:")
         anchors = (elems.get("metrics", []) + elems.get("dates", []))
@@ -687,6 +696,8 @@ def _render_claim_sentence(
                 raw = f"{loc_topic} 사안에서, 법원 접수 기록에 따르면, {fact_h}"
             elif bucket == "alleged_regulator":
                 raw = f"{loc_topic} 사안에서, 정부 및 관계 당국에 따르면, {fact_h}"
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"{loc_topic} 사안에서, 언론 보도에 따르면, {fact_h}"
             elif bucket == "settled":
                 raw = f"{loc_topic} 사안은 책임을 인정하지 않고 합의로 종결됐습니다: {fact_h}"
             elif bucket == "unverified":
@@ -705,6 +716,8 @@ def _render_claim_sentence(
                 raw = f"법원 접수 기록에 적시된 수치에 따르면, {fact_h}"
             elif bucket == "alleged_regulator":
                 raw = f"규제 당국에 따르면, 집계된 수치는 {fact_h}"
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"언론 보도에 집계된 수치에 따르면, {fact_h}"
             elif bucket == "settled":
                 raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
@@ -726,6 +739,8 @@ def _render_claim_sentence(
                 raw = f"{q_short} 법원 접수 기록에 따르면, {fact_h}"
             elif bucket == "alleged_regulator" and not any(p in fact for p in ["당국", "발표", "조사"]):
                 raw = f"{q_short} 규제 당국에 따르면, {fact_h}"
+            elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact for p in ["보도에 따르면", "취재에 따르면", "보도됐다", "전해졌다"]):
+                raw = f"{q_short} 언론 보도에 따르면, {fact_h}"
             elif bucket == "settled" and "합의" not in fact:
                 raw = f"{q_short} {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified" and "보도" not in fact:
@@ -764,7 +779,16 @@ def _render_claim_sentence(
 
             pfx = p_opts[v_idx]
             fact_h = _to_kr_honorific(fact)
-            if bucket == "settled":
+            if role_slot == "aftermath":
+                aftermath_framings = [
+                    f"피해 회복과 제도 보완 국면에서, {fact_h}",
+                    f"사태 수습과 재발 방지 논의 과정에서, {fact_h}",
+                    f"사후 검증과 구조적 대책 단계에서, {fact_h}",
+                    f"제도적 평가와 시장 감시 과정에서, {fact_h}",
+                    f"후속 조사와 제도 개선 논의에서, {fact_h}",
+                ]
+                raw = f"{pfx}{aftermath_framings[v_idx]}"
+            elif bucket == "settled":
                 raw = f"{pfx}{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
             else:
                 raw = f"{pfx}{fact_h}"
@@ -781,6 +805,8 @@ def _render_claim_sentence(
                 raw = f"{loc_topic}をめぐり、裁判所の記録によれば、{fact}。"
             elif bucket == "alleged_regulator":
                 raw = f"{loc_topic}をめぐり、当局の公表によれば、{fact}。"
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"{loc_topic}をめぐり、報道によれば、{fact}。"
             elif bucket == "settled":
                 raw = f"{loc_topic}をめぐり、違法性を認めることなく和解に至りました：{fact}。"
             elif bucket == "unverified":
@@ -798,6 +824,8 @@ def _render_claim_sentence(
                 raw = f"裁判所の記録によれば、規模は{fact}。"
             elif bucket == "alleged_regulator":
                 raw = f"当局の公表資料によれば、規模は{fact}。"
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"報道によれば、確認された規模として{fact}。"
             elif bucket == "settled":
                 raw = f"合意規模として、{fact}（違法性を認めることなく和解）。"
             elif bucket == "unverified":
@@ -818,6 +846,8 @@ def _render_claim_sentence(
                 raw = f"{q_short} 裁判所の記録によれば、{fact}。"
             elif bucket == "alleged_regulator" and not any(p in fact for p in ["当局", "公表"]):
                 raw = f"{q_short} 当局の公表によれば、{fact}。"
+            elif bucket in ("alleged", "press_allegation", "press_charge") and "報道" not in fact:
+                raw = f"{q_short} 報道によれば、{fact}。"
             elif bucket == "settled" and "和解" not in fact:
                 raw = f"{q_short} {fact}（違法性を認めることなく和解）。"
             elif bucket == "unverified" and "未確認" not in fact:
@@ -871,6 +901,8 @@ def _render_claim_sentence(
                 raw = f"Trong vụ việc {loc_topic}: Theo hồ sơ tại tòa án, {fact}."
             elif bucket == "alleged_regulator":
                 raw = f"Trong vụ việc {loc_topic}: Theo cơ quan chức năng, {fact}."
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"Trong bối cảnh {loc_topic}, theo phản ánh của báo chí, {fact}."
             elif bucket == "settled":
                 raw = f"Vụ việc {loc_topic} khép lại bằng thỏa thuận dàn xếp: {fact}."
             elif bucket == "unverified":
@@ -888,6 +920,8 @@ def _render_claim_sentence(
                 raw = f"Theo hồ sơ tại tòa án, quy mô xác nhận: {fact}."
             elif bucket == "alleged_regulator":
                 raw = f"Theo cơ quan quản lý, quy mô xác nhận: {fact}."
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"Theo thông tin báo chí, quy mô xác nhận: {fact}."
             elif bucket == "settled":
                 raw = f"Quy mô xử lý xác nhận: {fact} (dàn xếp mà không thừa nhận sai phạm)."
             elif bucket == "unverified":
@@ -908,6 +942,8 @@ def _render_claim_sentence(
                 raw = f"{q_short} Theo hồ sơ tại tòa án, {fact}."
             elif bucket == "alleged_regulator" and not any(p in fact for p in ["cơ quan", "thanh tra", "công bố"]):
                 raw = f"{q_short} Theo cơ quan chức năng, {fact}."
+            elif bucket in ("alleged", "press_allegation", "press_charge") and "báo chí" not in fact.lower():
+                raw = f"{q_short} Theo thông tin báo chí phản ánh, {fact}."
             elif bucket == "settled" and not any(p in fact for p in ["dàn xếp", "hòa giải"]):
                 raw = f"{q_short} {fact} (thỏa thuận dàn xếp không thừa nhận sai phạm)."
             elif bucket == "unverified" and "chưa kiểm chứng" not in fact:
@@ -961,6 +997,8 @@ def _render_claim_sentence(
                 raw = f"Crisis trigger in {loc_topic}: According to court records, {fact}."
             elif bucket == "alleged_regulator":
                 raw = f"Crisis trigger in {loc_topic}: According to regulatory filings, {fact}."
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"Crisis trigger in {loc_topic}: According to press reports, {fact}."
             elif bucket == "settled":
                 raw = f"{loc_topic} concluded under terms of settlement: {fact}."
             elif bucket == "unverified":
@@ -978,6 +1016,8 @@ def _render_claim_sentence(
                 raw = f"According to court records, documented scale reached: {fact}."
             elif bucket == "alleged_regulator":
                 raw = f"Regulatory filings establish documented scale: {fact}."
+            elif bucket in ("alleged", "press_allegation", "press_charge"):
+                raw = f"According to press reports, documented scale reached: {fact}."
             elif bucket == "settled":
                 raw = f"Documented scale under resolved terms: {fact} (settled without admitting wrongdoing)."
             elif bucket == "unverified":
@@ -998,6 +1038,8 @@ def _render_claim_sentence(
                 raw = f"{q_short} According to court records, {fact}."
             elif bucket == "alleged_regulator" and not any(p in fact.lower() for p in ["regulatory", "regulators", "filings"]):
                 raw = f"{q_short} According to regulatory filings, {fact}."
+            elif bucket in ("alleged", "press_allegation", "press_charge") and not any(p in fact.lower() for p in ["reports", "reported", "press"]):
+                raw = f"{q_short} According to press reports, {fact}."
             elif bucket == "settled" and "settled" not in fact.lower():
                 raw = f"{q_short} {fact} (settled without admitting wrongdoing)."
             elif bucket == "unverified" and "unverified" not in fact.lower():
@@ -1254,8 +1296,12 @@ def _build_grounded_story_beats(
         is_aftermath = beat_id.startswith("B5")
         for l_idx, (role_slot, src_pool) in enumerate(slots, start=1):
             disallowed: Set[str] = set()
-            if is_aftermath and b1_catalyst_cid:
-                disallowed.add(b1_catalyst_cid)
+            if is_aftermath:
+                if b1_catalyst_cid:
+                    disallowed.add(b1_catalyst_cid)
+                for b_prior in raw_beats[:2]:
+                    for ln_p in b_prior[2]:
+                        disallowed.update(ln_p.claim_ids or [])
             c_obj = _pick_claim(
                 src_pool,
                 restrict_to_preferred=(is_hook_beat and bool(verified_pool)),
@@ -1316,15 +1362,29 @@ def _build_grounded_story_beats(
                             rem_shrunk += "。"
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     elif m == "KR":
-                        rem_clauses = [c.strip() for c in re.split(r"[,;—]\s*", rem) if c.strip()]
-                        if len(rem_clauses) > 1 and len(rem_clauses[0]) >= 16:
-                            rem_shrunk = _to_kr_honorific(rem_clauses[0])
-                        else:
-                            rem_words = rem.strip().split()
-                            if len(rem_words) > 8 and rem_words[-1].endswith(("다.", "습니다.", "입니다.", "했다.", "됐다.")):
-                                rem_shrunk = f"{' '.join(rem_words[:6])} {rem_words[-1]}"
+                        rem_clean = rem.strip()
+                        c_idx = rem_clean.find(",")
+                        if c_idx != -1 and c_idx < len(rem_clean) - 8:
+                            pfx_r = rem_clean[:c_idx + 1].strip()
+                            fact_r = rem_clean[c_idx + 1:].strip()
+                            r_words = fact_r.split()
+                            if len(r_words) > 5:
+                                if r_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
+                                    shrunk_r = f"{' '.join(r_words[:3])} {r_words[-1]}"
+                                else:
+                                    shrunk_r = _to_kr_honorific(f"{' '.join(r_words[:3])} {r_words[-1]}")
                             else:
-                                rem_shrunk = _to_kr_honorific(" ".join(rem_words[:8]))
+                                shrunk_r = _to_kr_honorific(fact_r)
+                            rem_shrunk = f"{pfx_r} {shrunk_r}"
+                        else:
+                            r_words = rem_clean.split()
+                            if len(r_words) > 6:
+                                if r_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
+                                    rem_shrunk = f"{' '.join(r_words[:4])} {r_words[-1]}"
+                                else:
+                                    rem_shrunk = _to_kr_honorific(f"{' '.join(r_words[:4])} {r_words[-1]}")
+                            else:
+                                rem_shrunk = _to_kr_honorific(rem_clean)
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     else:
                         rem_words = rem.strip().split()
@@ -1367,15 +1427,28 @@ def _build_grounded_story_beats(
                                 shrunk_main += "。"
                             ln_cur.text = shrunk_main
                     else:  # KR
-                        clauses = [c.strip() for c in re.split(r"[;—]|,\s+", main_body) if c.strip()]
-                        if len(clauses) > 1 and len(clauses[0]) >= 16:
-                            shrunk_main = _to_kr_honorific(clauses[0])
-                        else:
-                            words = main_body.split()
-                            if len(words) > 10 and words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
-                                shrunk_main = f"{' '.join(words[:7])} {words[-1]}"
+                        comma_idx = cur_t.rfind(",")
+                        if comma_idx != -1 and comma_idx < len(cur_t) - 8:
+                            pfx_m = cur_t[:comma_idx + 1].strip()
+                            fact_m = cur_t[comma_idx + 1:].strip()
+                            m_words = fact_m.split()
+                            if len(m_words) > 5:
+                                if m_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
+                                    shrunk_m = f"{' '.join(m_words[:3])} {m_words[-1]}"
+                                else:
+                                    shrunk_m = _to_kr_honorific(f"{' '.join(m_words[:3])} {m_words[-1]}")
                             else:
-                                shrunk_main = _to_kr_honorific(" ".join(words[:9]))
+                                shrunk_m = _to_kr_honorific(fact_m)
+                            shrunk_main = f"{pfx_m} {shrunk_m}"
+                        else:
+                            m_words = cur_t.split()
+                            if len(m_words) > 6:
+                                if m_words[-1].endswith(("습니다.", "입니다.", "합니다.", "됩니다.")):
+                                    shrunk_main = f"{' '.join(m_words[:4])} {m_words[-1]}"
+                                else:
+                                    shrunk_main = _to_kr_honorific(f"{' '.join(m_words[:4])} {m_words[-1]}")
+                            else:
+                                shrunk_main = _to_kr_honorific(cur_t)
                         if paren_suffix:
                             ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                         else:

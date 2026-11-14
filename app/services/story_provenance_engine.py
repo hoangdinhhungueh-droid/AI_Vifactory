@@ -470,25 +470,29 @@ def classify_claim_provenance(
             speaker = "journalist"
 
     # 3. Verification status & tier calibration (Anti-RSS-Elevation Invariant)
-    explicit_primary_flag = raw_ver == "verified_primary" and (is_primary_url or is_official_portal)
+    has_unconfirmed_text = any(k in combined_low for k in (
+        "remains unconfirmed", "unconfirmed", "without proving collusion",
+        "확인되지 않", "확인되지 않았", "확정되지 않", "입증되지 않", "미확인",
+        "確認されていない", "立証されていない", "chưa được xác nhận", "chưa kiểm chứng",
+    ))
+    explicit_primary_flag = raw_ver == "verified_primary" and (is_primary_url or is_official_portal) and not has_unconfirmed_text
     if (
-        "remains unconfirmed" in combined_low
-        or "without proving collusion" in combined_low
+        has_unconfirmed_text
         or has_speculative
         or procedural_status == "speculation"
         or speaker == "analyst"
     ):
-        verification_status = "speculative"
+        verification_status = "unverified_secondary" if has_unconfirmed_text else "speculative"
         if doc_type == "statute":
             doc_type = "commentary"
     elif explicit_primary_flag:
         verification_status = "verified_primary"
     elif has_speculative:
         verification_status = "speculative"
-    elif (is_primary_url or is_official_portal) and raw_conf in ("verified", "high", ""):
+    elif (is_primary_url or is_official_portal) and raw_conf in ("verified", "high", "") and not has_unconfirmed_text:
         verification_status = "verified_primary"
     elif is_rss:
-        if is_official_portal:
+        if is_official_portal and not has_unconfirmed_text:
             verification_status = "verified_primary"
         elif raw_conf == "verified" and is_reputable_press:
             verification_status = "corroborated_secondary"
