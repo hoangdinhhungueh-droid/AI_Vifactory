@@ -399,6 +399,10 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     t = re.sub(r"보도가\s*있었던\s*것으로\s*보도됐습니다\.$", "것으로 보도됐습니다.", t)
     t = re.sub(r"보도가\s*있었던\s*것으로\s*전해졌습니다\.$", "것으로 전해졌습니다.", t)
     t = re.sub(r"보도가\s*있었던\s*것으로\s*알려졌습니다\.$", "것으로 알려졌습니다.", t)
+    t = re.sub(r"보도했다고\s*([가-힣A-Za-z0-9·]+(?:가|이))\s*보도한\s*것으로\s*보도됐습니다\.$", r"보도했다고 \1가 보도한 것으로 전해졌습니다.", t)
+    t = re.sub(r"보도한\s*것으로\s*보도됐습니다\.$", "보도한 것으로 전해졌습니다.", t)
+    t = re.sub(r"보도된\s*것으로\s*보도됐습니다\.$", "보도된 것으로 전해졌습니다.", t)
+    t = re.sub(r"전해진\s*것으로\s*전해졌습니다\.$", "전해진 것으로 보도됐습니다.", t)
 
     if t.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "설명합니다.", "제시했습니다.")):
         return t
@@ -463,9 +467,12 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
 
 
 def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
-    """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while preserving subject, metric, and predicate."""
+    """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while preserving legal qualifier prefix, subject, metric, and predicate."""
     cand = text.strip().rstrip(". ")
-    cand = re.sub(r"^[가-힣0-9a-zA-Z\s·]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에),?\s*", "", cand)
+    pfx_m = re.match(r"^([가-힣0-9a-zA-Z\s·]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에),?\s*)", cand)
+    pfx = pfx_m.group(1) if pfx_m else ""
+    if pfx:
+        cand = cand[len(pfx):].strip()
     cand = re.sub(r"\b\d{4}년\s*", "", cand)
     cand = re.sub(r"(?:와|과)\s*(?:관련|관계)\s*(?:기관|당국|부처)(?:이|가)?\s*", "가 ", cand)
     cand = re.sub(r"(?:심사|검토|조사|점검|실사)\s*(?:및|과|와)\s*[가-힣\s]+?절차를\s*", "", cand)
@@ -511,7 +518,7 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     cand = _to_kr_honorific(cand)
     if not cand.endswith((".", "!", "?")):
         cand += "."
-    return cand
+    return f"{pfx}{cand}".strip()
 
 
 def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode: bool = False) -> str:
@@ -957,7 +964,7 @@ def _render_claim_sentence(
             elif bucket == "settled":
                 raw = f"공식 합의 종결 기록에 따르면, {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"초기 언론 보도에 따르면, {fact_h}"
+                raw = f"공식 확인 전 초기 언론 보도에 따르면, {fact_h}"
             elif bucket == "fact":
                 raw = fact_h
             else:
@@ -983,7 +990,7 @@ def _render_claim_sentence(
             elif bucket == "settled":
                 raw = f"합의 종결된 수치는 {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"초기 보도에 나타난 수치를 보면, {fact_h}"
+                raw = f"공식 확인 전 초기 보도에 나타난 수치를 보면, {fact_h}"
             elif bucket == "fact":
                 raw = f"개정 법령에 따르면, {fact_h}" if not any(k in fact_h for k in ("법령", "특별법", "법률", "규정", "조례")) else fact_h
             else:
@@ -992,7 +999,7 @@ def _render_claim_sentence(
             fact_h = _to_kr_honorific(fact)
             if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
                 fact_h = _soften_kr_reported_predicate(fact_h)
-            q_short = cq_clean if (cq_clean and 6 <= len(cq_clean) <= 16 and not cq_clean.endswith("?")) else "왜 못 막았을까?"
+            q_short = cq_clean.rstrip("?").strip() if (cq_clean and 6 <= len(cq_clean.rstrip("?").strip()) <= 16) else "어디서 균열이 시작됐을까"
             if not q_short.endswith("?"):
                 q_short += "?"
             if has_existing_pfx:
@@ -1018,8 +1025,8 @@ def _render_claim_sentence(
             elif bucket == "settled" and "합의" not in fact:
                 raw = f"{q_short} {fact_h} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                if not any(p in fact_h for p in ["보도", "취재", "보도됐", "전해졌"]):
-                    raw = f"{q_short} 초기 보도에 따르면, {fact_h}"
+                if not any(p in fact_h for p in ["공식 확인 전", "검증 전", "미확인"]):
+                    raw = f"{q_short} 공식 확인 전 초기 보도에 따르면, {fact_h}"
                 else:
                     raw = f"{q_short} {fact_h}"
             else:
@@ -1062,11 +1069,11 @@ def _render_claim_sentence(
                     raw = f"공식 합의에 따른 제도 보완 국면에서, {fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
                 elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
                     unv_aftermath = [
-                        f"초기 언론 보도에 따른 사후 평가에서, {fact_h}",
-                        f"전해진 보도 내용에 따른 사후 분석 단계에서, {fact_h}",
-                        f"초기 취재 내용에 나타난 사태 수습 과정에서, {fact_h}",
-                        f"일부 언론 보도에 따른 후속 과제 논의에서, {fact_h}",
-                        f"초기 보도에 나타난 사후 점검 국면에서, {fact_h}",
+                        f"공식 확인 전 초기 보도에 따른 사후 분석에서, {fact_h}",
+                        f"검증 전 보도 내용에 따른 사후 점검 국면에서, {fact_h}",
+                        f"미확인 초기 보도에 따른 사태 수습 논의에서, {fact_h}",
+                        f"추가 검증 전 언론 보도에 따른 후속 과제 검토에서, {fact_h}",
+                        f"공식 확인되지 않은 초기 보도에 따른 사후 평가에서, {fact_h}",
                     ]
                     raw = unv_aftermath[v_idx]
                 elif bucket in ("alleged", "press_charge"):
@@ -1090,15 +1097,15 @@ def _render_claim_sentence(
             elif bucket == "settled":
                 raw = f"{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
             elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
-                if has_existing_pfx:
+                if has_existing_pfx and any(p in fact_h for p in ["미확인", "검증 전", "확인 전", "공식 확인 전", "추가 검증 전", "공식 확인되지 않은"]):
                     raw = fact_h
                 else:
                     unv_leads = [
-                        "취재 보도에 따르면, ",
-                        "초기 언론 보도를 보면, ",
-                        "당시 취재 내용에 따르면, ",
-                        "일부 언론 보도에 의하면, ",
-                        "초기 보도에 나타난 사실을 보면, ",
+                        "공식 확인 전 초기 보도에 따르면, ",
+                        "검증 전 초기 언론 보도를 보면, ",
+                        "추가 검증 전 취재 보도에 따르면, ",
+                        "미확인 초기 보도에 의하면, ",
+                        "공식 확인되지 않은 초기 보도를 보면, ",
                     ]
                     l_idx = slot_idx % len(unv_leads)
                     raw = f"{unv_leads[l_idx]}{fact_h}"
@@ -1192,7 +1199,7 @@ def _render_claim_sentence(
             else:
                 raw = f"確認された規模として、{fact}。"
         elif role_slot == "hook_paradox":
-            q_short = cq_clean if (cq_clean and len(cq_clean) <= 16) else "なぜ止められたはずが放置されたか。"
+            q_short = cq_clean if (cq_clean and len(cq_clean) <= 16) else "どこから綻びが始まったのか。"
             if not q_short.endswith(("か。", "？", "?")):
                 q_short = f"{q_short.rstrip(' 。')}か。"
             if bucket == "final_judgment" and not any(p in fact for p in ["判決", "確定"]):
@@ -1288,7 +1295,7 @@ def _render_claim_sentence(
             else:
                 raw = f"Quy mô xác nhận: {fact}."
         elif role_slot == "hook_paradox":
-            q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Vì sao cảnh báo bị bỏ qua?"
+            q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Đâu là nguyên nhân cốt lõi?"
             if not q_short.endswith("?"):
                 q_short += "?"
             if bucket == "final_judgment" and not any(p in fact for p in ["tòa", "phán quyết", "bản án"]):
@@ -1384,7 +1391,7 @@ def _render_claim_sentence(
             else:
                 raw = f"Verified scale: {fact}."
         elif role_slot == "hook_paradox":
-            q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Why did early oversight fail?"
+            q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Where did the structural tension begin?"
             if not q_short.endswith("?"):
                 q_short += "?"
             if bucket == "final_judgment" and not any(p in fact.lower() for p in ["court", "ruling", "verdict"]):
