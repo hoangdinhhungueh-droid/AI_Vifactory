@@ -347,9 +347,9 @@ def _to_kr_honorific(text: str) -> str:
 
     # Convert common mid-sentence conjunctive verbs into declarative past/present stems
     if re.search(r"(?:하고|하며|되고|되며|이고|이며|이고는|면서)$", t_clean):
-        t_clean = re.sub(r"(?:하고|하며)$", "했다", t_clean)
-        t_clean = re.sub(r"(?:되고|되며)$", "됐다", t_clean)
-        t_clean = re.sub(r"(?:이고|이며)$", "이다", t_clean)
+        t_clean = re.sub(r"(?:하고|하며|하면서)$", "했다", t_clean)
+        t_clean = re.sub(r"(?:되고|되며|되면서)$", "됐다", t_clean)
+        t_clean = re.sub(r"(?:이고|이며|이면서)$", "이다", t_clean)
         t_clean = re.sub(r"면서$", "했다", t_clean)
 
     # 1. Past tense verbs ending in ㅆ다 (했다, 됐다, 였다, 났다, 쳤다, 겪었다, 받았다, 멈췄다, 부풀려졌다, etc.)
@@ -379,11 +379,14 @@ def _to_kr_honorific(text: str) -> str:
     return f"{t_clean}."
 
 
-def _soften_kr_reported_predicate(text: str) -> str:
+def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     """Ensure unverified press claims end in reported speech (전해졌습니다/보도됐습니다) rather than definitive established facts."""
     t = text.strip()
     if t.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "설명합니다.", "제시했습니다.")):
         return t
+    h_bodo = "한 것으로 보도됐습니다." if slot_idx % 2 == 0 else "한 것으로 전해졌습니다."
+    d_bodo = "된 것으로 전해졌습니다." if slot_idx % 2 == 0 else "된 것으로 보도됐습니다."
+    su_bodo = "수 있는 것으로 전해졌습니다." if slot_idx % 2 == 0 else "수 있는 것으로 보도됐습니다."
     repls = [
         (r"마련했습니다\.$", "마련한 것으로 전해졌습니다."),
         (r"모집했습니다\.$", "모집한 것으로 보도됐습니다."),
@@ -400,15 +403,27 @@ def _soften_kr_reported_predicate(text: str) -> str:
         (r"추진했습니다\.$", "추진한 것으로 전해졌습니다."),
         (r"시행됩니다\.$", "시행되는 것으로 보도됐습니다."),
         (r"시작됩니다\.$", "시작되는 것으로 전해졌습니다."),
+        (r"수\s*있었던\s*것으로\s*보도됐습니다\.$", "수 있었던 것으로 보도됐습니다."),
+        (r"수\s*있었습니다\.$", "수 있었던 것으로 보도됐습니다."),
+        (r"수\s*있습니다\.$", su_bodo),
+        (r"이릅니다\.$", "이르는 것으로 집계됐습니다."),
+        (r"만듭니다\.$", "만드는 것으로 전해졌습니다."),
+        (r"겪었습니다\.$", "겪은 것으로 보도됐습니다."),
+        (r"겪고\s*있습니다\.$", "겪고 있는 것으로 보도됐습니다."),
         (r"있었습니다\.$", "있었던 것으로 보도됐습니다."),
         (r"없었습니다\.$", "없었던 것으로 보도됐습니다."),
+        (r"있습니다\.$", "있는 것으로 전해졌습니다."),
+        (r"없습니다\.$", "없는 것으로 전해졌습니다."),
         (r"지원합니다\.$", "지원하는 것으로 전해졌습니다."),
         (r"제공합니다\.$", "제공하는 것으로 전해졌습니다."),
-        (r"했습니다\.$", "한 것으로 보도됐습니다."),
-        (r"됐습니다\.$", "된 것으로 전해졌습니다."),
+        (r"했습니다\.$", h_bodo),
+        (r"됐습니다\.$", d_bodo),
         (r"합니다\.$", "하는 것으로 전해졌습니다."),
         (r"입니다\.$", "인 것으로 전해졌습니다."),
         (r"됩니다\.$", "되는 것으로 전해졌습니다."),
+        (r"었습니다\.$", "었던 것으로 보도됐습니다."),
+        (r"았습니다\.$", "았던 것으로 보도됐습니다."),
+        (r"였습니다\.$", "였던 것으로 보도됐습니다."),
     ]
     for pat, rep in repls:
         if re.search(pat, t):
@@ -438,9 +453,11 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         if len(clauses) > 1:
             head = clauses[0]
             conj_repls = [
+                (r"(?:되면서|되므로)$", "됐다"),
+                (r"(?:하면서|하므로)$", "했다"),
                 (r"하고$", "했다"), (r"하며$", "했다"), (r"되어$", "됐다"),
                 (r"되고$", "된다"), (r"이고$", "이다"), (r"으며$", "었다"), (r"고$", "다"),
-                (r"지만$", "다"), (r"으나$", "다"),
+                (r"지만$", "다"), (r"으나$", "다"), (r"면서$", "했다"),
             ]
             for c_pat, c_rep in conj_repls:
                 if re.search(c_pat, head):
@@ -452,8 +469,9 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         if hook_mode:
             compacted = clean
             compacted = re.sub(r"저금리와\s*높은\s*전세보증금\s*비율을\s*이용한\s*", "", compacted)
-            compacted = re.sub(r"전세사기\s*피해자의\s*보증금\s*회복을\s*지원하는\s*", "피해자 지원 ", compacted)
+            compacted = re.sub(r"전세사기\s*피해자의\s*보증금\s*(?:회복|회수)를\s*지원하는\s*", "피해자 지원 ", compacted)
             compacted = re.sub(r"전세사기\s*피해자에\s*대한\s*", "", compacted)
+            compacted = re.sub(r"보증금\s*최소\s*금융지원\s*", "최소보장 지원 ", compacted)
             compacted = re.sub(r"피해자로\s*인정된\s*임차인에게\s*", "피해자에게 ", compacted)
             compacted = re.sub(r"최소보장금융\s*지원의\s*", "최소보장 ", compacted)
             compacted = re.sub(r"손실\s*보증금의\s*", "손실 보증금 ", compacted)
@@ -819,7 +837,7 @@ def _render_claim_sentence(
         else:
             fact_h = _to_kr_honorific(fact)
             if vs == "unverified_secondary" or bucket in ("unverified", "alleged", "press_charge"):
-                fact_h = _soften_kr_reported_predicate(fact_h)
+                fact_h = _soften_kr_reported_predicate(fact_h, slot_idx=slot_idx)
 
             if role_slot == "aftermath":
                 aftermath_framings = [
@@ -852,30 +870,32 @@ def _render_claim_sentence(
             elif bucket == "settled":
                 raw = f"{fact_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
             elif bucket in ("alleged", "unverified", "press_charge"):
-                rot = slot_idx % 3
+                rot = slot_idx % 4
                 if has_existing_pfx:
                     raw = fact_h
                 elif rot == 0:
+                    raw = fact_h
+                elif rot == 1:
+                    connectors = ["실제로 ", "이 과정에서 ", "나아가 ", "그 결과 ", "한편 ", "동시에 ", "이에 따라 ", "주목할 점은 "]
+                    c_idx = slot_idx % len(connectors)
+                    raw = f"{connectors[c_idx]}{fact_h}"
+                elif rot == 2:
                     lead_opts = [
+                        "취재 기록을 보면, ",
                         "당시 언론 취재에 따르면, ",
                         "취재 보도에 의하면, ",
                         "언론 보도 내용에는, ",
                         "보도된 경위를 보면, ",
-                        "언론 취재 결과에 따르면, ",
-                    ]
-                    raw = f"{lead_opts[v_idx]}{fact_h}"
-                elif rot == 1:
-                    connectors = ["실제로 ", "이 과정에서 ", "나아가 ", "그 결과 ", "한편 "]
-                    raw = f"{connectors[v_idx]}{fact_h}"
-                else:
-                    lead_opts = [
-                        "취재 기록을 보면, ",
                         "초기 보도에 나타난 바에 따르면, ",
                         "관련 보도 내용을 살펴보면, ",
-                        "당시 보도에 따르면, ",
-                        "언론 보도 집계에 따르면, ",
+                        "언론 취재 결과에 따르면, ",
                     ]
-                    raw = f"{lead_opts[v_idx]}{fact_h}"
+                    l_idx = slot_idx % len(lead_opts)
+                    raw = f"{lead_opts[l_idx]}{fact_h}"
+                else:
+                    transitions = ["구체적으로 ", "특히 ", "사안의 핵심은 ", "당시 상황에서 ", "더 나아가 "]
+                    t_idx = slot_idx % len(transitions)
+                    raw = f"{transitions[t_idx]}{fact_h}"
             elif bucket == "alleged_regulator":
                 p_opts = ["정부 발표에 따르면, ", "관계 기관 공식 자료에 따르면, ", "규제 당국의 공식 발표에 따르면, ", "정부 및 관계 당국에 따르면, ", "당국의 공식 분석 자료를 보면, "]
                 raw = fact_h if has_existing_pfx else f"{p_opts[v_idx]}{fact_h}"
@@ -1417,6 +1437,7 @@ def _build_grounded_story_beats(
     raw_beats: List[Tuple[str, float, List[Any]]] = []
     vh_idx = 0
     b1_catalyst_cid: Optional[str] = None
+    total_rendered_lines = 0
     for beat_id, dur_s, slots in beat_specs:
         beat_lines: List[StorySceneLine] = []
         is_hook_beat = beat_id.startswith("B1")
@@ -1465,8 +1486,9 @@ def _build_grounded_story_beats(
                 topic=topic,
                 role_slot=role_slot,
                 central_question=central_question if role_slot == "hook_paradox" else "",
-                slot_idx=l_idx - 1,
+                slot_idx=total_rendered_lines,
             )
+            total_rendered_lines += 1
             vh = visual_hooks_seq[vh_idx % len(visual_hooks_seq)]
             vh_idx += 1
             beat_lines.append(StorySceneLine(
@@ -1531,7 +1553,10 @@ def _build_grounded_story_beats(
                         else:
                             r_words = fact_r.split()
                             if len(r_words) > 7:
-                                shrunk_r = _to_kr_honorific(" ".join(r_words[:3] + r_words[-3:]))
+                                head_part = " ".join(r_words[:4])
+                                tail_part = " ".join(r_words[-3:])
+                                head_part = re.sub(r"(?:의|에|에서|과|와|로|으로|를|을)$", "", head_part).strip()
+                                shrunk_r = _to_kr_honorific(f"{head_part} {tail_part}")
                             else:
                                 shrunk_r = _to_kr_honorific(fact_r)
                         rem_shrunk = f"{pfx_r} {shrunk_r}".strip()
@@ -1590,7 +1615,10 @@ def _build_grounded_story_beats(
                         else:
                             m_words = fact_m.split()
                             if len(m_words) > 7:
-                                shrunk_m = _to_kr_honorific(" ".join(m_words[:3] + m_words[-3:]))
+                                head_part = " ".join(m_words[:4])
+                                tail_part = " ".join(m_words[-3:])
+                                head_part = re.sub(r"(?:의|에|에서|과|와|로|으로|를|을)$", "", head_part).strip()
+                                shrunk_m = _to_kr_honorific(f"{head_part} {tail_part}")
                             else:
                                 shrunk_m = _to_kr_honorific(fact_m)
                         shrunk_main = f"{pfx_m} {shrunk_m}".strip()
@@ -1621,7 +1649,7 @@ def _build_grounded_story_beats(
             topic=topic,
             role_slot=expand_roles[b_idx],
             central_question="",
-            slot_idx=l_idx_e - 1,
+            slot_idx=total_rendered_lines + extra_guard,
         )
         vh_e = visual_hooks_seq[vh_idx % len(visual_hooks_seq)]
         vh_idx += 1
