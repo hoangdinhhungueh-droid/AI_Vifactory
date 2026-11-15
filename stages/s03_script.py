@@ -466,6 +466,24 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     return t
 
 
+def _sanitize_unverified_kr_claim(text: str) -> str:
+    """Sanitize unverified secondary claims to avoid prohibited regulator attribution or official recognition elevation."""
+    t = text
+    # 1. Eliminate prohibited official recognition claims in unverified snippets
+    t = re.sub(r"공식적으로\s*인정(?:되었던|됐던|된|받은|받았던)", "집계된", t)
+    t = re.sub(r"공식\s*인정(?:되었던|됐던|된|받은|받았던)", "집계된", t)
+    t = re.sub(r"공식\s*(?:확인|발표)된", "알려진", t)
+
+    # 2. Convert active government/authority agency to contextual framing
+    t = re.sub(r"\b(정부|지방자치단체|광역자치단체|관계\s*부처|행정\s*당국|규제\s*당국|당국)(?:가|이)\s*", r"\1 차원에서 ", t)
+
+    # 3. Soften established administrative action predicates into reported proposals/plans
+    if "차원에서" in t:
+        t = re.sub(r"([가-힣]*(?:마련|수립|운영|도입|개입|지급|설치|신설))한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?", r"\1하는 방안이 거론된 것으로 전해졌습니다.", t)
+        t = re.sub(r"([가-힣]*(?:마련|수립|운영|도입|개입|지급|설치|신설))된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?", r"\1 추진 방안이 거론된 것으로 전해졌습니다.", t)
+    return t
+
+
 def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while preserving legal qualifier prefix, subject, metric, and predicate."""
     cand = text.strip().rstrip(". ")
@@ -956,6 +974,9 @@ def _render_claim_sentence(
         if ls == "alleged" or vs in ("unverified_secondary", "speculative") or bucket in ("alleged", "unverified"):
             fact_h = _soften_kr_reported_predicate(fact_h, slot_idx=slot_idx)
             fact_stripped_h = _soften_kr_reported_predicate(fact_stripped_h, slot_idx=slot_idx)
+        if vs in ("unverified_secondary", "speculative") or bucket == "unverified":
+            fact_h = _sanitize_unverified_kr_claim(fact_h)
+            fact_stripped_h = _sanitize_unverified_kr_claim(fact_stripped_h)
 
         has_bucket_qualifier = False
         if existing_pfx:

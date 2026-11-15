@@ -1407,6 +1407,25 @@ def line_matches_expected_qualifier(
                             continue
                     return False, f"Misattributes {st}/{bucket} claim to '{ap}'"
 
+    # Guard against official recognition elevation or regulator action attribution on unverified claims
+    if bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
+        if m == "KR":
+            if any(p in line_text for p in ["공식적으로 인정", "공식 인정", "공식적 인정"]):
+                return False, "Elevates unverified claim using official recognition phrasing"
+            has_regulator_actor = bool(re.search(r"\b(정부|지방자치단체|광역자치단체|관계\s*부처|행정\s*당국|규제\s*당국|당국)(?:가|이)\s*", line_text))
+            has_established_action = bool(re.search(r"(?:마련|운영|시행|설립|수립)한\s*것으로\s*(?:보도|전해|알려)", line_text))
+            if has_regulator_actor and has_established_action:
+                return False, "Directly attributes established administrative action to regulator in unverified claim"
+        elif m == "JA":
+            if any(p in line_text for p in ["公式に認定", "公的に認定"]):
+                return False, "Elevates unverified claim using official recognition phrasing"
+        elif m == "VN":
+            if any(p in line_text for p in ["chính thức công nhận", "công nhận chính thức"]):
+                return False, "Elevates unverified claim using official recognition phrasing"
+        elif m == "EN":
+            if any(p in line_text.lower() for p in ["officially recognized", "official recognition"]):
+                return False, "Elevates unverified claim using official recognition phrasing"
+
     if not patterns:
         return True, "ok"
 
