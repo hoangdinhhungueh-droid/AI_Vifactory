@@ -637,8 +637,8 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += "MANDATE: Output all claim text and event descriptions in 100% natural Vietnamese.\n\n"
                 user_prompt += (
                     "CRITICAL MANDATE FOR CLAIM TEXT:\n"
-                    "- The 'claim' field must contain ONLY the direct, substantive factual statement itself (e.g. '국토교통부가 전세사기 피해자의 보증금 회복을 위한 최소보장제 시행을 공식 발표했다').\n"
-                    "- DO NOT write meta-commentary, audit caveats, or verification evaluations inside the 'claim' field (NEVER write '제공 자료는 ... 주장한다' or '그러나 ... 확인되지 않았다').\n"
+                    "- The 'claim' field must contain ONLY the direct, substantive factual statement itself (e.g. '<ENTITY> officially announced the implementation of <POLICY/MEASURE>').\n"
+                    "- DO NOT write meta-commentary, audit caveats, or verification evaluations inside the 'claim' field (NEVER write 'The provided document claims that...' or 'However, ... was not confirmed').\n"
                     "- All evidentiary reservations and caveats belong EXCLUSIVELY in the metadata fields ('legal_status', 'verification_status', 'doc_type', 'confidence').\n\n"
                     "Extract and compile an exhaustive, timestamped evidence_ledger (minimum 6-8 claims: C001, C002, ...) and chronological timeline strictly adhering to the schema.\n"
                     "Ensure every claim has a valid legal_status ('convicted' | 'charged' | 'alleged' | 'settled' | 'fact') and confidence ('high' | 'medium').\n"
