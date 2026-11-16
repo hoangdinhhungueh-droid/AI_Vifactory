@@ -620,6 +620,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         f"NOTE: Deterministic TTS timing already verified duration={measured_dur:.2f}s ({measured_units} {unit_type}) "
                         f"and deterministic_duration_ok={det_duration_ok}; do NOT invent a word-count mismatch on KR/JA unspaced text.\n"
                         "NOTE: Short 2-6 word pattern interrupt lines (e.g. '경고는 무시됐습니다.', 'The warning was ignored.') are dramatic pacing shifts, NOT factual evidentiary claims; do NOT require claim_ids or attribution qualifiers on them.\n"
+                        "NOTE: Natural journalistic reported predicates (e.g. '~것으로 보도됐습니다', '~것으로 전해졌습니다') in Asian languages are appropriate attribution markers and do not constitute repetitive disclaimer boilerplate when the main narrative facts are substantively varied.\n"
                         "Output ONLY a single valid JSON block starting with { and ending with }."
                     )
                     raw_resp = gateway.call_llm(

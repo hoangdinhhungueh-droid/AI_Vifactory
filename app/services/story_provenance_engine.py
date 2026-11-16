@@ -979,15 +979,22 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
         return "", ""
 
     if m == "KR":
-        pat = r"^[“\"‘']?(?:[가-힣A-Za-z0-9·\s]{2,35}?(?:따르면|의하면|보면|따른|의한)|[가-힣A-Za-z0-9·\s]{2,25}?(?:보고서|공소장|판결문|판결|소장|발표|조사|감사|공시|문건)(?:는|은|에|에서|를\s*통해|로\s*보면|에\s*따르면|에\s*의하면))[”\"’']?[,:]?\s*"
+        pat = (
+            r"^[“\"‘']?(?:"
+            r"(?:[가-힣A-Za-z0-9·\s]{1,30}?(?:보도|취재|발표|조사|감사|공시|문건|자료|기록|판결|공소장|소장|보고서|기사|언론|당국|정부|법원|검찰|경찰|수사|내용)"
+            r"(?:에\s*따르면|에\s*의하면|을\s*보면|를\s*보면|에\s*나타난|에서\s*밝힌))[”\"’']?[,:]?\s*"
+            r"|[가-힣A-Za-z0-9·\s]{1,25}?(?:보고서|공소장|판결문|판결|소장|발표|조사|감사|공시|문건)(?:를\s*통해|로\s*보면|에\s*따르면|에\s*의하면)[”\"’']?[,:]?\s*"
+            r")[”\"’']?[,:]?\s*"
+        )
         match = re.match(pat, t)
         if match:
             pfx = match.group(0)
-            return t[len(pfx):].strip(), pfx.strip()
+            if not re.search(r"[가-힣A-Za-z0-9·]+(?:이|가|은|는)\s+[가-힣A-Za-z0-9·]+", pfx.strip()):
+                return t[len(pfx):].strip(), pfx.strip()
         return t, ""
 
     if m == "JA":
-        pat = r"^[“\"‘'「]?(?:[^、,\s]{2,30}?(?:によれば|によると|によりますと|による|の記録では|の指摘では|の発表では|の報告では))[”\"’'」]?[、,:]?\s*"
+        pat = r"^[“\"‘'「]?(?:[^、,\s]{2,30}?(?:によれば|によると|によりますと|の記録では|の指摘では|の発表では|の報告では))[”\"’'」]?[、,:]?\s*"
         match = re.match(pat, t)
         if match:
             pfx = match.group(0)
@@ -1418,7 +1425,8 @@ def line_matches_expected_qualifier(
                 return False, "Elevates unverified claim using official recognition phrasing"
             has_regulator_actor = bool(re.search(r"\b(정부|지방자치단체|광역자치단체|관계\s*부처|행정\s*당국|규제\s*당국|당국)(?:가|이)\s*", line_text))
             has_established_action = bool(re.search(r"(?:마련|운영|시행|설립|수립)한\s*것으로\s*(?:보도|전해|알려)", line_text))
-            if has_regulator_actor and has_established_action:
+            raw_has_established_action = bool(re.search(r"(?:마련|운영|시행|설립|수립)", raw_claim_str))
+            if has_regulator_actor and has_established_action and not raw_has_established_action:
                 return False, "Directly attributes established administrative action to regulator in unverified claim"
         elif m == "JA":
             if any(p in line_text for p in ["公式に認定", "公的に認定"]):

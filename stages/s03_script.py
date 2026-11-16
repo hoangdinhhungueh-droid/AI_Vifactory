@@ -479,10 +479,6 @@ def _sanitize_unverified_kr_claim(text: str) -> str:
     # 2. Convert active government/authority agency to contextual framing
     t = re.sub(r"\b(정부|지방자치단체|광역자치단체|관계\s*부처|행정\s*당국|규제\s*당국|당국)(?:가|이)\s*", r"\1 차원에서 ", t)
 
-    # 3. Soften established administrative action predicates into reported proposals/plans
-    if "차원에서" in t:
-        t = re.sub(r"([가-힣]*(?:마련|수립|운영|도입|개입|지급|설치|신설))한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?", r"\1하는 방안이 거론된 것으로 전해졌습니다.", t)
-        t = re.sub(r"([가-힣]*(?:마련|수립|운영|도입|개입|지급|설치|신설))된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?", r"\1 추진 방안이 거론된 것으로 전해졌습니다.", t)
     return t
 
 
@@ -1034,6 +1030,14 @@ def _render_claim_sentence(
             elif bucket == "fact":
                 has_bucket_qualifier = True
 
+        if not has_bucket_qualifier and claim_obj is not None:
+            c_dict_chk = claim_obj if isinstance(claim_obj, dict) else (claim_obj.model_dump() if hasattr(claim_obj, "model_dump") else {})
+            if c_dict_chk:
+                from app.services.story_provenance_engine import line_matches_expected_qualifier as _chk_qual
+                ok_q, _ = _chk_qual(fact_h, c_dict_chk, market=m)
+                if ok_q:
+                    has_bucket_qualifier = True
+
         if role_slot == "hook_catalyst":
             if has_bucket_qualifier:
                 raw = fact_h
@@ -1048,17 +1052,17 @@ def _render_claim_sentence(
             elif bucket == "alleged_regulator":
                 raw = f"정부 발표에 따르면, {fact_stripped_h}"
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"언론 보도에 따르면, {fact_stripped_h}"
+                raw = fact_h if has_bucket_qualifier else f"보도에 따르면, {fact_stripped_h}"
             elif bucket == "settled":
                 raw = f"공식 합의 종결 기록에 따르면, {fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
             elif bucket == "unverified":
-                raw = f"공식 확인 전 초기 언론 보도에 따르면, {fact_stripped_h}"
+                raw = fact_h if has_bucket_qualifier else f"초기 보도에 따르면, {fact_stripped_h}"
             elif bucket == "fact":
                 raw = fact_h
             else:
                 raw = fact_h
         elif role_slot == "hook_scale":
-            if has_bucket_qualifier:
+            if has_bucket_qualifier or bucket in ("alleged", "unverified", "press_allegation", "press_charge"):
                 raw = fact_h
             elif bucket == "final_judgment":
                 raw = f"법원 확정 판결에 적시된 수치에 따르면, {fact_stripped_h}"
@@ -1070,12 +1074,8 @@ def _render_claim_sentence(
                 raw = f"법원 접수 기록에 적시된 수치에 따르면, {fact_stripped_h}"
             elif bucket == "alleged_regulator":
                 raw = f"규제 당국에 따르면, 집계된 수치는 {fact_stripped_h}"
-            elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"언론 보도를 보면, {fact_stripped_h}"
             elif bucket == "settled":
                 raw = f"합의 종결된 수치는 {fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
-            elif bucket == "unverified":
-                raw = f"공식 확인 전 초기 보도에 나타난 수치를 보면, {fact_stripped_h}"
             elif bucket == "fact":
                 raw = f"개정 법령에 따르면, {fact_h}" if not any(k in fact_h for k in ("법령", "특별법", "법률", "규정", "조례")) else fact_h
             else:
@@ -1084,8 +1084,8 @@ def _render_claim_sentence(
             q_short = cq_clean.rstrip("?").strip() if (cq_clean and 6 <= len(cq_clean.rstrip("?").strip()) <= 16) else "어디서 균열이 시작됐을까"
             if not q_short.endswith("?"):
                 q_short += "?"
-            if has_bucket_qualifier:
-                raw = f"{q_short} {fact_h}"
+            if has_bucket_qualifier or bucket in ("alleged", "unverified", "press_allegation", "press_charge"):
+                raw = f"{q_short} {fact_stripped_h}"
             elif bucket == "final_judgment" and not any(p in fact for p in ["판결", "유죄", "선고"]):
                 raw = f"{q_short} 법원 판결에 따르면, {fact_stripped_h}"
             elif bucket == "audit_finding" and not any(p in fact for p in ["감사", "보고서"]):
@@ -1096,12 +1096,8 @@ def _render_claim_sentence(
                 raw = f"{q_short} 법원 접수 기록에 따르면, {fact_stripped_h}"
             elif bucket == "alleged_regulator":
                 raw = f"{q_short} 정부 발표에 따르면, {fact_stripped_h}"
-            elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"{q_short} 언론 보도에 따르면, {fact_stripped_h}"
             elif bucket == "settled" and "합의" not in fact:
                 raw = f"{q_short} {fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
-            elif bucket == "unverified":
-                raw = f"{q_short} 공식 확인 전 초기 보도에 따르면, {fact_stripped_h}"
             else:
                 raw = f"{q_short} {fact_stripped_h}"
         else:
@@ -1147,11 +1143,11 @@ def _render_claim_sentence(
                     raw = unv_aftermath[v_idx]
                 elif bucket in ("alleged", "press_charge"):
                     alleged_aftermath = [
-                        f"언론 보도에 따른 사태 수습 과정에서, {fact_stripped_h}",
-                        f"보도에 나타난 피해 구제와 수습 논의에서, {fact_stripped_h}",
-                        f"취재를 통해 전해진 사후 대응 과정에서, {fact_stripped_h}",
-                        f"언론 취재에 따른 후속 정리 국면에서, {fact_stripped_h}",
+                        f"피해 구제와 사태 수습 논의에서, {fact_stripped_h}",
                         f"보도에 나타난 제도적 과제와 수습 단계에서, {fact_stripped_h}",
+                        f"사후 대응과 재발 방지 과정에서, {fact_stripped_h}",
+                        f"후속 정리와 피해자 지원 국면에서, {fact_stripped_h}",
+                        f"제도적 평가와 시장 점검 단계에서, {fact_stripped_h}",
                     ]
                     raw = alleged_aftermath[v_idx]
                 else:
@@ -1167,7 +1163,15 @@ def _render_claim_sentence(
                 raw = f"{fact_stripped_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
             elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
                 if has_bucket_qualifier:
-                    raw = fact_h
+                    if slot_idx % 4 == 0:
+                        unv_leads = [
+                            "취재 보도에 따르면, ",
+                            "당시 나온 보도를 보면, ",
+                            "초기 취재 내용을 살펴보면, ",
+                        ]
+                        raw = f"{unv_leads[(slot_idx // 4) % len(unv_leads)]}{fact_stripped_h}"
+                    else:
+                        raw = fact_h
                 else:
                     unv_leads = [
                         "공식 확인 전 초기 보도에 따르면, ",
@@ -1180,7 +1184,15 @@ def _render_claim_sentence(
                     raw = f"{unv_leads[l_idx]}{fact_stripped_h}"
             elif bucket in ("alleged", "press_charge"):
                 if has_bucket_qualifier:
-                    raw = fact_h
+                    if slot_idx % 4 == 0:
+                        alleged_leads = [
+                            "보도에 따르면, ",
+                            "당시 취재 내용을 보면, ",
+                            "보도된 경위를 보면, ",
+                        ]
+                        raw = f"{alleged_leads[(slot_idx // 4) % len(alleged_leads)]}{fact_stripped_h}"
+                    else:
+                        raw = fact_h
                 else:
                     alleged_leads = [
                         "언론 보도에 따르면, ",
@@ -1802,6 +1814,46 @@ def _build_grounded_story_beats(
                 claim_ids=cids,
                 visual_hook=vh,
             ))
+
+        # Insert authentic editorial pattern interrupts into B2, B3, B4 to break pacing monotony
+        b_key = beat_id[:2]
+        market_pattern_interrupts = {
+            "KR": {
+                "B2": ("경고의 신호는 분명했습니다.", "pattern_interrupt"),
+                "B3": ("구멍은 이미 커져 있었습니다.", "grease_pencil"),
+                "B4": ("결국 청구서가 돌아왔습니다.", "stop_motion_hit"),
+            },
+            "JA": {
+                "B2": ("警告の兆候は明白でした。", "pattern_interrupt"),
+                "B3": ("亀裂は急速に深まりました。", "grease_pencil"),
+                "B4": ("残されたのは巨額の負債でした。", "stop_motion_hit"),
+            },
+            "VN": {
+                "B2": ("Dấu hiệu cảnh báo bị phớt lờ.", "pattern_interrupt"),
+                "B3": ("Lỗ hổng nhanh chóng lan rộng.", "grease_pencil"),
+                "B4": ("Hóa đơn cuối cùng đã đến.", "stop_motion_hit"),
+            },
+            "EN": {
+                "B2": ("The warning signs were clear.", "pattern_interrupt"),
+                "B3": ("The crack was already widening.", "grease_pencil"),
+                "B4": ("The bill finally came due.", "stop_motion_hit"),
+            },
+        }
+        m_pis = market_pattern_interrupts.get(m, market_pattern_interrupts["EN"])
+        if b_key in m_pis and len(beat_lines) >= 2:
+            pi_text, pi_vh = m_pis[b_key]
+            insert_pos = 2 if b_key == "B2" else (3 if b_key == "B3" else 1)
+            insert_pos = min(insert_pos, len(beat_lines))
+            pi_line = StorySceneLine(
+                line_id=f"{b_key}_PI",
+                text=pi_text,
+                claim_ids=[],
+                visual_hook=pi_vh,
+            )
+            beat_lines.insert(insert_pos, pi_line)
+            for idx_re, ln_re in enumerate(beat_lines, start=1):
+                ln_re.line_id = f"{b_key}_L{idx_re:02d}"
+
         raw_beats.append((beat_id, dur_s, beat_lines))
 
     # Closed-loop TTS duration calibration: ensure B1 <= 24s AND total fits strictly inside [d_min..d_max] & [u_min..u_max]
@@ -2278,6 +2330,12 @@ def run(ctx: RunContext) -> StageArtifact:
                                 ok_already, _ = _pre_match_qual(text, c_dict_q, market=market, peer_claims=c_objs_dicts)
                                 if ok_already:
                                     continue
+                                if (market or "EN").upper() in ("KR", "KO"):
+                                    text_soft = _soften_kr_reported_predicate(text, slot_idx=l_idx)
+                                    ok_soft, _ = _pre_match_qual(text_soft, c_dict_q, market=market, peer_claims=c_objs_dicts)
+                                    if ok_soft:
+                                        text = text_soft
+                                        continue
                                 bkt = _exp_bucket(
                                     legal_status=str(c_dict_q.get("legal_status", "alleged")),
                                     source_type=str(c_dict_q.get("source_type", "press")),

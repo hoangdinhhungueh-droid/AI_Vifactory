@@ -1497,3 +1497,90 @@ def test_s03_beat1_catalyst_monopoly_and_s04_speculative_elevation(tmp_path):
         s04_run(ctx)
     assert exc_info.value.details["gates"]["claim_coverage_gate"] is False
 
+
+def test_provenance_subject_preservation_and_non_repetitive_pacing(tmp_path: Path):
+    """Verify systemic resolution of prefix stripping on sentence subjects,
+    preservation of raw administrative action, and editorial pattern interrupts in S03.
+    """
+    from app.schemas.story_contracts import EvidenceClaim
+    from app.services.story_provenance_engine import (
+        strip_attribution_prefix,
+        line_matches_expected_qualifier,
+    )
+    from stages.s03_script import (
+        _build_grounded_story_beats,
+        _is_editorial_pattern_interrupt,
+    )
+    from stages.s04_critic_script import _detect_repetitive_explainer_filler
+
+    # 1. Subject with adnominal ~에 따른 must NOT be stripped
+    c012_text = "한국토지주택공사 등 공공주택기관이 개정된 제도에 따른 우선매수권을 활용해 압류 주택을 매입한다"
+    cleaned, pfx = strip_attribution_prefix(c012_text, "KR")
+    assert "한국토지주택공사" in cleaned, f"Subject stripped! cleaned={cleaned}, pfx={pfx}"
+    assert pfx == "", f"Accidental prefix match: {pfx}"
+
+    # Legitimate prefix must be stripped
+    legit = "언론 보도에 따르면, 공공기관이 지원을 시작했습니다."
+    c_legit, p_legit = strip_attribution_prefix(legit, "KR")
+    assert "언론 보도에 따르면" in p_legit
+    assert c_legit == "공공기관이 지원을 시작했습니다."
+
+    # 2. Raw claim with established administrative action preserves qualifier match
+    c011_claim = {
+        "claim_id": "C011",
+        "claim": "정부가 부실 전세채권을 흡수하고 인증된 피해자에게 손실 보증금의 최소 3분의 1을 지급하는 국가 재정 기반의 개입 장치를 마련했다는 보도가 있었다.",
+        "legal_status": "alleged",
+        "source_type": "press",
+        "doc_type": "news_article",
+        "verification_status": "unverified_secondary",
+        "credibility_tier": "unconfirmed_claim",
+    }
+    line_c011 = "정부 차원에서 부실 전세채권을 흡수하고 인증된 피해자에게 손실 보증금의 최소 3분의 1을 지급하는 국가 재정 기반의 개입 장치를 마련한 것으로 전해졌습니다."
+    ok, msg = line_matches_expected_qualifier(line_c011, c011_claim, market="KR")
+    assert ok is True, f"C011 failed qualifier match: {msg}"
+
+    # 3. _build_grounded_story_beats must include editorial pattern interrupts and avoid repetitive filler
+    claim_texts = [
+        "금융감독원이 특정 사모펀드의 부실 자산 실태를 점검했다고 발표했다.",
+        "해당 펀드의 환매 중단 규모가 1조 2천억 원에 이르는 것으로 집계됐다.",
+        "운용사 대표가 해외 페이퍼컴퍼니를 설립해 자금을 은닉했다는 의혹이 제기됐다.",
+        "검찰이 불법 자금 흐름을 추적하기 위해 본사를 압수수색한 것으로 전해졌다.",
+        "금융위원회가 관련 판매 금융회사에 대해 기관경고 처분을 내렸다.",
+        "피해 투자자 비상대책위원회가 집단 소송을 제기하기로 합의했다.",
+        "국회 정무위원회 청문회에서 감독 부실 문제가 집중적으로 다뤄졌다.",
+        "감사원이 금융당국의 유착 의혹에 대해 특별감사에 착수했다.",
+        "핵심 관계자들이 자본시장법 위반 혐의로 출국 금지 조치됐다.",
+        "피해 보상 방안에 대한 금융당국 조정안이 최종 확정됐다.",
+        "재발 방지를 위한 사모펀드 제도 개선안이 국회를 통과했다.",
+    ]
+    test_claims = [
+        EvidenceClaim(
+            claim_id=f"C{i:03d}",
+            claim=claim_texts[i - 1],
+            source_name="테스트뉴스",
+            source_url=f"https://news.example.com/test/{i}",
+            source_type="press",
+            verification_status="corroborated_secondary" if i <= 3 else "unverified_secondary",
+            legal_status="alleged",
+            doc_type="news_article",
+            credibility_tier="press_allegation" if i <= 3 else "unconfirmed_claim",
+            causal_role="primary_catalyst" if i == 1 else ("transmission_mechanism" if i <= 4 else "background_context"),
+        )
+        for i in range(1, 12)
+    ]
+    beats = _build_grounded_story_beats(
+        topic="테스트 금융 규제 사안",
+        evidence_ledger=test_claims,
+        evidence_map={c.claim_id: c for c in test_claims},
+        market="KR",
+        central_question="어디서 문제가 시작됐을까?",
+    )
+    all_lines = [ln for _, _, lns in beats for ln in lns]
+    pi_lines = [ln for ln in all_lines if _is_editorial_pattern_interrupt(ln.model_dump(), ln.text, market="KR")]
+    assert len(pi_lines) >= 3, f"Expected >= 3 pattern interrupts across beats, got {len(pi_lines)}"
+
+    # Must NOT trigger repetitive explainer filler
+    has_filler = _detect_repetitive_explainer_filler([ln.model_dump() for ln in all_lines], topic="테스트 금융 규제 사안")
+    assert has_filler is False, "Fallback script triggered repetitive explainer filler!"
+
+
