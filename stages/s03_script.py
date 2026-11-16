@@ -506,9 +506,10 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     if rep_m and len(cand) > max_chars:
         tail = rep_m.group(0).rstrip(".") + "."
         head = cand[:rep_m.start()].strip()
-        # Progressively prune descriptive modifiers while strictly preserving subject, transferred object, and recipient
-        head = re.sub(r"\b(?:향후\s*가격\s*하락|운영상\s*부족분과\s*향후\s*가격\s*하락|운영상\s*부족분과|다세대주택|다세대·빌라|사적\s*신용)\s*", "", head)
-        head = re.sub(r"\b(?:다각적|추가적|일부|당시|기존)\s*", "", head)
+        # Progressively prune descriptive modifiers while strictly preserving subject, specific property scope (e.g. 다세대·빌라), transferred object, and recipient
+        head = re.sub(r"\b(?:향후\s*가격\s*하락|운영상\s*부족분과\s*향후\s*가격\s*하락|운영상\s*부족분과|사적\s*신용)\s*", "", head)
+        head = re.sub(r"\b(?:다각적|추가적|당시|기존)\s*", "", head)
+        head = re.sub(r"\b실제\s*시장가보다\s*높게\s*", "", head)
         head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*대해\s*", "", head)
         head = re.sub(r"([은는이가]\s)[가-힣\s]{2,20}?(?:과|와)\s+", r"\1", head)
         head = re.sub(r"\s+", " ", head).strip()
@@ -617,8 +618,9 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
         # Clean trailing reporting clutter from press/RSS claims
         clean = re.sub(r"(?:다는|라는|다는\s*내용의|라는\s*사실의)?\s*(?:보도가\s*있었다|보도가\s*나왔다|보도가\s*전해졌다|보도가\s*있었으며|보도가\s*있었던|보도이다)$", "다", clean)
         clean = re.sub(r"(?:다는|라는)?\s*(?:분석이\s*보도되었다|분석이\s*나왔다|분석이\s*제기되었다|분석이다|분석인\s*것으로\s*전해졌다)$", "다는 분석이다", clean)
+        clean = re.sub(r"(?:다는|라는)?\s*(?:의혹이\s*보도되었다|의혹이\s*나왔다|의혹이\s*제기되었다|의혹이\s*불거졌다|의혹이\s*있었다|의혹이다)$", "다는 의혹이 제기됐다", clean)
 
-        pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|의혹이\s*보도되었다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다)$"
+        pat_kr = r"([가-힣]+[다라])(?:는|고)?\s*(?:보도가\s*나왔다|보도이다|보도가\s*전해졌다|내용이\s*보도되었다|사실이\s*보도되었다|보도되었다|보도됐다|알려졌다|전해졌다)$"
         clean = re.sub(pat_kr, r"\1", clean)
         clean = re.sub(r"(?:보도되었다|보도됐다|알려졌다|전해졌다|보도됐습니다|전해졌습니다|알려졌습니다)\.?$", "", clean).strip()
         clean = re.sub(r"([가-힣]+)한\s*것으로$", r"\1했다", clean)
@@ -1191,25 +1193,17 @@ def _render_claim_sentence(
             elif bucket == "settled":
                 raw = f"{fact_stripped_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
             elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
-                if has_bucket_qualifier:
-                    if slot_idx % 4 == 0:
-                        unv_leads = [
-                            "취재 보도에 따르면, ",
-                            "당시 나온 보도를 보면, ",
-                            "초기 취재 내용을 살펴보면, ",
-                        ]
-                        raw = f"{unv_leads[(slot_idx // 4) % len(unv_leads)]}{fact_stripped_h}"
-                    else:
-                        raw = fact_h
+                unv_leads = [
+                    "공식 확인 전 초기 보도에 따르면, ",
+                    "검증 전 초기 언론 보도를 보면, ",
+                    "추가 검증 전 취재 보도에 따르면, ",
+                    "미확인 초기 보도에 의하면, ",
+                    "공식 확인되지 않은 초기 보도를 보면, ",
+                ]
+                l_idx = slot_idx % len(unv_leads)
+                if any(p in fact_h for p in ["공식 확인 전", "검증 전", "추가 검증 전", "미확인", "확인 전", "초기 보도", "확인되지 않은"]):
+                    raw = fact_h
                 else:
-                    unv_leads = [
-                        "공식 확인 전 초기 보도에 따르면, ",
-                        "검증 전 초기 언론 보도를 보면, ",
-                        "추가 검증 전 취재 보도에 따르면, ",
-                        "미확인 초기 보도에 의하면, ",
-                        "공식 확인되지 않은 초기 보도를 보면, ",
-                    ]
-                    l_idx = slot_idx % len(unv_leads)
                     raw = f"{unv_leads[l_idx]}{fact_stripped_h}"
             elif bucket in ("alleged", "press_charge"):
                 if has_bucket_qualifier:
@@ -1987,13 +1981,13 @@ def _build_grounded_story_beats(
             if idx == 2 and any(sep in cur_t for sep in ("?", "？")):
                 sep_used = "？" if "？" in cur_t else "?"
                 q_part, _, rem = cur_t.partition(sep_used)
-                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=36)
+                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=40)
                 ln_cur.text = f"{q_part.strip()}{sep_used} {shrunk_r}".strip()
             else:
                 paren_match = re.search(r"\s*(\([^()]+\))\s*[.。!?]?$", cur_t)
                 paren_suffix = paren_match.group(1) if paren_match else ""
                 main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
-                shrunk_main = _compact_kr_hook_line(main_body, max_chars=36)
+                shrunk_main = _compact_kr_hook_line(main_body, max_chars=40)
                 if paren_suffix:
                     ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                 else:

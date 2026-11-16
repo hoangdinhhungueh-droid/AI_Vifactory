@@ -1617,9 +1617,10 @@ def test_kr_hook_compaction_reported_predicate_preservation():
 
 def test_kr_unverified_predicate_reported_speech_and_no_bare_tallied():
     """Verify that unverified numeric press snippets end in reported speech and avoid bare '집계됐습니다'."""
-    from stages.s03_script import _render_claim_sentence, _soften_kr_reported_predicate
+    from stages.s03_script import _render_claim_sentence, _soften_kr_reported_predicate, _compact_kr_hook_line
     from app.services.story_provenance_engine import audit_statement_claim_alignment, line_matches_expected_qualifier
 
+    # 1. Test C008 numeric claim
     c_num = {
         "claim_id": "C008",
         "claim": "경기도에서 최소보장 회복 지원 발표 이전까지 전세사기 피해자로 인증된 사례가 9,317건에 이른다는 보도가 나왔다.",
@@ -1630,10 +1631,28 @@ def test_kr_unverified_predicate_reported_speech_and_no_bare_tallied():
         "credibility_tier": "unconfirmed_claim",
     }
 
-    # Render claim sentence for mechanism slot
     rendered_line, cids = _render_claim_sentence(c_num, "KR", "전세사기 피해자 최소보장제", "mechanism", slot_idx=5)
     assert not rendered_line.endswith("집계됐습니다."), f"Unverified snippet rendered with bare statistical count: {rendered_line}"
     assert "보도됐습니다" in rendered_line or "전해졌습니다" in rendered_line, f"Missing reported predicate in {rendered_line}"
+
+    # 2. Test C006 hook scope integrity (must preserve property scope 다세대·빌라)
+    c006_raw = "감정 관행의 문제로 일부 다세대·빌라 주택이 실제 시장가보다 높게 평가된 것으로 전해졌습니다."
+    shrunk_c006 = _compact_kr_hook_line(c006_raw, max_chars=40)
+    assert "다세대·빌라" in shrunk_c006 or "일부 다세대" in shrunk_c006, f"Scope pruned from hook line: {shrunk_c006}"
+
+    # 3. Test C007 allegation preservation (must preserve 의혹 and unverified attribution)
+    c007 = {
+        "claim_id": "C007",
+        "claim": "조직적 전세사기 집단이 수백 채의 주택을 보유한 지급불능 명의대여 임대인, 이른바 ‘빌라왕’을 모집해 수수료를 지급하고 세금 부담을 회피했다는 의혹이 보도되었다.",
+        "source_type": "press",
+        "doc_type": "rss_snippet",
+        "legal_status": "alleged",
+        "verification_status": "unverified_secondary",
+        "credibility_tier": "unconfirmed_claim",
+    }
+    rendered_c007, _ = _render_claim_sentence(c007, "KR", "전세사기 피해자 최소보장제", "setup", slot_idx=4)
+    assert "의혹" in rendered_c007, f"Allegation stripped from C007: {rendered_c007}"
+    assert any(p in rendered_c007 for p in ["초기 보도", "미확인", "검증 전"]), f"Missing unverified lead in C007: {rendered_c007}"
 
     # Verify statement-claim audit has zero unverified attribution gaps
     beats = [{
@@ -1642,10 +1661,15 @@ def test_kr_unverified_predicate_reported_speech_and_no_bare_tallied():
             "line_id": "B3_L06",
             "text": rendered_line,
             "claim_ids": ["C008"],
+        }, {
+            "line_id": "B2_L05",
+            "text": rendered_c007,
+            "claim_ids": ["C007"],
         }]
     }]
-    audit = audit_statement_claim_alignment(beats, [c_num], market="KR")
+    audit = audit_statement_claim_alignment(beats, [c_num, c007], market="KR")
     assert not audit.get("unverified_attribution_gaps"), f"Audit flagged attribution gap: {audit.get('unverified_attribution_gaps')}"
+
 
 
 
