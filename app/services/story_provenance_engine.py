@@ -2481,6 +2481,16 @@ def audit_statement_claim_alignment(
         str(c.get("claim_id", f"C{idx+1:03d}")): c for idx, c in enumerate(evidence_ledger or [])
     }
 
+    has_any_verified = any(
+        str(c.get("verification_status")) in ("verified_primary", "corroborated_secondary")
+        and (
+            resolve_claim_credibility_tier(c) in ("verified_fact", "official_regulation", "press_allegation")
+            or str(c.get("source_type")) in ("court", "regulator", "gov")
+            or str(c.get("doc_type")) in ("statute", "court_judgment", "regulatory_notice", "gov_report", "audit_report")
+        )
+        for c in ledger_by_id.values()
+    )
+
     # Build normalized map index from explicit statement_claim_map or inline line claim_ids
     mapped_claims: Set[str] = set()
     substantive_covered: Set[str] = set()
@@ -2526,7 +2536,7 @@ def audit_statement_claim_alignment(
                 )
                 if is_ver_anchor:
                     beat1_has_verified_anchor = True
-                elif (ver in ("unverified_secondary", "speculative") or cred == "unconfirmed_claim") and idx < 2:
+                elif has_any_verified and (ver in ("unverified_secondary", "speculative") or cred == "unconfirmed_claim") and idx == 0:
                     # Opening hook premise built solely on unverified / unconfirmed claim
                     if not any(
                         str(ledger_by_id[oc].get("verification_status")) in ("verified_primary", "corroborated_secondary")
