@@ -1821,10 +1821,41 @@ def test_beat5_living_warning_and_claim_freshness():
     b1_cids = {cid for ln in beats[0][2] for cid in (ln.claim_ids or [])}
     b5_cids = {cid for ln in b5_lines for cid in (ln.claim_ids or [])}
     assert "C001" not in b5_cids, "Beat 5 must not repeat the primary opening catalyst"
+def test_kr_compound_compaction_and_press_qualifier_parity():
+    """Verify Korean compound hook compaction preserves semantic coherence and press qualifiers match perfectly."""
+    from stages.s03_script import _compact_kr_hook_line, _sanitize_unverified_kr_claim
+    from app.services.story_provenance_engine import line_matches_expected_qualifier
 
+    # 1. Compound sentence compaction without mangling
+    c006_raw = (
+        "허위 또는 부실 감정 관행으로 일부 다세대주택이 실제 시장가보다 높게 평가됐고, "
+        "공공 보증기관의 보증이 실질적인 시장 검증 없이 주택가치를 초과하는 수준까지 제공됐다는 의혹이 제기됐습니다."
+    )
+    compacted = _compact_kr_hook_line(c006_raw, max_chars=40)
+    assert "허위" in compacted and "평가" in compacted
+    assert "제기됐습니다" in compacted or "전해졌습니다" in compacted or "보도됐습니다" in compacted
+    # Must NOT contain the mangled fragment "허위 또는 평가된"
+    assert "허위 또는 평가된" not in compacted
 
+    # 2. Press qualifier prefix parity for '당시 취재 내용을 보면'
+    test_claim = {
+        "claim_id": "C004",
+        "claim": "한국의 전통적 전세제도에서는 세입자가 일시금 보증금을 제공하고 집주인이 이를 추가 주택 매입 등에 활용하는 구조가 형성됐다",
+        "legal_status": "alleged",
+        "source_type": "press",
+        "doc_type": "news_article",
+        "verification_status": "corroborated_secondary",
+        "credibility_tier": "press_allegation",
+    }
+    line_b2_l02 = "당시 취재 내용을 보면, 한국의 전통적 전세제도에서는 세입자가 일시금 보증금을 제공하고 집주인이 이를 추가 주택 매입 등에 활용하는 구조가 형성됐습니다."
+    ok_q, msg_q = line_matches_expected_qualifier(line_b2_l02, test_claim, market="KR")
+    assert ok_q, f"Expected qualifier to pass, got: {msg_q}"
 
-
+    # 3. Sanitize unverified official recognition in noun phrase
+    unv_line = "정부가 부실 전세채권을 흡수하고 공식 인정 피해자에게 손실 보증금의 최소 3분의 1을 지급하는 재정 지원 장치를 마련했습니다."
+    sanitized = _sanitize_unverified_kr_claim(unv_line)
+    assert "공식 인정" not in sanitized
+    assert "지원 대상 피해자" in sanitized or "인정 피해자" in sanitized
 
 
 

@@ -358,11 +358,17 @@ def _to_kr_honorific(text: str) -> str:
         return f"{t_clean} 전해졌습니다."
 
     # Convert common mid-sentence conjunctive verbs into declarative past/present stems
-    if re.search(r"(?:하고|하며|되고|되며|이고|이며|이고는|면서)$", t_clean):
+    if re.search(r"(?:하고|하며|되고|되며|이고|이며|이고는|면서|했고|하였고|됐고|되었고|였고|이었고|았고|었고|었으며|았으며|였으며|되었으며|하였으며)$", t_clean):
         t_clean = re.sub(r"(?:하고|하며|하면서)$", "했다", t_clean)
         t_clean = re.sub(r"(?:되고|되며|되면서)$", "됐다", t_clean)
+        t_clean = re.sub(r"(?:했고|하였고|하였으며)$", "했다", t_clean)
+        t_clean = re.sub(r"(?:됐고|되었고|되었으며)$", "됐다", t_clean)
+        t_clean = re.sub(r"(?:였고|이었고|였으며|이었으며)$", "였다", t_clean)
+        t_clean = re.sub(r"(?:았고|았으며)$", "았다", t_clean)
+        t_clean = re.sub(r"(?:었고|었으며)$", "었다", t_clean)
         t_clean = re.sub(r"(?:이고|이며|이면서)$", "이다", t_clean)
         t_clean = re.sub(r"면서$", "했다", t_clean)
+
 
     # 1. Past tense verbs ending in ㅆ다 (했다, 됐다, 였다, 났다, 쳤다, 겪었다, 받았다, 멈췄다, 부풀려졌다, etc.)
     if re.search(r"([았었였했됐졌왔뒀썼]다|ㅆ다)$", t_clean):
@@ -472,9 +478,12 @@ def _sanitize_unverified_kr_claim(text: str) -> str:
     """Sanitize unverified secondary claims to avoid prohibited regulator attribution or official recognition elevation."""
     t = text
     # 1. Eliminate prohibited official recognition claims in unverified snippets
-    t = re.sub(r"공식적으로\s*인정(?:되었던|됐던|된|받은|받았던)", "집계된", t)
-    t = re.sub(r"공식\s*인정(?:되었던|됐던|된|받은|받았던)", "집계된", t)
+    t = re.sub(r"공식\s*인정\s*(피해자|대상자|사례|건)", r"지원 대상 \1", t)
+    t = re.sub(r"공식적으로\s*인정(?:되었던|됐던|된|받은|받았던)?", "집계된", t)
+    t = re.sub(r"공식\s*인정(?:되었던|됐던|된|받은|받았던)?", "확인된", t)
     t = re.sub(r"공식\s*(?:확인|발표)된", "알려진", t)
+
+
 
     # 2. Convert active government/authority agency to contextual framing
     t = re.sub(r"\b(정부|지방자치단체|광역자치단체|관계\s*부처|행정\s*당국|규제\s*당국|당국)(?:가|이)\s*", r"\1 차원에서 ", t)
@@ -483,7 +492,7 @@ def _sanitize_unverified_kr_claim(text: str) -> str:
 
 
 def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
-    """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while strictly preserving legal qualifier prefix, subject, metric, and reported predicate."""
+    """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while strictly preserving legal qualifier prefix, subject, core metric, and reported predicate without semantic truncation."""
     cand = text.strip().rstrip(". ")
     pfx_m = re.match(r"^([“\"‘']?[가-힣0-9a-zA-Z\s·]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에)[”\"’']?,?\s*)", cand)
     pfx = pfx_m.group(1) if pfx_m else ""
@@ -493,24 +502,37 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     cand = re.sub(r"(?:와|과)\s*(?:관련|관계)\s*(?:기관|당국|부처)(?:이|가)?\s*", "가 ", cand)
     cand = re.sub(r"(?:심사|검토|조사|점검|실사)\s*(?:및|과|와)\s*[가-힣\s]+?절차를\s*", "", cand)
     cand = re.sub(r"총\s*(\d+[조억만\s]*원)\s*규모(?:의)?\s*", r"\1 ", cand)
-    cand = re.sub(r"(?:진행하고|추진하고|시행하고)\s*있다는\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다)", "추진을 발표했습니다", cand)
-    cand = re.sub(r"(?:다는|라는|고\s*있다는)?\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다|있었다|있었습니다)", "다고 발표했습니다", cand)
+    cand = re.sub(r"(?:진행하고|추진하고|시행하고)\s*있다는\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다|나왔던|있었다|있었습니다|있었던)", "추진을 발표한", cand)
+    cand = re.sub(r"(?:다는|라는|고\s*있다는)?\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다|나왔던|있었다|있었습니다|있었던)", "다고 발표한", cand)
 
-    # Detect if cand ends with an essential reported predicate (legal qualifier)
+    # Detect if cand ends with an essential reported predicate or allegation predicate (legal qualifier)
     rep_m = re.search(
         r"([가-힣]+(?:한|된|하는|되는|인|은|는)\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다|나타났습니다)|"
-        r"[가-힣]+(?:다는|라는)\s*(?:보도입니다|분석입니다|의혹입니다|지적입니다))\.?$",
+        r"[가-힣]+(?:다는|라는)\s*(?:보도입니다|분석입니다|의혹입니다|지적입니다)|"
+        r"의혹이\s*(?:제기됐습니다|불거졌습니다|제기된\s*것으로\s*(?:전해졌습니다|보도됐습니다)))\.?$",
         cand,
     )
 
     if rep_m and len(cand) > max_chars:
         tail = rep_m.group(0).rstrip(".") + "."
         head = cand[:rep_m.start()].strip()
-        # Progressively prune descriptive modifiers while strictly preserving subject, specific entity scope, transferred object, and recipient
-        # 1. Comparative or intensifier adverbial phrases (e.g. 보다 높게, 보다 크게, 매우, 심각하게)
+
+        # Check if head contains coordinate clause (e.g. 평가됐고, ...)
+        clauses = [c.strip() for c in re.split(r"[;—]|,\s*", head) if c.strip()]
+        if len(clauses) > 1:
+            c0 = clauses[0]
+            c0 = re.sub(r"\b(?:매우|상당히|일부|주요|초기|향후|당시|기존|추가적|잠재적|사적|공적|실제|실질적인)\s*", "", c0)
+            c0_h = _to_kr_honorific(c0)
+            if not c0_h.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
+                c0_h = _soften_kr_reported_predicate(c0_h, slot_idx=0)
+            if len(c0_h) <= max_chars + 8:
+                cand_fin = f"{pfx}{c0_h}".strip()
+                return f"{cand_fin}." if not cand_fin.endswith((".", "!", "?")) else cand_fin
+
+        # 1. Comparative or intensifier adverbial phrases
         head = re.sub(r"\b(?:[가-힣0-9·]+보다\s*(?:더\s*)?(?:높게|낮게|크게|작게|많게|적게)|실제보다\s*[가-힣]+|크게|심각하게|상당히|매우)\s*", "", head)
         # 2. General adnominal temporal, descriptive, or structural modifiers
-        head = re.sub(r"\b(?:향후|당시|기존|추가적|다각적|잠재적|사적|공적|일부|주요|초기)\s*", "", head)
+        head = re.sub(r"\b(?:향후|당시|기존|추가적|다각적|잠재적|사적|공적|일부|주요|초기|실제|실질적인)\s*", "", head)
         # 3. Postpositional topic or reference adverbials
         head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*(?:대해|따라|관해)\s*", "", head)
         # 4. Coordinating nominal phrases in subject or predicate
@@ -522,7 +544,7 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         if len(cand_rep) <= max_chars:
             cand = cand_rep
         else:
-            subj_m = re.match(r"^([가-힣\s]+?[은는이가])", head)
+            subj_m = re.match(r"^([가-힣\s]+?(?<!또)(?<!모)(?<!다)(?<!어)[은는이가])", head)
             recip_m = re.search(r"([가-힣0-9·]+(?:에게|에))\s*", head)
             obj_matches = list(re.finditer(r"([가-힣0-9·]+(?:을|를))", head))
             obj_m = obj_matches[-1] if obj_matches else None
@@ -534,8 +556,6 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
                     cand = f"{subj_m.group(1)} {obj_m.group(1)} {tail}".strip()
             elif subj_m and obj_m:
                 cand = f"{subj_m.group(1)} {obj_m.group(1)} {tail}".strip()
-            elif subj_m:
-                cand = f"{subj_m.group(1)} {tail}".strip()
 
     if len(cand) > max_chars:
         cand = re.sub(r"\b\d{1,2}월\s*\d{1,2}일\s*", "", cand)
@@ -550,37 +570,15 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         cand = re.sub(r"(\d[조억만\s]*원)\s*[가-힣\s]{2,15}?(지원|대책|사업|수사|감사|과징금|환수)", r"\1 \2", cand)
         cand = re.sub(r"([은는이가]\s)[가-힣\s]{2,15}?(?=\d)", r"\1", cand)
 
-    # CRITICAL: If rep_m was matched, NEVER strip the reported predicate into indicative past/present tense,
-    # as that destroys the provenance qualification required by Rule 118 / Rule 130!
-    if not rep_m and len(cand) > max_chars:
-        clauses = [c.strip() for c in re.split(r"[;—]|,\s*", cand) if c.strip()]
-        if len(clauses) > 1 and len(clauses[0]) <= max_chars:
-            cand = _to_kr_honorific(clauses[0])
-        else:
-            conn_m = re.search(r"^(.*?([가-힣]+(?:되어|되면서|하여|하면서|하고|되고|이지만|았지만|었지만)))\s+", cand)
-            if conn_m:
-                c_part = conn_m.group(1).strip()
-                for c_pat, c_rep in [
-                    (r"되어$", "됐다"), (r"되면서$", "됐다"), (r"하면서$", "했다"),
-                    (r"하여$", "했다"), (r"하고$", "했다"), (r"되고$", "된다"),
-                    (r"(?:았지만|었지만)$", "었다"), (r"이지만$", "이다"), (r"지만$", "다")
-                ]:
-                    c_part = re.sub(c_pat, c_rep, c_part)
-                cand = _to_kr_honorific(c_part)
-            else:
-                words = cand.split()
-                if len(words) > 5:
-                    if words[-2] in ("것으로", "바가", "점이", "수", "줄"):
-                        cand = " ".join(words[:3] + words[-2:])
-                    else:
-                        cand = " ".join(words[:4] + [words[-1]])
-                    cand = _to_kr_honorific(cand)
-
     cand = re.sub(r"\s+", " ", cand).strip()
     cand = _to_kr_honorific(cand)
-    if not cand.endswith((".", "!", "?")):
-        cand += "."
-    return f"{pfx}{cand}".strip()
+    if rep_m and not cand.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
+        cand = _soften_kr_reported_predicate(cand, slot_idx=0)
+
+    cand_fin = f"{pfx}{cand}".strip()
+    return f"{cand_fin}." if not cand_fin.endswith((".", "!", "?")) else cand_fin
+
+
 
 
 def _is_editorial_pattern_interrupt(ln_dict: Dict[str, Any], text_str: str, market: str = "EN") -> bool:
@@ -1986,7 +1984,7 @@ def _build_grounded_story_beats(
                                 shrunk_main += "。"
                             ln_cur.text = shrunk_main
                     else:  # KR
-                        shrunk_main = _compact_kr_hook_line(main_body, max_chars=34)
+                        shrunk_main = _compact_kr_hook_line(main_body, max_chars=40)
                         if paren_suffix:
                             ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                         else:
@@ -2004,13 +2002,14 @@ def _build_grounded_story_beats(
             if idx == 2 and any(sep in cur_t for sep in ("?", "？")):
                 sep_used = "？" if "？" in cur_t else "?"
                 q_part, _, rem = cur_t.partition(sep_used)
-                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=40)
+                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=34)
                 ln_cur.text = f"{q_part.strip()}{sep_used} {shrunk_r}".strip()
             else:
                 paren_match = re.search(r"\s*(\([^()]+\))\s*[.。!?]?$", cur_t)
                 paren_suffix = paren_match.group(1) if paren_match else ""
                 main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
-                shrunk_main = _compact_kr_hook_line(main_body, max_chars=40)
+                shrunk_main = _compact_kr_hook_line(main_body, max_chars=34)
+
                 if paren_suffix:
                     ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                 else:
