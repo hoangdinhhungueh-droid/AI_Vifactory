@@ -483,7 +483,7 @@ def _sanitize_unverified_kr_claim(text: str) -> str:
 
 
 def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
-    """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while preserving legal qualifier prefix, subject, metric, and predicate."""
+    """Compacts a Korean sentence down to <= max_chars for Beat 1 hook while strictly preserving legal qualifier prefix, subject, metric, and reported predicate."""
     cand = text.strip().rstrip(". ")
     pfx_m = re.match(r"^([“\"‘']?[가-힣0-9a-zA-Z\s·]+(?:따르면|의하면|보면|전해진 바에|공개된 바에|나타난 바에)[”\"’']?,?\s*)", cand)
     pfx = pfx_m.group(1) if pfx_m else ""
@@ -495,6 +495,39 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     cand = re.sub(r"총\s*(\d+[조억만\s]*원)\s*규모(?:의)?\s*", r"\1 ", cand)
     cand = re.sub(r"(?:진행하고|추진하고|시행하고)\s*있다는\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다)", "추진을 발표했습니다", cand)
     cand = re.sub(r"(?:다는|라는|고\s*있다는)?\s*(?:공식\s*)?발표가\s*(?:나왔다|나왔습니다|있었다|있었습니다)", "다고 발표했습니다", cand)
+
+    # Detect if cand ends with an essential reported predicate (legal qualifier)
+    rep_m = re.search(
+        r"([가-힣]+(?:한|된|하는|되는|인|은|는)\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다|나타났습니다)|"
+        r"[가-힣]+(?:다는|라는)\s*(?:보도입니다|분석입니다|의혹입니다|지적입니다))\.?$",
+        cand,
+    )
+
+    if rep_m and len(cand) > max_chars:
+        tail = rep_m.group(0).rstrip(".") + "."
+        head = cand[:rep_m.start()].strip()
+        # Progressively prune descriptive modifiers while preserving subject and core direct object
+        head = re.sub(r"\b(?:향후|당시|기존|신규|일부|다각적|운영상|추가적|사적)\s*", "", head)
+        head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*대해\s*", "", head)
+        head = re.sub(r"([은는이가]\s)[가-힣\s]{2,20}?(?:과|와)\s+", r"\1", head)
+        head = re.sub(r"[가-힣\s]{2,15}?(?:에게|에|으로|로)\s+", " ", head)
+        head = re.sub(r"\s+", " ", head).strip()
+        cand_rep = f"{head} {tail}".strip()
+        if len(cand_rep) <= max_chars:
+            cand = cand_rep
+        else:
+            subj_m = re.match(r"^([가-힣\s]+?[은는이가])", head)
+            if subj_m:
+                subj = subj_m.group(1).strip()
+                obj_m = re.search(r"([가-힣0-9·]+(?:을|를))\s*$", head)
+                if obj_m:
+                    cand_rep = f"{subj} {obj_m.group(1)} {tail}".strip()
+                    if len(cand_rep) <= max_chars:
+                        cand = cand_rep
+                    else:
+                        cand = f"{subj} {tail}".strip()
+                else:
+                    cand = f"{subj} {tail}".strip()
 
     if len(cand) > max_chars:
         cand = re.sub(r"\b\d{1,2}월\s*\d{1,2}일\s*", "", cand)
@@ -509,16 +542,9 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         cand = re.sub(r"(\d[조억만\s]*원)\s*[가-힣\s]{2,15}?(지원|대책|사업|수사|감사|과징금|환수)", r"\1 \2", cand)
         cand = re.sub(r"([은는이가]\s)[가-힣\s]{2,15}?(?=\d)", r"\1", cand)
 
-    if len(cand) > max_chars:
-        # Only shorten reported predicates if an explicit attribution prefix is already present
-        if pfx or re.search(r"(?:보도|취재|발표|조사|공소|판결)", cand):
-            cand = re.sub(r"([가-힣]+)하는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1합니다", cand)
-            cand = re.sub(r"([가-힣]+)되는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됩니다", cand)
-            cand = re.sub(r"([가-힣]+)인\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1입니다", cand)
-            cand = re.sub(r"([가-힣]+)한\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1했습니다", cand)
-            cand = re.sub(r"([가-힣]+)된\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됐습니다", cand)
-
-    if len(cand) > max_chars:
+    # CRITICAL: If rep_m was matched, NEVER strip the reported predicate into indicative past/present tense,
+    # as that destroys the provenance qualification required by Rule 118 / Rule 130!
+    if not rep_m and len(cand) > max_chars:
         clauses = [c.strip() for c in re.split(r"[;—]|,\s*", cand) if c.strip()]
         if len(clauses) > 1 and len(clauses[0]) <= max_chars:
             cand = _to_kr_honorific(clauses[0])
@@ -1899,7 +1925,7 @@ def _build_grounded_story_beats(
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     elif m == "KR":
                         rem_clean = rem.strip()
-                        shrunk_r = _compact_kr_hook_line(rem_clean, max_chars=26)
+                        shrunk_r = _compact_kr_hook_line(rem_clean, max_chars=32)
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     else:
                         rem_words = rem.strip().split()
@@ -1960,13 +1986,13 @@ def _build_grounded_story_beats(
             if idx == 2 and any(sep in cur_t for sep in ("?", "？")):
                 sep_used = "？" if "？" in cur_t else "?"
                 q_part, _, rem = cur_t.partition(sep_used)
-                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=20)
+                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=30)
                 ln_cur.text = f"{q_part.strip()}{sep_used} {shrunk_r}".strip()
             else:
                 paren_match = re.search(r"\s*(\([^()]+\))\s*[.。!?]?$", cur_t)
                 paren_suffix = paren_match.group(1) if paren_match else ""
                 main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
-                shrunk_main = _compact_kr_hook_line(main_body, max_chars=26)
+                shrunk_main = _compact_kr_hook_line(main_body, max_chars=32)
                 if paren_suffix:
                     ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                 else:

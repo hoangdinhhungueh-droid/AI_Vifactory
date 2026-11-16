@@ -1584,3 +1584,35 @@ def test_provenance_subject_preservation_and_non_repetitive_pacing(tmp_path: Pat
     assert has_filler is False, "Fallback script triggered repetitive explainer filler!"
 
 
+def test_kr_hook_compaction_reported_predicate_preservation():
+    """Verify that _compact_kr_hook_line strictly preserves reported speech endings and subjects."""
+    from stages.s03_script import _compact_kr_hook_line
+    from app.services.story_provenance_engine import line_matches_expected_qualifier
+
+    # Test alleged claim with reported predicate
+    raw_alleged = "투기성 다세대주택 개발 방식이 향후 가격 하락 위험을 신규 세입자에게 전가한 것으로 보도됐습니다."
+    shrunk = _compact_kr_hook_line(raw_alleged, max_chars=32)
+
+    assert "전가한 것으로 보도됐습니다." in shrunk or "것으로 보도됐습니다." in shrunk, (
+        f"Compaction stripped reported speech qualifier into unhedged predicate: {shrunk}"
+    )
+    assert not shrunk.endswith("전가했습니다."), f"Compaction incorrectly hardened reported speech into fact: {shrunk}"
+    assert "방식이" in shrunk or "투기성" in shrunk, f"Compaction stripped grammatical subject: {shrunk}"
+
+    c_alleged = {
+        "claim_id": "C005",
+        "claim": "저금리와 높은 전세보증금 비율을 활용한 투기성 다세대주택 개발 방식이 운영상 부족분과 향후 가격 하락 위험을 신규 세입자에게 전가했다는 보도가 있었다.",
+        "legal_status": "alleged",
+        "source_type": "press",
+        "doc_type": "news_article",
+        "speaker": "reporter",
+        "procedural_status": "reported_event",
+        "verification_status": "corroborated_secondary",
+        "credibility_tier": "press_allegation",
+    }
+    full_hook_line = f"어디서 균열이 시작됐을까? {shrunk}"
+    ok, msg = line_matches_expected_qualifier(full_hook_line, c_alleged, market="KR")
+    assert ok, f"Compacted hook line failed provenance qualification: {msg}"
+
+
+
