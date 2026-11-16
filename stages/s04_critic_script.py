@@ -604,8 +604,8 @@ def run(ctx: RunContext) -> StageArtifact:
                 s1_art = require_input(StageID.S1_IDEATION, ctx.paths)
                 if s1_art and isinstance(s1_art.payload, dict):
                     money_usd_val = s1_art.payload.get("money_at_stake_usd")
-            except Exception:
-                pass
+            except (FileNotFoundError, KeyError, AttributeError, Exception) as _s1_err:
+                logger.debug(f"[S04_CRITIC] S01 artifact money_at_stake_usd not loaded: {_s1_err}")
         currency_sanity_ok, currency_issues = check_currency_sanity(
             money_at_stake_usd=money_usd_val,
             all_text=all_text,
