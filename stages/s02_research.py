@@ -636,6 +636,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 elif market == "VN":
                     user_prompt += "MANDATE: Output all claim text and event descriptions in 100% natural Vietnamese.\n\n"
                 user_prompt += (
+                    "CRITICAL MANDATE FOR CLAIM TEXT:\n"
+                    "- The 'claim' field must contain ONLY the direct, substantive factual statement itself (e.g. '국토교통부가 전세사기 피해자의 보증금 회복을 위한 최소보장제 시행을 공식 발표했다').\n"
+                    "- DO NOT write meta-commentary, audit caveats, or verification evaluations inside the 'claim' field (NEVER write '제공 자료는 ... 주장한다' or '그러나 ... 확인되지 않았다').\n"
+                    "- All evidentiary reservations and caveats belong EXCLUSIVELY in the metadata fields ('legal_status', 'verification_status', 'doc_type', 'confidence').\n\n"
                     "Extract and compile an exhaustive, timestamped evidence_ledger (minimum 6-8 claims: C001, C002, ...) and chronological timeline strictly adhering to the schema.\n"
                     "Ensure every claim has a valid legal_status ('convicted' | 'charged' | 'alleged' | 'settled' | 'fact') and confidence ('high' | 'medium').\n"
                     "Start response immediately with { and end with }. Output ONLY valid JSON with NO conversational preamble."
@@ -673,9 +677,12 @@ def run(ctx: RunContext) -> StageArtifact:
                 # Index grounding URLs/claims so LLM cannot launder an RSS claim into verified_primary
                 g_claims_raw = grounding_intel.get("claims", []) if grounding_intel else []
                 raw_ledger = parsed_json.get("evidence_ledger", [])
+                from app.services.story_provenance_engine import sanitize_substantive_claim_text
                 for idx, c in enumerate(raw_ledger, start=1):
                     c_id = c.get("claim_id") or f"C{idx:03d}"
                     c_dict = dict(c)
+                    if c_dict.get("claim"):
+                        c_dict["claim"] = sanitize_substantive_claim_text(c_dict["claim"], market=market)
                     if not c_dict.get("source") and c_dict.get("source_name"):
                         c_dict["source"] = c_dict["source_name"]
                     prov_c = _classify_llm_claim(c_dict, market=market)

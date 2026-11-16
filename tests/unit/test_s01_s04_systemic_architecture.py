@@ -1671,6 +1671,47 @@ def test_kr_unverified_predicate_reported_speech_and_no_bare_tallied():
     assert not audit.get("unverified_attribution_gaps"), f"Audit flagged attribution gap: {audit.get('unverified_attribution_gaps')}"
 
 
+def test_sanitize_substantive_claim_text_and_hook_purpose_compaction():
+    """Verify that LLM meta-audit commentary is stripped from substantive claims and purpose-clauses are neatly pruned in hook compaction."""
+    from app.services.story_provenance_engine import sanitize_substantive_claim_text
+    from stages.s03_script import _compact_kr_hook_line
+
+    # 1. Test LLM meta-commentary stripping
+    kr_meta = (
+        "제공 자료는 국토교통부가 전세사기 피해자의 보증금 회복을 위한 최소보장제 시행을 발표했다고 주장한다. "
+        "그러나 연결 주소는 정책브리핑 원문이 아닌 뉴스 집계 주소이며, 공식 발표문과 법령은 확인되지 않았다. "
+        "기재일은 제공 자료가 주장하는 보도일로서 독립적으로 확인된 발표일이 아니다."
+    )
+    kr_clean = sanitize_substantive_claim_text(kr_meta, "KR")
+    assert kr_clean == "국토교통부가 전세사기 피해자의 보증금 회복을 위한 최소보장제 시행을 발표했다", f"Unexpected cleaned text: {kr_clean}"
+    assert "제공 자료" not in kr_clean
+    assert "주장한다" not in kr_clean
+    assert "그러나" not in kr_clean
+
+    # 2. Test JA, VN, EN sanitization
+    ja_meta = "提供資料によれば国土交通省が対策を発表した。しかし確認されていない。"
+    ja_clean = sanitize_substantive_claim_text(ja_meta, "JA")
+    assert "提供資料によれば" not in ja_clean and ja_clean.endswith("。")
+
+    vn_meta = "Tài liệu được cung cấp cho biết Bộ Xây dựng đã ban hành chính sách mới. Tuy nhiên nguồn tin chưa được kiểm chứng."
+    vn_clean = sanitize_substantive_claim_text(vn_meta, "VN")
+    assert "Tài liệu được cung cấp" not in vn_clean and vn_clean.endswith(".")
+
+    en_meta = "The provided document claims that the FTC launched an inquiry. However, independent confirmation is lacking."
+    en_clean = sanitize_substantive_claim_text(en_meta, "EN")
+    assert "The provided document claims that" not in en_clean and en_clean.endswith(".")
+
+    # 3. Test Korean hook compaction with purpose-clause pruning and object preservation
+    hook_raw = "국토교통부가 전세사기 피해자의 보증금 회복을 위한 최소보장제 시행을 발표한 것으로 전해졌습니다."
+    hook_compacted = _compact_kr_hook_line(hook_raw, max_chars=35)
+    assert len(hook_compacted) <= 35, f"Compacted hook exceeds max_chars: {len(hook_compacted)} ({hook_compacted})"
+    assert "국토교통부" in hook_compacted
+    assert "최소보장제" in hook_compacted or "시행을" in hook_compacted
+    assert "전해졌습니다" in hook_compacted
+    assert "보도일" not in hook_compacted
+
+
+
 
 
 

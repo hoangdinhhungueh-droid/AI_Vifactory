@@ -512,6 +512,7 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         head = re.sub(r"\b실제\s*시장가보다\s*높게\s*", "", head)
         head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*대해\s*", "", head)
         head = re.sub(r"([은는이가]\s)[가-힣\s]{2,20}?(?:과|와)\s+", r"\1", head)
+        head = re.sub(r"(?<=[은는이가]\s)[가-힣\s]{2,25}?(?:을|를)\s*위한\s*", "", head)
         head = re.sub(r"\s+", " ", head).strip()
         cand_rep = f"{head} {tail}".strip()
         if len(cand_rep) <= max_chars:
@@ -519,7 +520,8 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         else:
             subj_m = re.match(r"^([가-힣\s]+?[은는이가])", head)
             recip_m = re.search(r"([가-힣0-9·]+(?:에게|에))\s*", head)
-            obj_m = re.search(r"([가-힣0-9·]+(?:을|를))\s*", head)
+            obj_matches = list(re.finditer(r"([가-힣0-9·]+(?:을|를))", head))
+            obj_m = obj_matches[-1] if obj_matches else None
             if subj_m and recip_m and obj_m:
                 cand_rep = f"{subj_m.group(1)} {obj_m.group(1)} {recip_m.group(1)} {tail}".strip()
                 if len(cand_rep) <= max_chars:
@@ -876,6 +878,8 @@ def _format_claim_fact(c: Any, market: str, topic: str = "", hook_mode: bool = F
 
     m = normalize_market_code(market)
     raw_text = c if isinstance(c, str) else (c.get("claim", "") if isinstance(c, dict) else getattr(c, "claim", ""))
+    from app.services.story_provenance_engine import sanitize_substantive_claim_text
+    raw_text = sanitize_substantive_claim_text(raw_text, market=m)
     text = re.sub(r"\s+", " ", (raw_text or "").strip()).rstrip(".。")
     loc_topic = _localized_topic_label(topic, m)
     if not text:

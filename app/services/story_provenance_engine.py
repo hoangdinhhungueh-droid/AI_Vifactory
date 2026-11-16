@@ -969,6 +969,39 @@ def _qualifier_pattern_matches(pattern: str, text: str, market: str) -> bool:
     return pattern.lower() in text.lower()
 
 
+def sanitize_substantive_claim_text(raw_text: str, market: str) -> str:
+    """Strip LLM meta-audit preamble/commentary from claim text to preserve the pure substantive statement."""
+    m = normalize_market_code(market)
+    t = (raw_text or "").strip()
+    if not t:
+        return ""
+    if m == "KR":
+        s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
+        s1 = re.sub(r"^(?:제공\s*자료(?:는|가)|제시된\s*자료(?:는|가)|자료(?:는|가))\s*", "", s1)
+        s1 = re.sub(r"했다고\s*(?:주장한다|밝혔다|전한다)\.?$", "했다", s1)
+        s1 = re.sub(r"됐다고\s*(?:주장한다|밝혔다|전한다)\.?$", "됐다", s1)
+        s1 = re.sub(r"된다고\s*(?:주장한다|전한다)\.?$", "된다", s1)
+        s1 = re.sub(r"한다고\s*(?:주장한다|전한다)\.?$", "한다", s1)
+        s1 = re.sub(r"구조를\s*지적한다\.?$", "구조를 활용했다", s1)
+        s1 = re.sub(r"의혹을\s*(?:제시한다|제기한다)\.?$", "의혹이 제기됐다", s1)
+        s1 = re.sub(r"추정을\s*(?:제시한다|제기한다)\.?$", "추정이 나왔다", s1)
+        s1 = re.sub(r"(?:고\s*평가한다|라고\s*평가한다)\.?$", "는 평가를 받았다", s1)
+        if not s1.endswith(("다", "했다", "됐다", "있다", "없다", "인다", "는다")):
+            s1 += "다"
+        return s1
+    if m == "JA":
+        s1 = re.split(r"[。]\s*", t)[0].strip().rstrip("。")
+        s1 = re.sub(r"^(?:提供資料によれば|提示された資料は)\s*", "", s1)
+        return s1 + "。" if not s1.endswith("。") else s1
+    if m == "VN":
+        s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
+        s1 = re.sub(r"^(?:Tài liệu được cung cấp|Theo tài liệu cung cấp)\s*", "", s1, flags=re.IGNORECASE)
+        return s1 + "." if not s1.endswith(".") else s1
+    s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
+    s1 = re.sub(r"^(?:The provided document claims that|The provided source states that)\s*", "", s1, flags=re.IGNORECASE)
+    return s1 + "." if not s1.endswith(".") else s1
+
+
 def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
     """Strip leading attribution/qualifier boilerplate from a claim text to prevent double disclaimers.
     Returns (cleaned_text, detected_prefix).
