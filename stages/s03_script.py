@@ -557,7 +557,8 @@ def _is_editorial_pattern_interrupt(ln_dict: Dict[str, Any], text_str: str, mark
     if not t or re.search(r"\d", t):
         return False
     from app.services.story_provenance_engine import strip_attribution_prefix
-    t_clean = strip_attribution_prefix(t, market=market).strip()
+    t_clean, _ = strip_attribution_prefix(t, market=market)
+    t_clean = t_clean.strip()
     words = t_clean.split()
 
     # Explicit visual hook marking
@@ -2192,7 +2193,8 @@ def run(ctx: RunContext) -> StageArtifact:
                             # Handle editorial pattern interrupts cleanly
                             if _is_editorial_pattern_interrupt(ln, text, market=market):
                                 from app.services.story_provenance_engine import strip_attribution_prefix
-                                text_clean = strip_attribution_prefix(text, market=market).strip()
+                                text_clean, _ = strip_attribution_prefix(text, market=market)
+                                text_clean = text_clean.strip()
                                 lines_data.append(StorySceneLine(
                                     line_id=ln.get("line_id", f"{b_id}_L{l_idx:02d}"),
                                     text=text_clean,
