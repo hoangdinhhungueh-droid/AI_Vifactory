@@ -1369,15 +1369,15 @@ def test_adversarial_credibility_tier_anti_laundering_and_corroboration():
 
 def test_s03_beat1_catalyst_monopoly_and_s04_speculative_elevation(tmp_path):
     """Verify Beat 1 accesses distinct verified claims and S04 rejects speculative opening hook elevation."""
-    from stages.s03_script import _build_grounded_story_beats
-    from stages.s04_critic_script import run as s04_run
-    from app.schemas.story_contracts import EvidenceClaim, StoryScriptBeat, StorySceneLine
-    from core.contracts.stages import StageArtifact, Provenance
+    from app.schemas.story_contracts import EvidenceClaim, StorySceneLine, StoryScriptBeat
+    from app.services.preset_loader import load_preset
+    from core.config import RunContext, load_profile
+    from core.contracts.stages import Provenance, StageArtifact
+    from core.gates import GateError, emit_artifact
     from core.paths import RunPaths
     from core.run_manifest import RunManifest
-    from core.config import RunContext, load_profile
-    from app.services.preset_loader import load_preset
-    from core.gates import emit_artifact, GateError
+    from stages.s03_script import _build_grounded_story_beats
+    from stages.s04_critic_script import run as s04_run
 
     # Ledger with 1 catalyst and 4 other verified claims
     claims_ledger = [
@@ -1504,8 +1504,8 @@ def test_provenance_subject_preservation_and_non_repetitive_pacing(tmp_path: Pat
     """
     from app.schemas.story_contracts import EvidenceClaim
     from app.services.story_provenance_engine import (
-        strip_attribution_prefix,
         line_matches_expected_qualifier,
+        strip_attribution_prefix,
     )
     from stages.s03_script import (
         _build_grounded_story_beats,
@@ -1586,8 +1586,8 @@ def test_provenance_subject_preservation_and_non_repetitive_pacing(tmp_path: Pat
 
 def test_kr_hook_compaction_reported_predicate_preservation():
     """Verify that _compact_kr_hook_line strictly preserves reported speech endings and subjects."""
-    from stages.s03_script import _compact_kr_hook_line
     from app.services.story_provenance_engine import line_matches_expected_qualifier
+    from stages.s03_script import _compact_kr_hook_line
 
     # Test alleged claim with reported predicate
     raw_alleged = "투기성 다세대주택 개발 방식이 향후 가격 하락 위험을 신규 세입자에게 전가한 것으로 보도됐습니다."
@@ -1617,8 +1617,8 @@ def test_kr_hook_compaction_reported_predicate_preservation():
 
 def test_kr_unverified_predicate_reported_speech_and_no_bare_tallied():
     """Verify that unverified numeric press snippets end in reported speech and avoid bare '집계됐습니다'."""
-    from stages.s03_script import _render_claim_sentence, _soften_kr_reported_predicate, _compact_kr_hook_line
     from app.services.story_provenance_engine import audit_statement_claim_alignment, line_matches_expected_qualifier
+    from stages.s03_script import _compact_kr_hook_line, _render_claim_sentence
 
     # 1. Test C008 numeric claim
     c_num = {
@@ -1743,8 +1743,8 @@ def test_currency_fx_matrix_and_unit_error_guard():
 def test_anti_double_hedging_and_predicate_dehedging():
     """Verify single-hedging invariant, dehedge_predicate, and check_script_double_hedging."""
     from app.services.story_provenance_engine import (
-        dehedge_predicate,
         check_script_double_hedging,
+        dehedge_predicate,
     )
 
     # 1. dehedge_predicate converts reported speech endings into polite declarative
@@ -1820,11 +1820,12 @@ def test_beat5_living_warning_and_claim_freshness():
     # Verify B5 does not recycle B1 catalyst claim
     b1_cids = {cid for ln in beats[0][2] for cid in (ln.claim_ids or [])}
     b5_cids = {cid for ln in b5_lines for cid in (ln.claim_ids or [])}
+    assert "C001" in b1_cids
     assert "C001" not in b5_cids, "Beat 5 must not repeat the primary opening catalyst"
 def test_kr_compound_compaction_and_press_qualifier_parity():
     """Verify Korean compound hook compaction preserves semantic coherence and press qualifiers match perfectly."""
-    from stages.s03_script import _compact_kr_hook_line, _sanitize_unverified_kr_claim
     from app.services.story_provenance_engine import line_matches_expected_qualifier
+    from stages.s03_script import _compact_kr_hook_line, _sanitize_unverified_kr_claim
 
     # 1. Compound sentence compaction without mangling
     c006_raw = (
@@ -1906,8 +1907,8 @@ def test_kr_dehedging_morphology_and_reachability():
 
 def test_s01_s04_currency_sanity_enforcement():
     """Verify currency sanity coercion in S01 and fail-closed gate enforcement in S04."""
-    from stages.s01_ideation import _coerce_money_at_stake_usd
     from app.services.story_provenance_engine import check_currency_sanity
+    from stages.s01_ideation import _coerce_money_at_stake_usd
 
     # Unscaled KRW 22조 (2.2e13) must be converted via FX to ~15.7B USD
     coerced = _coerce_money_at_stake_usd(22000000000000.0, fallback_val=1000000.0, market="KR")

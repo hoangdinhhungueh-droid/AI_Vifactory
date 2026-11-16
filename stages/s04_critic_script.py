@@ -10,12 +10,11 @@ and calibrated rubric scoring (Rule 118, Rule 128, Rule 130, Rule 139).
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import time
 from collections import Counter
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.config import RunContext
 from core.contracts.stages import CouncilDecision, CriticVerdict, Provenance, StageArtifact, StageID
@@ -583,7 +582,11 @@ def run(ctx: RunContext) -> StageArtifact:
         # ------------------------------------------------------------------
         # Gate 9: Anti-Double-Hedging Gate (Rule 128 / Rule 131 single-hedging invariant)
         # ------------------------------------------------------------------
-        from app.services.story_provenance_engine import check_script_double_hedging, check_currency_sanity, strip_attribution_prefix
+        from app.services.story_provenance_engine import (
+            check_currency_sanity,
+            check_script_double_hedging,
+            strip_attribution_prefix,
+        )
 
         double_hedging_ok, double_hedging_issues = check_script_double_hedging(all_lines, market=market)
         if not double_hedging_ok:

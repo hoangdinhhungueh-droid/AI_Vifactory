@@ -26,6 +26,7 @@ from scripts.orchestrator.hhtech_planner import call_opus55_with_fallbacks
 from scripts.orchestrator.opus55_supervisor_gate import SUPERVISOR_SYSTEM_PROMPT
 from scripts.vps_runner import FastVPSClient
 
+
 def main():
     parser = argparse.ArgumentParser(description="Run Claude Opus 5.5 Supervisory Audit on S01-S04")
     parser.add_argument("--episode-id", default=os.getenv("TARGET_EPISODE_ID", "KR_EP0007_jeonse_deposit_trap"), help="Target Episode ID")
@@ -262,7 +263,7 @@ EVALUATION SCOPE & INSTRUCTIONS:
         try:
             import json_repair
             parsed = json_repair.loads(clean_json)
-        except Exception as e_repair:
+        except Exception:
             import json5
             parsed = json5.loads(clean_json)
     parsed["audit_metadata"] = {

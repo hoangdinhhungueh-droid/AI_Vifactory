@@ -2340,7 +2340,10 @@ def run(ctx: RunContext) -> StageArtifact:
 
                             # Filter out hollow claim citations that have zero semantic overlap with the statement
                             if c_ids:
-                                from app.services.story_provenance_engine import has_entity_or_metric_signal, extract_claim_elements
+                                from app.services.story_provenance_engine import (
+                                    extract_claim_elements,
+                                    has_entity_or_metric_signal,
+                                )
                                 sig_cids = []
                                 for cid in c_ids:
                                     co_raw = evidence_map.get(cid)
