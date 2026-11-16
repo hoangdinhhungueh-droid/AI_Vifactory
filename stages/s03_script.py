@@ -510,11 +510,13 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         cand = re.sub(r"([은는이가]\s)[가-힣\s]{2,15}?(?=\d)", r"\1", cand)
 
     if len(cand) > max_chars:
-        cand = re.sub(r"([가-힣]+)하는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1했습니다", cand)
-        cand = re.sub(r"([가-힣]+)되는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됐습니다", cand)
-        cand = re.sub(r"([가-힣]+)인\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1입니다", cand)
-        cand = re.sub(r"([가-힣]+)한\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1했습니다", cand)
-        cand = re.sub(r"([가-힣]+)된\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됐습니다", cand)
+        # Only shorten reported predicates if an explicit attribution prefix is already present
+        if pfx or re.search(r"(?:보도|취재|발표|조사|공소|판결)", cand):
+            cand = re.sub(r"([가-힣]+)하는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1합니다", cand)
+            cand = re.sub(r"([가-힣]+)되는\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됩니다", cand)
+            cand = re.sub(r"([가-힣]+)인\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1입니다", cand)
+            cand = re.sub(r"([가-힣]+)한\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1했습니다", cand)
+            cand = re.sub(r"([가-힣]+)된\s*것으로\s*(?:전해졌습니다|보도됐습니다|알려졌습니다)", r"\1됐습니다", cand)
 
     if len(cand) > max_chars:
         clauses = [c.strip() for c in re.split(r"[;—]|,\s*", cand) if c.strip()]
