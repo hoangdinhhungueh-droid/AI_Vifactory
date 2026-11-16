@@ -26,6 +26,7 @@ EXEMPTED_FILES = {
     "test_zero_semantic_bias.py",
     "anti_bias_linter.py",
     "supervisory_review_s01_s04.py",
+    "run_opus55_s01_s04_audit.py",
 }
 
 # Forbidden episode-specific domain words that must NEVER appear in generic services/scripts

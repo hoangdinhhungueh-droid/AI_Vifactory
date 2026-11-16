@@ -1633,7 +1633,13 @@ def test_kr_unverified_predicate_reported_speech_and_no_bare_tallied():
 
     rendered_line, cids = _render_claim_sentence(c_num, "KR", "전세사기 피해자 최소보장제", "mechanism", slot_idx=5)
     assert not rendered_line.endswith("집계됐습니다."), f"Unverified snippet rendered with bare statistical count: {rendered_line}"
-    assert "보도됐습니다" in rendered_line or "전해졌습니다" in rendered_line, f"Missing reported predicate in {rendered_line}"
+    ok_qual, _ = line_matches_expected_qualifier(rendered_line, c_num, market="KR")
+    assert ok_qual, f"Rendered line must satisfy qualifier bucket: {rendered_line}"
+    # Single-hedging invariant: lead qualifier OR reported predicate, never both
+    has_lead = "보도에 따르면" in rendered_line or "초기 보도" in rendered_line
+    has_rep_pred = "보도됐습니다" in rendered_line or "전해졌습니다" in rendered_line
+    assert has_lead or has_rep_pred, f"Missing unverified qualification: {rendered_line}"
+    assert not (has_lead and has_rep_pred), f"Double-hedging detected in: {rendered_line}"
 
     # 2. Test C006 hook scope integrity (must preserve property scope 다세대·빌라)
     c006_raw = "감정 관행의 문제로 일부 다세대·빌라 주택이 실제 시장가보다 높게 평가된 것으로 전해졌습니다."
@@ -1709,6 +1715,113 @@ def test_sanitize_substantive_claim_text_and_hook_purpose_compaction():
     assert "최소보장제" in hook_compacted or "시행을" in hook_compacted
     assert "전해졌습니다" in hook_compacted
     assert "보도일" not in hook_compacted
+
+
+def test_currency_fx_matrix_and_unit_error_guard():
+    """Verify FX currency conversion matrix and three-order-of-magnitude unit error guard."""
+    from stages.s01_ideation import _coerce_money_at_stake_usd
+
+    # 1. KRW: 22조 원 string and raw numeric
+    kr_str_usd = _coerce_money_at_stake_usd("22조 원", 5e6, market="KR")
+    assert 1.5e10 <= kr_str_usd <= 1.6e10, f"KRW 22조 string conversion error: {kr_str_usd}"
+    kr_raw_usd = _coerce_money_at_stake_usd(2.2e13, 5e6, market="KR")
+    assert 1.5e10 <= kr_raw_usd <= 1.6e10, f"KRW 22조 raw float unit guard error: {kr_raw_usd}"
+
+    # 2. JPY: 1500億円
+    ja_str_usd = _coerce_money_at_stake_usd("1500億円", 5e6, market="JA")
+    assert 9.9e8 <= ja_str_usd <= 1.1e9, f"JPY 1500억 string conversion error: {ja_str_usd}"
+
+    # 3. VND: 500 tỷ đồng
+    vn_str_usd = _coerce_money_at_stake_usd("500 tỷ đồng", 5e6, market="VN")
+    assert 1.9e7 <= vn_str_usd <= 2.1e7, f"VND 500 tỷ string conversion error: {vn_str_usd}"
+
+    # 4. EN: $22 trillion
+    en_str_usd = _coerce_money_at_stake_usd("$22 trillion", 5e6, market="EN")
+    assert en_str_usd == 2.2e13, f"USD $22 trillion conversion error: {en_str_usd}"
+
+
+def test_anti_double_hedging_and_predicate_dehedging():
+    """Verify single-hedging invariant, dehedge_predicate, and check_script_double_hedging."""
+    from app.services.story_provenance_engine import (
+        dehedge_predicate,
+        check_script_double_hedging,
+    )
+
+    # 1. dehedge_predicate converts reported speech endings into polite declarative
+    s_kr = "검증 전 초기 언론 보도를 보면, 피해 규모는 22조 원에 달한 것으로 보도됐습니다."
+    dh_kr = dehedge_predicate(s_kr, market="KR")
+    assert dh_kr == "검증 전 초기 언론 보도를 보면, 피해 규모는 22조 원에 달했습니다."
+    assert "보도됐습니다" not in dh_kr
+
+    s_kr2 = "언론 보도에 따르면, 해당 법인은 자금을 전가한 것으로 전해졌습니다."
+    dh_kr2 = dehedge_predicate(s_kr2, market="KR")
+    assert dh_kr2 == "언론 보도에 따르면, 해당 법인은 자금을 전가했습니다."
+    assert "전해졌습니다" not in dh_kr2
+
+    # 2. check_script_double_hedging flags double hedging and passes single hedging
+    lines_double = [
+        {"line_id": "B1_L01", "text": "2026년 11월 10일 법원 확정 판결에 따르면, 주택 2,800여 채를 매입한 임대업자가 사기 혐의로 징역 15년을 확정받았습니다."},
+        {"line_id": "B1_L02", "text": "검증 전 초기 언론 보도를 보면, 피해 규모는 22조 원에 달한 것으로 보도됐습니다."},
+    ]
+    ok_dh, issues_dh = check_script_double_hedging(lines_double, market="KR")
+    assert not ok_dh
+    assert any("B1_L02" in iss for iss in issues_dh)
+
+    lines_single = [
+        {"line_id": "B1_L01", "text": "2026년 11월 10일 법원 확정 판결에 따르면, 주택 2,800여 채를 매입한 임대업자가 사기 혐의로 징역 15년을 확정받았습니다."},
+        {"line_id": "B1_L02", "text": "검증 전 초기 언론 보도를 보면, 피해 규모는 22조 원에 달했습니다."},
+        {"line_id": "B1_L03", "text": "피해 규모는 22조 원에 달한 것으로 보도됐습니다."},
+    ]
+    ok_sh, issues_sh = check_script_double_hedging(lines_single, market="KR")
+    assert ok_sh and len(issues_sh) == 0
+
+
+def test_currency_sanity_gate_and_market_symbols():
+    """Verify check_currency_sanity flags unscaled local currency and cross-currency anomalies."""
+    from app.services.story_provenance_engine import check_currency_sanity
+
+    # Unscaled local currency in KR market
+    ok_kr, issues_kr = check_currency_sanity(2.2e13, "피해 규모는 22조 원입니다.", market="KR")
+    assert not ok_kr
+    assert any("unscaled local currency" in iss for iss in issues_kr)
+
+    # Properly converted USD in KR market
+    ok_kr_good, issues_kr_good = check_currency_sanity(1.57e10, "피해 규모는 22조 원입니다.", market="KR")
+    assert ok_kr_good and len(issues_kr_good) == 0
+
+    # Unlocalized currency symbol leak (e.g. raw $ in purely domestic KR script)
+    ok_leak, issues_leak = check_currency_sanity(1e7, "피해 금액은 $5,000,000에 달했습니다.", market="KR")
+    assert not ok_leak
+    assert any("uses raw USD/$" in iss for iss in issues_leak)
+
+
+def test_beat5_living_warning_and_claim_freshness():
+    """Verify Beat 5 includes living warning pattern interrupt and prioritizes fresh claims."""
+    from stages.s03_script import _build_grounded_story_beats, _is_editorial_pattern_interrupt
+
+    test_claims = [
+        {"claim_id": f"C{i:03d}", "claim": f"테스트 사실 관계 #{i}에 대해 국토교통부가 {100*i}억 원 규모 지원을 발표했다.", "source_type": "press", "doc_type": "news_article", "legal_status": "alleged", "verification_status": "corroborated_secondary", "causal_role": "transmission_mechanism"}
+        for i in range(1, 15)
+    ]
+    test_claims[0]["causal_role"] = "primary_catalyst"
+    test_claims[0]["verification_status"] = "verified_primary"
+    c_map = {c["claim_id"]: c for c in test_claims}
+
+    beats = _build_grounded_story_beats("전세사기 피해 지원 대책", test_claims, c_map, market="KR")
+    assert len(beats) == 5
+    b5_id, b5_dur, b5_lines = beats[4]
+    assert b5_id == "B5_aftermath"
+
+    # Verify B5 contains living warning line
+    b5_pi_lines = [ln for ln in b5_lines if _is_editorial_pattern_interrupt(ln.model_dump(), ln.text, market="KR")]
+    assert len(b5_pi_lines) >= 1, "Beat 5 must contain a living warning pattern interrupt"
+    assert "제도의 빈틈은 아직 완전히 메워지지 않았습니다." in [ln.text for ln in b5_pi_lines]
+
+    # Verify B5 does not recycle B1 catalyst claim
+    b1_cids = {cid for ln in beats[0][2] for cid in (ln.claim_ids or [])}
+    b5_cids = {cid for ln in b5_lines for cid in (ln.claim_ids or [])}
+    assert "C001" not in b5_cids, "Beat 5 must not repeat the primary opening catalyst"
+
 
 
 

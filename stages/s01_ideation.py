@@ -22,26 +22,65 @@ logger = logging.getLogger(__name__)
 STAGE: StageID = StageID.S1_IDEATION
 
 
-def _coerce_money_at_stake_usd(raw_val: object, fallback_val: float) -> float:
-    """Safely coerce LLM-emitted money_at_stake_usd (None, 'null', '$172.7M', <=0) into a valid float."""
+def _coerce_money_at_stake_usd(raw_val: object, fallback_val: float, market: str = "EN") -> float:
+    """Safely coerce LLM-emitted money_at_stake_usd (None, 'null', '$172.7M', '22조 원', <=0) into a valid float USD."""
+    m_code = (market or "EN").upper()
+    fx_rate = 1.0
+    if m_code in ("KR", "KRW"):
+        fx_rate = 1.0 / 1400.0
+    elif m_code in ("JA", "JP", "JPY"):
+        fx_rate = 1.0 / 150.0
+    elif m_code in ("VN", "VI", "VND"):
+        fx_rate = 1.0 / 25500.0
+
     if isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool):
         val = float(raw_val)
-        return val if val > 0 else float(fallback_val)
+        if val > 0:
+            # Three-order-of-magnitude unit error guard: if local currency (e.g. KRW 22조 = 2.2e13) was emitted as raw int in USD field
+            if m_code in ("KR", "KRW") and val >= 1e11:
+                return round(val * fx_rate, 2)
+            if m_code in ("JA", "JP", "JPY") and val >= 1e11:
+                return round(val * fx_rate, 2)
+            if m_code in ("VN", "VI", "VND") and val >= 1e11:
+                return round(val * fx_rate, 2)
+            return val
+        return float(fallback_val)
+
     if isinstance(raw_val, str):
         txt = raw_val.strip().lower().replace(",", "")
         mult = 1.0
-        if "trillion" in txt or "조" in txt:
+        is_local_currency = False
+
+        if "조" in txt or "兆" in txt:
             mult = 1e12
-        elif "billion" in txt or "억" in txt:
-            mult = 1e9 if "billion" in txt else 1e8
-        elif "million" in txt or "만" in txt:
-            mult = 1e6 if "million" in txt else 1e4
+            is_local_currency = True
+        elif "trillion" in txt:
+            mult = 1e12
+        elif "억" in txt or "億" in txt:
+            mult = 1e8
+            is_local_currency = True
+        elif "tỷ" in txt or "ty" in txt:
+            mult = 1e9
+            is_local_currency = True
+        elif "billion" in txt:
+            mult = 1e9
+        elif "만" in txt or "万" in txt:
+            mult = 1e4
+            is_local_currency = True
+        elif "million" in txt or "triệu" in txt:
+            mult = 1e6
+
+        if any(c in txt for c in ["원", "krw", "엔", "円", "jpy", "đồng", "dong", "vnd"]):
+            is_local_currency = True
+
         m = re.search(r"([0-9]+(?:\.[0-9]+)?)", txt)
         if m:
             try:
-                val = float(m.group(1)) * mult
-                if val > 0:
-                    return val
+                base_val = float(m.group(1)) * mult
+                if is_local_currency or (m_code != "EN" and not any(u in txt for u in ["$", "usd", "dollar"])):
+                    base_val = base_val * fx_rate
+                if base_val > 0:
+                    return round(base_val, 2)
             except ValueError as _val_err:
                 logger.debug(f"[S01_IDEATION] Could not parse money_at_stake_usd from {raw_val!r}: {_val_err}")
     return float(fallback_val)
@@ -453,6 +492,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 parsed_json["money_at_stake_usd"] = _coerce_money_at_stake_usd(
                     parsed_json.get("money_at_stake_usd"),
                     generic.money_at_stake_usd,
+                    market=market,
                 )
                 if parsed_json.get("status") not in ("ok", "rejected"):
                     parsed_json["status"] = "ok"

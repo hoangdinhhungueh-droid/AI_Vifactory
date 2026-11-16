@@ -977,6 +977,8 @@ def sanitize_substantive_claim_text(raw_text: str, market: str) -> str:
         return ""
     if m == "KR":
         s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
+        if not s1:
+            return ""
         s1 = re.sub(r"^(?:제공\s*자료(?:는|가)|제시된\s*자료(?:는|가)|자료(?:는|가))\s*", "", s1)
         s1 = re.sub(r"했다고\s*(?:주장한다|밝혔다|전한다)\.?$", "했다", s1)
         s1 = re.sub(r"됐다고\s*(?:주장한다|밝혔다|전한다)\.?$", "됐다", s1)
@@ -986,20 +988,31 @@ def sanitize_substantive_claim_text(raw_text: str, market: str) -> str:
         s1 = re.sub(r"의혹을\s*(?:제시한다|제기한다)\.?$", "의혹이 제기됐다", s1)
         s1 = re.sub(r"추정을\s*(?:제시한다|제기한다)\.?$", "추정이 나왔다", s1)
         s1 = re.sub(r"(?:고\s*평가한다|라고\s*평가한다)\.?$", "는 평가를 받았다", s1)
-        if not s1.endswith(("다", "했다", "됐다", "있다", "없다", "인다", "는다")):
-            s1 += "다"
+        # Morphological verb/adjective normalization avoiding blind '다' suffix on nouns or numbers
+        if not s1.endswith("다"):
+            if re.search(r"(?:[았었였했됐졌왔뒀썼렀쳤났맞]음|함|됨|임)$", s1):
+                s1 = re.sub(r"음$", "다", s1)
+                s1 = re.sub(r"함$", "했다", s1)
+                s1 = re.sub(r"됨$", "됐다", s1)
+                s1 = re.sub(r"임$", "이다", s1)
+            elif re.search(r"(?:발표|시행|추진|조사|적발|부과|확인|보고|제기|전가)$", s1):
+                s1 += "했다"
+            elif re.search(r"(?:것|바|점)$", s1):
+                s1 += "이다"
+            elif re.search(r"[가-힣]$", s1) and not re.search(r"[0-9\s/]$", s1):
+                s1 += "다"
         return s1
     if m == "JA":
         s1 = re.split(r"[。]\s*", t)[0].strip().rstrip("。")
         s1 = re.sub(r"^(?:提供資料によれば|提示された資料は)\s*", "", s1)
-        return s1 + "。" if not s1.endswith("。") else s1
+        return f"{s1}。" if s1 else ""
     if m == "VN":
         s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
         s1 = re.sub(r"^(?:Tài liệu được cung cấp|Theo tài liệu cung cấp)\s*", "", s1, flags=re.IGNORECASE)
-        return s1 + "." if not s1.endswith(".") else s1
+        return f"{s1}." if s1 else ""
     s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
     s1 = re.sub(r"^(?:The provided document claims that|The provided source states that)\s*", "", s1, flags=re.IGNORECASE)
-    return s1 + "." if not s1.endswith(".") else s1
+    return f"{s1}." if s1 else ""
 
 
 def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
@@ -1048,6 +1061,181 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
         pfx = match.group(0)
         return t[len(pfx):].strip(), pfx.strip()
     return t, ""
+
+
+def dehedge_predicate(text: str, market: str = "EN") -> str:
+    """Convert softened reported speech predicate endings back into clean declarative forms
+    when an attribution lead prefix is already present at the start of the sentence.
+    Enforces the single-hedging invariant: an attribution qualifier belongs at the beginning
+    OR in the predicate verb, never redundantly in both.
+    """
+    m = normalize_market_code(market)
+    t = (text or "").strip()
+    if not t:
+        return ""
+    if m == "KR":
+        has_period = t.endswith(".")
+        t_clean = t.rstrip(".")
+
+        repls = [
+            (r"한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "했습니다"),
+            (r"했던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "했습니다"),
+            (r"된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "됐습니다"),
+            (r"됐던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "됐습니다"),
+            (r"인\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "입니다"),
+            (r"였던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "이었습니다"),
+            (r"이었던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "이었습니다"),
+            (r"이른\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "이르렀습니다"),
+            (r"이르는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "이릅니다"),
+            (r"달한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "달했습니다"),
+            (r"달하는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "달합니다"),
+            (r"머문\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "머물렀습니다"),
+            (r"그친\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "그쳤습니다"),
+            (r"시작된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "시작됐습니다"),
+            (r"시작되는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "시작됩니다"),
+            (r"시행된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "시행됐습니다"),
+            (r"시행되는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "시행됩니다"),
+            (r"모집한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "모집했습니다"),
+            (r"마련한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "마련했습니다"),
+            (r"정체된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "정체됐습니다"),
+            (r"설치한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "설치했습니다"),
+            (r"지원한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "지원했습니다"),
+            (r"작동한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "작동했습니다"),
+            (r"전가한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "전가했습니다"),
+            (r"제공한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "제공했습니다"),
+            (r"회피한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "회피했습니다"),
+            (r"발표한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "발표했습니다"),
+            (r"확인된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "확인됐습니다"),
+            (r"추진한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "추진했습니다"),
+            (r"수\s*있었던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "수 있었습니다"),
+            (r"수\s*있는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "수 있습니다"),
+            (r"겪은\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "겪었습니다"),
+            (r"겪고\s*있는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "겪고 있습니다"),
+            (r"있었던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "있었습니다"),
+            (r"없었던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "없었습니다"),
+            (r"있는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "있습니다"),
+            (r"없는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "없습니다"),
+            (r"지원받는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "지원받습니다"),
+            (r"지원받았던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "지원받았습니다"),
+            (r"받았던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "받았습니다"),
+            (r"받는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "받습니다"),
+            (r"지원하는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "지원합니다"),
+            (r"제공하는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "제공합니다"),
+            (r"하는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "합니다"),
+            (r"되는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "됩니다"),
+            (r"밝힌\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "밝혔습니다"),
+            (r"나타난\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "나타났습니다"),
+            (r"드러난\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "드러났습니다"),
+            (r"([았었였했됐졌왔뒀썼렀쳤났맞])던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1습니다"),
+            (r"는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "습니다"),
+            (r"은\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "었습니다"),
+            (r"을\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", "을 것입니다"),
+        ]
+        for pat, rep in repls:
+            if re.search(pat, t_clean):
+                t_clean = re.sub(pat, rep, t_clean)
+                break
+        return f"{t_clean}." if has_period or not t_clean.endswith((".", "!", "?")) else t_clean
+
+    if m == "JA":
+        t = re.sub(r"(?:と報道されました|と伝えられました|と報じられました)[。.]?$", "でした。", t)
+        t = re.sub(r"に達したと報道されました[。.]?$", "に達しました。", t)
+        return t
+
+    if m == "VN":
+        t = re.sub(r",\s*được báo cáo là\s+", ", ", t, flags=re.IGNORECASE)
+        t = re.sub(r",\s*được cho là\s+", ", ", t, flags=re.IGNORECASE)
+        return t
+
+    # EN
+    t = re.sub(r"\bwas reportedly\b", "was", t, flags=re.IGNORECASE)
+    t = re.sub(r"\breportedly reached\b", "reached", t, flags=re.IGNORECASE)
+    t = re.sub(r"\breportedly amounted to\b", "amounted to", t, flags=re.IGNORECASE)
+    return t
+
+
+def check_script_double_hedging(
+    lines: List[Dict[str, Any]],
+    market: str = "EN",
+) -> Tuple[bool, List[str]]:
+    """Verify that script lines do not suffer from redundant double-hedging (e.g. both lead attribution and reported speech ending)."""
+    m = normalize_market_code(market)
+    issues: List[str] = []
+
+    for ln in lines:
+        ln_id = str(ln.get("line_id", "LINE"))
+        txt = str(ln.get("text", "")).strip()
+        if not txt:
+            continue
+
+        stripped, pfx = strip_attribution_prefix(txt, market=m)
+        if not pfx:
+            continue
+
+        if m == "KR":
+            if re.search(r"(?:것으로|바가|점이)\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?$", txt):
+                issues.append(
+                    f"Line {ln_id} has redundant double hedging: lead prefix '{pfx}' combined with reported predicate ending."
+                )
+            elif re.search(r"(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?$", stripped) and not any(k in stripped for k in ("공식 발표", "브리핑")):
+                if re.search(r"(?:[한된인] 것으로|던 것으로)\s*(?:보도됐습니다|전해졌습니다)\.?$", stripped):
+                    issues.append(
+                        f"Line {ln_id} has redundant double hedging: lead prefix '{pfx}' combined with reported predicate ending."
+                    )
+        elif m == "JA":
+            if re.search(r"(?:と報道されました|と伝えられました|と報じられました)[。.]?$", txt):
+                issues.append(
+                    f"Line {ln_id} has redundant double hedging: lead prefix '{pfx}' combined with reported predicate ending."
+                )
+        elif m == "VN":
+            if re.search(r"\b(?:được báo cáo là|được cho là|theo tin tức cho biết)\b", stripped, re.IGNORECASE):
+                issues.append(
+                    f"Line {ln_id} has redundant double hedging: lead prefix '{pfx}' combined with redundant reported clause."
+                )
+        else:
+            if re.search(r"\b(?:was reportedly|reportedly|was alleged to be)\b", stripped, re.IGNORECASE):
+                issues.append(
+                    f"Line {ln_id} has redundant double hedging: lead prefix '{pfx}' combined with redundant reporting qualifier."
+                )
+
+    return len(issues) == 0, issues
+
+
+def check_currency_sanity(
+    money_at_stake_usd: Optional[float],
+    all_text: str,
+    market: str = "EN",
+) -> Tuple[bool, List[str]]:
+    """Validate that money_at_stake_usd has been converted from local currency via FX,
+    and script text does not mix contradictory unlocalized currency units.
+    """
+    m = normalize_market_code(market)
+    issues: List[str] = []
+
+    if money_at_stake_usd is not None:
+        try:
+            val = float(money_at_stake_usd)
+            if m in ("KR", "JA", "VN") and val > 5e11:
+                issues.append(
+                    f"Unreasonable money_at_stake_usd (${val:,.2f}) for market {market}: exceeds $500B limit, indicating unscaled local currency."
+                )
+            elif val <= 0:
+                issues.append(f"Invalid non-positive money_at_stake_usd: {val}")
+        except (ValueError, TypeError):
+            issues.append(f"Could not parse money_at_stake_usd as float: {money_at_stake_usd}")
+
+    txt_lower = all_text.lower()
+    if m == "KR":
+        if re.search(r"\$\s*\d+|\d+\s*달러|\d+\s*usd\b", txt_lower) and not re.search(r"미국|달러\s*대비|환율|외환|해외", txt_lower):
+            issues.append("Korean script uses raw USD/$ symbols for domestic financial figures without FX/cross-border context.")
+    elif m == "JA":
+        if re.search(r"\b(?:krw|원|vnd|đồng)\b", txt_lower) and not re.search(r"韓国|ベトナム|為替", txt_lower):
+            issues.append("Japanese script uses non-domestic currency symbols without context.")
+    elif m == "VN":
+        if re.search(r"\b(?:krw|won|jpy|yên)\b", txt_lower) and not re.search(r"hàn quốc|nhật bản|tỷ giá", txt_lower):
+            issues.append("Vietnamese script uses non-domestic currency symbols without context.")
+
+    return len(issues) == 0, issues
 
 
 def expected_qualifier_bucket(

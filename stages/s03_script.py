@@ -506,13 +506,17 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     if rep_m and len(cand) > max_chars:
         tail = rep_m.group(0).rstrip(".") + "."
         head = cand[:rep_m.start()].strip()
-        # Progressively prune descriptive modifiers while strictly preserving subject, specific property scope (e.g. 다세대·빌라), transferred object, and recipient
-        head = re.sub(r"\b(?:향후\s*가격\s*하락|운영상\s*부족분과\s*향후\s*가격\s*하락|운영상\s*부족분과|사적\s*신용)\s*", "", head)
-        head = re.sub(r"\b(?:다각적|추가적|당시|기존)\s*", "", head)
-        head = re.sub(r"\b실제\s*시장가보다\s*높게\s*", "", head)
-        head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*대해\s*", "", head)
+        # Progressively prune descriptive modifiers while strictly preserving subject, specific entity scope, transferred object, and recipient
+        # 1. Comparative or intensifier adverbial phrases (e.g. 보다 높게, 보다 크게, 매우, 심각하게)
+        head = re.sub(r"\b(?:[가-힣0-9·]+보다\s*(?:더\s*)?(?:높게|낮게|크게|작게|많게|적게)|실제보다\s*[가-힣]+|크게|심각하게|상당히|매우)\s*", "", head)
+        # 2. General adnominal temporal, descriptive, or structural modifiers
+        head = re.sub(r"\b(?:향후|당시|기존|추가적|다각적|잠재적|사적|공적|일부|주요|초기)\s*", "", head)
+        # 3. Postpositional topic or reference adverbials
+        head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*(?:대해|따라|관해)\s*", "", head)
+        # 4. Coordinating nominal phrases in subject or predicate
         head = re.sub(r"([은는이가]\s)[가-힣\s]{2,20}?(?:과|와)\s+", r"\1", head)
-        head = re.sub(r"(?<=[은는이가]\s)[가-힣\s]{2,25}?(?:을|를)\s*위한\s*", "", head)
+        # 5. Adnominal purpose, relational, or causal clauses
+        head = re.sub(r"(?<=[은는이가]\s)[가-힣\s]{2,25}?(?:을|를)\s*(?:위한|향한|관한|둘러싼)\s*", "", head)
         head = re.sub(r"\s+", " ", head).strip()
         cand_rep = f"{head} {tail}".strip()
         if len(cand_rep) <= max_chars:
@@ -593,17 +597,17 @@ def _is_editorial_pattern_interrupt(ln_dict: Dict[str, Any], text_str: str, mark
 
     # Explicit visual hook marking
     if vh in ("pattern_interrupt", "grease_pencil", "stop_motion_hit"):
-        if m in ("KR", "JA") and len(t_clean) <= 25 and len(words) <= 7:
+        if m in ("KR", "JA") and len(t_clean) <= 32 and len(words) <= 8:
             return True
-        if len(words) <= 7:
+        if len(words) <= 10:
             return True
 
     # Generic short dramatic phrase without administrative/investigative verbs or policy nouns
     if m in ("KR", "JA"):
-        if len(t_clean) <= 18 and len(words) <= 5 and not any(k in t_clean for k in ("조사", "수사", "판결", "공소", "기소", "발표", "시행", "인가", "승인", "신청", "회복", "지원")):
+        if len(t_clean) <= 30 and len(words) <= 8 and not any(k in t_clean for k in ("조사", "수사", "판결", "공소", "기소", "발표", "시행", "인가", "승인", "신청", "회복", "지원")):
             return True
     else:
-        if len(words) <= 5 and not any(k in t_clean.lower() for k in ("investigat", "ruling", "indict", "announced", "enacted", "approved")):
+        if len(words) <= 10 and not any(k in t_clean.lower() for k in ("investigat", "ruling", "indict", "announced", "enacted", "approved")):
             return True
     return False
 
@@ -990,6 +994,7 @@ def _render_claim_sentence(
     with provenance-matched legal & verification qualification and non-repetitive framing.
     """
     from app.services.story_provenance_engine import (
+        dehedge_predicate,
         expected_qualifier_bucket,
         normalize_market_code,
         strip_attribution_prefix,
@@ -1632,6 +1637,9 @@ def _render_claim_sentence(
     if m == "KR":
         raw = re.sub(r"\b[Pp]ackage\b", "지원책", raw)
         raw = re.sub(r"\b[Pp]lan\b", "계획", raw)
+    _, lead_pfx = strip_attribution_prefix(raw, market=m)
+    if lead_pfx:
+        raw = dehedge_predicate(raw, market=m)
     return raw, [cid]
 
 
@@ -1803,20 +1811,27 @@ def _build_grounded_story_beats(
             unused_in_pool = [c for c in src_pool if _get_cid(c) and _get_cid(c) not in used_in_prior and _get_cid(c) not in disallowed]
             if unused_in_pool:
                 disallowed.update(used_in_prior)
-            elif is_aftermath:
-                # In aftermath beat, never repeat B2 setup/background or B4 crisis claims
-                if len(raw_beats) > 1:
-                    for ln_p in raw_beats[1][2]:
-                        disallowed.update(ln_p.claim_ids or [])
-                if len(raw_beats) > 3:
-                    for ln_p in raw_beats[3][2]:
-                        disallowed.update(ln_p.claim_ids or [])
-            elif not is_hook_beat:
-                # If pool exhausted in B2..B4, allow recycling least recently used claims from earlier beats,
-                # but disallow the immediately preceding beat to maintain freshness
-                if raw_beats:
-                    for ln_p in raw_beats[-1][2]:
-                        disallowed.update(ln_p.claim_ids or [])
+            else:
+                unused_in_all = [c for c in all_claims if _get_cid(c) and _get_cid(c) not in used_in_prior and _get_cid(c) not in disallowed]
+                if unused_in_all:
+                    src_pool = unused_in_all
+                    disallowed.update(used_in_prior)
+                elif is_aftermath:
+                    # In aftermath beat when all claims are exhausted, never repeat B1 catalyst, B2 setup, or B4 crisis
+                    if b1_catalyst_cid:
+                        disallowed.add(b1_catalyst_cid)
+                    if len(raw_beats) > 1:
+                        for ln_p in raw_beats[1][2]:
+                            disallowed.update(ln_p.claim_ids or [])
+                    if len(raw_beats) > 3:
+                        for ln_p in raw_beats[3][2]:
+                            disallowed.update(ln_p.claim_ids or [])
+                elif not is_hook_beat:
+                    # If pool exhausted in B2..B4, allow recycling least recently used claims from earlier beats,
+                    # but disallow the immediately preceding beat to maintain freshness
+                    if raw_beats:
+                        for ln_p in raw_beats[-1][2]:
+                            disallowed.update(ln_p.claim_ids or [])
             c_obj = _pick_claim(
                 src_pool,
                 restrict_to_preferred=(is_hook_beat and bool(verified_pool)),
@@ -1842,28 +1857,32 @@ def _build_grounded_story_beats(
                 visual_hook=vh,
             ))
 
-        # Insert authentic editorial pattern interrupts into B2, B3, B4 to break pacing monotony
+        # Insert authentic editorial pattern interrupts into B2, B3, B4, B5 to break pacing monotony and deliver living warning
         b_key = beat_id[:2]
         market_pattern_interrupts = {
             "KR": {
                 "B2": ("경고의 신호는 분명했습니다.", "pattern_interrupt"),
                 "B3": ("구멍은 이미 커져 있었습니다.", "grease_pencil"),
                 "B4": ("결국 청구서가 돌아왔습니다.", "stop_motion_hit"),
+                "B5": ("제도의 빈틈은 아직 완전히 메워지지 않았습니다.", "stop_motion_hit"),
             },
             "JA": {
                 "B2": ("警告の兆候は明白でした。", "pattern_interrupt"),
                 "B3": ("亀裂は急速に深まりました。", "grease_pencil"),
                 "B4": ("残されたのは巨額の負債でした。", "stop_motion_hit"),
+                "B5": ("制度の歪みは、今も完全には埋まっていません。", "stop_motion_hit"),
             },
             "VN": {
                 "B2": ("Dấu hiệu cảnh báo bị phớt lờ.", "pattern_interrupt"),
                 "B3": ("Lỗ hổng nhanh chóng lan rộng.", "grease_pencil"),
                 "B4": ("Hóa đơn cuối cùng đã đến.", "stop_motion_hit"),
+                "B5": ("Lỗ hổng thể chế vẫn chưa được lấp đầy.", "stop_motion_hit"),
             },
             "EN": {
                 "B2": ("The warning signs were clear.", "pattern_interrupt"),
                 "B3": ("The crack was already widening.", "grease_pencil"),
                 "B4": ("The bill finally came due.", "stop_motion_hit"),
+                "B5": ("The systemic loophole has yet to be fully closed.", "stop_motion_hit"),
             },
         }
         m_pis = market_pattern_interrupts.get(m, market_pattern_interrupts["EN"])

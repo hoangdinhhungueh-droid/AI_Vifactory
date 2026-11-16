@@ -581,6 +581,70 @@ def run(ctx: RunContext) -> StageArtifact:
             })
 
         # ------------------------------------------------------------------
+        # Gate 9: Anti-Double-Hedging Gate (Rule 128 / Rule 131 single-hedging invariant)
+        # ------------------------------------------------------------------
+        from app.services.story_provenance_engine import check_script_double_hedging, check_currency_sanity
+
+        double_hedging_ok, double_hedging_issues = check_script_double_hedging(all_lines, market=market)
+        if not double_hedging_ok:
+            for issue in double_hedging_issues:
+                violations.append({
+                    "line_id": None,
+                    "gate": "anti_double_hedging_gate",
+                    "detail": issue,
+                })
+
+        # ------------------------------------------------------------------
+        # Gate 10: Currency Sanity Gate (Local FX scaling & currency symbol consistency)
+        # ------------------------------------------------------------------
+        money_usd_val = getattr(getattr(ctx, "manifest", None), "money_at_stake_usd", None)
+        if money_usd_val is None:
+            try:
+                from core.models import StageID
+                s1_art = require_input(StageID.S1_IDEATION, ctx.paths)
+                if s1_art and isinstance(s1_art.payload, dict):
+                    money_usd_val = s1_art.payload.get("money_at_stake_usd")
+            except Exception:
+                pass
+        currency_sanity_ok, currency_issues = check_currency_sanity(
+            money_at_stake_usd=money_usd_val,
+            all_text=all_text,
+            market=market,
+        )
+        if not currency_sanity_ok:
+            for issue in currency_issues:
+                violations.append({
+                    "line_id": None,
+                    "gate": "currency_sanity_gate",
+                    "detail": issue,
+                })
+
+        # ------------------------------------------------------------------
+        # Gate 11: Beat 5 Living Warning & Anti-Monopoly Gate (Rule 131)
+        # ------------------------------------------------------------------
+        living_warning_ok = True
+        if len(beats) >= 5:
+            b5 = beats[4]
+            b5_lines = [ln for ln in b5.get("lines", []) if isinstance(ln, dict)]
+            has_b5_living_warning = any(
+                str(ln.get("visual_hook", "")).lower() in ("stop_motion_hit", "pattern_interrupt")
+                and len(ln.get("claim_ids", []) or []) == 0
+                for ln in b5_lines
+            )
+            if not has_b5_living_warning:
+                has_b5_living_warning = any(
+                    any(warn in str(ln.get("text", "")) for warn in ("빈틈", "경고", "남겨진", "歪み", "hổng", "loophole", "warning"))
+                    for ln in b5_lines
+                )
+            if not has_b5_living_warning and len(b5_lines) >= 3:
+                living_warning_ok = False
+                violations.append({
+                    "line_id": "B5",
+                    "gate": "living_warning_gate",
+                    "detail": "Beat 5 must contain a Living Warning / pattern interrupt reflecting on systemic unresolved risks.",
+                })
+
+        # ------------------------------------------------------------------
         # Active LLM Critic Evaluation via model_gateway (Live Runs Only)
         # ------------------------------------------------------------------
         det_duration_ok = bool(duration_ok)
@@ -709,6 +773,9 @@ def run(ctx: RunContext) -> StageArtifact:
             and entity_fit_ok
             and topic_specificity_ok
             and claim_coverage_ok
+            and double_hedging_ok
+            and currency_sanity_ok
+            and living_warning_ok
             and bool(claim_audit["passed"])
         )
 
@@ -723,6 +790,9 @@ def run(ctx: RunContext) -> StageArtifact:
             "topic_specificity_gate": topic_specificity_ok,
             "claim_coverage_gate": claim_coverage_ok,
             "statement_claim_alignment_ok": bool(claim_audit["passed"]),
+            "anti_double_hedging_gate": double_hedging_ok,
+            "currency_sanity_gate": currency_sanity_ok,
+            "living_warning_gate": living_warning_ok,
         }
 
         calibrated = compute_calibrated_script_score(
