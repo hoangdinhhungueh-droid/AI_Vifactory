@@ -506,28 +506,29 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     if rep_m and len(cand) > max_chars:
         tail = rep_m.group(0).rstrip(".") + "."
         head = cand[:rep_m.start()].strip()
-        # Progressively prune descriptive modifiers while preserving subject and core direct object
-        head = re.sub(r"\b(?:향후|당시|기존|신규|일부|다각적|운영상|추가적|사적)\s*", "", head)
+        # Progressively prune descriptive modifiers while strictly preserving subject, transferred object, and recipient
+        head = re.sub(r"\b(?:향후\s*가격\s*하락|운영상\s*부족분과\s*향후\s*가격\s*하락|운영상\s*부족분과|다세대주택|다세대·빌라|사적\s*신용)\s*", "", head)
+        head = re.sub(r"\b(?:다각적|추가적|일부|당시|기존)\s*", "", head)
         head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*대해\s*", "", head)
         head = re.sub(r"([은는이가]\s)[가-힣\s]{2,20}?(?:과|와)\s+", r"\1", head)
-        head = re.sub(r"[가-힣\s]{2,15}?(?:에게|에|으로|로)\s+", " ", head)
         head = re.sub(r"\s+", " ", head).strip()
         cand_rep = f"{head} {tail}".strip()
         if len(cand_rep) <= max_chars:
             cand = cand_rep
         else:
             subj_m = re.match(r"^([가-힣\s]+?[은는이가])", head)
-            if subj_m:
-                subj = subj_m.group(1).strip()
-                obj_m = re.search(r"([가-힣0-9·]+(?:을|를))\s*$", head)
-                if obj_m:
-                    cand_rep = f"{subj} {obj_m.group(1)} {tail}".strip()
-                    if len(cand_rep) <= max_chars:
-                        cand = cand_rep
-                    else:
-                        cand = f"{subj} {tail}".strip()
+            recip_m = re.search(r"([가-힣0-9·]+(?:에게|에))\s*", head)
+            obj_m = re.search(r"([가-힣0-9·]+(?:을|를))\s*", head)
+            if subj_m and recip_m and obj_m:
+                cand_rep = f"{subj_m.group(1)} {obj_m.group(1)} {recip_m.group(1)} {tail}".strip()
+                if len(cand_rep) <= max_chars:
+                    cand = cand_rep
                 else:
-                    cand = f"{subj} {tail}".strip()
+                    cand = f"{subj_m.group(1)} {obj_m.group(1)} {tail}".strip()
+            elif subj_m and obj_m:
+                cand = f"{subj_m.group(1)} {obj_m.group(1)} {tail}".strip()
+            elif subj_m:
+                cand = f"{subj_m.group(1)} {tail}".strip()
 
     if len(cand) > max_chars:
         cand = re.sub(r"\b\d{1,2}월\s*\d{1,2}일\s*", "", cand)
@@ -1132,59 +1133,59 @@ def _render_claim_sentence(
             if role_slot == "aftermath":
                 if bucket == "alleged_regulator":
                     reg_aftermath = [
-                        f"정부 공식 발표에 따른 제도 개선 과정에서, {fact_stripped_h}",
-                        f"관계 당국 발표에 따른 사후 대책 단계에서, {fact_stripped_h}",
-                        f"정부 및 관계 기관의 제도 보완 국면에서, {fact_stripped_h}",
-                        f"당국 공식 발표에 따른 피해 회복 추진 과정에서, {fact_stripped_h}",
-                        f"공식 발표에 나타난 재발 방지 대책 단계에서, {fact_stripped_h}",
+                        f"정부 공식 발표에 따르면, {fact_stripped_h}",
+                        f"관계 당국 발표에 따르면, {fact_stripped_h}",
+                        f"당국 공식 발표에 따르면, {fact_stripped_h}",
+                        f"정부 발표에 따르면, {fact_stripped_h}",
+                        f"관계 기관 공식 발표에 따르면, {fact_stripped_h}",
                     ]
                     raw = reg_aftermath[v_idx]
                 elif bucket == "audit_finding":
                     audit_aftermath = [
-                        f"감사원 감사 보고서에 따른 점검 단계에서, {fact_stripped_h}",
-                        f"공식 감사 결과에 따른 사후 시정 국면에서, {fact_stripped_h}",
-                        f"감사 보고서에 나타난 제도 개선 과정에서, {fact_stripped_h}",
-                        f"감사 결과 및 점검에 따른 보완 단계에서, {fact_stripped_h}",
-                        f"감사원 점검 기록에 따른 관리 감독 국면에서, {fact_stripped_h}",
+                        f"감사원 감사 보고서에 따르면, {fact_stripped_h}",
+                        f"공식 감사 결과에 따르면, {fact_stripped_h}",
+                        f"감사 보고서에 따르면, {fact_stripped_h}",
+                        f"감사원 점검 기록에 따르면, {fact_stripped_h}",
+                        f"공식 감사 기록에 의하면, {fact_stripped_h}",
                     ]
                     raw = audit_aftermath[v_idx]
                 elif bucket == "indictment":
-                    raw = f"검찰 공소장에 따른 수사 마무리 단계에서, {fact_stripped_h}"
+                    raw = f"검찰 공소장에 따르면, {fact_stripped_h}"
                 elif bucket == "court_record":
-                    raw = f"법원 접수 기록에 따른 사후 정리 과정에서, {fact_stripped_h}"
+                    raw = f"법원 접수 기록에 따르면, {fact_stripped_h}"
                 elif bucket == "final_judgment":
-                    raw = f"법원 확정 판결에 따른 최종 심판 단계에서, {fact_stripped_h}"
+                    raw = f"법원 확정 판결에 따르면, {fact_stripped_h}"
                 elif bucket == "criminal_complaint":
-                    raw = f"제출된 소장에 따른 법적 검토 단계에서, {fact_stripped_h}"
+                    raw = f"제출된 소장에 따르면, {fact_stripped_h}"
                 elif bucket == "proposed":
-                    raw = f"추진 중인 정책 방침에 따른 제도화 과정에서, {fact_stripped_h}"
+                    raw = f"정부 추진 방침에 따르면, {fact_stripped_h}"
                 elif bucket == "settled":
-                    raw = f"공식 합의에 따른 제도 보완 국면에서, {fact_stripped_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
+                    raw = f"공식 합의에 따르면, {fact_stripped_h.rstrip('.')} (공식적인 잘못을 인정하지 않고 합의됨)."
                 elif bucket == "unverified" or vs in ("unverified_secondary", "speculative"):
                     unv_aftermath = [
-                        f"공식 확인 전 초기 보도에 따른 사후 분석에서, {fact_stripped_h}",
-                        f"검증 전 보도 내용에 따른 사후 점검 국면에서, {fact_stripped_h}",
-                        f"미확인 초기 보도에 따른 사태 수습 논의에서, {fact_stripped_h}",
-                        f"추가 검증 전 언론 보도에 따른 후속 과제 검토에서, {fact_stripped_h}",
-                        f"공식 확인되지 않은 초기 보도에 따른 사후 평가에서, {fact_stripped_h}",
+                        f"공식 확인 전 초기 보도에 따르면, {fact_stripped_h}",
+                        f"검증 전 초기 언론 보도에 따르면, {fact_stripped_h}",
+                        f"미확인 초기 보도에 따르면, {fact_stripped_h}",
+                        f"추가 검증 전 취재 보도에 따르면, {fact_stripped_h}",
+                        f"초기 언론 보도에 따르면, {fact_stripped_h}",
                     ]
                     raw = unv_aftermath[v_idx]
                 elif bucket in ("alleged", "press_charge"):
                     alleged_aftermath = [
-                        f"피해 구제와 사태 수습 논의에서, {fact_stripped_h}",
-                        f"보도에 나타난 제도적 과제와 수습 단계에서, {fact_stripped_h}",
-                        f"사후 대응과 재발 방지 과정에서, {fact_stripped_h}",
-                        f"후속 정리와 피해자 지원 국면에서, {fact_stripped_h}",
-                        f"제도적 평가와 시장 점검 단계에서, {fact_stripped_h}",
+                        f"취재 보도에 따르면, {fact_stripped_h}",
+                        f"언론 보도에 따르면, {fact_stripped_h}",
+                        f"공개된 보도에 따르면, {fact_stripped_h}",
+                        f"당시 언론 보도를 보면, {fact_stripped_h}",
+                        f"후속 보도에 따르면, {fact_stripped_h}",
                     ]
                     raw = alleged_aftermath[v_idx]
                 else:
                     aftermath_framings = [
-                        f"피해 회복과 제도 보완 국면에서, {fact_stripped_h}",
-                        f"사태 수습과 재발 방지 논의 과정에서, {fact_stripped_h}",
-                        f"사후 검증과 구조적 대책 단계에서, {fact_stripped_h}",
-                        f"제도적 평가와 시장 감시 과정에서, {fact_stripped_h}",
-                        f"후속 조사와 제도 개선 논의에서, {fact_stripped_h}",
+                        f"취재 보도에 따르면, {fact_stripped_h}",
+                        f"언론 보도에 따르면, {fact_stripped_h}",
+                        f"보도된 내용에 따르면, {fact_stripped_h}",
+                        f"당시 보도에 따르면, {fact_stripped_h}",
+                        f"후속 보도에 따르면, {fact_stripped_h}",
                     ]
                     raw = aftermath_framings[v_idx]
             elif bucket == "settled":
@@ -1925,7 +1926,7 @@ def _build_grounded_story_beats(
                         ln_cur.text = f"{q_text} {rem_shrunk}".strip()
                     elif m == "KR":
                         rem_clean = rem.strip()
-                        shrunk_r = _compact_kr_hook_line(rem_clean, max_chars=32)
+                        shrunk_r = _compact_kr_hook_line(rem_clean, max_chars=40)
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     else:
                         rem_words = rem.strip().split()
@@ -1986,13 +1987,13 @@ def _build_grounded_story_beats(
             if idx == 2 and any(sep in cur_t for sep in ("?", "？")):
                 sep_used = "？" if "？" in cur_t else "?"
                 q_part, _, rem = cur_t.partition(sep_used)
-                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=30)
+                shrunk_r = _compact_kr_hook_line(rem.strip(), max_chars=36)
                 ln_cur.text = f"{q_part.strip()}{sep_used} {shrunk_r}".strip()
             else:
                 paren_match = re.search(r"\s*(\([^()]+\))\s*[.。!?]?$", cur_t)
                 paren_suffix = paren_match.group(1) if paren_match else ""
                 main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
-                shrunk_main = _compact_kr_hook_line(main_body, max_chars=32)
+                shrunk_main = _compact_kr_hook_line(main_body, max_chars=36)
                 if paren_suffix:
                     ln_cur.text = f"{shrunk_main.rstrip('.')} {paren_suffix}."
                 else:

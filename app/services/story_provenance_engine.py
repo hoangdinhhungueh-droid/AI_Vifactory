@@ -1405,7 +1405,12 @@ def line_matches_expected_qualifier(
             peer_auth_buckets.add(pc_b)
 
     # Guard against authority laundering: press/unverified claims must never claim prosecutor indictment or regulator mandate
-    if (st == "press" or vs in ("unverified_secondary", "speculative")) and bucket in ("press_charge", "alleged", "unverified"):
+    if (
+        st == "press"
+        or vs in ("unverified_secondary", "speculative")
+        or dt in ("news_article", "press_report", "rss_snippet")
+        or sp in ("journalist", "reporter")
+    ) and bucket in ("press_charge", "alleged", "unverified"):
         for auth_b in ("indictment", "alleged_regulator", "audit_finding"):
             if auth_b in peer_auth_buckets:
                 continue
