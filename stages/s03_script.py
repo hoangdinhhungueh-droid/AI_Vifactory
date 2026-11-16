@@ -549,6 +549,34 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
     return f"{pfx}{cand}".strip()
 
 
+def _is_editorial_pattern_interrupt(ln_dict: Dict[str, Any], text_str: str, market: str = "EN") -> bool:
+    """Detect whether a line is a short dramatic pattern interrupt / rhythm shift rather than a factual evidentiary claim."""
+    m = (market or "EN").upper()
+    vh = str(ln_dict.get("visual_hook", "")).lower()
+    t = (text_str or "").strip()
+    if not t or re.search(r"\d", t):
+        return False
+    from app.services.story_provenance_engine import strip_attribution_prefix
+    t_clean = strip_attribution_prefix(t, market=market).strip()
+    words = t_clean.split()
+
+    # Explicit visual hook marking
+    if vh in ("pattern_interrupt", "grease_pencil", "stop_motion_hit"):
+        if m in ("KR", "JA") and len(t_clean) <= 25 and len(words) <= 7:
+            return True
+        if len(words) <= 7:
+            return True
+
+    # Generic short dramatic phrase without administrative/investigative verbs or policy nouns
+    if m in ("KR", "JA"):
+        if len(t_clean) <= 18 and len(words) <= 5 and not any(k in t_clean for k in ("조사", "수사", "판결", "공소", "기소", "발표", "시행", "인가", "승인", "신청", "회복", "지원")):
+            return True
+    else:
+        if len(words) <= 5 and not any(k in t_clean.lower() for k in ("investigat", "ruling", "indict", "announced", "enacted", "approved")):
+            return True
+    return False
+
+
 def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode: bool = False) -> str:
     """Bound clause length cleanly for beat tempo without bisecting parentheticals or dropping metrics."""
     clean = re.sub(r"\s+", " ", (text or "").strip()).rstrip(".。")
@@ -2088,7 +2116,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         "   - Distinguish 'court_judgment' (법원 확정 판결에 따르면) vs 'indictment' (검찰 공소장에 따르면) vs 'criminal_complaint' (고발장·소장에 따르면).\n"
                         "4. ANTI-REPETITIVE TEMPLATE FILLER (Gate 5):\n"
                         "   - DO NOT start consecutive lines with '보도에 따르면' or '취재에 따르면'! Alternate between lines with attributions and narrative/structural explanatory lines.\n"
-                        "   - Include at least ONE short, punchy 2-6 word Pattern Interrupt line in Beat 2, Beat 3, and Beat 4 (e.g. '경고는 무시됐습니다.', '장부는 비어 있었습니다.', '청구서는 남았습니다.') without any boilerplate attribution prefixes.\n"
+                        "   - Include at least ONE short, punchy 2-6 word Pattern Interrupt line in Beat 2, Beat 3, and Beat 4 reflecting the topic's dramatic tension (e.g. '경고는 무시됐습니다.', '위험은 은폐됐습니다.', '구멍은 커졌습니다.') without any boilerplate attribution prefixes and with visual_hook='pattern_interrupt' or 'grease_pencil'. Do NOT attach ungrounded claims to pattern interrupts.\n"
                         "5. STRICT CAUSAL DISCIPLINE & SOFTENED PREDICATES (Rule 130):\n"
                         "   - NEVER assert macro causal leaps (e.g. '손실이 공공으로 이전됐다', '청구서는 국가로 향했다') unless a cited claim explicitly proves that consequence.\n"
                         "   - When citing analytical findings or allegations, use softened reported verbs ('넘겼다는 분석입니다', '넘긴 것으로 전해졌습니다'), NEVER definitive past tense ('넘겼습니다').\n\n"
@@ -2155,7 +2183,40 @@ def run(ctx: RunContext) -> StageArtifact:
                                 ln = {"text": ln}
                             elif not isinstance(ln, dict):
                                 continue
+
+                            v_hook = ln.get("visual_hook") or "stamp"
+                            text = ln.get("text", "")
+                            if (market or "EN").upper() in ("KR", "KO"):
+                                text = _normalize_spoken_korean_numbers(text)
+
+                            # Handle editorial pattern interrupts cleanly
+                            if _is_editorial_pattern_interrupt(ln, text, market=market):
+                                from app.services.story_provenance_engine import strip_attribution_prefix
+                                text_clean = strip_attribution_prefix(text, market=market).strip()
+                                lines_data.append(StorySceneLine(
+                                    line_id=ln.get("line_id", f"{b_id}_L{l_idx:02d}"),
+                                    text=text_clean,
+                                    claim_ids=[],
+                                    visual_hook="grease_pencil" if v_hook == "stamp" else v_hook,
+                                ))
+                                continue
+
                             c_ids = [cid for cid in (ln.get("claim_ids") or []) if cid in evidence_map]
+
+                            # Filter out hollow claim citations that have zero semantic overlap with the statement
+                            if c_ids:
+                                from app.services.story_provenance_engine import has_entity_or_metric_signal, extract_claim_elements
+                                sig_cids = []
+                                for cid in c_ids:
+                                    co_raw = evidence_map.get(cid)
+                                    if co_raw:
+                                        co_txt = str(co_raw.get("claim", "") if isinstance(co_raw, dict) else getattr(co_raw, "claim", ""))
+                                        has_sig, _ = has_entity_or_metric_signal(text, extract_claim_elements(co_txt), min_stem_hits=1)
+                                        if has_sig:
+                                            sig_cids.append(cid)
+                                if sig_cids:
+                                    c_ids = sig_cids
+
                             if not c_ids and evidence_ledger:
                                 c_ids = [evidence_ledger[min(idx - 1, len(evidence_ledger) - 1)].claim_id]
 
@@ -2171,10 +2232,6 @@ def run(ctx: RunContext) -> StageArtifact:
                                 ]
                                 if _ver_cids:
                                     c_ids = _ver_cids
-
-                            text = ln.get("text", "")
-                            if (market or "EN").upper() in ("KR", "KO"):
-                                text = _normalize_spoken_korean_numbers(text)
 
                             from app.services.story_provenance_engine import (
                                 expected_qualifier_bucket as _exp_bucket,

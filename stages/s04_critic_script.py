@@ -216,6 +216,9 @@ def run(ctx: RunContext) -> StageArtifact:
                 text = str(ln.get("text", ""))
                 c_ids = ln.get("claim_ids", []) or []
                 if not c_ids:
+                    from stages.s03_script import _is_editorial_pattern_interrupt
+                    if _is_editorial_pattern_interrupt(ln, text, market=market):
+                        continue
                     claims_ok = False
                     violations.append({
                         "line_id": line_id,
@@ -416,7 +419,18 @@ def run(ctx: RunContext) -> StageArtifact:
         min_req_entities = min(3, len(evidence_entities)) if evidence_entities else 0
         min_req_metrics = min(1, len(evidence_metrics)) if evidence_metrics else 0
 
-        if evidence_entities and len(matched_entities) < min_req_entities and not is_cross_script_synth:
+        # Substantive topic specificity passes if:
+        # 1. Direct entity match meets min_req_entities, OR
+        # 2. At least 2 entities matched AND at least 2 quantitative metrics/dates matched, OR
+        # 3. At least 1 entity matched AND at least 3 quantitative metrics/dates matched AND 3+ domain stems matched
+        has_substantive_anchors = (
+            len(matched_entities) >= min_req_entities
+            or (len(matched_entities) >= 2 and len(matched_metrics) >= 2)
+            or (len(matched_entities) >= 1 and len(matched_metrics) >= 3 and len(matched_stems) >= 3)
+            or is_cross_script_synth
+        )
+
+        if evidence_entities and not has_substantive_anchors:
             # Allow high-specificity ledger domain stems only if explicit institutional entities < 3
             if len(evidence_entities) < 3 and (len(matched_entities) + len(matched_stems)) >= 3:
                 pass
@@ -605,6 +619,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         "legal/procedural qualifier specificity, script/institutional purity, causal polarity & claim coverage). "
                         f"NOTE: Deterministic TTS timing already verified duration={measured_dur:.2f}s ({measured_units} {unit_type}) "
                         f"and deterministic_duration_ok={det_duration_ok}; do NOT invent a word-count mismatch on KR/JA unspaced text.\n"
+                        "NOTE: Short 2-6 word pattern interrupt lines (e.g. '경고는 무시됐습니다.', 'The warning was ignored.') are dramatic pacing shifts, NOT factual evidentiary claims; do NOT require claim_ids or attribution qualifiers on them.\n"
                         "Output ONLY a single valid JSON block starting with { and ending with }."
                     )
                     raw_resp = gateway.call_llm(
@@ -633,6 +648,9 @@ def run(ctx: RunContext) -> StageArtifact:
                     if parsed_critic.get("aggregate_score") is not None:
                         llm_score = float(parsed_critic["aggregate_score"])
 
+                    all_lines_dict = {str(ln.get("line_id")): ln for ln in all_lines if isinstance(ln, dict)}
+                    from stages.s03_script import _is_editorial_pattern_interrupt
+
                     if isinstance(parsed_critic.get("gates"), dict):
                         g_map = parsed_critic["gates"]
                         if not det_duration_ok and g_map.get("duration_estimate_in_window") is False:
@@ -657,8 +675,14 @@ def run(ctx: RunContext) -> StageArtifact:
                     kept_llm_viols = []
                     for v in parsed_critic.get("violations", []):
                         if isinstance(v, dict) and v.get("gate"):
-                            if det_duration_ok and v.get("gate") == "duration_estimate_in_window":
+                            g_name = v.get("gate")
+                            lid = str(v.get("line_id", ""))
+                            if det_duration_ok and g_name == "duration_estimate_in_window":
                                 continue
+                            target_ln = all_lines_dict.get(lid)
+                            if target_ln and _is_editorial_pattern_interrupt(target_ln, str(target_ln.get("text", "")), market=market):
+                                if g_name in ("statement_claim_alignment_ok", "legal_language_matches_status", "every_factual_line_has_claim_id", "market_entity_appropriateness"):
+                                    continue
                             violations.append(v)
                             kept_llm_viols.append(v)
                     for feed in parsed_critic.get("feedback", []):

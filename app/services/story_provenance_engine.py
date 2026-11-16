@@ -1926,17 +1926,39 @@ def extract_claim_elements(claim_text: str) -> Dict[str, Any]:
     acronyms = re.findall(r"\b[A-Z][A-Z0-9&\-]{1,10}\b", text)
     proper_phrases = re.findall(r"\b[A-Z][A-Za-z0-9]*(?:[-–][A-Za-z0-9]+)*(?:\s+[A-Z][A-Za-z0-9]*(?:[-–][A-Za-z0-9]+)*){1,4}\b", text)
 
-    # 3. Localized institutional / organization nouns (Hangul, Japanese Kanji/Katakana, Vietnamese)
-    kr_entities = re.findall(
-        r"[가-힣]{2,12}(?:부|청|원|은행|위원회|법원|검찰|공사|공단|협회|연구원|센터)",
+    # 3. Localized institutional / organization / administrative nouns (Hangul, Japanese Kanji/Katakana, Vietnamese)
+    kr_prov = re.findall(
+        r"([가-힣]{1,5}(?:특별자치도|자치도|광역단체|지자체|자치단체|광역시|특별시|특례시|도|시|군|구))(?:에서|에|의|를|을|와|과|로|으로|는|은|이|가|\b)",
         text,
     )
-    jp_entities = re.findall(
-        r"[\u4e00-\u9fff\u30a0-\u30ff]{2,12}(?:省|庁|委員会|銀行|裁判所|検察|公社|協会|機構)",
+    kr_prov_clean = [
+        p for p in kr_prov
+        if p not in ("시행되", "시작되", "회복하도", "보도", "당시", "경우", "도시", "다시", "시도", "일부", "사안", "규모", "제도", "채무")
+    ]
+    kr_inst = re.findall(
+        r"[가-힣]{2,12}(?:부|청|원|은행|위원회|법원|검찰|공사|공단|협회|연구원|센터|기관|단체|처|국|실)",
         text,
     )
+    kr_inst_clean = [
+        i for i in kr_inst
+        if i not in ("보도", "당시", "경위", "내용", "결과", "분석", "조사", "사실", "경우", "이유", "구조", "수준", "규모", "방식", "조치", "제도", "사안", "일부", "전국", "지역", "피해", "채무")
+    ]
+    kr_entities = list(set(kr_prov_clean + kr_inst_clean))
+
+    jp_prov = re.findall(
+        r"([一-龠ぁ-ん]{1,4}(?:府|県|市|区|町|村)|東京都|北海道)(?:で|に|の|を|と|へ|は|が|\b)",
+        text,
+    )
+    jp_prov_clean = [p for p in jp_prov if p not in ("報道", "当時", "結果", "分析", "調査", "事実", "場合", "理由", "構造", "規模", "制度")]
+    jp_inst = re.findall(
+        r"[\u4e00-\u9fff\u30a0-\u30ff]{2,12}(?:省|庁|委員会|銀行|裁判所|検察|公社|協会|機構|機関|団体|法人|組合|警察)",
+        text,
+    )
+    jp_inst_clean = [i for i in jp_inst if i not in ("報道", "当時", "結果", "分析", "調査", "事実", "場合", "理由", "構造", "規模", "制度")]
+    jp_entities = list(set(jp_prov_clean + jp_inst_clean))
+
     vn_entities = re.findall(
-        r"(?:Bộ|Ngân hàng|Tòa án|Viện kiểm sát|Ủy ban|Thanh tra|Cơ quan)\s+[A-ZÀ-Ỹa-zà-ỹ\s]{2,28}",
+        r"(?:Bộ|Ngân hàng|Tòa án|Viện kiểm sát|Ủy ban|Thanh tra|Cơ quan|Tổng công ty|Tập đoàn|Ban|Sở|Tỉnh|Thành phố|Tp\.)\s+[A-ZÀ-Ỹa-zà-ỹ\s]{2,28}",
         text,
     )
 
