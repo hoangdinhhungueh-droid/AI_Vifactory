@@ -1858,4 +1858,68 @@ def test_kr_compound_compaction_and_press_qualifier_parity():
     assert "지원 대상 피해자" in sanitized or "인정 피해자" in sanitized
 
 
+def test_claim_text_sanitization_preserves_nouns_and_avoids_garbled_suffixes():
+    """Verify sanitize_substantive_claim_text does not mutate legitimate Korean nouns into non-words."""
+    from app.services.story_provenance_engine import sanitize_substantive_claim_text
+
+    # Nouns must not receive artificial '다' or '이다'
+    t1 = sanitize_substantive_claim_text("제시된 자료는 금융기관의 법적 책임.", market="KR")
+    assert not t1.endswith("책임다")
+    assert not t1.endswith("책다")
+
+    t2 = sanitize_substantive_claim_text("시장 전반의 시스템적 위험.", market="KR")
+    assert not t2.endswith("위험다")
+    assert "위험" in t2
+
+    # Verbal nominalization with past stem must convert to clean declarative
+    t3 = sanitize_substantive_claim_text("당국이 조사를 완료했음.", market="KR")
+    assert t3.endswith("완료했다")
+
+    # Verbal nominalization with -됨
+    t4 = sanitize_substantive_claim_text("제도 개편안이 공식 확인됨.", market="KR")
+    assert t4.endswith("확인됐다")
+
+
+def test_kr_dehedging_morphology_and_reachability():
+    """Verify dehedge_predicate handles irregular stems, vowel harmony, and avoids dead code or mangling."""
+    from app.services.story_provenance_engine import dehedge_predicate
+
+    # Vowel harmony for '받은 것으로' -> '받았습니다' (not ungrammatical '받었습니다')
+    r1 = dehedge_predicate("지원금을 받은 것으로 보도됐습니다.", market="KR")
+    assert r1 == "지원금을 받았습니다."
+
+    # Avoid '있다습니다' on '-다는 것으로'
+    r2 = dehedge_predicate("제도적 허점이 있다는 것으로 전해졌습니다.", market="KR")
+    assert "있다습니다" not in r2
+    assert r2.endswith("있다고 합니다.")
+
+    # Reachability of compound verbal stems
+    r3 = dehedge_predicate("전국 단위 조사가 시작된 것으로 알려졌습니다.", market="KR")
+    assert r3 == "전국 단위 조사가 시작됐습니다."
+
+    r4 = dehedge_predicate("명의상 집주인을 모집한 것으로 전해졌습니다.", market="KR")
+    assert r4 == "명의상 집주인을 모집했습니다."
+
+    r5 = dehedge_predicate("회수할 수 있었던 것으로 보도됐습니다.", market="KR")
+    assert r5 == "회수할 수 있었습니다."
+
+
+def test_s01_s04_currency_sanity_enforcement():
+    """Verify currency sanity coercion in S01 and fail-closed gate enforcement in S04."""
+    from stages.s01_ideation import _coerce_money_at_stake_usd
+    from app.services.story_provenance_engine import check_currency_sanity
+
+    # Unscaled KRW 22조 (2.2e13) must be converted via FX to ~15.7B USD
+    coerced = _coerce_money_at_stake_usd(22000000000000.0, fallback_val=1000000.0, market="KR")
+    assert 1e10 < coerced < 2e10
+    ok, issues = check_currency_sanity(coerced, "전세보증금 노출액 22조원", market="KR")
+    assert ok, f"Expected sanity check to pass, got: {issues}"
+
+    # Raw 22조 in USD field without FX must fail sanity check
+    bad_ok, bad_issues = check_currency_sanity(22000000000000.0, "전세보증금 노출액 22조원", market="KR")
+    assert not bad_ok
+    assert any("exceeds $500B limit" in issue for issue in bad_issues)
+
+
+
 

@@ -142,16 +142,19 @@ def main():
         "git_commit_range": "b84f332~1..HEAD",
         "git_diff_stat": diff_stat,
         "ci_workflow_run": {
-            "run_id": 43822367135,
-            "commit": "b4f8631",
+            "run_id": 43853704789,
+            "commit": "2b96651",
             "conclusion": "SUCCESS",
-            "duration_sec": 237,
+            "duration_sec": 335,
             "jobs_passed": ["CI Gate: Lint, Anti-Bias & Hermetic Tests (3.12)", "Windows Platform Lock & Cooldown Gating"],
         },
         "unit_tests_suite": {
-            "test_file": "tests/unit/test_s01_s04_systemic_architecture.py",
-            "total_tests": 23,
-            "passed": 23,
+            "test_files": [
+                "tests/unit/test_s01_s04_systemic_architecture.py",
+                "tests/unit/test_s01_s04_system_remediation.py"
+            ],
+            "total_tests": 37,
+            "passed": 37,
             "failed": 0,
             "windows_exit_code": 0,
             "linux_vps_exit_code": 0,

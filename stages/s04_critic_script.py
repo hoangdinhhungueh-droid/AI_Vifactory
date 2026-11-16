@@ -182,7 +182,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
         duration_ok = True
         drift_s = abs(self_est_dur - measured_dur)
-        max_allowed_drift = max(30.0, measured_dur * 0.25)
+        max_allowed_drift = max(30.0, max(self_est_dur, measured_dur) * 0.25)
         if self_est_dur > 0 and drift_s > max_allowed_drift:
             duration_ok = False
             violations.append({
@@ -583,7 +583,7 @@ def run(ctx: RunContext) -> StageArtifact:
         # ------------------------------------------------------------------
         # Gate 9: Anti-Double-Hedging Gate (Rule 128 / Rule 131 single-hedging invariant)
         # ------------------------------------------------------------------
-        from app.services.story_provenance_engine import check_script_double_hedging, check_currency_sanity
+        from app.services.story_provenance_engine import check_script_double_hedging, check_currency_sanity, strip_attribution_prefix
 
         double_hedging_ok, double_hedging_issues = check_script_double_hedging(all_lines, market=market)
         if not double_hedging_ok:
@@ -599,13 +599,16 @@ def run(ctx: RunContext) -> StageArtifact:
         # ------------------------------------------------------------------
         money_usd_val = getattr(getattr(ctx, "manifest", None), "money_at_stake_usd", None)
         if money_usd_val is None:
-            try:
-                from core.models import StageID
-                s1_art = require_input(StageID.S1_IDEATION, ctx.paths)
-                if s1_art and isinstance(s1_art.payload, dict):
-                    money_usd_val = s1_art.payload.get("money_at_stake_usd")
-            except (FileNotFoundError, KeyError, AttributeError, Exception) as _s1_err:
-                logger.debug(f"[S04_CRITIC] S01 artifact money_at_stake_usd not loaded: {_s1_err}")
+            s1_file = ctx.paths.artifact_file("s01_ideation")
+            if s1_file.exists():
+                try:
+                    import json
+                    s1_data = json.loads(s1_file.read_text(encoding="utf-8"))
+                    s1_payload = s1_data.get("payload", {})
+                    if isinstance(s1_payload, dict):
+                        money_usd_val = s1_payload.get("money_at_stake_usd")
+                except Exception as _s1_err:
+                    logger.debug(f"[S04_CRITIC] S01 artifact money_at_stake_usd not loaded: {_s1_err}")
         currency_sanity_ok, currency_issues = check_currency_sanity(
             money_at_stake_usd=money_usd_val,
             all_text=all_text,
@@ -643,6 +646,53 @@ def run(ctx: RunContext) -> StageArtifact:
                     "gate": "living_warning_gate",
                     "detail": "Beat 5 must contain a Living Warning / pattern interrupt reflecting on systemic unresolved risks.",
                 })
+
+        # ------------------------------------------------------------------
+        # Gate 12: Beat Advancement & Anti-Spoken-Redundancy Gate (Rule 130/131)
+        # ------------------------------------------------------------------
+        spoken_redundancy_ok = True
+        substantive_lines: List[Tuple[str, str, str, Set[str], List[str]]] = []
+        for b in beats:
+            b_id = str(b.get("beat_id", ""))
+            for ln in b.get("lines", []):
+                t_raw = str(ln.get("text", "")).strip()
+                if not t_raw:
+                    continue
+                core_t, _ = strip_attribution_prefix(t_raw, market=market)
+                core_t = re.sub(r"^[가-힣A-Za-z0-9\s,·]+(?:따르면|의하면|보면|revealed|reported|indicates|states)[,:]?\s*", "", core_t)
+                words = set(re.findall(r"[가-힣A-Za-z0-9]{2,}", core_t.lower()))
+                cids = [cid for cid in (ln.get("claim_ids", []) or []) if cid]
+                if len(words) >= 4:
+                    substantive_lines.append((b_id, str(ln.get("line_id", "")), core_t, words, cids))
+
+        # Redundancy check: Beat 5 must advance the narrative and not repeat Beat 1 or Beat 3 claims
+        # When evidence ledger has sufficient claims (>= 8), B5 repeating B1/B3 lines near-verbatim is a strict failure (Rule 131)
+        for i, (b1_id, l1_id, t1, w1, c1) in enumerate(substantive_lines):
+            for b2_id, l2_id, t2, w2, c2 in substantive_lines[i + 1:]:
+                if b1_id != b2_id:
+                    shared_claims = set(c1) & set(c2)
+                    intersection = len(w1 & w2)
+                    min_len = min(len(w1), len(w2))
+                    containment = (intersection / min_len) if min_len > 0 else 0.0
+
+                    is_b5_b1_b3_echo = (
+                        (b1_id.startswith("B5") and (b2_id.startswith("B1") or b2_id.startswith("B3")))
+                        or (b2_id.startswith("B5") and (b1_id.startswith("B1") or b1_id.startswith("B3")))
+                    )
+                    if is_b5_b1_b3_echo and shared_claims and containment >= 0.50 and len(evidence_list) >= 8:
+                        spoken_redundancy_ok = False
+                        violations.append({
+                            "line_id": l2_id if b2_id.startswith("B5") else l1_id,
+                            "gate": "spoken_redundancy_gate",
+                            "detail": f"Beat 5 line repeats claim(s) {list(shared_claims)} from {b1_id if b2_id.startswith('B5') else b2_id} near-verbatim (containment {containment:.0%}), causing spoken redundancy and stalling narrative advancement (Rule 131).",
+                        })
+                    elif containment >= 0.95 and len(evidence_list) >= 8:
+                        spoken_redundancy_ok = False
+                        violations.append({
+                            "line_id": l2_id,
+                            "gate": "spoken_redundancy_gate",
+                            "detail": f"Line '{l2_id}' in {b2_id} duplicates line '{l1_id}' in {b1_id} near-verbatim (overlap {containment:.0%}).",
+                        })
 
         # ------------------------------------------------------------------
         # Active LLM Critic Evaluation via model_gateway (Live Runs Only)
@@ -776,6 +826,7 @@ def run(ctx: RunContext) -> StageArtifact:
             and double_hedging_ok
             and currency_sanity_ok
             and living_warning_ok
+            and spoken_redundancy_ok
             and bool(claim_audit["passed"])
         )
 
@@ -793,6 +844,7 @@ def run(ctx: RunContext) -> StageArtifact:
             "anti_double_hedging_gate": double_hedging_ok,
             "currency_sanity_gate": currency_sanity_ok,
             "living_warning_gate": living_warning_ok,
+            "spoken_redundancy_gate": spoken_redundancy_ok,
         }
 
         calibrated = compute_calibrated_script_score(

@@ -367,6 +367,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     if pm and pm.metric_type == "currency" and pm.raw_value > 0:
                         money_val = float(pm.raw_value)
                         break
+            money_val = _coerce_money_at_stake_usd(money_val, fallback_val=1000000.0, market=market)
             return StoryIdeationPayload(
                 preset=preset_raw if preset_raw in ("story_forensic", "vox_narrative") else "story_forensic",
                 niche="business_heist" if market == "KR" else "corporate_scandal",
@@ -574,6 +575,23 @@ def run(ctx: RunContext) -> StageArtifact:
             "angle_brief": f"Investigative docudrama analyzing the structural mechanisms of {topic_name}.",
             "status": "APPROVED",
         }
+
+    # Programmatic FX Sanity Enforcement Gate (Rule 127 / Rule 134)
+    from app.services.story_provenance_engine import check_currency_sanity
+    cur_val = payload.get("money_at_stake_usd") if isinstance(payload, dict) else getattr(payload, "money_at_stake_usd", None)
+    if cur_val is not None:
+        sanity_ok, sanity_issues = check_currency_sanity(
+            money_at_stake_usd=cur_val,
+            all_text=str(payload.get("scheme_mechanism_summary", "")) + " " + str(payload.get("title_working", "")),
+            market=market,
+        )
+        if not sanity_ok:
+            logger.warning(f"[S01_IDEATION] Currency sanity violation detected: {sanity_issues}; auto-scaling money_at_stake_usd.")
+            coerced_val = _coerce_money_at_stake_usd(cur_val, fallback_val=1000000.0, market=market)
+            if isinstance(payload, dict):
+                payload["money_at_stake_usd"] = coerced_val
+            else:
+                setattr(payload, "money_at_stake_usd", coerced_val)
 
     prov = Provenance(
         generator="stages.s01_ideation",

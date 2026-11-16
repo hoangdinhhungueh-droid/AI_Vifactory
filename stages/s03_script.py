@@ -1628,9 +1628,40 @@ def _render_claim_sentence(
                         "European", "American", "Korean", "Japanese", "Vietnamese", "Article", "Under", "Review",
                     ):
                         fact_clean = fact_clean[0].lower() + fact_clean[1:]
-                raw = f"{pfx}{fact_clean}."
-            else:
-                raw = f"{fact_clean}."
+
+            if role_slot == "setup":
+                tails = [
+                    f"early documentation establishes that {fact_clean}.",
+                    f"{fact_clean}, laying the institutional foundation for subsequent transactions.",
+                    f"baseline records confirm that {fact_clean}.",
+                    f"{fact_clean}, setting the initial framework in place.",
+                    f"initial regulatory disclosures reveal that {fact_clean}.",
+                ]
+            elif role_slot == "mechanism":
+                tails = [
+                    f"examining the operational mechanism confirms that {fact_clean}.",
+                    f"{fact_clean}, demonstrating the core transactional flow.",
+                    f"evidence tracking the financial architecture shows that {fact_clean}.",
+                    f"{fact_clean}, creating an underlying structural distortion.",
+                    f"detailed operational audit records show that {fact_clean}.",
+                ]
+            elif role_slot == "crack":
+                tails = [
+                    f"at the critical turning point, documentation revealed that {fact_clean}.",
+                    f"{fact_clean}, triggering escalating supervisory scrutiny.",
+                    f"subsequent investigative findings established that {fact_clean}.",
+                    f"{fact_clean}, exposing the operational breakdown.",
+                    f"evidentiary filings at this stage confirm that {fact_clean}.",
+                ]
+            else:  # aftermath
+                tails = [
+                    f"in the institutional aftermath, records confirm that {fact_clean}.",
+                    f"{fact_clean}, resulting in lasting regulatory liabilities.",
+                    f"post-investigation reviews concluded that {fact_clean}.",
+                    f"{fact_clean}, underscoring the ongoing reform challenge.",
+                    f"final regulatory findings established that {fact_clean}.",
+                ]
+            raw = f"{pfx}{tails[v_idx]}"
 
     if m == "KR":
         raw = re.sub(r"\b[Pp]ackage\b", "지원책", raw)
@@ -1737,49 +1768,41 @@ def _build_grounded_story_beats(
         "cutout", "ruler_measure", "compass_arc", "scissors_cut", "grease_pencil",
     ]
 
+    # Scale and partition slots dynamically so each claim in evidence_ledger has a designated slot
+    # Ensures full docudrama duration (>= 180s) while eliminating spoken redundancy (Rule 130/131)
+    total_claims_n = len(all_claims)
+    if total_claims_n >= 10:
+        n_b1 = min(3, total_claims_n)
+        n_b5 = min(3, max(2, (total_claims_n - 2) // 4))
+        n_b4 = 2
+        n_b2 = min(3, max(2, (total_claims_n - 3 - 2) // 4))
+        n_b3 = max(2, total_claims_n - n_b1 - n_b2 - n_b4 - n_b5)
+    elif total_claims_n >= 8:
+        n_b1 = 3
+        n_b5 = 2
+        n_b4 = 2
+        n_b2 = 2
+        n_b3 = max(1, total_claims_n - n_b1 - n_b2 - n_b4 - n_b5)
+    else:
+        target_slots = max(14, total_claims_n)
+        n_b1 = min(3, total_claims_n) if total_claims_n > 0 else 3
+        rem = max(0, target_slots - n_b1)
+        n_b4 = 2
+        n_b5 = max(2, min(3, (rem - 2) // 4)) if rem > 2 else 1
+        n_b2 = max(2, min(3, (rem - 2) // 4)) if rem > 2 else 1
+        n_b3 = max(3, rem - n_b4 - n_b5 - n_b2) if rem > 4 else max(1, rem)
+
     beat_specs: List[Tuple[str, float, List[Tuple[str, List[Any]]]]] = [
         ("B1_hook", 19.2, [
             ("hook_catalyst", hook_source),
             ("hook_scale", verified_pool or hook_source),
             ("hook_paradox", hook_source),
-        ]),
-        ("B2_setup", 40.8, [
-            ("setup", b2_source),
-            ("setup", b2_source),
-            ("setup", b2_source),
-            ("setup", b2_source),
-        ]),
-        ("B3_scheme", 79.2, [
-            ("mechanism", b3_source),
-            ("mechanism", b3_source),
-            ("mechanism", b3_source),
-            ("mechanism", b3_source),
-            ("mechanism", b3_source),
-        ]),
-        ("B4_crack", 60.0, [
-            ("crack", b4_source),
-            ("crack", b4_source),
-        ]),
-        ("B5_aftermath", 40.8, [
-            ("aftermath", b5_source),
-            ("aftermath", b5_source),
-            ("aftermath", b5_source),
-        ]),
+        ][:n_b1]),
+        ("B2_setup", 40.8, [("setup", b2_source) for _ in range(n_b2)]),
+        ("B3_scheme", 79.2, [("mechanism", b3_source) for _ in range(n_b3)]),
+        ("B4_crack", 60.0, [("crack", b4_source) for _ in range(n_b4)]),
+        ("B5_aftermath", 40.8, [("aftermath", b5_source) for _ in range(n_b5)]),
     ]
-
-    # Scale up lines dynamically on larger ledgers so >= 70% of distinct claims are explicitly covered
-    total_claims_n = len(all_claims)
-    target_lines_total = (
-        max(17, min(26, total_claims_n + 2))
-        if total_claims_n <= 24
-        else max(24, min(30, int(total_claims_n * 0.72) + 2))
-    )
-    extra_needed = max(0, target_lines_total - sum(len(slots) for _, _, slots in beat_specs))
-    expand_order = [2, 3, 1, 4]  # B3_scheme, B4_crack, B2_setup, B5_aftermath
-    for i in range(extra_needed):
-        b_idx = expand_order[i % len(expand_order)]
-        role_slot, src_pool = beat_specs[b_idx][2][0]
-        beat_specs[b_idx][2].append((role_slot, src_pool))
 
     raw_beats: List[Tuple[str, float, List[Any]]] = []
     vh_idx = 0
@@ -1806,8 +1829,10 @@ def _build_grounded_story_beats(
                 for ln_p in b_prior[2]
                 for cid in (ln_p.claim_ids or [])
             }
+            # Step 1: Prioritize claims unused anywhere in prior beats
             unused_in_pool = [c for c in src_pool if _get_cid(c) and _get_cid(c) not in used_in_prior and _get_cid(c) not in disallowed]
             if unused_in_pool:
+                src_pool = unused_in_pool
                 disallowed.update(used_in_prior)
             else:
                 unused_in_all = [c for c in all_claims if _get_cid(c) and _get_cid(c) not in used_in_prior and _get_cid(c) not in disallowed]
@@ -1815,18 +1840,14 @@ def _build_grounded_story_beats(
                     src_pool = unused_in_all
                     disallowed.update(used_in_prior)
                 elif is_aftermath:
-                    # In aftermath beat when all claims are exhausted, never repeat B1 catalyst, B2 setup, or B4 crisis
+                    # When all claims in ledger are exhausted, never repeat B1 catalyst or B3 scheme claims
                     if b1_catalyst_cid:
                         disallowed.add(b1_catalyst_cid)
-                    if len(raw_beats) > 1:
-                        for ln_p in raw_beats[1][2]:
-                            disallowed.update(ln_p.claim_ids or [])
-                    if len(raw_beats) > 3:
-                        for ln_p in raw_beats[3][2]:
+                    if len(raw_beats) > 2:
+                        for ln_p in raw_beats[2][2]:
                             disallowed.update(ln_p.claim_ids or [])
                 elif not is_hook_beat:
-                    # If pool exhausted in B2..B4, allow recycling least recently used claims from earlier beats,
-                    # but disallow the immediately preceding beat to maintain freshness
+                    # If pool exhausted, disallow immediately preceding beat to preserve freshness
                     if raw_beats:
                         for ln_p in raw_beats[-1][2]:
                             disallowed.update(ln_p.claim_ids or [])
@@ -2022,14 +2043,27 @@ def _build_grounded_story_beats(
     timing_now = estimate_script_speech_duration(all_line_texts, market=m, docudrama_tempo=True)
     measured_s = float(timing_now["estimated_duration_sec"])
     measured_units = int(timing_now["spoken_units"])
-    expand_beats = [2, 3, 1, 4]  # B3_scheme, B4_crack, B2_setup, B5_aftermath (never bloat B1_hook)
-    expand_roles = {1: "setup", 2: "mechanism", 3: "crack", 4: "aftermath"}
-    expand_pools = {1: b2_source, 2: b3_source, 3: b4_source, 4: b5_source}
+    expand_beats = [2, 1, 3]  # B3_scheme, B2_setup, B4_crack (never bloat B1_hook or B5_aftermath)
+    expand_roles = {1: "setup", 2: "mechanism", 3: "crack"}
+    expand_pools = {1: b2_source, 2: b3_source, 3: b4_source}
     extra_guard = 0
-    while (measured_s < max(195.0, d_min + 15.0) or measured_units < eff_u_min) and measured_s < (d_max - 20.0) and measured_units < (eff_u_max - 30) and extra_guard < 26 and all_claims:
+    while (measured_s < d_min or measured_units < eff_u_min) and measured_s < (d_max - 20.0) and measured_units < (eff_u_max - 30) and extra_guard < 26 and all_claims:
         b_idx = expand_beats[extra_guard % len(expand_beats)]
         beat_id_e, _, beat_lines_e = raw_beats[b_idx]
-        c_obj = _pick_claim(expand_pools[b_idx])
+        used_cids_global = {cid for _, _, lns in raw_beats for ln in lns for cid in (ln.claim_ids or []) if cid}
+        unused_claims_global = [c for c in all_claims if _get_cid(c) and _get_cid(c) not in used_cids_global]
+        pool_to_use = unused_claims_global or expand_pools[b_idx]
+        disallow_e = {cid for ln in beat_lines_e for cid in (ln.claim_ids or [])}
+        if b1_catalyst_cid:
+            disallow_e.add(b1_catalyst_cid)
+        if len(raw_beats) > 4:
+            for ln_b5 in raw_beats[4][2]:
+                disallow_e.update(ln_b5.claim_ids or [])
+        c_obj = _pick_claim(pool_to_use, disallow_cids=disallow_e)
+        if not c_obj:
+            c_obj = _pick_claim(all_claims, disallow_cids=disallow_e)
+        if not c_obj:
+            break
         l_idx_e = len(beat_lines_e) + 1
         txt_e, cids_e = _render_claim_sentence(
             c_obj,
