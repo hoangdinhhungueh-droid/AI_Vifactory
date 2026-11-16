@@ -2635,6 +2635,64 @@ def run(ctx: RunContext) -> StageArtifact:
                 u_max=u_max,
             )
 
+        # Systemic post-generation enforcement: ensure single hedging, living warning, and proper attribution
+        from app.services.story_provenance_engine import dehedge_predicate, strip_attribution_prefix
+
+        # 1. Normalize line texts across all beats for single-hedging and eliminate false supervisory attributions
+        for b_tuple in raw_beats:
+            b_id, _, b_lines = b_tuple
+            for ln in b_lines:
+                t = str(ln.text or "").strip()
+                # Clean false supervisory attribution on non-supervisory claims
+                if market == "KR" and "감독 당국의 조사" in t:
+                    c_objs = [evidence_map.get(cid) for cid in (ln.claim_ids or []) if cid in evidence_map]
+                    is_formal_inv = any(
+                        str(getattr(co, "procedural_status", "") or "").lower() in ("investigation", "inquiry")
+                        or str(getattr(co, "doc_type", "") or "").lower() in ("investigation_report", "inspection_report")
+                        for co in c_objs
+                    )
+                    if not is_formal_inv:
+                        t = re.sub(r"감독 당국의 조사 내용에 의하면,?\s*", "정부 발표 자료에 따르면, ", t)
+                        t = re.sub(r"감독 당국의 조사에 따르면,?\s*", "당국 발표에 따르면, ", t)
+                # Ensure single-hedging: if line has attribution prefix, dehedge the predicate
+                _, pfx = strip_attribution_prefix(t, market=market)
+                if pfx:
+                    t = dehedge_predicate(t, market=market)
+                ln.text = t
+
+        # 2. Ensure Beat 5 contains a Living Warning / pattern interrupt reflecting on systemic risks
+        if len(raw_beats) >= 5:
+            b5_tuple = raw_beats[4]
+            b5_lines = b5_tuple[2]
+            has_b5_lw = any(
+                str(getattr(ln, "visual_hook", "")).lower() in ("stop_motion_hit", "pattern_interrupt")
+                and len(getattr(ln, "claim_ids", []) or []) == 0
+                for ln in b5_lines
+            )
+            if not has_b5_lw:
+                has_b5_lw = any(
+                    any(warn in str(getattr(ln, "text", "")) for warn in ("빈틈", "경고", "남겨진", "歪み", "hổng", "loophole", "warning"))
+                    for ln in b5_lines
+                )
+            if not has_b5_lw:
+                market_lw = {
+                    "KR": ("제도의 빈틈은 아직 완전히 메워지지 않았습니다.", "stop_motion_hit"),
+                    "JA": ("制度の歪みは、今も完全には埋まっていません。", "stop_motion_hit"),
+                    "VN": ("Lỗ hổng thể chế vẫn chưa được lấp đầy.", "stop_motion_hit"),
+                    "EN": ("The systemic loophole has yet to be fully closed.", "stop_motion_hit"),
+                }
+                lw_text, lw_vh = market_lw.get(market, market_lw["EN"])
+                insert_idx = len(b5_lines) // 2
+                pi_ln = StorySceneLine(
+                    line_id=f"B5_L{len(b5_lines) + 1:02d}",
+                    text=lw_text,
+                    claim_ids=[],
+                    visual_hook=lw_vh,
+                )
+                b5_lines.insert(insert_idx, pi_ln)
+                for idx_b5, ln_b5 in enumerate(b5_lines, start=1):
+                    ln_b5.line_id = f"B5_L{idx_b5:02d}"
+
         story_beats: List[StoryScriptBeat] = []
         all_scenes: List[Scene] = []
         total_words = 0
