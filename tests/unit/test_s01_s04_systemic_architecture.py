@@ -1615,4 +1615,38 @@ def test_kr_hook_compaction_reported_predicate_preservation():
     assert ok, f"Compacted hook line failed provenance qualification: {msg}"
 
 
+def test_kr_unverified_predicate_reported_speech_and_no_bare_tallied():
+    """Verify that unverified numeric press snippets end in reported speech and avoid bare '집계됐습니다'."""
+    from stages.s03_script import _render_claim_sentence, _soften_kr_reported_predicate
+    from app.services.story_provenance_engine import audit_statement_claim_alignment, line_matches_expected_qualifier
+
+    c_num = {
+        "claim_id": "C008",
+        "claim": "경기도에서 최소보장 회복 지원 발표 이전까지 전세사기 피해자로 인증된 사례가 9,317건에 이른다는 보도가 나왔다.",
+        "source_type": "press",
+        "doc_type": "rss_snippet",
+        "legal_status": "alleged",
+        "verification_status": "unverified_secondary",
+        "credibility_tier": "unconfirmed_claim",
+    }
+
+    # Render claim sentence for mechanism slot
+    rendered_line, cids = _render_claim_sentence(c_num, "KR", "전세사기 피해자 최소보장제", "mechanism", slot_idx=5)
+    assert not rendered_line.endswith("집계됐습니다."), f"Unverified snippet rendered with bare statistical count: {rendered_line}"
+    assert "보도됐습니다" in rendered_line or "전해졌습니다" in rendered_line, f"Missing reported predicate in {rendered_line}"
+
+    # Verify statement-claim audit has zero unverified attribution gaps
+    beats = [{
+        "beat_id": "B3_scheme",
+        "lines": [{
+            "line_id": "B3_L06",
+            "text": rendered_line,
+            "claim_ids": ["C008"],
+        }]
+    }]
+    audit = audit_statement_claim_alignment(beats, [c_num], market="KR")
+    assert not audit.get("unverified_attribution_gaps"), f"Audit flagged attribution gap: {audit.get('unverified_attribution_gaps')}"
+
+
+
 
