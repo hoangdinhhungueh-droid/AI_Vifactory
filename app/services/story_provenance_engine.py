@@ -1063,6 +1063,8 @@ def expected_qualifier_bucket(
             return "audit_finding"
         if vs in ("unverified_secondary", "speculative") and cred == "unconfirmed_claim":
             return "unverified"
+        if sp in ("journalist", "reporter") or dt in ("news_article", "press_report"):
+            return "alleged"
         if dt in ("press_release", "briefing", "official_statement", "gov_report", "news_release"):
             return "alleged_regulator"
         if ls == "fact" and (vs in ("verified_primary", "corroborated_secondary") or cred in ("verified_fact", "official_regulation")):
@@ -1128,6 +1130,7 @@ def route_legal_qualifier(
     speaker: Optional[str] = None,
     procedural_status: str = "unknown",
     verification_status: str = "corroborated_secondary",
+    credibility_tier: Optional[str] = None,
     slot_idx: int = 0,
 ) -> str:
     """Apply market-specific procedural & verification qualifier based on full provenance."""
@@ -1143,6 +1146,7 @@ def route_legal_qualifier(
         speaker=speaker,
         procedural_status=procedural_status,
         verification_status=verification_status,
+        credibility_tier=credibility_tier,
     )
     if bucket == "fact":
         return body

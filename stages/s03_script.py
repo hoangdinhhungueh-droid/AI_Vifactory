@@ -87,6 +87,7 @@ def _apply_legal_qualifier(
     speaker: Optional[str] = None,
     procedural_status: str = "unknown",
     verification_status: str = "corroborated_secondary",
+    credibility_tier: Optional[str] = None,
     slot_idx: int = 0,
 ) -> str:
     """Apply context-aware procedural & verification qualifier based on full evidence provenance."""
@@ -119,6 +120,7 @@ def _apply_legal_qualifier(
         speaker=speaker,
         procedural_status=procedural_status,
         verification_status=verification_status,
+        credibility_tier=credibility_tier,
         slot_idx=slot_idx,
     )
 
@@ -2283,6 +2285,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                     speaker=c_dict_q.get("speaker"),
                                     procedural_status=str(c_dict_q.get("procedural_status", "unknown")),
                                     verification_status=str(c_dict_q.get("verification_status", "corroborated_secondary")),
+                                    credibility_tier=str(c_dict_q.get("credibility_tier", "") or ""),
                                 )
                                 if bkt == "fact" or (bkt != "settled" and applied_prefix_bucket):
                                     continue
@@ -2295,6 +2298,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                     speaker=c_dict_q.get("speaker"),
                                     procedural_status=str(c_dict_q.get("procedural_status", "unknown")),
                                     verification_status=str(c_dict_q.get("verification_status", "corroborated_secondary")),
+                                    credibility_tier=str(c_dict_q.get("credibility_tier", "") or ""),
                                     slot_idx=l_idx,
                                 )
                                 if bkt != "settled":
