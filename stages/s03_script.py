@@ -543,7 +543,7 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
             c0_h = _to_kr_honorific(c0)
             if not c0_h.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
                 c0_h = _soften_kr_reported_predicate(c0_h, slot_idx=0)
-            if len(c0_h) <= max_chars + 8:
+            if len(c0_h) <= max_chars + 12:
                 cand_fin = f"{pfx}{c0_h}".strip()
                 return f"{cand_fin}." if not cand_fin.endswith((".", "!", "?")) else cand_fin
 
@@ -1139,7 +1139,7 @@ def _render_claim_sentence(
             else:
                 raw = f"집계된 수치에 따르면, {fact_stripped_h}"
         elif role_slot == "hook_paradox":
-            q_short = f"{cq_clean.rstrip('?').strip()}?" if (cq_clean and 6 <= len(cq_clean.rstrip('?').strip()) <= 16) else ""
+            q_short = f"{cq_clean.rstrip('?').strip()}?" if (cq_clean and 6 <= len(cq_clean.rstrip('?').strip()) <= 16) else "실제 구조는 어떠했을까?"
             q_pfx = f"{q_short} " if q_short else ""
             if has_bucket_qualifier or bucket in ("alleged", "unverified", "press_allegation", "press_charge"):
                 raw = f"{q_pfx}{fact_stripped_h}"
