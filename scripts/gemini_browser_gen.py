@@ -306,9 +306,9 @@ def check_gemini_session(page, acc_name=""):
     sign_in_btn = page.query_selector('a[href*="ServiceLogin"], a[href*="InteractiveLogin"], button:has-text("Sign in"), button:has-text("Đăng nhập")')
     user_avatar = page.query_selector('a[href*="SignOutOptions"], a[aria-label*="Google Account"], a[aria-label*="Tài khoản Google"], [data-test-id="user-avatar"]')
 
-    if sign_in_btn and not user_avatar and not input_box:
+    if sign_in_btn and not user_avatar:
         print("\n" + "!"*70)
-        print(f"❌ {label}CHƯA ĐĂNG NHẬP GOOGLE PRO TRÊN TRÌNH DUYỆT!")
+        print(f"❌ {label}CHƯA ĐĂNG NHẬP GOOGLE PRO TRÊN TRÌNH DUYỆT (Phát hiện nút Sign in)!")
         print(r"👉 Vui lòng mở tiện ích trên Desktop: C:\Users\hunghd2\Desktop\AI VF\Mo_Gemini_DangNhap.bat")
         print("👉 Bấm 'Sign in' để hoàn tất đăng nhập tài khoản Google Pro.")
         print("!"*70 + "\n")
