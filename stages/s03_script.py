@@ -484,9 +484,15 @@ def _sanitize_unverified_kr_claim(text: str) -> str:
     t = re.sub(r"공식\s*(?:확인|발표)된", "알려진", t)
 
     # 2. Convert active government/authority agency to contextual framing
+    t = re.sub(r"(?:설치한다|설치하는\s*것으로\s*전해졌습니다|설치하는\s*것으로\s*보도됐습니다)", "설치하는 방안이 거론된 것으로 전해졌습니다", t)
+    t = re.sub(r"(?:마련했다|마련한\s*것으로\s*전해졌습니다|마련한\s*것으로\s*보도됐습니다)", "마련하는 방안이 거론된 것으로 전해졌습니다", t)
     t = re.sub(r"\b(정부|지방자치단체|광역자치단체|관계\s*부처|행정\s*당국|규제\s*당국|당국)(?:가|이)\s*", r"\1 차원에서 ", t)
 
-    # 3. Guard against unverified statutory elevation or state guarantee assertions
+    # 3. Soften unverified numeric counts and speculative loss estimates
+    t = re.sub(r"([가-힣0-9\s]+건)에\s*이르렀(?:다|습니다)", r"\1으로 집계된 것으로 전해졌습니다", t)
+    t = re.sub(r"([가-힣0-9\s]+원)으로\s*제시됐(?:다|습니다)", r"\1에 달할 수 있다는 잠재적 추정이 제기된 것으로 전해졌습니다", t)
+
+    # 4. Guard against unverified statutory elevation or state guarantee assertions
     t = re.sub(r"(?:개정\s*)?법률에\s*따른\s*(우선매수권|권리|구제책|대책|방안)", r"보도에 제시된 \1 방안", t)
     t = re.sub(r"개정\s*(?:법률|법령|특별법)에\s*따른", "보도된 방안에 따른", t)
     t = re.sub(
@@ -533,7 +539,7 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         clauses = [c.strip() for c in re.split(r"[;—]|,\s*", head) if c.strip()]
         if len(clauses) > 1:
             c0 = clauses[0]
-            c0 = re.sub(r"\b(?:매우|상당히|일부|주요|초기|향후|당시|기존|추가적|잠재적|사적|공적|실제|실질적인)\s*", "", c0)
+            c0 = re.sub(r"\b(?:매우|상당히|주요|초기|향후|당시|기존|추가적|잠재적|사적|공적|실제|실질적인)\s*", "", c0)
             c0_h = _to_kr_honorific(c0)
             if not c0_h.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
                 c0_h = _soften_kr_reported_predicate(c0_h, slot_idx=0)
@@ -543,8 +549,8 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
 
         # 1. Comparative or intensifier adverbial phrases
         head = re.sub(r"\b(?:[가-힣0-9·]+보다\s*(?:더\s*)?(?:높게|낮게|크게|작게|많게|적게)|실제보다\s*[가-힣]+|크게|심각하게|상당히|매우)\s*", "", head)
-        # 2. General adnominal temporal, descriptive, or structural modifiers
-        head = re.sub(r"\b(?:향후|당시|기존|추가적|다각적|잠재적|사적|공적|일부|주요|초기|실제|실질적인)\s*", "", head)
+        # 2. General adnominal temporal, descriptive, or structural modifiers (preserve '일부' as legal scope qualifier)
+        head = re.sub(r"\b(?:향후|당시|기존|추가적|다각적|잠재적|사적|공적|주요|초기|실제|실질적인)\s*", "", head)
         # 3. Postpositional topic or reference adverbials
         head = re.sub(r"[가-힣0-9a-zA-Z·]+\s*에\s*(?:대해|따라|관해)\s*", "", head)
         # 4. Coordinating nominal phrases in subject or predicate
@@ -1133,25 +1139,24 @@ def _render_claim_sentence(
             else:
                 raw = f"집계된 수치에 따르면, {fact_stripped_h}"
         elif role_slot == "hook_paradox":
-            q_short = cq_clean.rstrip("?").strip() if (cq_clean and 6 <= len(cq_clean.rstrip("?").strip()) <= 16) else "어디서 균열이 시작됐을까"
-            if not q_short.endswith("?"):
-                q_short += "?"
+            q_short = f"{cq_clean.rstrip('?').strip()}?" if (cq_clean and 6 <= len(cq_clean.rstrip('?').strip()) <= 16) else ""
+            q_pfx = f"{q_short} " if q_short else ""
             if has_bucket_qualifier or bucket in ("alleged", "unverified", "press_allegation", "press_charge"):
-                raw = f"{q_short} {fact_stripped_h}"
+                raw = f"{q_pfx}{fact_stripped_h}"
             elif bucket == "final_judgment" and not any(p in fact for p in ["판결", "유죄", "선고"]):
-                raw = f"{q_short} 법원 판결에 따르면, {fact_stripped_h}"
+                raw = f"{q_pfx}법원 판결에 따르면, {fact_stripped_h}"
             elif bucket == "audit_finding" and not any(p in fact for p in ["감사", "보고서"]):
-                raw = f"{q_short} 감사 보고서에 따르면, {fact_stripped_h}"
+                raw = f"{q_pfx}감사 보고서에 따르면, {fact_stripped_h}"
             elif bucket == "indictment" and not any(p in fact for p in ["공소", "기소"]):
-                raw = f"{q_short} 검찰 공소장에 따르면, {fact_stripped_h}"
+                raw = f"{q_pfx}검찰 공소장에 따르면, {fact_stripped_h}"
             elif bucket == "court_record" and not any(p in fact for p in ["법원", "기록"]):
-                raw = f"{q_short} 법원 접수 기록에 따르면, {fact_stripped_h}"
+                raw = f"{q_pfx}법원 접수 기록에 따르면, {fact_stripped_h}"
             elif bucket == "alleged_regulator":
-                raw = f"{q_short} 정부 발표에 따르면, {fact_stripped_h}"
+                raw = f"{q_pfx}정부 발표에 따르면, {fact_stripped_h}"
             elif bucket == "settled" and "합의" not in fact:
-                raw = f"{q_short} {fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
+                raw = f"{q_pfx}{fact_stripped_h.rstrip('.')} (책임을 인정하지 않고 합의됨)."
             else:
-                raw = f"{q_short} {fact_stripped_h}"
+                raw = f"{q_pfx}{fact_stripped_h}"
         else:
             if role_slot == "aftermath":
                 if bucket == "alleged_regulator":
