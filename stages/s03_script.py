@@ -2367,11 +2367,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                         has_sig, _ = has_entity_or_metric_signal(text, extract_claim_elements(co_txt), min_stem_hits=1)
                                         if has_sig:
                                             sig_cids.append(cid)
-                                if sig_cids:
-                                    c_ids = sig_cids
-
-                            if not c_ids and evidence_ledger:
-                                c_ids = [evidence_ledger[min(idx - 1, len(evidence_ledger) - 1)].claim_id]
+                                c_ids = sig_cids
 
                             # Never taint a Beat 1 line that already cites verified_primary/corroborated_secondary
                             # with an extra unverified_secondary cid unless all claims on the line are unverified.
@@ -2520,6 +2516,14 @@ def run(ctx: RunContext) -> StageArtifact:
                         [{"text": ln.text, "claim_ids": ln.claim_ids} for _, _, lns in cand_beats],
                         topic=topic,
                     )
+                    from app.services.story_provenance_engine import has_entity_or_metric_signal as _has_sig
+                    has_hollow_line = any(
+                        bool(ln.claim_ids) and not any(
+                            _has_sig(ln.text, _extract_elems(str(getattr(evidence_map[cid], "claim", "") if not isinstance(evidence_map[cid], dict) else evidence_map[cid].get("claim", ""))), min_stem_hits=1)[0]
+                            for cid in ln.claim_ids if cid in evidence_map
+                        )
+                        for _, _, lns in cand_beats for ln in lns
+                    )
                     b1_dur_ok = b1_dur <= 24.5
                     b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and b1_dur_ok and not align_res.get("beat1_unverified_elevation"))
                     units_ok = u_min <= cand_units <= u_max
@@ -2532,6 +2536,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         and ent_ok
                         and not qual_issues
                         and not has_filler
+                        and not has_hollow_line
                         and align_res.get("passed", False)
                     )
                     return passed, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler
@@ -2659,7 +2664,7 @@ def run(ctx: RunContext) -> StageArtifact:
             for ln in b_lines:
                 t = str(ln.text or "").strip()
                 # Clean false supervisory attribution on non-supervisory claims
-                if market == "KR" and "감독 당국의 조사" in t:
+                if market == "KR" and any(k in t for k in ("감독 당국의 조사", "당국의 조사")):
                     c_objs = [evidence_map.get(cid) for cid in (ln.claim_ids or []) if cid in evidence_map]
                     is_formal_inv = any(
                         str(getattr(co, "procedural_status", "") or "").lower() in ("investigation", "inquiry")
@@ -2667,8 +2672,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         for co in c_objs
                     )
                     if not is_formal_inv:
-                        t = re.sub(r"감독 당국의 조사 내용에 의하면,?\s*", "정부 발표 자료에 따르면, ", t)
-                        t = re.sub(r"감독 당국의 조사에 따르면,?\s*", "당국 발표에 따르면, ", t)
+                        t = re.sub(r"(?:감독\s*)?당국의\s*조사(?:\s*및\s*공표)?(?:에\s*따르면|의\s*의하면|내용에\s*의하면),?\s*", "당국 발표에 따르면, ", t)
 
                 # Sanitize unverified/speculative claims across all markets to prevent statutory elevation or false state guarantee assertions
                 c_objs_unv = [evidence_map.get(cid) for cid in (ln.claim_ids or []) if cid in evidence_map]

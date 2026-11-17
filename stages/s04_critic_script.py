@@ -130,7 +130,16 @@ def run(ctx: RunContext) -> StageArtifact:
         from core.pacing_budgeter import estimate_script_speech_duration
 
         beats = s3_art.payload.get("beats", [])
-        evidence_raw = s3_art.payload.get("evidence_ledger", [])
+        evidence_raw = s3_art.payload.get("evidence_ledger") or []
+        if not evidence_raw:
+            try:
+                s2_path = ctx.paths.artifact_file(StageID.S2_RESEARCH.value)
+                if s2_path.exists():
+                    s2_data = json.loads(s2_path.read_text(encoding="utf-8"))
+                    evidence_raw = s2_data.get("payload", {}).get("evidence_ledger", []) or []
+            except Exception as _s2_load_err:
+                logger.debug(f"[S04_CRITIC] Notice loading S02 fallback ledger: {_s2_load_err}")
+                evidence_raw = []
         evidence_list: List[Dict[str, Any]] = [
             (c if isinstance(c, dict) else (c.model_dump() if hasattr(c, "model_dump") else {}))
             for c in evidence_raw
