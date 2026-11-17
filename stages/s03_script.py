@@ -483,10 +483,24 @@ def _sanitize_unverified_kr_claim(text: str) -> str:
     t = re.sub(r"공식\s*인정(?:되었던|됐던|된|받은|받았던)?", "확인된", t)
     t = re.sub(r"공식\s*(?:확인|발표)된", "알려진", t)
 
-
-
     # 2. Convert active government/authority agency to contextual framing
     t = re.sub(r"\b(정부|지방자치단체|광역자치단체|관계\s*부처|행정\s*당국|규제\s*당국|당국)(?:가|이)\s*", r"\1 차원에서 ", t)
+
+    # 3. Guard against unverified statutory elevation or state guarantee assertions
+    t = re.sub(r"(?:개정\s*)?법률에\s*따른\s*(우선매수권|권리|구제책|대책|방안)", r"보도에 제시된 \1 방안", t)
+    t = re.sub(r"개정\s*(?:법률|법령|특별법)에\s*따른", "보도된 방안에 따른", t)
+    t = re.sub(
+        r"국가가\s*(?:법적으로\s*)?보장하는\s*(?:부동산\s*정책상의\s*)?선례를\s*(?:만드는|만든다는|형성하는)",
+        "정책적 선례라는 언론 일각의 해석을 제시하는",
+        t,
+    )
+    t = re.sub(
+        r"국가가\s*(?:법적으로\s*)?보장하는\s*(?:부동산\s*정책상의\s*)?선례를\s*(?:만든다|형성한다)",
+        "정책적 선례라는 언론 일각의 해석을 제시한다",
+        t,
+    )
+    t = re.sub(r"국가가\s*(?:법적으로\s*)?보장하는\s*(?:부동산\s*정책상의\s*)?선례", "정책적 선례라는 해석", t)
+    t = re.sub(r"국가가\s*보장하는", "국가 지원이 논의되는", t)
 
     return t
 
@@ -548,14 +562,16 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
             recip_m = re.search(r"([가-힣0-9·]+(?:에게|에))\s*", head)
             obj_matches = list(re.finditer(r"([가-힣0-9·]+(?:을|를))", head))
             obj_m = obj_matches[-1] if obj_matches else None
+            verb_m = re.search(r"([가-힣]+지)\s*$", head)
+            verb_part = f" {verb_m.group(1)}" if verb_m else ""
             if subj_m and recip_m and obj_m:
-                cand_rep = f"{subj_m.group(1)} {obj_m.group(1)} {recip_m.group(1)} {tail}".strip()
+                cand_rep = f"{subj_m.group(1)} {obj_m.group(1)} {recip_m.group(1)}{verb_part} {tail}".strip()
                 if len(cand_rep) <= max_chars:
                     cand = cand_rep
                 else:
-                    cand = f"{subj_m.group(1)} {obj_m.group(1)} {tail}".strip()
+                    cand = f"{subj_m.group(1)} {obj_m.group(1)}{verb_part} {tail}".strip()
             elif subj_m and obj_m:
-                cand = f"{subj_m.group(1)} {obj_m.group(1)} {tail}".strip()
+                cand = f"{subj_m.group(1)} {obj_m.group(1)}{verb_part} {tail}".strip()
 
     if len(cand) > max_chars:
         cand = re.sub(r"\b\d{1,2}월\s*\d{1,2}일\s*", "", cand)
@@ -2245,6 +2261,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} spoken Hangul+numeral syllables across 19-24 lines). Beat 1 (B1_hook) MUST have ONLY 3 concise lines totaling <= 95 syllables (~15-20s) and cite ONLY verified_primary, official_regulation, or corroborated_secondary claim_ids (NEVER put unverified_secondary / unconfirmed_claim inside B1_hook!).\n"
                         "3. STRICT ATTRIBUTION SPECIFICITY (Gate 3):\n"
                         "   - For claims with credibility_tier='unconfirmed_claim' (RSS snippets/unverified reports): Attribute ONLY as preliminary/unconfirmed reporting ('초기 보도에 따르면', '확인되지 않은 보도에 따르면', '일부 보도에 따르면', '전해진 바에 따르면'). NEVER claim them as '언론사 취재 결과', '취재 결과', or '감독 당국의 조사'!\n"
+                        "     DO NOT frame unverified secondary reports as established statutory authority ('개정 법률에 따른') or binding state guarantees ('국가가 보장하는')! Qualify them strictly as reported proposals or media speculation ('보도에 제시된 방안에 따르면', '언론 일각에서는 정책적 선례라는 해석이 제기됐습니다').\n"
                         "   - For claims with credibility_tier='official_regulation' or government announcements: Attribute to the announcement or statute ('정부 발표에 따르면', '공식 발표 자료에 따르면', '현행 법령에 따르면'). Do NOT invent non-existent investigations ('감독 당국의 조사' is forbidden unless the claim explicitly describes a supervisory investigation).\n"
                         "   - For claims with credibility_tier='press_allegation' / corroborated_secondary: Attribute to reporting ('보도에 따르면', '언론 보도를 보면', '당시 분석 보도에 따르면').\n"
                         "   - Distinguish 'court_judgment' (법원 확정 판결에 따르면) vs 'indictment' (검찰 공소장에 따르면) vs 'criminal_complaint' (고발장·소장에 따르면).\n"
@@ -2654,6 +2671,28 @@ def run(ctx: RunContext) -> StageArtifact:
                     if not is_formal_inv:
                         t = re.sub(r"감독 당국의 조사 내용에 의하면,?\s*", "정부 발표 자료에 따르면, ", t)
                         t = re.sub(r"감독 당국의 조사에 따르면,?\s*", "당국 발표에 따르면, ", t)
+
+                # Sanitize unverified/speculative claims across all markets to prevent statutory elevation or false state guarantee assertions
+                c_objs_unv = [evidence_map.get(cid) for cid in (ln.claim_ids or []) if cid in evidence_map]
+                is_all_unverified = c_objs_unv and all(
+                    str(getattr(co, "verification_status", "") or "").lower() in ("unverified_secondary", "speculative")
+                    or str(getattr(co, "credibility_tier", "") or "").lower() == "unconfirmed_claim"
+                    or str(getattr(co, "procedural_status", "") or "").lower() == "speculation"
+                    for co in c_objs_unv
+                )
+                if is_all_unverified:
+                    if market == "KR":
+                        t = _sanitize_unverified_kr_claim(t)
+                    elif market == "JA":
+                        t = re.sub(r"改正法律による", "報道で提示された案による", t)
+                        t = re.sub(r"国家が保証する", "政策的先例との解釈が示される", t)
+                    elif market == "VN":
+                        t = re.sub(r"theo luật sửa đổi", "theo phương án được báo chí nêu", t, flags=re.IGNORECASE)
+                        t = re.sub(r"được nhà nước bảo đảm", "được nhận định là tiền lệ chính sách", t, flags=re.IGNORECASE)
+                    else:
+                        t = re.sub(r"\bstatutory\s+(?:right|measure|remedy)\b", "reported proposed measure", t, flags=re.IGNORECASE)
+                        t = re.sub(r"\bguaranteed\s+by\s+the\s+state\b", "debated as a policy precedent in press reports", t, flags=re.IGNORECASE)
+
                 # Ensure single-hedging: if line has attribution prefix, dehedge the predicate
                 _, pfx = strip_attribution_prefix(t, market=market)
                 if pfx:

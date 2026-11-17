@@ -1113,14 +1113,46 @@ def dehedge_predicate(text: str, market: str = "EN") -> str:
         if not matched_specific:
             # 2. Generic morphological derivations (Rule 128 generic contract)
             t_clean = re.sub(r"([았었였했됐졌왔뒀썼렀쳤났맞])던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1습니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)했던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1했습니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)됐던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1됐습니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1했습니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1됐습니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)하는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1합니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)되는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1됩니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)인\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1입니다", t_clean)
-            t_clean = re.sub(r"([가-힣]+)(?:이었던|였던)\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$", r"\1이었습니다", t_clean)
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))했던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}했습니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))됐던\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}됐습니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))한\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}했습니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))된\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}됐습니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))하는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}합니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))되는\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}됩니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))인\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}입니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:(?<=\s)|([가-힣]+))(?:이었던|였던)\s*것으로\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{m.group(1) or ''}이었습니다",
+                t_clean,
+            )
 
         return f"{t_clean}." if has_period or not t_clean.endswith((".", "!", "?")) else t_clean
 
@@ -1645,6 +1677,12 @@ def line_matches_expected_qualifier(
             raw_has_established_action = bool(re.search(r"(?:마련|운영|시행|설립|수립)", raw_claim_str))
             if has_regulator_actor and has_established_action and not raw_has_established_action:
                 return False, "Directly attributes established administrative action to regulator in unverified claim"
+
+            # Guard against unverified statutory elevation or binding state guarantee assertions
+            if re.search(r"(?:개정\s*)?법률에\s*따른", line_text) and not re.search(r"(?:개정\s*)?법률에\s*따른", raw_claim_str):
+                return False, "Elevates unverified claim using statutory authority phrasing ('개정 법률에 따른')"
+            if re.search(r"국가가\s*(?:법적으로\s*)?보장하는", line_text) and not re.search(r"국가가\s*(?:법적으로\s*)?보장하는", raw_claim_str):
+                return False, "Elevates unverified claim using state guarantee phrasing ('국가가 보장하는')"
         elif m == "JA":
             if any(p in line_text for p in ["公式に認定", "公的に認定"]):
                 return False, "Elevates unverified claim using official recognition phrasing"

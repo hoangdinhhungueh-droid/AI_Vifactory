@@ -1904,6 +1904,65 @@ def test_kr_dehedging_morphology_and_reachability():
     r5 = dehedge_predicate("회수할 수 있었던 것으로 보도됐습니다.", market="KR")
     assert r5 == "회수할 수 있었습니다."
 
+    # Auxiliary unattached verbal phrases with preceding space
+    r6 = dehedge_predicate("보증 가입을 가능하게 한 것으로 전해졌습니다.", market="KR")
+    assert r6 == "보증 가입을 가능하게 했습니다."
+
+    r7 = dehedge_predicate("정책적 선례라는 해석이 제시된 것으로 전해졌습니다.", market="KR")
+    assert r7 == "정책적 선례라는 해석이 제시됐습니다."
+
+
+def test_unverified_statutory_and_guarantee_sanitization():
+    """Verify systemic sanitization of unverified claims, negative verb preservation, and statutory elevation guards."""
+    from app.services.story_provenance_engine import line_matches_expected_qualifier
+    from stages.s03_script import _compact_kr_hook_line, _sanitize_unverified_kr_claim
+
+    # 1. Negative verb stem preservation in hook compaction
+    raw_hook = "고레버리지 전세 임대사업에서는 준비자금을 충분히 확보하지 않는 것으로 전해졌습니다."
+    shrunk = _compact_kr_hook_line(raw_hook, max_chars=40)
+    assert "확보하지 않는" in shrunk
+    assert "준비자금을 않는" not in shrunk
+
+    # 2. Sanitization of unverified statutory rights and state guarantees
+    raw_c12 = "공공주택사업자는 개정 법률에 따른 우선매수권으로 피해주택을 매입한다"
+    san_c12 = _sanitize_unverified_kr_claim(raw_c12)
+    assert "개정 법률에 따른" not in san_c12
+    assert "보도에 제시된 우선매수권 방안" in san_c12
+
+    raw_c14 = "최소보장제는 보증금 손실의 일부를 국가가 보장하는 부동산 정책상의 선례를 만든다"
+    san_c14 = _sanitize_unverified_kr_claim(raw_c14)
+    assert "국가가 보장하는" not in san_c14
+    assert "정책적 선례라는" in san_c14
+
+    # 3. Guard against statutory elevation and state guarantee exaggeration in line_matches_expected_qualifier
+    claim_unv = {
+        "claim_id": "C099",
+        "claim": "언론 보도에서 구제 방안이 제기되었다",
+        "source_type": "press",
+        "doc_type": "news_article",
+        "legal_status": "alleged",
+        "procedural_status": "reported_event",
+        "verification_status": "unverified_secondary",
+        "credibility_tier": "unconfirmed_claim",
+    }
+    # Unverified claim asserting statutory right must fail qualifier check
+    ok_statute, reason_statute = line_matches_expected_qualifier(
+        "초기 보도에 의하면, 개정 법률에 따른 우선매수권이 부여됩니다.",
+        claim_unv,
+        market="KR",
+    )
+    assert not ok_statute
+    assert "statutory authority phrasing" in reason_statute
+
+    # Unverified claim asserting state guarantee must fail qualifier check
+    ok_guar, reason_guar = line_matches_expected_qualifier(
+        "초기 보도에 의하면, 국가가 법적으로 보장하는 선례가 만들어집니다.",
+        claim_unv,
+        market="KR",
+    )
+    assert not ok_guar
+    assert "state guarantee phrasing" in reason_guar
+
 
 def test_s01_s04_currency_sanity_enforcement():
     """Verify currency sanity coercion in S01 and fail-closed gate enforcement in S04."""
