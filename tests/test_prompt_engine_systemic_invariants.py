@@ -180,7 +180,7 @@ def test_demographic_anchor_in_mixed_hero_string():
 
 
 # --- TEST 9: GEMINI BROWSER GEN PROMPTS FORGE SYNC INTEGRITY ---
-def test_gemini_browser_gen_prompts_forge_sync_integrity(tmp_path, monkeypatch):
+def test_gemini_browser_gen_prompts_forge_sync_integrity(tmp_path):
     from pathlib import Path
     import json
     import scripts.gemini_browser_gen as gbg
@@ -205,15 +205,18 @@ def test_gemini_browser_gen_prompts_forge_sync_integrity(tmp_path, monkeypatch):
     with open(ep_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
         json.dump(pf_data, f)
 
-    monkeypatch.setattr(gbg, "ROOT_DIR", tmp_path)
+    orig_root = gbg.ROOT_DIR
+    try:
+        gbg.ROOT_DIR = tmp_path
+        items = gbg.fetch_prompts_from_vps(test_ep_id)
+        assert len(items) == 1
+        # MUST retain the full diorama prompt, NOT the background prompt
+        assert "Authentic Vox tactile" in items[0]["prompt"]
+        assert items[0]["prompt"].startswith("Authentic Vox")
 
-    items = gbg.fetch_prompts_from_vps(test_ep_id)
-    assert len(items) == 1
-    # MUST retain the full diorama prompt, NOT the background prompt
-    assert "Authentic Vox tactile" in items[0]["prompt"]
-    assert items[0]["prompt"].startswith("Authentic Vox")
-
-    # director_plan.json image_prompt must NOT be corrupted into background
-    with open(ep_dir / "director_plan.json", "r", encoding="utf-8") as f:
-        saved_dp = json.load(f)
-    assert saved_dp["scenes"][0]["image_prompt"] == "Authentic Vox tactile paper-collage diorama with hero auditor"
+        # director_plan.json image_prompt must NOT be corrupted into background
+        with open(ep_dir / "director_plan.json", "r", encoding="utf-8") as f:
+            saved_dp = json.load(f)
+        assert saved_dp["scenes"][0]["image_prompt"] == "Authentic Vox tactile paper-collage diorama with hero auditor"
+    finally:
+        gbg.ROOT_DIR = orig_root
