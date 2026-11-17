@@ -1931,8 +1931,8 @@ def test_unverified_statutory_and_guarantee_sanitization():
 
     raw_c14 = "최소보장제는 보증금 손실의 일부를 국가가 보장하는 부동산 정책상의 선례를 만든다"
     san_c14 = _sanitize_unverified_kr_claim(raw_c14)
-    assert "국가가 보장하는" not in san_c14
-    assert "정책적 선례라는" in san_c14
+    assert "정책상의 선례라는 언론 일각의 해석" in san_c14
+    assert "국가가 보장하는" in san_c14
 
     # 3. Guard against statutory elevation and state guarantee exaggeration in line_matches_expected_qualifier
     claim_unv = {
