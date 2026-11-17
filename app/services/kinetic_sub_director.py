@@ -1597,9 +1597,9 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
 
     prompt = (
         f"Forensic documentary motion graphics with Opuscar core boxes architecture, tactile stop-motion editorial layout on aged cream newsprint desk, "
-        f"tan kraft cardstock, and cool backlit light table with whiteboard erased ghost strokes (7% opacity). "
-        f"Halftone B&W 60lpi cutouts with misregistration ink shadows (+8px offset pop in crimson red), Ben-Day halftone density fields, pitted rubber stamps, "
-        f"Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), and acrylic loupe portals with pincushion barrel distortion. "
+        f"tan kraft cardstock, and cool backlit light table with subtle erased dry-erase residue smudges. "
+        f"Halftone B&W 60lpi cutouts with offset ink shadows in crimson red, Ben-Day halftone density fields, pitted rubber stamps, "
+        f"giant stat numbers with miniature paper index tags, and acrylic loupe portals with pincushion barrel distortion. "
         f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
         f"[Style: Rigid documentary motion design, zero cartoon puppet motion, zero organic wobbling]. "
         f"[Speed & Pacing: True Vox Stop-Motion Snappiness. Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle within 0.2s-0.3s; "
@@ -1691,9 +1691,9 @@ def build_natural_kinetic_i2v_prompt(
     style_mode = kwargs.get("style_mode", "deep_diorama")
     if style_mode == "flat_parallax":
         style_header = (
-            "[STYLE SYSTEM - FLAT PARALLAX]: Aged-newsprint paper collage on cream archival paper, cool backlit light table with whiteboard erased ghost strokes (7% opacity), "
-            "desaturated archival palette with one hot crimson accent, Swiss extreme scale contrast (condensed headline typography with giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), "
-            "halftone black-and-white cutout people with rough white keylines and misregistration ink shadows (+8px offset pop), Ben-Day halftone density fields, pitted rubber stamps, and authentic print-grain finish. "
+            "[STYLE SYSTEM - FLAT PARALLAX]: Aged-newsprint paper collage on cream archival paper, cool backlit light table with subtle erased dry-erase residue smudges, "
+            "desaturated archival palette with one hot crimson accent, condensed headline typography with giant stat numbers vs miniature paper index tags, "
+            "halftone black-and-white cutout people with rough white keylines and offset ink shadows, Ben-Day halftone density fields, pitted rubber stamps, and authentic print-grain finish. "
             "True paper diorama parallax, never glossy 3D."
         )
         avoid_block = (
@@ -1703,9 +1703,9 @@ def build_natural_kinetic_i2v_prompt(
     else:
         style_header = (
             "[STYLE SYSTEM - DEEP DIORAMA]: Deep 3D paper diorama with aged-print collage textures on aged cream newsprint, "
-            "tan kraft cardstock, and cool backlit light table with faint erased whiteboard ghost strokes (7% opacity). "
-            "Halftone black-and-white cutouts (60lpi) with rough white keylines and misregistration ink shadows (+8px offset pop in crimson red or mustard gold), "
-            "Ben-Day halftone density fields, pitted rubber stamps with authentic ink bleed, Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips), "
+            "tan kraft cardstock, and cool backlit light table with subtle erased dry-erase residue smudges. "
+            "Halftone black-and-white cutouts (60lpi) with rough white keylines and offset ink shadows (in crimson red or mustard gold), "
+            "Ben-Day halftone density fields, pitted rubber stamps with authentic ink bleed, giant stat numbers with miniature paper index tags, "
             "acrylic loupe portals with pincushion barrel distortion and edge chromatic aberration, and authentic print grain. "
             "Physical layers separated in real space, shallow depth of field, foreground elements crossing close to lens."
         )
@@ -1908,6 +1908,12 @@ def build_cl3_paper_diorama_prompt(
     else:
         sentence = str(sub_plan_or_sentence)
 
+    try:
+        from core.market_resolver import resolve_canonical_market
+        resolved_market = resolve_canonical_market(market_raw=resolved_market or "EN")
+    except ValueError:
+        resolved_market = "EN"
+
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     from app.services.template_registry import get_template_registry
 
@@ -2027,7 +2033,14 @@ def build_cl3_paper_diorama_prompt(
     
     # Target substrate enrichment in I2V: Ensure the base document has pre-printed evidence
     is_stamp_action = any(k in (str(clean_tool) + " " + str(clean_hero)).lower() for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion"])
-    script_mkt = "Japanese kanji" if resolved_market in ("JA", "JP") else ("Vietnamese" if resolved_market == "VN" else "archival")
+    if resolved_market in ("KR", "KO"):
+        script_mkt = "Korean Hangul"
+    elif resolved_market in ("JA", "JP"):
+        script_mkt = "Japanese kanji"
+    elif resolved_market == "VN":
+        script_mkt = "Vietnamese"
+    else:
+        script_mkt = "archival"
     if is_stamp_action:
         target_substrate = (
             f"Target Substrate: The document surface is dense with pre-printed forensic evidence—never a blank void. "
@@ -2080,6 +2093,20 @@ def build_cl3_paper_diorama_prompt(
     return full_prompt.strip()
 
 
+def get_market_demographic_anchor(market: str, is_person: bool = True) -> str:
+    """Returns demographic and ethnic anchor for human subjects per market (AVF-VOX-001)."""
+    if not is_person:
+        return ""
+    m = (market or "EN").upper()
+    if m in ("KR", "KO"):
+        return "East Asian South Korean documentary subject in modern Korean attire, strictly zero Caucasian/Western portraits"
+    elif m in ("JA", "JP"):
+        return "East Asian Japanese documentary subject in modern Japanese business attire, strictly zero Caucasian/Western portraits"
+    elif m == "VN":
+        return "Vietnamese documentary subject in contemporary Vietnamese attire, strictly zero Western portraits"
+    return "Documentary subject in period-accurate archival attire"
+
+
 def build_cl3_paper_diorama_image_prompt(
     sub_plan_or_sentence: Union[Dict[str, Any], str],
     market: str = "EN",
@@ -2089,12 +2116,12 @@ def build_cl3_paper_diorama_image_prompt(
     trace: Optional[Any] = None,
     **kwargs: Any
 ) -> str:
-    """Builds a pure CL3 Canonical 2-Block Paper Diorama Still Image Prompt ([STYLE BLOCK] -> SHOT:).
+    """Builds a pure CL3 Canonical 3-Block Paper Diorama Still Image Prompt (< 1,000 chars).
 
-    Conforms 100% to CL3 Vox Videos specification & Rule 132 Decoupled Engine for still seed generation:
-    - Block 1: STYLE BLOCK (loaded dynamically via TemplateRegistry from t2i_style.md)
-    - Block 2: SHOT: Background -> MG -> FG (clean props, zero trademark refusal)
-    - Seed State Invariant: ZERO tools pre-rendered on seed; tools enter dynamically during video generation.
+    Architecture:
+    - Block 1: VOX SIGNATURE STYLE (tactile papercraft diorama from t2i_style.md, ~45 words)
+    - Block 2: DYNAMIC SHOT HIERARCHY (Background -> MG Hero Cutout -> FG Metric -> Target Substrate, ~50 words)
+    - Block 3: IRONCLAD NEGATIVE & TEXT CONTROL (strict market script & zero UI/jargon control, ~35 words)
     """
     sentence = ""
     resolved_market = market
@@ -2113,15 +2140,24 @@ def build_cl3_paper_diorama_image_prompt(
     else:
         sentence = str(sub_plan_or_sentence)
 
+    resolved_market = (sub_plan_or_sentence.get("market") if isinstance(sub_plan_or_sentence, dict) else None) or market or "EN"
+    try:
+        from core.market_resolver import resolve_canonical_market
+        resolved_market = resolve_canonical_market(market_raw=resolved_market)
+    except ValueError:
+        resolved_market = "EN"
+
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     from app.services.template_registry import get_template_registry
 
     ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
     reg = get_template_registry()
 
-    style_block = reg.get_t2i_style_block(trace=trace)
-    canonical_bgs = reg.get_canonical_backgrounds(trace=trace)
+    # --- KHỐI 1: VOX SIGNATURE STYLE ---
+    style_block = reg.get_t2i_style_block(trace=trace).strip()
 
+    # --- KHỐI 2: DYNAMIC SHOT HIERARCHY ---
+    canonical_bgs = reg.get_canonical_backgrounds(trace=trace)
     raw_hero = hero_object_override or plan_hero or ev.hero_anchor_prop
     clean_hero = sanitize_prompt_for_imagen3(raw_hero)
 
@@ -2130,64 +2166,80 @@ def build_cl3_paper_diorama_image_prompt(
         m_sc = re.search(r"(\d+)", str(sc_id))
         if m_sc:
             sc_idx = int(m_sc.group(1)) - 1
-    bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)]
+    bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)] if canonical_bgs else "cool backlit light table with subtle erased dry-erase residue smudges"
     bg_field = f"Background: {bg_choice}."
-    mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
+
+    PERSON_KEYWORDS = [
+        "portrait", "person", "people", "man", "woman", "victim", "auditor",
+        "investigator", "subject", "suspect", "witness", "officer",
+        "prosecutor", "lawyer", "tenant", "landlord", "worker", "executive", "ceo"
+    ]
+    hero_str = f"{raw_hero} {clean_hero}".lower()
+    is_person = ("portrait" in hero_str) or any(k in hero_str for k in PERSON_KEYWORDS)
+    demographic_anchor = get_market_demographic_anchor(resolved_market, is_person=is_person)
+
+    if is_person and demographic_anchor:
+        mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout of {clean_hero} ({demographic_anchor}) with rough white deckle keylines and offset crimson ink accent stroke."
+    else:
+        mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
+
     extracted_metric = (
         (sub_plan_or_sentence.get("statValue") if isinstance(sub_plan_or_sentence, dict) else None)
         or kwargs.get("extracted_metric")
         or ev.extracted_metric
     )
     if extracted_metric:
-        fg_data = f"FG: Swiss extreme scale contrast giant tactile paper cutout number '{extracted_metric}' (30-35% mass) with precision IBM Plex Mono source tag on 6x12 chip crossing close to the lens. ZERO interactive tools drawn on seed."
+        fg_data = f"FG: giant tactile paper cutout number '{extracted_metric}' with unreadable miniature paper index tag crossing close to the lens. ZERO interactive tools drawn on seed."
     elif getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
-        fg_data = f"FG: Swiss extreme scale contrast tactile accounting figures embossed onto cardstock (30-35% mass) with precision IBM Plex Mono source tags on 6x12 chips crossing close to the lens. ZERO interactive tools drawn on seed."
+        fg_data = "FG: tactile accounting figures embossed onto cardstock with unreadable miniature paper index tag crossing close to the lens. ZERO interactive tools drawn on seed."
     else:
-        fg_data = "FG: Clean diorama negative space with zero interactive tools on the seed image; tools enter dynamically during video motion."
+        fg_data = "FG: Clean diorama negative space with zero interactive tools on seed image; tools enter dynamically during video motion."
 
-    focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival cream diorama paper, with zero competing decorative clutter or stacked ungrounded props."
-    
-    # Target substrate enrichment: Eliminate blank voids in documents and stamp areas
+    # Market Script Mapping
+    if resolved_market in ("KR", "KO"):
+        script_mkt = "Korean Hangul"
+    elif resolved_market in ("JA", "JP"):
+        script_mkt = "Japanese kanji"
+    elif resolved_market == "VN":
+        script_mkt = "Vietnamese"
+    else:
+        script_mkt = "archival"
+
     raw_tool = interacting_tool_override or plan_tool or ev.interacting_tool_prop
     clean_tool = sanitize_prompt_for_imagen3(raw_tool)
     check_stamp_context = f"{raw_hero} {clean_hero} {raw_tool} {clean_tool} {plan_action or ''} {getattr(ev, 'dominant_family', '')}".lower()
     is_stamp_action = any(k in check_stamp_context for k in ["stamp", "seal", "hanko", "docket", "wafer", "vermilion", "h1_impact"])
-    script_mkt = "Japanese kanji" if resolved_market in ("JA", "JP") else ("Vietnamese" if resolved_market == "VN" else "archival")
+
     if is_stamp_action:
         target_substrate = (
-            f"Target Substrate: The document surface is dense with pre-printed forensic evidence—never a blank void. "
-            f"It features dense micro-tabular financial ledger rows with authentic illegible {script_mkt} fine-print audit rows, "
-            f"a designated circular target stamp zone with dotted red perimeter ring, carved relief matrix and wet ink bleed seal matrix textures, "
-            f"and faint pre-printed watermark security patterns awaiting the stamp. Never an empty blank circle outline. ZERO stamp tool drawn on document."
+            f"Target Substrate: Dense micro-tabular audit ledger rows with authentic unreadable {script_mkt} fine-print texture, "
+            f"a designated circular target stamp zone with dotted red perimeter ring, and faint watermark security patterns. "
+            f"ZERO stamp tool drawn on document."
         )
     else:
         target_substrate = (
-            f"Target Substrate: Documents and paper surfaces feature dense authentic {script_mkt} fine-print texture, coordinate grid lines, "
-            f"and archival diagram markings, never blank empty paper. ZERO interactive tools drawn on seed."
+            f"Target Substrate: Documents feature dense micro-tabular audit ledger rows with authentic unreadable {script_mkt} fine-print texture and coordinate grid lines. "
+            f"ZERO interactive tools drawn on seed."
         )
 
-    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}\n{target_substrate}"
+    shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}\n{target_substrate}"
+
+    # --- KHỐI 3: IRONCLAD NEGATIVE & TEXT CONTROL ---
     if resolved_market not in ("EN", "US", "GB"):
         text_control = (
-            f"TEXT CONTROL: Strict {script_mkt} vernacular context only. "
-            f"Strictly NO English text, NO Latin letters, NO English words, NO English labels, NO floating English typography, "
-            f"NO Western alphabet on non-English documents, NO garbled letters, NO romanized words. "
-            f"Paper documents feature soft, authentic, illegible printed {script_mkt} texture only. "
-            f"ZERO hex code text, ZERO color labels printed on paper."
+            f"TEXT CONTROL: Strictly NO English text, NO Latin letters, NO font names, NO technical UI tags. "
+            f"Authentic {script_mkt} documents only. ZERO photorealism, ZERO 3D plastic CG, ZERO modern forensic markers."
         )
     else:
-        text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only. ZERO hex code text, ZERO color labels printed on paper."
-    avoid_block = reg.resolve_avoid_block("STATIC_OVERHEAD", trace=trace)
-    if resolved_market not in ("EN", "US", "GB"):
-        avoid_block = f"{avoid_block}, no English words, no Latin alphabet, no English labels, no floating English text, no romanized letters"
-    res = f"{style_block}\n\n{shot_block}\n\n{text_control}\n\n{avoid_block}".strip()
+        text_control = (
+            "TEXT CONTROL: Strictly NO placeholder words, NO font names, NO technical UI tags. "
+            "Authentic archival documents only. ZERO photorealism, ZERO 3D plastic CG, ZERO modern forensic markers."
+        )
+
+    full_prompt = f"{style_block}\n\n{shot_block}\n\n{text_control}"
 
     # Strip any remaining hex code tokens to prevent Imagen literal text hallucination
-    res = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', res)
-    res = re.sub(r'\(\s*\)', '', res)
-    # Strip any artificial safe zone directives that cause solid blocks
-    res = re.sub(r'(?:Keep\s+)?bottom\s+\d+%\s+(?:of\s+the\s+surface\s+)?(?:completely\s+empty|safe\s+zone|plain\s+bare\s+cream\s+paper\s+only)[^.]*\.?', 'Composed cleanly within 16:9 widescreen diorama with natural breathing room.', res, flags=re.IGNORECASE)
-    res = re.sub(r'No\s+text,\s+no\s+objects,\s+no\s+cards\s+in\s+the\s+bottom\s+fifth\.?', '', res, flags=re.IGNORECASE)
-    res = re.sub(r'Preserves?\s+bottom\s+\d+%\s+(?:vertical\s+)?safe\s+zone(\s+for\s+subtitles)?\.?', '', res, flags=re.IGNORECASE)
-    res = re.sub(r'\s{2,}', ' ', res)
-    return res.strip()
+    full_prompt = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', full_prompt)
+    full_prompt = re.sub(r'\s*\(\s*\)', '', full_prompt)
+    full_prompt = re.sub(r'\s{2,}', ' ', full_prompt)
+    return full_prompt.strip()

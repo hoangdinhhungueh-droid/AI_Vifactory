@@ -73,10 +73,10 @@ For every micro-scene (duration 4.0 – 6.0 seconds), extract and define:
 Every image prompt must be constructed with 5 explicit layered brackets:
 
 `Editorial investigative documentary frame in signature VOX paper-cut collage style with Opuscar core boxes (visual-investigation, archive-lighttable, swiss-motion, halftone-dossier, briefing-board). `
-`[Layer 1: <canvas_workspace>, cool backlit light table #F7F9FB with faint erased whiteboard ghost strokes (7% opacity)] -> `
+`[Layer 1: <canvas_workspace>, cool backlit light table with subtle erased dry-erase residue smudges] -> `
 `[Layer 2: bold flat geometric color block in <color_bar>] -> `
-`[Layer 3: pure clean archival diorama negative space and balanced compositional breathing room on aged cream newsprint #F4F1EA, strictly zero floating typography, zero letters, zero text labels] -> `
-`[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge, misregistration ink shadows (+8px offset pop in crimson red #D62E1F or mustard gold #D9A441), Ben-Day halftone density fields, pitted rubber stamps, and realistic soft drop shadow: <hero_cutout_object>. Interacting elements & acrylic loupe portals: <interacting_objects>] -> `
+`[Layer 3: pure clean archival diorama negative space and balanced compositional breathing room on aged cream newsprint, strictly zero floating typography, zero letters, zero text labels] -> `
+`[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge, offset ink shadows (in crimson red or mustard gold), Ben-Day halftone density fields, pitted rubber stamps, and realistic soft drop shadow: <hero_cutout_object>. Interacting elements & acrylic loupe portals: <interacting_objects>] -> `
 `[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration, matte archival finish]. `
 `Strictly locked color palette: Crimson Red #D62E1F, Mustard Gold #D9A441, Charcoal #1A1A1A, Tan Kraft #C9BB9C on Archival Cream #F4F1EA and Cool Light Table #F7F9FB. `
 `Clear object-assembly composition, strong editorial hierarchy, tactile paper craft.`

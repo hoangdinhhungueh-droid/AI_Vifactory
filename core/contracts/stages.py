@@ -139,6 +139,7 @@ class Scene(BaseModel):
     actions: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     camera_move: Optional[str] = None
     image_prompt: Optional[str] = None
+    bg_prompt: Optional[str] = Field(default=None, description="Clean background environment description")
     i2v_prompt_omni: Optional[str] = None
     i2v_prompt_google_flow: Optional[str] = None
     second_by_second_action_breakdown: Optional[List[Dict[str, Any]]] = Field(default_factory=list)

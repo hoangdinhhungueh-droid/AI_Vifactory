@@ -359,6 +359,14 @@ def build_vox_scene_prompts(
         {"at_second": min(2.0, max(0.9, t_hold_start - 0.2)), "sfx_name": evidence.sound_foley}
     ]
 
+    # 5.5 Clean Background Description
+    from app.services.template_registry import get_template_registry
+    _reg = get_template_registry()
+    _canonical_bgs = _reg.get_canonical_backgrounds()
+    _bg_choice = _canonical_bgs[idx % len(_canonical_bgs)] if _canonical_bgs else "cool backlit light table on aged archival cream newsprint"
+    clean_bg_prompt = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', f"Background: {_bg_choice}.").strip()
+    clean_bg_prompt = re.sub(r'\s{2,}', ' ', clean_bg_prompt)
+
     # 6. Canonical CL3 2-Block Image Prompt (config/prompts/cl3_vox_engine/image_prompts_system.md)
     try:
         from app.services.kinetic_sub_director import build_cl3_paper_diorama_image_prompt
@@ -424,9 +432,9 @@ def build_vox_scene_prompts(
         logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
         sub_plan = {}
         i2v_omni = (
-            f"[STYLE BLOCK]: Deep 3D paper diorama on archival cream newsprint #F4F1EA, tan kraft #C9BB9C, and cool backlit light table #F7F9FB with faint erased whiteboard ghost strokes (7% opacity). "
-            f"Halftone B&W 60lpi cutouts with rough keylines and misregistration ink shadows (+8px offset pop in crimson red #D62E1F). "
-            f"Ben-Day halftone density fields, pitted rubber stamps, and Swiss extreme scale contrast (giant stat numbers 30-35% mass vs precision IBM Plex Mono source tags on 6x12 chips).\n"
+            f"[STYLE BLOCK]: Deep 3D paper diorama on archival cream newsprint, tan kraft, and cool backlit light table with subtle erased dry-erase residue smudges. "
+            f"Halftone B&W 60lpi cutouts with rough keylines and offset ink shadows in crimson red. "
+            f"Ben-Day halftone density fields, pitted rubber stamps, and giant stat numbers with miniature paper index tags.\n"
             f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk with smooth 24/30fps motion. Settle on the {hero_obj}.\n"
             f"[ACTION PHASE]: Snappy cubic-bezier(.7, 0, .2, 1) ease-in with mechanical back-overshoot and settle in 0.2s-0.3s. In 0.3s (9 frames at 30fps), the {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
             f"[PHYSICAL REACTION & RESIDUE]: {evidence.physical_reaction.capitalize()}, leaving {evidence.tactile_residue}.\n"
@@ -434,6 +442,8 @@ def build_vox_scene_prompts(
             f"[AUDIO]: Tactile paper pops, soft ink squelch stamps, ticks, and ducked silence before slams. No music, no voice-over.\n"
             f"[AVOID]: no photorealism, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no music, no voice-over."
         )
+        i2v_omni = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', i2v_omni).strip()
+        i2v_omni = re.sub(r'\s{2,}', ' ', i2v_omni)
         i2v_google_flow = i2v_omni
 
     resolved_interacting = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"] if sub_plan else ["tactile investigation tool", "forensic verification prop"]
@@ -454,6 +464,7 @@ def build_vox_scene_prompts(
         "headline_typography": headline_typography,
         "audio_foley_cues": audio_foley_cues,
         "image_prompt": image_prompt,
+        "bg_prompt": clean_bg_prompt,
         "i2v_prompt_omni": i2v_omni,
         "i2v_prompt_google_flow": i2v_google_flow,
         "scene_sub_director_plan": sub_plan,
@@ -1081,6 +1092,7 @@ def run(ctx: RunContext) -> StageArtifact:
         scene.actions = vox_meta["actions"]
         scene.camera_move = vox_meta["camera_move"]
         scene.image_prompt = vox_meta["image_prompt"]
+        scene.bg_prompt = vox_meta.get("bg_prompt")
         scene.i2v_prompt_omni = vox_meta["i2v_prompt_omni"]
         scene.i2v_prompt_google_flow = vox_meta["i2v_prompt_google_flow"]
         scene.second_by_second_action_breakdown = vox_meta["second_by_second_action_breakdown"]
@@ -1274,7 +1286,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     "episode_id": ctx.run_id,
                     "market": market,
                     "total_scenes": len(scenes),
-                    "backgrounds": {s.scene_id: s.image_prompt for s in scenes},
+                    "backgrounds": {s.scene_id: getattr(s, "bg_prompt", None) or s.image_prompt for s in scenes},
                     "foregrounds": {s.scene_id: s.hero_cutout_object for s in scenes},
                     "vox_collages": {s.scene_id: s.image_prompt for s in scenes},
                     "universal_video_prompt": build_universal_video_prompt(scenes[0]) if scenes else "",

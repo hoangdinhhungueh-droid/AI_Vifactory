@@ -334,6 +334,7 @@ def fetch_prompts_from_vps(episode_id):
     # Đảm bảo copy prompts_forge.json từ workspace vào local_episode_dir nếu chưa có
     ws_pf = ROOT_DIR / "episodes" / episode_id / "prompts_forge.json"
     local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
+    pf_collages = {}
     pf_bgs = {}
     if ws_pf.exists():
         try:
@@ -341,6 +342,9 @@ def fetch_prompts_from_vps(episode_id):
             shutil.copy2(str(ws_pf), local_prompts_file)
             with open(ws_pf, "r", encoding="utf-8") as _pff:
                 _pfd = json.load(_pff)
+                raw_c = _pfd.get("vox_collages", {})
+                if isinstance(raw_c, dict):
+                    pf_collages = {k: (v if isinstance(v, str) else v.get("prompt", "")) for k, v in raw_c.items()}
                 raw_b = _pfd.get("backgrounds", {})
                 if isinstance(raw_b, dict):
                     pf_bgs = {k: (v if isinstance(v, str) else v.get("prompt", "")) for k, v in raw_b.items()}
@@ -359,12 +363,16 @@ def fetch_prompts_from_vps(episode_id):
                 for s in dp.get("scenes", []):
                     s_id = s.get("scene_id", "")
                     prompt = s.get("image_prompt", "")
-                    # Nếu prompts_forge có prompt Rule 140 Vox chuẩn, ưu tiên đồng bộ
-                    if s_id in pf_bgs and pf_bgs[s_id]:
-                        if prompt != pf_bgs[s_id]:
-                            prompt = pf_bgs[s_id]
+                    # Nếu prompts_forge có prompt Rule 140 Vox chuẩn (vox_collages), ưu tiên đồng bộ
+                    if s_id in pf_collages and pf_collages[s_id]:
+                        if prompt != pf_collages[s_id]:
+                            prompt = pf_collages[s_id]
                             s["image_prompt"] = prompt
-                            s["bg_prompt"] = prompt
+                            dp_modified = True
+                    # Đồng bộ bg_prompt riêng biệt từ backgrounds nếu có
+                    if s_id in pf_bgs and pf_bgs[s_id]:
+                        if s.get("bg_prompt") != pf_bgs[s_id]:
+                            s["bg_prompt"] = pf_bgs[s_id]
                             dp_modified = True
                     if prompt:
                         items.append({
@@ -442,10 +450,12 @@ def fetch_prompts_from_vps(episode_id):
         d = json.loads(raw_bytes.decode("utf-8"))
 
     items = []
-    for k, p in d.get("backgrounds", {}).items():
+    source_bgs = d.get("vox_collages") or d.get("backgrounds", {})
+    for k, p in source_bgs.items():
         prompt_text = p if isinstance(p, str) else p.get("prompt", "")
+        rk = k if k.startswith("composite_") else f"composite_{k}"
         items.append({
-            "reuse_key": k,
+            "reuse_key": rk,
             "layer_type": "Background",
             "prompt": f"{prompt_text} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
         })
@@ -522,6 +532,56 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             # Khử thương hiệu / trademark vi phạm bộ lọc bản quyền Google Imagen 3
             clean_p = re.sub(r'\b(Binance|バイナンス|바이낸스)\b', '大手暗号資産取引所', clean_p, flags=re.IGNORECASE)
             clean_p = re.sub(r'\b(Coinbase|コインベース|코인베이스)\b', '暗号資産取引所', clean_p, flags=re.IGNORECASE)
+
+            # Lọc bỏ các rò rỉ từ khóa thiết kế & internal jargons (Rule 128, Rule 140)
+            LEAK_PATTERNS = [
+                r"\bIBM\s+Plex\s+Mono\b",
+                r"\b6x12\s+chips?\b",
+                r"\bSwiss\s+extreme\s+scale\s+contrast\b",
+                r"\bSwiss\s+extreme\b",
+                r"\b7%\s+opacity\b",
+                r"\+8px\s+offset(?:\s+pop)?\b",
+                r"\b30-35%\s+mass\b",
+                r"grease\s+pencil[^\.\n]*",
+                r"Observation\s+\d+",
+                r"Archive\s+Ref:[^\.\n]*",
+            ]
+            for pat in LEAK_PATTERNS:
+                clean_p = re.sub(pat, '', clean_p, flags=re.IGNORECASE)
+
+            # Strip bare hex codes and leftover empty brackets
+            clean_p = re.sub(r'#[0-9a-fA-F]{3,8}\b', '', clean_p)
+            clean_p = re.sub(r'\s*\(\s*\)', '', clean_p)
+
+            # Phán đoán market từ prompt, output path hoặc episode_id để neo sắc tộc và negative prompt
+            detected_mkt = "EN"
+            path_str = str(output_png_path).upper()
+            if "KR_" in path_str or "KO_" in path_str or re.search(r'[\uac00-\ud7a3]', clean_p) or "hangul" in clean_p.lower():
+                detected_mkt = "KR"
+            elif "JP_" in path_str or "JA_" in path_str or re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', clean_p) or "kanji" in clean_p.lower():
+                detected_mkt = "JP"
+            elif "VN_" in path_str or re.search(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]', clean_p, re.IGNORECASE):
+                detected_mkt = "VN"
+
+            if detected_mkt == "KR":
+                if any(w in clean_p.lower() for w in ["portrait", "victim", "person", "auditor", "subject", "investigator"]):
+                    if "East Asian South Korean" not in clean_p:
+                        clean_p += " East Asian South Korean documentary subject in modern Korean attire, strictly zero Caucasian/Western portraits."
+                if "strictly no english text" not in clean_p.lower():
+                    clean_p += " Strictly NO English text, NO Latin letters, NO font names. Authentic Korean Hangul documents only. ZERO photorealism, ZERO 3D plastic CG, ZERO Caucasian portraits."
+            elif detected_mkt == "JP":
+                if any(w in clean_p.lower() for w in ["portrait", "victim", "person", "auditor", "subject", "investigator"]):
+                    if "East Asian Japanese" not in clean_p:
+                        clean_p += " East Asian Japanese documentary subject in modern Japanese business attire, strictly zero Caucasian/Western portraits."
+                if "strictly no english text" not in clean_p.lower():
+                    clean_p += " Strictly NO English text, NO Latin letters, NO font names. Authentic Japanese kanji documents only. ZERO photorealism, ZERO 3D plastic CG, ZERO Caucasian portraits."
+            elif detected_mkt == "VN":
+                if any(w in clean_p.lower() for w in ["portrait", "victim", "person", "auditor", "subject", "investigator"]):
+                    if "Vietnamese documentary subject" not in clean_p:
+                        clean_p += " Vietnamese documentary subject in contemporary Vietnamese attire, strictly zero Western portraits."
+                if "strictly no english text" not in clean_p.lower():
+                    clean_p += " Strictly NO English text, NO Latin letters, NO font names. Authentic Vietnamese documents only. ZERO photorealism, ZERO 3D plastic CG, ZERO Western portraits."
+
             clean_p = re.sub(r'\s+', ' ', clean_p).strip()
             if not clean_p.lower().startswith("generate an image") and not clean_p.lower().startswith("tạo hình ảnh"):
                 full_prompt = f"Tạo hình ảnh: {clean_p}"

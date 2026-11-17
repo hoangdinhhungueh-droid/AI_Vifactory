@@ -20,18 +20,21 @@ def test_t2i_opuscar_specifications_in_templates():
     reg = get_template_registry()
     t2i_style = reg.get_t2i_style_block()
 
-    assert "#F7F9FB" in t2i_style
-    assert "7% opacity" in t2i_style or "7%" in t2i_style
-    assert "+8px offset" in t2i_style or "+8px" in t2i_style
-    assert "Ben-Day halftone density fields" in t2i_style
-    assert "pitted rubber stamps" in t2i_style
-    assert "Swiss extreme scale contrast" in t2i_style
-    assert "30-35% mass" in t2i_style
-    assert "IBM Plex Mono" in t2i_style
-    assert "6x12 chips" in t2i_style
-    assert "acrylic loupe portal" in t2i_style
-    assert "pincushion barrel distortion" in t2i_style
-    assert "chromatic aberration" in t2i_style
+    # Clean Visual Contract Assertions (Rule 132 & Rule 140)
+    assert "#F4F1EA" in t2i_style
+    assert "#C9BB9C" in t2i_style
+    assert "60lpi" in t2i_style
+    assert "halftone" in t2i_style.lower()
+    assert "crimson" in t2i_style.lower()
+    assert "deckle edges" in t2i_style.lower() or "deckle" in t2i_style.lower()
+    assert len(t2i_style) < 350
+
+    # Zero Leaked Design Jargon Invariants
+    assert "IBM Plex Mono" not in t2i_style
+    assert "Swiss extreme" not in t2i_style
+    assert "7% opacity" not in t2i_style
+    assert "6x12 chip" not in t2i_style
+    assert "+8px offset" not in t2i_style
 
 
 def test_i2v_opuscar_specifications_in_templates():
@@ -50,6 +53,13 @@ def test_i2v_opuscar_specifications_in_templates():
     assert "on twos" in deep_diorama
     assert "readcheck formula" in deep_diorama
     assert "silence before slams" in deep_diorama
+
+    # Zero Leaked Design Jargon Invariants in I2V templates
+    assert "IBM Plex Mono" not in deep_diorama
+    assert "Swiss extreme" not in deep_diorama
+    assert "7% opacity" not in deep_diorama
+    assert "6x12 chip" not in deep_diorama
+    assert "+8px offset" not in deep_diorama
 
 
 def test_build_cl3_paper_diorama_prompt_opuscar():
@@ -72,6 +82,12 @@ def test_build_cl3_paper_diorama_prompt_opuscar():
     assert "12fps" in prompt
     assert "readcheck formula" in prompt
 
+    # Zero Leaked Design Jargon Invariants
+    assert "IBM Plex Mono" not in prompt
+    assert "Swiss extreme" not in prompt
+    assert "7% opacity" not in prompt
+    assert "+8px offset" not in prompt
+
 
 def test_build_natural_kinetic_i2v_prompt_opuscar():
     sub_plan = {
@@ -85,6 +101,12 @@ def test_build_natural_kinetic_i2v_prompt_opuscar():
     assert "cubic-bezier(.7, 0, .2, 1)" in prompt
     assert "back-overshoot" in prompt
     assert "readcheck formula" in prompt
+
+    # Zero Leaked Design Jargon Invariants
+    assert "IBM Plex Mono" not in prompt
+    assert "Swiss extreme" not in prompt
+    assert "7% opacity" not in prompt
+    assert "+8px offset" not in prompt
     assert "dual-rate motion" in prompt
     assert "12fps" in prompt
     assert "two real silences" in prompt
@@ -159,6 +181,12 @@ def test_build_kinetic_causal_i2v_prompt_opuscar():
     assert "Opuscar" in prompt
     assert "cubic-bezier(.7, 0, .2, 1)" in prompt
     assert "readcheck formula" in prompt
+
+    # Zero Leaked Design Jargon Invariants
+    assert "IBM Plex Mono" not in prompt
+    assert "Swiss extreme" not in prompt
+    assert "7% opacity" not in prompt
+    assert "+8px offset" not in prompt
     assert "two real silences" in prompt
     assert "Dual-rate motion" in prompt
     # Anti-Token-Leak assertion: Zero bare hex codes in prompt
