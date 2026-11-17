@@ -10,6 +10,7 @@ and calibrated rubric scoring (Rule 118, Rule 128, Rule 130, Rule 139).
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -614,7 +615,6 @@ def run(ctx: RunContext) -> StageArtifact:
             s1_file = ctx.paths.artifact_file("s01_ideation")
             if s1_file.exists():
                 try:
-                    import json
                     s1_data = json.loads(s1_file.read_text(encoding="utf-8"))
                     s1_payload = s1_data.get("payload", {})
                     if isinstance(s1_payload, dict):
