@@ -290,15 +290,13 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             t_assembly = max(2.5, min(5.0, round(clip_dur * 0.65, 1)))
             t_living = max(1.5, round(clip_dur - t_assembly, 1))
             raw_prompt = (
-                f"Locked static camera, no zoom, no pan, no tilt, no rotation, no camera movement of any kind. "
-                f"Handcrafted stop-motion paper-cut animation on aged archival cream newsprint. "
-                f"Over the first {t_assembly:.1f} seconds, the papercut scene assembles itself layer by layer from back to front: "
-                f"the background archival elements slide into place first, followed by midground documents and {ev.hero_anchor_prop}, "
-                f"then {ev.interacting_tool_prop} animates across the surface {ev.tactile_action_verb}, causing {ev.physical_reaction} and leaving {ev.tactile_residue}, "
-                f"each 2D cutout piece sliding smoothly into position, gently bouncing to a stop, casting real layered paper drop shadows with visible paper thickness at every cut edge. "
-                f"For the final {t_living:.1f} seconds, all assembly stops completely and the image becomes a living paper poster: "
-                f"only subtle paper grain flutter and micro shadow breathing at 12fps remain. Nothing enters, exits or shifts position. "
-                f"Strictly zero human hands, zero live-action body parts, zero 3D CGI photorealism, zero metallic physics, zero camera movement."
+                f"Slow continuous documentary camera dolly-in (~8% push-in toward the focal evidence over the full shot) with 3-plane parallax depth. "
+                f"Handcrafted tactile paper-collage diorama on aged archival cream newsprint. "
+                f"All documents remain anchored firmly in place on the newsprint desk, strictly zero gravity falling, zero sheets dropping from above. "
+                f"A thick red directional route line draws on progressively across {ev.hero_anchor_prop}, "
+                f"while {ev.interacting_tool_prop} {ev.tactile_action_verb}, causing {ev.physical_reaction} and leaving {ev.tactile_residue}. "
+                f"Living paper grain vibration and subtle tactile shadow breathing at 12fps on twos. "
+                f"Strictly zero human hands, zero live-action body parts, zero falling paper, zero slideshow transitions, zero 3D CGI photorealism, zero 3D metallic physics."
             )
         except Exception as _p_err:
             logger.debug(f"Prompt generation fallback notice: {_p_err}")

@@ -6,17 +6,17 @@
 
 ---
 
-## ⚡ 0. ĐẠI HIẾN PHÁP CHỐNG PHIM ĐIỆN ẢNH CGI (ANTI-CINEMATIC CGI & ZERO-HUMAN-HAND)
+## ⚡ 0. ĐẠI HIẾN PHÁP ĐẠO DIỄN VOX ENGINE V3 (ANTI-CINEMATIC CGI & ANTI-SLIDESHOW)
 
 > [!IMPORTANT]
 > **KỶ LUẬT THÉP CHO GOOGLE FLOW & OMNI**:
-> 1. **Khóa cứng máy quay (Locked Static Camera)**: `Locked static camera, no zoom, no pan, no tilt, no rotation, no camera movement of any kind.` Cấm tuyệt đối máy quay bay lượn (camera fly-through) gây hiệu ứng phim điện ảnh CGI.
-> 2. **Cấu trúc 2 thì Dừng hình (2-Phase Stop-Motion)**:
->    - **Thì 1 (Lắp ráp tầng lớp - Layer Assembly)**: Các lớp giấy cắt phẳng 2D trượt vào vị trí từ sau ra trước (Hậu cảnh -> Trung cảnh -> Tiền cảnh), nảy nhẹ dừng lại, mép cắt giấy lộ rõ thớ giấy và đổ bóng phẳng.
->    - **Thì 2 (Poster giấy sống - Living Paper Poster Hold)**: Đóng băng toàn bộ phân cảnh, chỉ duy trì vi rung thớ giấy 12fps (on twos).
-> 3. **Cấm tuyệt đối bàn tay người thật & CGI bóng bẩy**:
->    - CẤM 100% bàn tay, ngón tay, cánh tay người thật cầm con dấu/thước kẻ. Mọi tương tác đóng dấu hoặc kẹp giấy diễn ra tự động bằng chấn động 1 frame (`1-frame impact shake`).
->    - CẤM 100% đồng xu kim loại bóng bẩy 3D, chi tiết đổ bóng ray-tracing CGI.
+> 1. **Cú máy tài liệu điều tra (Documentary Dolly-In with 3-Plane Parallax)**: `Slow continuous documentary camera dolly-in (~8% push-in toward the focal evidence over the full shot) with 3-plane parallax depth (foreground moves subtly faster than background).` CẤM camera đứng chết cứng (static camera) gây hiệu ứng chuyển slide PowerPoint, CẤM camera bay lượn quay vòng (fly-through) gây hiệu ứng CGI điện ảnh.
+> 2. **Triệt tiêu trọng lực rơi — Neo giữ tài liệu (Anchored Substrates, Zero Gravity Falling)**:
+>    - `All paper documents remain anchored firmly in place on the newsprint desk, strictly zero gravity falling, zero sheets dropping from above.`
+>    - Chuyển động tập trung vào **hành động điều tra đang diễn ra**: đường chỉ dẫn màu đỏ vẽ nối (`progressive red ink line draws on`), vết mộc đỏ dập chấn động (`1-frame impact shake stamp imprint`), kính lúp trượt soi con số.
+> 3. **Bộ lọc cấm 2 chiều (Bi-Directional Avoid Filter)**:
+>    - CẤM 100% bàn tay/cánh tay người thật, CẤM tiền xu 3D kim loại, CẤM ray-tracing bóng bẩy.
+>    - CẤM rơi giấy lạch cạch từ trên cao, CẤM camera bất động hoàn toàn, CẤM chuyển slide vô tri.
 
 ---
 

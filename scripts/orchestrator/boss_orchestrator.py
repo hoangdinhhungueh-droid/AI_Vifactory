@@ -342,8 +342,9 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
         prompt=user_prompt,
         system_prompt=BOSS_SYSTEM_PROMPT,
         model=planner_model,
-        max_tokens=3500,
+        max_tokens=7000,
         temperature=0.3,
+        timeout=150.0,
     )
 
     # Save plan to specs directory with verifiable physical telemetry

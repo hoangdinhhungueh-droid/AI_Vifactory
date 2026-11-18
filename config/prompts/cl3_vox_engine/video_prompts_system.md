@@ -6,20 +6,25 @@
 
 ---
 
-## ⚡ 0. ĐẠI HIẾN PHÁP CHỐNG PHIM ĐIỆN ẢNH CGI (ANTI-CINEMATIC CGI & ZERO-HUMAN-HAND MANDATE)
+## ⚡ 0. ĐẠI HIẾN PHÁP ĐẠO DIỄN VOX ENGINE V3 (ANTI-CINEMATIC CGI & ANTI-SLIDESHOW MANDATE)
 
 > [!CAUTION]
-> **TẠI SAO VIDEO BỊ BIẾN THÀNH PHIM ĐIỆN ẢNH THAY VÌ VOX STYLE?**
-> Khi các mô hình tạo video (Omni, Veo, Kling, Runway) gặp các từ khóa như *"metallic coins race"*, *"whipping past the lens"*, *"stamping down firmly"*, *"deep 3D diorama"*, *"camera is an actor"*, mô hình sẽ tự động kích hoạt chế độ **Phim Điện ảnh 3D CGI Live-action**: sinh ra bàn tay người thật cầm con dấu gỗ dập xuống, tiền xu kim loại 3D bay lượn, và máy quay bay lượn tạo vệt mờ (motion blur)!
+> **2 CẠM BẪY CẦN TRIỆT TIÊU KHI LÀM VIDEO VOX STYLE**:
+> 1. **Cạm bẫy 1: Biến thành Phim điện ảnh 3D CGI (Cinematic Drift)**:
+>    - Khi prompt dùng từ ngữ: *"metallic coins race"*, *"whipping past the lens"*, *"stamping down firmly"*, mô hình sẽ sinh ra bàn tay người thật cầm con dấu, tiền xu 3D kim loại bay lượn, camera trôi tự do như phim hành động.
+> 2. **Cạm bẫy 2: Biến thành Slide trình chiếu vô tri (Slideshow / PowerPoint Collapse)**:
+>    - Khi prompt ép *"Locked static camera... papercut scene assembles layer by layer"*, mô hình sẽ khóa chết máy quay và thả rơi các mảnh giấy từ trên cao xuống bàn rồi đứng im. Người xem lập tức nhìn thấy hiệu ứng chuyển slide PowerPoint vô hồn.
 > 
-> **CHUẨN VOX STYLE THỰC SỰ**:
-> 1. **Khóa cứng máy quay (Locked Static Camera)**: `Locked static camera, no zoom, no pan, no tilt, no rotation, no camera movement of any kind.`
-> 2. **Phân rã 2 thì Dừng hình (2-Phase Stop-Motion Mechanics)**:
->    - **Thì 1 (Lắp ráp tầng lớp - Assembly Phase: 0s -> T_assembly)**: Các lớp giấy cắt phẳng (`2D flat paper cutouts`) trượt vào vị trí từ sau ra trước (Hậu cảnh -> Trung cảnh -> Tiền cảnh & Đạo cụ), nảy nhẹ dừng lại (`gently bouncing to a stop`), để lộ mép cắt giấy trắng (`visible paper thickness and cut deckle edges`) và bóng đổ rơi (`drop shadows`).
->    - **Thì 2 (Poster giấy sống - Living Paper Poster Hold: T_assembly -> End)**: Mọi chuyển động vào/ra dừng hẳn, toàn bộ phân cảnh đóng băng thành một bức poster giấy sống động, CHỈ duy trì vi rung thớ giấy và bóng đổ ở 12fps (on twos). Không có vật thể nào di chuyển tọa độ hay phóng to/thu nhỏ.
-> 3. **Bộ lọc cấm tuyệt đối (Zero Human Hand / Zero 3D CGI)**:
->    - **CẤM 100% bàn tay người thật, ngón tay, cánh tay, da thịt người thật**. Mọi con dấu dập xuống tự động bằng chấn động 1 frame (`1-frame impact shake`), hoặc xuất hiện vết mực in đỏ trực tiếp (`wet vermilion seal impression reveals directly`).
->    - **CẤM 100% đồng xu kim loại bóng bẩy 3D, vật liệu nhựa CGI bóng bẩy**. Đồng xu phải là hình vẽ minh họa 2D cắt giấy phẳng (`2D flat paper coin cutouts`).
+> **CHUẨN ĐẠO DIỄN VOX KINETIC ĐÍCH THỰC (THE JOHNNY HARRIS / VOX STANDARD)**:
+> 1. **Cú máy tài liệu điều tra có chiều sâu (Documentary Dolly-In with 3-Plane Parallax)**:
+>    - `Slow continuous documentary camera dolly-in (~8% push-in toward the focal evidence over the full shot) with 3-plane parallax depth (foreground moves subtly faster than background).`
+>    - Máy quay tiến từ từ vào chứng cứ quan trọng, tạo cảm giác người xem đang cùng đạo diễn cúi xuống bàn tài liệu điều tra.
+> 2. **Triệt tiêu trọng lực rơi — Neo giữ tài liệu (Anchored Substrates, Zero Gravity Falling)**:
+>    - `All paper documents remain anchored firmly in place on the newsprint desk, strictly zero gravity falling, zero sheets dropping from above.`
+>    - Tài liệu đã nằm sẵn trên bàn; chuyển động tập trung vào **hành động điều tra đang diễn ra**: đường chỉ dẫn màu đỏ vẽ nối (`progressive red ink line draws on`), vết mộc đỏ dập chấn động (`1-frame impact shake stamp imprint`), kính lúp trượt soi con số.
+> 3. **Bộ lọc cấm 2 chiều (Bi-Directional Avoid Filter)**:
+>    - **Chống CGI**: CẤM 100% bàn tay/cánh tay người thật, CẤM tiền xu 3D kim loại, CẤM ray-tracing bóng bẩy.
+>    - **Chống Slide**: CẤM rơi giấy lạch cạch từ trên cao, CẤM camera bất động hoàn toàn, CẤM chuyển slide vô tri.
 
 ---
 
