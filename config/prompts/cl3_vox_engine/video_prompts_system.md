@@ -1,8 +1,25 @@
 # 🏛️ CL3 CANONICAL PROMPT ENGINE: PAPER DIORAMA I2V VIDEO PROMPT SYSTEM (KIM CHỈ NAM)
 
 > **BẢN QUY CHUẨN ĐẠO DIỄN VÀ SINH VIDEO CHUYỂN ĐỘNG VOX COLLAGE (I2V MASTER ARCHITECTURE).**  
-> Hợp nhất tinh hoa của **CL3 Vox Video System** và **Vox Engine v3 (Rule 120, 122, 135, 140, 141)**.  
+> Hợp nhất tinh hoa của **CL3 Vox Video System**, **Vox Engine v3 (Rule 120, 122, 135, 140, 141)** và **Quy chuẩn Cắt giấy Dừng hình (Paper Stop-Motion Assembly Standard)**.  
 > Áp dụng trực tiếp cho Google Flow (Veo 3.1 - Fast / Omni 1.1 Flash) và Remotion Engine trong toàn bộ hệ thống.
+
+---
+
+## ⚡ 0. ĐẠI HIẾN PHÁP CHỐNG PHIM ĐIỆN ẢNH CGI (ANTI-CINEMATIC CGI & ZERO-HUMAN-HAND MANDATE)
+
+> [!CAUTION]
+> **TẠI SAO VIDEO BỊ BIẾN THÀNH PHIM ĐIỆN ẢNH THAY VÌ VOX STYLE?**
+> Khi các mô hình tạo video (Omni, Veo, Kling, Runway) gặp các từ khóa như *"metallic coins race"*, *"whipping past the lens"*, *"stamping down firmly"*, *"deep 3D diorama"*, *"camera is an actor"*, mô hình sẽ tự động kích hoạt chế độ **Phim Điện ảnh 3D CGI Live-action**: sinh ra bàn tay người thật cầm con dấu gỗ dập xuống, tiền xu kim loại 3D bay lượn, và máy quay bay lượn tạo vệt mờ (motion blur)!
+> 
+> **CHUẨN VOX STYLE THỰC SỰ**:
+> 1. **Khóa cứng máy quay (Locked Static Camera)**: `Locked static camera, no zoom, no pan, no tilt, no rotation, no camera movement of any kind.`
+> 2. **Phân rã 2 thì Dừng hình (2-Phase Stop-Motion Mechanics)**:
+>    - **Thì 1 (Lắp ráp tầng lớp - Assembly Phase: 0s -> T_assembly)**: Các lớp giấy cắt phẳng (`2D flat paper cutouts`) trượt vào vị trí từ sau ra trước (Hậu cảnh -> Trung cảnh -> Tiền cảnh & Đạo cụ), nảy nhẹ dừng lại (`gently bouncing to a stop`), để lộ mép cắt giấy trắng (`visible paper thickness and cut deckle edges`) và bóng đổ rơi (`drop shadows`).
+>    - **Thì 2 (Poster giấy sống - Living Paper Poster Hold: T_assembly -> End)**: Mọi chuyển động vào/ra dừng hẳn, toàn bộ phân cảnh đóng băng thành một bức poster giấy sống động, CHỈ duy trì vi rung thớ giấy và bóng đổ ở 12fps (on twos). Không có vật thể nào di chuyển tọa độ hay phóng to/thu nhỏ.
+> 3. **Bộ lọc cấm tuyệt đối (Zero Human Hand / Zero 3D CGI)**:
+>    - **CẤM 100% bàn tay người thật, ngón tay, cánh tay, da thịt người thật**. Mọi con dấu dập xuống tự động bằng chấn động 1 frame (`1-frame impact shake`), hoặc xuất hiện vết mực in đỏ trực tiếp (`wet vermilion seal impression reveals directly`).
+>    - **CẤM 100% đồng xu kim loại bóng bẩy 3D, vật liệu nhựa CGI bóng bẩy**. Đồng xu phải là hình vẽ minh họa 2D cắt giấy phẳng (`2D flat paper coin cutouts`).
 
 ---
 

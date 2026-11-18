@@ -144,6 +144,38 @@ def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[
             or ""
         )
 
+        if not i2v_prompt:
+            try:
+                from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+                from core.market_resolver import resolve_canonical_market
+                sentence_val = (
+                    getattr(s, "narration", "")
+                    or getattr(s, "narration_text", "")
+                    or getattr(s, "headline", "")
+                    or (s.get("narration") if isinstance(s, dict) else "")
+                    or (s.get("sentence") if isinstance(s, dict) else "")
+                    or "investigation"
+                )
+                market_val = resolve_canonical_market(market_raw=getattr(s, "market", None) or (s.get("market") if isinstance(s, dict) else None) or episode_id.split("_")[0])
+                ev = extract_evidence_for_sentence(sentence_val, market=market_val, scene_id=sc_id)
+                h_fam_val = h_fam or "H1_IMPACT"
+                hero = hero or ev.hero_anchor_prop
+                t_assembly = max(2.5, min(5.0, round(dur * 0.65, 1)))
+                t_living = max(1.5, round(dur - t_assembly, 1))
+                i2v_prompt = (
+                    f"Locked static camera, no zoom, no pan, no tilt, no rotation, no camera movement of any kind. "
+                    f"Handcrafted stop-motion paper-cut animation on aged archival cream newsprint. "
+                    f"Over the first {t_assembly:.1f} seconds, the papercut scene assembles itself layer by layer from back to front: "
+                    f"the background archival elements slide into place first, followed by midground documents and {ev.hero_anchor_prop}, "
+                    f"then {ev.interacting_tool_prop} animates across the surface {ev.tactile_action_verb}, causing {ev.physical_reaction} and leaving {ev.tactile_residue}, "
+                    f"each 2D cutout piece sliding smoothly into position, gently bouncing to a stop, casting real layered paper drop shadows with visible paper thickness at every cut edge. "
+                    f"For the final {t_living:.1f} seconds, all assembly stops completely and the image becomes a living paper poster: "
+                    f"only subtle paper grain flutter and micro shadow breathing at 12fps remain. Nothing enters, exits or shifts position. "
+                    f"Strictly zero human hands, zero live-action body parts, zero 3D CGI photorealism, zero metallic physics, zero camera movement."
+                )
+            except Exception as _gen_err:
+                logger.debug(f"Manifest i2v prompt fallback notice: {_gen_err}")
+
         clips.append({
             "scene_id": sc_id,
             "clip_index": idx + 1,

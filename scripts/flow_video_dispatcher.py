@@ -267,6 +267,35 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
     debug_dir = episode_dir / "debug_flow"
     debug_dir.mkdir(parents=True, exist_ok=True)
     output_filename = clip.get("output_filename") or f"clip_{scene_id.lower()}.mp4"
+
+    if not raw_prompt:
+        try:
+            from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+            from core.market_resolver import resolve_canonical_market
+            narration = clip.get("narration") or ""
+            if not narration and (episode_dir / "director_plan.json").exists():
+                try:
+                    with open(episode_dir / "director_plan.json", encoding="utf-8") as _dpf:
+                        _dp = json.load(_dpf)
+                        for _sc in _dp.get("scenes", []):
+                            if _sc.get("scene_id") == scene_id:
+                                narration = _sc.get("narration", "")
+                                break
+                except Exception:
+                    pass
+            market_val = resolve_canonical_market("KR" if "KR_" in str(episode_dir) else "EN")
+            ev = extract_evidence_for_sentence(narration or scene_id, market=market_val, scene_id=scene_id)
+            h_fam = clip.get("h_family") or "H1_IMPACT"
+            raw_prompt = (
+                f"Authentic Vox tactile paper-collage diorama. {h_fam}: "
+                f"The {ev.interacting_tool_prop} {ev.tactile_action_verb} {ev.hero_anchor_prop}, "
+                f"{ev.physical_reaction}, leaving {ev.tactile_residue}. "
+                f"Living paper texture with subtle shadow breathing at 12fps on twos. "
+                f"Zero photorealism, zero 3D CGI."
+            )
+        except Exception as _p_err:
+            logger.debug(f"Prompt generation fallback notice: {_p_err}")
+
     prompt_text = raw_prompt
 
     print(f"\n   🎬 [BẮT ĐẦU CLIP I2V] {scene_id} -> {output_filename}")
@@ -593,11 +622,14 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
 
             # Đảm bảo prompt text không bị mất sau khi chèn chip
             box_text = prompt_box.text_content() or ""
-            if prompt_text[:30] not in box_text:
-                print("      ℹ️ Bổ sung lại prompt text phía sau chip ảnh...")
+            if prompt_text and (not prompt_text[:30] or prompt_text[:30] not in box_text):
+                print(f"      ℹ️ Bổ sung lại prompt text phía sau chip ảnh ({len(prompt_text)} chars)...")
                 prompt_box.click(force=True)
                 page.keyboard.press("End")
-                page.keyboard.type(f" {prompt_text}")
+                try:
+                    page.keyboard.insert_text(f" {prompt_text}")
+                except Exception:
+                    page.keyboard.type(f" {prompt_text}")
                 time.sleep(1)
 
             # Chụp ảnh bằng chứng prompt box đã sẵn sàng trước khi bấm Start
@@ -621,6 +653,21 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 print(f"      🛑 [QUOTA EXHAUSTED] Không thấy nút tạo do hết credit: {quota_msg}")
                 raise FlowQuotaExhaustedError(f"Missing start button due to quota: {quota_msg}")
             print("      ❌ Không tìm thấy nút Start generation!")
+            return False
+
+        # Chờ nút start_gen được enable (tối đa 10s)
+        for _wait_btn in range(10):
+            if not start_gen.is_disabled():
+                break
+            # Nếu nút vẫn disabled, gõ thêm phím Space vào prompt_box để kích hoạt event input của ProseMirror
+            prompt_box.click(force=True)
+            page.keyboard.press("End")
+            page.keyboard.press("Space")
+            time.sleep(1)
+
+        if start_gen.is_disabled():
+            page.screenshot(path=str(debug_dir / f"disabled_button_{scene_id}.png"))
+            print(f"      ❌ Nút Start generation vẫn đang bị disabled sau khi nhập prompt! Đã lưu: disabled_button_{scene_id}.png")
             return False
 
         start_gen.click(force=True)
@@ -672,6 +719,16 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             rendering_cards = [p.inner_text().strip() for p in pcts if "%" in p.inner_text()]
             stop_btn = page.locator("button:has-text('Stop'), button[aria-label*='Stop']").first
             is_generating = (stop_btn.count() > 0 and stop_btn.is_visible())
+
+            # Kiem tra nút 'Thử lại' / 'Try again' khi gặp lỗi tạm thời của Google Flow
+            retry_btn = page.locator("button:has-text('Thử lại'), button:has-text('Try again'), button[aria-label*='Thử lại' i], button[aria-label*='Try again' i]").first
+            if retry_btn.count() > 0 and retry_btn.is_visible():
+                print(f"\n      🔄 Phát hiện thông báo lỗi tạm thời ('Đã xảy ra lỗi. Hãy thử lại'). Đang bấm 'Thử lại'...")
+                try:
+                    retry_btn.click(force=True)
+                    time.sleep(3)
+                except Exception as _r_err:
+                    logger.debug(f"Retry click notice: {_r_err}")
 
             # Kiem tra nhanh loi Safety Policy hoac Quota tu Google Flow
             err_box = page.locator("text='Không thành công', text='Không thể tạo video', text='Failed to generate'").first

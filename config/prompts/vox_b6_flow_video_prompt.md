@@ -1,8 +1,22 @@
 # 🏛️ CANONICAL VOX VIDEO PROMPT ENGINE (B6 FLOW VIDEO & REMOTION PIPELINE)
 
 > **QUY CHUẨN ĐẠO DIỄN CHUYỂN ĐỘNG VÀ SINH VIDEO I2V VOX ENGINE V3.**  
-> Tích hợp 100% chuẩn mực từ **CL3 Vox Video System** (`config/prompts/cl3_vox_engine/video_prompts_system.md`).  
+> Tích hợp 100% chuẩn mực từ **CL3 Vox Video System** (`config/prompts/cl3_vox_engine/video_prompts_system.md`) và **Quy chuẩn Cắt giấy Dừng hình 5 Giai đoạn**.  
 > Ràng buộc trực tiếp các dịch vụ sinh video qua Google Flow (Veo 3.1 - Fast / Omni 1.1 Flash) và Remotion VPS.
+
+---
+
+## ⚡ 0. ĐẠI HIẾN PHÁP CHỐNG PHIM ĐIỆN ẢNH CGI (ANTI-CINEMATIC CGI & ZERO-HUMAN-HAND)
+
+> [!IMPORTANT]
+> **KỶ LUẬT THÉP CHO GOOGLE FLOW & OMNI**:
+> 1. **Khóa cứng máy quay (Locked Static Camera)**: `Locked static camera, no zoom, no pan, no tilt, no rotation, no camera movement of any kind.` Cấm tuyệt đối máy quay bay lượn (camera fly-through) gây hiệu ứng phim điện ảnh CGI.
+> 2. **Cấu trúc 2 thì Dừng hình (2-Phase Stop-Motion)**:
+>    - **Thì 1 (Lắp ráp tầng lớp - Layer Assembly)**: Các lớp giấy cắt phẳng 2D trượt vào vị trí từ sau ra trước (Hậu cảnh -> Trung cảnh -> Tiền cảnh), nảy nhẹ dừng lại, mép cắt giấy lộ rõ thớ giấy và đổ bóng phẳng.
+>    - **Thì 2 (Poster giấy sống - Living Paper Poster Hold)**: Đóng băng toàn bộ phân cảnh, chỉ duy trì vi rung thớ giấy 12fps (on twos).
+> 3. **Cấm tuyệt đối bàn tay người thật & CGI bóng bẩy**:
+>    - CẤM 100% bàn tay, ngón tay, cánh tay người thật cầm con dấu/thước kẻ. Mọi tương tác đóng dấu hoặc kẹp giấy diễn ra tự động bằng chấn động 1 frame (`1-frame impact shake`).
+>    - CẤM 100% đồng xu kim loại bóng bẩy 3D, chi tiết đổ bóng ray-tracing CGI.
 
 ---
 
