@@ -24,14 +24,17 @@ jobs:
       
       - name: Install system dependencies (ffmpeg & OCR)
         timeout-minutes: 5
+        shell: bash
         run: |
-          if ! command -v ffmpeg &> /dev/null || ! command -v tesseract &> /dev/null; then
+          set +e
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v tesseract >/dev/null 2>&1; then
             sudo systemctl stop unattended-upgrades 2>/dev/null || true
             sudo DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="20" || true
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 -o Acquire::http::Timeout="20" --no-install-recommends ffmpeg tesseract-ocr || true
           else
             echo "ffmpeg and tesseract-ocr already installed."
           fi
+          exit 0
 
       - name: Install dependencies
         run: |
