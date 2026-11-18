@@ -281,17 +281,24 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                             if _sc.get("scene_id") == scene_id:
                                 narration = _sc.get("narration", "")
                                 break
-                except Exception:
-                    pass
+                except Exception as _read_err:
+                    logger.debug(f"Notice reading narration from director_plan.json: {_read_err}")
             market_val = resolve_canonical_market("KR" if "KR_" in str(episode_dir) else "EN")
             ev = extract_evidence_for_sentence(narration or scene_id, market=market_val, scene_id=scene_id)
             h_fam = clip.get("h_family") or "H1_IMPACT"
+            clip_dur = float(clip.get("duration_sec", 5.0))
+            t_assembly = max(2.5, min(5.0, round(clip_dur * 0.65, 1)))
+            t_living = max(1.5, round(clip_dur - t_assembly, 1))
             raw_prompt = (
-                f"Authentic Vox tactile paper-collage diorama. {h_fam}: "
-                f"The {ev.interacting_tool_prop} {ev.tactile_action_verb} {ev.hero_anchor_prop}, "
-                f"{ev.physical_reaction}, leaving {ev.tactile_residue}. "
-                f"Living paper texture with subtle shadow breathing at 12fps on twos. "
-                f"Zero photorealism, zero 3D CGI."
+                f"Locked static camera, no zoom, no pan, no tilt, no rotation, no camera movement of any kind. "
+                f"Handcrafted stop-motion paper-cut animation on aged archival cream newsprint. "
+                f"Over the first {t_assembly:.1f} seconds, the papercut scene assembles itself layer by layer from back to front: "
+                f"the background archival elements slide into place first, followed by midground documents and {ev.hero_anchor_prop}, "
+                f"then {ev.interacting_tool_prop} animates across the surface {ev.tactile_action_verb}, causing {ev.physical_reaction} and leaving {ev.tactile_residue}, "
+                f"each 2D cutout piece sliding smoothly into position, gently bouncing to a stop, casting real layered paper drop shadows with visible paper thickness at every cut edge. "
+                f"For the final {t_living:.1f} seconds, all assembly stops completely and the image becomes a living paper poster: "
+                f"only subtle paper grain flutter and micro shadow breathing at 12fps remain. Nothing enters, exits or shifts position. "
+                f"Strictly zero human hands, zero live-action body parts, zero 3D CGI photorealism, zero metallic physics, zero camera movement."
             )
         except Exception as _p_err:
             logger.debug(f"Prompt generation fallback notice: {_p_err}")
