@@ -32,6 +32,7 @@ import {
   VoxPaperBackdrop,
   VoxGlobalPaperLife,
   VoxDimensionLine,
+  VoxDeskWorld,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -2426,6 +2427,7 @@ export const TwoLayerEpisode: React.FC<{
             heroPosition={resolvedHeroPosition}
             supportingCutouts={resolvedCutouts}
             yarns={rawYarns}
+            dimensionLines={s.dimensionLines}
             stampText={s.stampText || s.stamp_text || (Array.isArray(s.tactile_props) && s.tactile_props.length > 0 ? s.tactile_props[0] : undefined)}
             stampColor={s.stampColor || s.stamp_color || s.color_accent || "#D62E1F"}
             hasMarkerHighlight={s.hasMarkerHighlight !== false}
@@ -2627,6 +2629,32 @@ const RemotionRoot = () => {
           const total = totalSceneFrames(props.scenes);
           return {
             durationInFrames: total > 0 ? total : 300,
+            fps,
+            width,
+            height,
+          };
+        }}
+      />
+      {/* Continuous Forensic DeskWorld Composition (Rule 140 / FT-207) */}
+      <Composition
+        id="VoxDeskWorld"
+        component={VoxDeskWorld as any}
+        durationInFrames={962}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{ stations: [] }}
+        calculateMetadata={({ props }: { props: any }) => {
+          const fps = props.fps || 30;
+          const width = props.width || 1920;
+          const height = props.height || 1080;
+          let durationInFrames = props.durationInFrames;
+          if (!durationInFrames && props.stations && props.stations.length > 0) {
+            const totalSec = props.stations.reduce((sum: number, s: any) => sum + (s.dwell_duration_sec || 8), 0);
+            durationInFrames = Math.round(totalSec * fps);
+          }
+          return {
+            durationInFrames: durationInFrames > 0 ? durationInFrames : 962,
             fps,
             width,
             height,
