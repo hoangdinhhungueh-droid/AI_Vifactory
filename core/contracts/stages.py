@@ -128,10 +128,12 @@ class Scene(BaseModel):
     duration_est_sec: float = 5.0
     shots: List[Shot] = Field(default_factory=list)
 
-    # Vox Kinematic & Object-Assembly Decomposition (AVF-VOX-001)
+    # Vox Kinematic & Object-Assembly Decomposition (AVF-VOX-001 & FT-201)
     canvas_workspace: Optional[str] = None
     hero_cutout_object: Optional[str] = None
+    interacting_tool: Optional[str] = Field(default=None, description="Interacting physical tool or connector prop")
     interacting_objects: Optional[List[str]] = Field(default_factory=list)
+    decomposed_prompts: Optional[Dict[str, Any]] = Field(default=None, description="Decomposed prompts for Master Sheet & Layer Slicer (FT-201)")
     motion_track_and_assembly: Optional[Dict[str, Any]] = None
     graphic_typography: Optional[Dict[str, Any]] = None
     visual_continuity_link_to_next: Optional[str] = None

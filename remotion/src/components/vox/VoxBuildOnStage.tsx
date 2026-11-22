@@ -15,6 +15,7 @@ import {
   VoxBrassPin,
   VoxWashiTape,
   VoxConnectingYarn,
+  VoxDimensionLine,
 } from "./papercraft";
 import { VoxParallaxLayer } from "./VoxParallaxLayer";
 import { VoxDynamicChart, VoxDynamicChartProps } from "./VoxDynamicChart";
@@ -34,7 +35,7 @@ export interface VoxBuildOnCutout {
   delaySec?: number; // entry delay in seconds (default ~ 3.5s)
   hasPin?: boolean;
   hasTape?: boolean;
-  entranceType?: "slide_in_deal" | "delicate_tack" | "stamp_slam" | "drop";
+  entranceType?: "slide_in_deal" | "delicate_tack" | "stamp_slam" | "drop" | "paper_slap" | "tactile_drop";
   hasMarkerHighlight?: boolean;
   highlightText?: string;
 }
@@ -46,6 +47,17 @@ export interface VoxBuildOnYarn {
   toY: number;   // %
   color?: string; // default crimson #dc2626
   delaySec?: number; // default ~ 5.0s
+  label?: string; // Forensic evidence badge pinned on the yarn
+}
+
+export interface VoxBuildOnDimensionLine {
+  startX: number;
+  endX: number;
+  y: number;
+  label: string;
+  color?: string;
+  delaySec?: number;
+  rotation?: number;
 }
 
 export interface VoxBuildOnStageProps {
@@ -79,6 +91,9 @@ export interface VoxBuildOnStageProps {
 
   /** Red Yarn / Tactical Connecting Lines */
   yarns?: VoxBuildOnYarn[];
+
+  /** Forensic Dimension Lines & Architectural Calipers */
+  dimensionLines?: VoxBuildOnDimensionLine[];
 
   /** Official Rubber Stamp */
   stampText?: string;
@@ -139,6 +154,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   heroPosition = { xPct: 50, yPct: 52, widthPct: 22 },
   supportingCutouts = [],
   yarns = [],
+  dimensionLines = [],
   stampText,
   stampColor = "#dc2626",
   hasMarkerHighlight = true,
@@ -190,15 +206,16 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const isVideoBackground = Boolean(
     backgroundSrc && /\.(mp4|webm)($|\?)/i.test(backgroundSrc)
   );
-  const effectiveCameraMovement = isVideoBackground ? "locked" : cameraMovement;
+  const isLockedCamera = cameraMovement === "locked" || disableDrift || isVideoBackground;
+  const effectiveCameraMovement = isLockedCamera ? "locked" : cameraMovement;
 
   // Stepped Kinetic Framing resolution (Boss Opus 5.5 Masterclass & Rule 140)
-  const resolvedPresetId = presetId || ((sceneIndex % 6) + 1);
+  const resolvedPresetId = presetId !== undefined ? presetId : ((sceneIndex % 6) + 1);
   const activePreset =
     CANONICAL_MOTION_PRESETS[resolvedPresetId] ||
     CANONICAL_MOTION_PRESETS[1];
-  const effectivePunches = steppedPunches || activePreset.steppedPunches;
-  const useSteppedFraming = Boolean(effectivePunches && effectivePunches.length > 0);
+  const effectivePunches = steppedPunches || (isLockedCamera || resolvedPresetId === 0 ? [] : activePreset.steppedPunches);
+  const useSteppedFraming = !isLockedCamera && Boolean(effectivePunches && effectivePunches.length > 0);
 
   const steppedPose = useSteppedFraming
     ? computeSteppedPose(frame, effectivePunches!, fps, disableDrift)
@@ -240,29 +257,30 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
     ? interpolate(backdropSpring, [0, 1], [0.2, 1])
     : interpolate(frame, [0, Math.min(10, fTotal)], [0.85, 1], { extrapolateRight: "clamp" });
 
-  // 2. HERO SUBJECT CHOREOGRAPHY (Tactile slide only in paper_collage; grounded rise/fade in cinematic_doc)
-  const heroDelayFrames = isTactileCollage ? Math.round(fps * 0.6 * speedRatio) : 0;
+  // 2. HERO SUBJECT CHOREOGRAPHY (Authentic Vox Tactile Paper Slap — ZERO sliding across desk)
+  const heroDelayFrames = isTactileCollage ? Math.round(fps * 0.5 * speedRatio) : 0;
   const steppedHeroFrame = isTactileCollage ? Math.floor(frame / 2) * 2 : frame;
   const heroSpring = spring({
     frame: Math.max(0, steppedHeroFrame - heroDelayFrames),
     fps,
-    config: isTactileCollage ? SPRING_PRESETS.paperSlide : SPRING_PRESETS.paperHeavy,
+    config: isTactileCollage ? SPRING_PRESETS.opuscarSnappy : SPRING_PRESETS.paperHeavy,
   });
   const heroTargetX = heroPosition.xPct;
-  const isRight = heroTargetX > 50;
-  const heroStartX = isTactileCollage
-    ? isRight
-      ? heroTargetX + 10
-      : heroTargetX - 10
-    : isRight
-    ? heroTargetX + 2.5
-    : heroTargetX - 2.5;
-  const heroCurrentX = interpolate(heroSpring, [0, 1], [heroStartX, heroTargetX]);
+  // ZERO horizontal slide: Position stays locked at target X!
+  const heroCurrentX = heroTargetX;
+  // Paper drop from above desk (Z-axis scale & slight Y settle)
+  const heroScale = isTactileCollage
+    ? interpolate(heroSpring, [0, 0.75, 1], [1.22, 0.98, 1.0])
+    : 1.0;
+  const heroCurrentY = isTactileCollage
+    ? interpolate(heroSpring, [0, 1], [heroPosition.yPct - 3.5, heroPosition.yPct])
+    : heroPosition.yPct;
   const heroRotation = isTactileCollage
-    ? interpolate(heroSpring, [0, 0.8, 1], [isRight ? 2.5 : -2.5, isRight ? -0.8 : 0.8, 0])
+    ? interpolate(heroSpring, [0, 0.75, 1], [3.5, -0.6, 0])
     : 0;
-  const heroDropShadow = interpolate(heroSpring, [0, 1], [4, 18]);
-  const heroOpacity = interpolate(heroSpring, [0, 0.35, 1], [0, 1, 1]);
+  // Shadow tightens on contact
+  const heroDropShadow = interpolate(heroSpring, [0, 1], [28, 12]);
+  const heroOpacity = interpolate(heroSpring, [0, 0.15, 1], [0, 1, 1]);
 
   // 3. EDITORIAL HEADLINE STAMP (2.5s - 4.0s)
   const headlineDelayFrames = Math.round(fps * 2.2 * speedRatio);
@@ -323,9 +341,11 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
         style={{
           width: "100%",
           height: "100%",
-          perspective: isVideoBackground ? undefined : 1400,
-          transformStyle: isVideoBackground ? undefined : "preserve-3d",
-          transform: steppedPose
+          perspective: (isVideoBackground || isLockedCamera) ? undefined : 1400,
+          transformStyle: (isVideoBackground || isLockedCamera) ? undefined : "preserve-3d",
+          transform: isLockedCamera
+            ? "none"
+            : steppedPose
             ? `translate3d(${steppedPose.x.toFixed(2)}px, ${steppedPose.y.toFixed(2)}px, 0) scale(${steppedPose.scale.toFixed(4)}) rotate(${steppedPose.rotateZ.toFixed(2)}deg)`
             : isVideoBackground
             ? "none"
@@ -686,9 +706,9 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               style={{
                 position: "absolute",
                 left: `${isEvidenceDossier ? Math.max(heroCurrentX, 68) : heroCurrentX}%`,
-                top: `${heroPosition.yPct}%`,
+                top: `${heroCurrentY}%`,
                 width: `${heroPosition.widthPct || 22}%`,
-                transform: `translate(-50%, -50%) rotate(${heroRotation}deg)`,
+                transform: `translate(-50%, -50%) scale(${heroScale}) rotate(${heroRotation}deg)`,
                 filter: `drop-shadow(0 ${heroDropShadow}px 24px rgba(0,0,0,0.35))`,
                 opacity: heroOpacity,
                 zIndex: 30,
@@ -732,6 +752,45 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     <VoxBrassPin size={28} dropFrame={heroDelayFrames + 4} />
                   </div>
                 )}
+
+                {/* Secondary Micro-Motion: Procedural Highlighter Sweep across Hero Document */}
+                {hasMarkerHighlight && (heroLabel || headline) && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: "10%",
+                      left: "5%",
+                      right: "5%",
+                      zIndex: 36,
+                      textAlign: "center",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <ProceduralMarkerSweep
+                      startFrame={heroDelayFrames + 12}
+                      durationFrames={16}
+                      color="#ffe600"
+                      height="1.5em"
+                      blendMode="multiply"
+                    >
+                      <span
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: "12px",
+                          fontWeight: 900,
+                          color: "#0f172a",
+                          backgroundColor: "rgba(255, 255, 255, 0.88)",
+                          padding: "2px 8px",
+                          borderRadius: "2px",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
+                          letterSpacing: "0.08em",
+                        }}
+                      >
+                        {heroLabel || headline}
+                      </span>
+                    </ProceduralMarkerSweep>
+                  </div>
+                )}
               </div>
             </div>
           </VoxParallaxLayer>
@@ -761,17 +820,17 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             const cutDelayFrames = Math.round(
               fps * (cutout.delaySec !== undefined ? cutout.delaySec : defaultCutSec)
             );
-            // Varied Entrance Choreography: slide_in_deal, delicate_tack, stamp_slam
-            const entrance = cutout.entranceType || (idx % 2 === 0 ? "slide_in_deal" : "delicate_tack");
+            // Varied Entrance Choreography: paper_slap (authentic Vox Z-drop), delicate_tack, stamp_slam
+            const entrance = cutout.entranceType || (idx % 2 === 0 ? "paper_slap" : "delicate_tack");
             const steppedCutFrame = isTactileCollage ? Math.floor(frame / 2) * 2 : frame;
             const cutSpring = spring({
               frame: Math.max(0, steppedCutFrame - cutDelayFrames),
               fps,
-              config: entrance === "slide_in_deal"
+              config: entrance === "stamp_slam"
+                ? SPRING_PRESETS.opuscarStampSlam
+                : entrance === "slide_in_deal"
                 ? SPRING_PRESETS.paperSlide
-                : entrance === "stamp_slam"
-                ? SPRING_PRESETS.stamp
-                : SPRING_PRESETS.paperHeavy,
+                : SPRING_PRESETS.opuscarSnappy,
             });
 
             let curX = cutout.xPct;
@@ -779,25 +838,39 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             let curRot = cutout.rotation || 0;
             let curScale = 1.0;
 
-            if (entrance === "slide_in_deal") {
-              const startX = cutout.xPct > 50 ? cutout.xPct + 14 : cutout.xPct - 14;
+            if (entrance === "stamp_slam") {
+              curScale = interpolate(cutSpring, [0, 0.85, 1], [2.4, 0.96, 1.0]);
+              curX = cutout.xPct;
+              curY = cutout.yPct;
+              curRot = cutout.rotation || 0;
+            } else if (entrance === "slide_in_deal") {
+              const startX = cutout.xPct > 50 ? cutout.xPct + 12 : cutout.xPct - 12;
               curX = interpolate(cutSpring, [0, 1], [startX, cutout.xPct]);
               curY = cutout.yPct;
               curRot = interpolate(
                 cutSpring,
                 [0, 0.8, 1],
-                [(cutout.rotation || 0) + (cutout.xPct > 50 ? 5 : -5), (cutout.rotation || 0) - (cutout.xPct > 50 ? 1 : -1), cutout.rotation || 0]
+                [(cutout.rotation || 0) + (cutout.xPct > 50 ? 4 : -4), (cutout.rotation || 0) - (cutout.xPct > 50 ? 1 : -1), cutout.rotation || 0]
               );
-            } else if (entrance === "stamp_slam") {
-              curScale = interpolate(cutSpring, [0, 1], [1.7, 1.0]);
+            } else if (entrance === "delicate_tack" || entrance === "drop") {
               curX = cutout.xPct;
-              curY = cutout.yPct;
-              curRot = cutout.rotation || 0;
+              curY = interpolate(cutSpring, [0, 1], [cutout.yPct - 4.5, cutout.yPct]);
+              curScale = interpolate(cutSpring, [0, 0.85, 1], [1.16, 0.98, 1.0]);
+              curRot = interpolate(
+                cutSpring,
+                [0, 0.85, 1],
+                [(cutout.rotation || 0) * 1.3, (cutout.rotation || 0) * 0.98, cutout.rotation || 0]
+              );
             } else {
-              // Delicate tack/drop: gentle 8% descent from above (not 25% drop)
+              // Default authentic Vox Paper Slap: Z-axis drop onto desk, ZERO horizontal slide!
               curX = cutout.xPct;
-              curY = interpolate(cutSpring, [0, 1], [cutout.yPct - 8, cutout.yPct]);
-              curRot = interpolate(cutSpring, [0, 1], [(cutout.rotation || 0) * 1.4, cutout.rotation || 0]);
+              curY = interpolate(cutSpring, [0, 1], [cutout.yPct - 3.5, cutout.yPct]);
+              curScale = interpolate(cutSpring, [0, 0.75, 1], [1.22, 0.98, 1.0]);
+              curRot = interpolate(
+                cutSpring,
+                [0, 0.75, 1],
+                [(cutout.rotation || 0) + (idx % 2 === 0 ? 3.5 : -3.5), (cutout.rotation || 0) - (idx % 2 === 0 ? 0.6 : -0.6), cutout.rotation || 0]
+              );
             }
 
             return (
@@ -822,20 +895,27 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 ) : (
                   <div
                     style={{
-                      padding: "10px 12px",
-                      backgroundColor: "#ffffff",
-                      border: "1.5px solid #e2e8f0",
-                      borderRadius: "4px",
+                      padding: "12px 14px",
+                      backgroundColor: cutout.variant === "sticky_note" ? "#FEF08A" : "#FFFFFF",
+                      border: cutout.variant === "sticky_note" ? "1px solid #EAB308" : "1.5px solid #CBD5E1",
+                      borderRadius: cutout.variant === "sticky_note" ? "2px" : "4px",
+                      boxShadow: cutout.variant === "sticky_note" ? "0 6px 14px rgba(161, 98, 7, 0.28)" : "0 4px 12px rgba(0,0,0,0.14)",
                       fontFamily: "monospace",
-                      fontSize: "10px",
+                      fontSize: "11px",
                       fontWeight: 700,
-                      color: "#1e293b",
+                      color: cutout.variant === "sticky_note" ? "#713F12" : "#1E293B",
+                      lineHeight: 1.35,
                     }}
                   >
-                    <div style={{ color: "#dc2626", marginBottom: "3px" }}>
-                      [EXHIBIT #{idx + 1}]
+                    <div style={{ color: cutout.variant === "sticky_note" ? "#A16207" : "#DC2626", marginBottom: "4px", fontSize: "10px", fontWeight: 800 }}>
+                      [{cutout.badge || (cutout.variant === "sticky_note" ? "AUDIT MEMO" : `EXHIBIT #${idx + 1}`)}]
                     </div>
                     <div>{cutout.label || "FORENSIC RECORD"}</div>
+                    {cutout.subLabel && (
+                      <div style={{ fontSize: "9px", color: cutout.variant === "sticky_note" ? "#854D0E" : "#64748B", marginTop: "4px" }}>
+                        {cutout.subLabel}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -921,11 +1001,26 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 yarnThickness={4.5}
                 drawStartFrame={yarnDelayFrames}
                 drawDuration={yarnDurationFrames}
+                label={yarn.label}
                 showPins={true}
                 pinSize={26}
               />
             );
           })}
+
+          {/* LAYER 3.5: FORENSIC DIMENSION LINES & ARCHITECTURAL CALIPERS */}
+          {dimensionLines && dimensionLines.length > 0 && dimensionLines.map((dim, dIdx) => (
+            <VoxDimensionLine
+              key={`dim-${dIdx}`}
+              startX={dim.startX}
+              endX={dim.endX}
+              y={dim.y}
+              label={dim.label}
+              color={dim.color || "#DC2626"}
+              startFrame={Math.round(fps * (dim.delaySec !== undefined ? dim.delaySec : 1.5))}
+              rotation={dim.rotation || 0}
+            />
+          ))}
 
           {/* LAYER 4: OFFICIAL RUBBER STAMP SLAM (Strictly tactile paper_collage mode) */}
           {isTactileCollage && stampText && (
