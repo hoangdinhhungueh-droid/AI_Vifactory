@@ -27,6 +27,7 @@ EXEMPTED_FILES = {
     "anti_bias_linter.py",
     "supervisory_review_s01_s04.py",
     "run_opus55_s01_s04_audit.py",
+    "run_hhtech_vox_council_audit.py",
 }
 
 # Forbidden episode-specific domain words that must NEVER appear in generic services/scripts

@@ -96,6 +96,7 @@ EXEMPTED_FILES = {
     "e2e_pipeline_smoketest.py",
     "supervisory_review_s01_s04.py",
     "run_opus55_s01_s04_audit.py",
+    "run_hhtech_vox_council_audit.py",
 }
 
 

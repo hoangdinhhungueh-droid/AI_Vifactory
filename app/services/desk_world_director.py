@@ -49,7 +49,7 @@ class ContinuousDeskWorldProps(BaseModel):
 def build_continuous_desk_world(
     act_id: str = "ACT_01",
     timestamps: Optional[Dict[str, Any]] = None,
-    assets_base_dir: str = "episodes/EN_EP0268_general_pants_collapse/images"
+    assets_base_dir: str = "assets/images"
 ) -> ContinuousDeskWorldProps:
     """
     Builds the unified 4-station investigative desk canvas for Act I.
