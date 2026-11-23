@@ -11,10 +11,10 @@ duration_window_s:
 narration:
   wpm_estimate: 125
   word_budget:
-    min: 460
+    min: 360
     max: 540
     target: 500
-    optimal_min: 480
+    optimal_min: 370
     optimal_max: 520
 beats:
   - id: B1_hook

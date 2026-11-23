@@ -65,6 +65,7 @@ PROMPT_LOCAL_FILES = {
     "b10_seo": ROOT_DIR / "config" / "prompts" / "seo_package_prompt.md",
     "cl3_t2i": ROOT_DIR / "config" / "prompts" / "cl3_vox_engine" / "image_prompts_system.md",
     "cl3_i2v": ROOT_DIR / "config" / "prompts" / "cl3_vox_engine" / "video_prompts_system.md",
+    "opus_art_director": ROOT_DIR / "config" / "prompts" / "cl3_vox_engine" / "opus_art_director.md",
 }
 
 # In-memory multi-hub cache state
@@ -585,6 +586,17 @@ def get_cl3_i2v_rules(force_refresh: bool = False) -> str:
     if content:
         return content
     local_p = PROMPT_LOCAL_FILES.get("cl3_i2v")
+    if local_p and local_p.exists():
+        return local_p.read_text(encoding="utf-8")
+    return ""
+
+
+def get_opus_art_director_rules(force_refresh: bool = False) -> str:
+    """Opus 5.5 Dynamic Art Director rules loaded dynamically from Notion SoT or local file."""
+    content = fetch_prompt_module("opus_art_director", force_refresh=force_refresh)
+    if content:
+        return content
+    local_p = PROMPT_LOCAL_FILES.get("opus_art_director")
     if local_p and local_p.exists():
         return local_p.read_text(encoding="utf-8")
     return ""

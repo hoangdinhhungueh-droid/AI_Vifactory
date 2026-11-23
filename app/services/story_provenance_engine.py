@@ -117,6 +117,9 @@ _REPUTABLE_PRESS_DOMAINS = (
     "tuoitre.vn",
     "thanhnien.vn",
     "vietnamplus.vn",
+    "theguardian.com",
+    "afr.com",
+    "alvarezandmarsal.com",
 )
 
 
@@ -166,6 +169,7 @@ def is_reputable_press_domain(url: str, source_name: str = "") -> bool:
         "한국경제", "매일경제", "조선일보", "중앙일보", "서울경제", "머니투데이", "이데일리", "뉴스1", "뉴시스", "한국일보", "세계일보", "국민일보",
         "chosun", "chosunbiz", "donga", "joongang", "hankyoreh", "kyunghyang", "hankook", "maeil", "seoul economic",
         "vnexpress", "tuổi trẻ", "tuoi tre", "thanh niên", "thanh nien", "ttxvn", "vietnamplus", "vtv", "vov", "lao động", "nhân dân", "tiền phong", "tien phong", "dân trí", "dan tri",
+        "australian financial review", "afr", "alvarez & marsal", "alvarez and marsal",
     )
     return any(w in s_low or w in s_clean for w in wire_names)
 
@@ -175,7 +179,7 @@ def is_official_portal_name(source_name: str = "") -> bool:
     s_low = (source_name or "").lower()
     if not s_low:
         return False
-    if re.search(r"\b(?:sec|doj|ftc|irs|gao|cbo)\b", s_low):
+    if re.search(r"\b(?:sec|doj|ftc|irs|gao|cbo|asic|apra)\b", s_low):
         return True
     s_clean = re.sub(r"\(.*?\)", "", s_low).strip()
     portal_markers = (
@@ -923,7 +927,13 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "audits uncovered", "audit examination", "audit review", "audits revealed",
             "audit identified", "audit records", "official audit exhibits",
         ],
-        "alleged": ["according to press reports", "allegedly", "alleged", "claimed", "according to", "reportedly", "published media accounts", "public reporting", "media reporting", "published reporting", "press investigations", "published accounts"],
+        "alleged": [
+            "according to press reports", "allegedly", "alleged", "claimed", "according to", "reportedly",
+            "published media accounts", "public reporting", "media reporting", "published reporting",
+            "press investigations", "published accounts", "press reports", "press reporting", "press accounts",
+            "industry reporting", "industry reports", "reporting indicates", "reports indicate",
+            "reporting reflects", "reports reflect",
+        ],
         "settled": [
             "settled without admitting", "consent decree", "agreed to pay without admitting",
             "under the terms of the settlement", "settlement disclosures", "settlement records", "settled",
@@ -932,7 +942,8 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
         "unverified": [
             "unverified", "preliminary reports", "initial reports", "early reports",
             "yet to be verified", "unconfirmed", "unconfirmed reports", "early unverified",
-            "pending verification", "initial reporting",
+            "pending verification", "initial reporting", "preliminary industry reporting",
+            "preliminary industry reports", "industry census",
         ],
         "proposed": ["proposed", "draft", "under consideration", "planned", "pending regulatory", "proposals"],
     },
@@ -964,6 +975,15 @@ def _qualifier_pattern_matches(pattern: str, text: str, market: str) -> bool:
         if pattern in text:
             return True
         if "によれば" in pattern and pattern.replace("によれば", "による") in text:
+            return True
+        return False
+    if m == "EN":
+        t_low = text.lower()
+        pat_low = pattern.lower().strip()
+        if pat_low in t_low:
+            return True
+        p_clean = pat_low.rstrip(",. ")
+        if p_clean in t_low:
             return True
         return False
     return pattern.lower() in text.lower()
@@ -1008,7 +1028,8 @@ def sanitize_substantive_claim_text(raw_text: str, market: str) -> str:
         s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
         s1 = re.sub(r"^(?:Tài liệu được cung cấp|Theo tài liệu cung cấp)\s*", "", s1, flags=re.IGNORECASE)
         return f"{s1}." if s1 else ""
-    s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
+    t_clean = re.sub(r"\b(Co|Inc|Ltd|Corp|Gov|Dept|Mr|Ms|Mrs|Dr|vs)\.\s+", r"\1@@DOT_SPACE@@", t)
+    s1 = re.split(r"\.\s+", t_clean)[0].replace("@@DOT_SPACE@@", ". ").strip().rstrip(".")
     s1 = re.sub(r"^(?:The provided document claims that|The provided source states that)\s*", "", s1, flags=re.IGNORECASE)
     return f"{s1}." if s1 else ""
 
@@ -1053,11 +1074,25 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
             return t[len(pfx):].strip(), pfx.strip()
         return t, ""
 
-    pat = r"^[“\"‘']?(?:According to\s+[^,:\n]{2,60}?|As\s+[^,:\n]{2,40}?(?:reported|documented|disclosed|revealed)[^,:\n]*?)[”\"’']?[,:;]\s*"
-    match = re.match(pat, t, re.IGNORECASE)
-    if match:
-        pfx = match.group(0)
-        return t[len(pfx):].strip(), pfx.strip()
+    pat = (
+        r"^[“\"‘']?(?:"
+        r"According to\s+[^,:\n]{1,60}[,:;]\s*|"
+        r"As\s+[^,:\n]{1,40}(?:reported|documented|disclosed|revealed)[^,:\n]*[,:;]\s*|"
+        r"(?:Published|Media|Press|Industry)\s+(?:reporting|reports|investigations|accounts)\s+(?:indicate|indicates|reflect|reflects|note|notes|show|shows|documented|document|confirm|confirms)(?:\s+that)?(?:,\s*|\s+)|"
+        r"(?:Regulatory|Official|Statutory)\s+(?:filings|notices|records)\s+(?:establish|confirms|confirm|indicate|indicates|reflect|reflects|show|shows)(?:\s+that)?(?:,\s*|\s+)"
+        r")[”\"’']?\s*"
+    )
+    pfx_list = []
+    curr_t = t
+    while True:
+        m = re.match(pat, curr_t, re.IGNORECASE)
+        if not m:
+            break
+        p = m.group(0)
+        pfx_list.append(p.strip())
+        curr_t = curr_t[len(p):].strip()
+    if pfx_list:
+        return curr_t, " ".join(pfx_list)
     return t, ""
 
 

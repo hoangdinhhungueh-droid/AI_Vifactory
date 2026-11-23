@@ -53,17 +53,57 @@ def run(ctx: RunContext) -> StageArtifact:
 
     # Ensure bulk_image_prompts.txt is always emitted for Human Gate 2 / Gate 3
     bulk_prompts_file = ctx.paths.root / "bulk_image_prompts.txt"
+    decomposed_file = ctx.paths.root / "decomposed_layer_prompts.json"
     bulk_lines = [f"# Bulk Image Prompts for Run: {ctx.run_id}", ""]
+    decomposed_export: Dict[str, Any] = {}
+
     for sc in scenes:
         sc_id = sc.get("scene_id", "SCENE_01")
         headline = sc.get("headline", "")
         p_text = sc.get("image_prompt") or sc.get("visual_prompt") or sc.get("narration", "")
+        dp = sc.get("decomposed_prompts") or {}
+        manifest = sc.get("dynamic_art_manifest") or {}
+        hero_obj = sc.get("hero_cutout_object", "")
+        tool_prop = sc.get("interacting_tool", "")
+
+        # Prioritize Opus 5.5 Bespoke Art Director prompts (FT-206)
+        assembled_anchor_prompt = manifest.get("assembled_keyframe_prompt") or dp.get("assembled_anchor_prompt") or p_text.strip()
+        hero_cutout_prompt = manifest.get("hero_cutout_prompt") or dp.get("hero_cutout_prompt", "")
+        interacting_tool_prompt = manifest.get("interacting_tool_prompt") or dp.get("interacting_tool_prompt", "")
+        stage_backdrop_prompt = dp.get("stage_backdrop_prompt", "")
+        relational_motion = dp.get("relational_motion_mechanism", "")
+
         bulk_lines.append(f"=== {sc_id} // {headline} ===")
-        bulk_lines.append(f"Target: composite_{sc_id.lower()}.png")
+        bulk_lines.append(f"Target Seed Image (Assembled Anchor): composite_{sc_id.lower()}.png")
         bulk_lines.append(f"Narration: {sc.get('narration', '')}")
-        bulk_lines.append(f"Prompt:\n{p_text.strip()}")
+        bulk_lines.append(f"Hero Cutout: {hero_obj}")
+        bulk_lines.append(f"Interacting Tool: {tool_prop}")
+        bulk_lines.append(f"[1. ASSEMBLED ANCHOR PROMPT]:\n{assembled_anchor_prompt.strip()}")
+        if hero_cutout_prompt:
+            bulk_lines.append(f"[2. HERO CUTOUT PROMPT (Alpha #FFFFFF)]:\n{hero_cutout_prompt.strip()}")
+        if interacting_tool_prompt:
+            bulk_lines.append(f"[3. INTERACTING TOOL PROMPT (Alpha #FFFFFF)]:\n{interacting_tool_prompt.strip()}")
+        if stage_backdrop_prompt:
+            bulk_lines.append(f"[4. STAGE BACKDROP PROMPT]:\n{stage_backdrop_prompt.strip()}")
+        if relational_motion:
+            bulk_lines.append(f"[5. RELATIONAL MOTION COUPLING]:\n{relational_motion.strip()}")
         bulk_lines.append("")
+
+        decomposed_export[sc_id] = {
+            "headline": headline,
+            "narration": sc.get("narration", ""),
+            "hero_cutout_object": hero_obj,
+            "interacting_tool": tool_prop,
+            "assembled_anchor_prompt": assembled_anchor_prompt.strip(),
+            "hero_cutout_prompt": hero_cutout_prompt.strip(),
+            "interacting_tool_prompt": interacting_tool_prompt.strip(),
+            "stage_backdrop_prompt": stage_backdrop_prompt.strip(),
+            "relational_motion_mechanism": relational_motion.strip(),
+            "dynamic_art_manifest": manifest if manifest else None,
+        }
+
     bulk_prompts_file.write_text("\n".join(bulk_lines), encoding="utf-8")
+    decomposed_file.write_text(json.dumps(decomposed_export, indent=2, ensure_ascii=False), encoding="utf-8")
     if ctx.paths.composite_seeds_dir.exists():
         (ctx.paths.composite_seeds_dir / "prompts.txt").write_text("\n".join(bulk_lines), encoding="utf-8")
 

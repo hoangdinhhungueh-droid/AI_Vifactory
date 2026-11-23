@@ -885,6 +885,500 @@ def render_scene_contact_sheet_png(
     return output_path
 
 
+def render_scene_master_asset_sheet_png(
+    scene: Dict[str, Any],
+    output_path: Path,
+    image_dir: Optional[Path] = None,
+    market: str = "EN",
+) -> Path:
+    """Renders the Canonical Vox Master Asset Sheet for a single scene (FT-201 / Direction A+).
+    
+    Shows the Assembled Result Anchor on the left, the Modular Decomposed Asset Zoo on the right,
+    and the Unidirectional Motion Coupling Contract at the bottom.
+    """
+    from PIL import Image, ImageDraw
+
+    w, h = 1920, 1080
+    bg_color = VOX_PALETTE["cream_paper"]
+    card_bg = "#FFFFFF"
+    ink = VOX_PALETTE["ink_black"]
+    hot_red = VOX_PALETTE["hot_red"]
+    border_col = VOX_PALETTE["aged_border"]
+    gray = VOX_PALETTE["halftone_gray"]
+    fonts = _get_pil_fonts()
+
+    img = Image.new("RGB", (w, h), color=bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Outer aged frame border
+    draw.rectangle([16, 16, w - 16, h - 16], outline=border_col, width=3)
+
+    # Top Header
+    sc_id = scene.get("scene_id", "SCENE_01")
+    headline = (scene.get("headline") or "FORENSIC COLLAGE").upper()
+    dur = float(scene.get("duration_est_sec") or 5.5)
+
+    draw.rectangle([20, 20, w - 20, 75], fill=ink)
+    draw.text((36, 28), f"VOX MASTER ASSET SHEET // {sc_id} (DIRECTION A+)", fill="#FFFFFF", font=fonts["title"])
+    draw.text((w - 28, 38), f"{headline[:36]} // {dur:.1f}S // LOCKED COMPUTER FRAME", fill=hot_red, font=fonts["body_bold"], anchor="ra")
+
+    # =========================================================================
+    # LEFT PANEL: ASSEMBLED RESULT SCENE (STYLE ANCHOR)
+    # =========================================================================
+    left_x1, left_y1, left_x2, left_y2 = 40, 95, 880, 780
+    draw.rectangle([left_x1, left_y1, left_x2, left_y2], fill=card_bg, outline=border_col, width=2)
+    
+    # Title bar
+    draw.rectangle([left_x1 + 2, left_y1 + 2, left_x2 - 2, left_y1 + 38], fill=ink)
+    draw.text((left_x1 + 12, left_y1 + 10), "[STYLE ANCHOR] ASSEMBLED RESULT SCENE (TARGET COMPOSITE)", fill="#FFFFFF", font=fonts["label"])
+
+    # 16:9 Image Area: 820 x 460
+    img_x1, img_y1 = left_x1 + 10, left_y1 + 46
+    img_w, img_h = 820, 460
+    img_x2, img_y2 = img_x1 + img_w, img_y1 + img_h
+
+    # Check for seed image
+    img_loaded = False
+    if image_dir and image_dir.exists():
+        for cand_name in [f"composite_{sc_id.lower()}.png", f"{sc_id.lower()}.png", f"{sc_id}.png"]:
+            cand_p = image_dir / cand_name
+            if cand_p.exists():
+                try:
+                    s_img = Image.open(cand_p).convert("RGB")
+                    s_img = s_img.resize((img_w, img_h), Image.Resampling.LANCZOS)
+                    img.paste(s_img, (img_x1, img_y1))
+                    img_loaded = True
+                    break
+                except Exception:
+                    pass
+
+    if not img_loaded:
+        # Draw high-fidelity tactile diorama preview
+        draw.rectangle([img_x1, img_y1, img_x2, img_y2], fill=(244, 241, 234), outline=border_col, width=1)
+        # Grid lines
+        for gx in range(img_x1, img_x2, 40):
+            draw.line([(gx, img_y1), (gx, img_y2)], fill=(230, 226, 216), width=1)
+        for gy in range(img_y1, img_y2, 40):
+            draw.line([(img_x1, gy), (img_x2, gy)], fill=(230, 226, 216), width=1)
+
+        # Hero silhouette preview (center-left)
+        hero_obj = scene.get("hero_cutout_object") or "Archival Hero Subject"
+        hx1, hy1, hx2, hy2 = img_x1 + 60, img_y1 + 70, img_x1 + 320, img_y2 - 60
+        # Red drop shadow
+        draw.rectangle([hx1 + 10, hy1 + 10, hx2 + 10, hy2 + 10], fill=(214, 46, 31))
+        # White deckle edge
+        draw.rectangle([hx1, hy1, hx2, hy2], fill="#FFFFFF", outline=ink, width=2)
+        # Halftone texture fill
+        draw.rectangle([hx1 + 8, hy1 + 8, hx2 - 8, hy2 - 8], fill=(45, 45, 45))
+        for dy in range(hy1 + 14, hy2 - 14, 14):
+            for dx in range(hx1 + 14, hx2 - 14, 14):
+                draw.ellipse([dx - 2, dy - 2, dx + 2, dy + 2], fill=(120, 120, 120))
+        draw.text(((hx1 + hx2) // 2, (hy1 + hy2) // 2), f"{hero_obj[:22].upper()}", fill="#FFFFFF", font=fonts["label"], anchor="mm")
+
+        # Stat Card preview (center-right)
+        stat_hero = extract_stat_hero_from_text(scene.get("narration") or "")
+        if stat_hero:
+            cx1, cy1, cx2, cy2 = img_x1 + 420, img_y1 + 100, img_x2 - 50, img_y1 + 320
+            draw.rectangle([cx1 + 8, cy1 + 8, cx2 + 8, cy2 + 8], fill=(26, 26, 26, 80))
+            draw.rectangle([cx1, cy1, cx2, cy2], fill=bg_color, outline=border_col, width=2)
+            draw.rectangle([cx1, cy1, cx2, cy1 + 36], fill=ink)
+            draw.text((cx1 + 12, cy1 + 8), "QUANTITATIVE EVIDENCE", fill="#FFFFFF", font=fonts["caption"])
+            draw.text(((cx1 + cx2) // 2, cy1 + 110), stat_hero, fill=hot_red, font=fonts["stat_hero"], anchor="mm")
+
+        # Red connecting line / vector
+        draw.line([(hx2, (hy1 + hy2) // 2), (img_x1 + 420, img_y1 + 210)], fill=hot_red, width=4)
+        draw.ellipse([hx2 - 6, (hy1 + hy2) // 2 - 6, hx2 + 6, (hy1 + hy2) // 2 + 6], fill=(217, 164, 65))
+        draw.ellipse([img_x1 + 414, img_y1 + 204, img_x1 + 426, img_y1 + 216], fill=(217, 164, 65))
+
+        draw.text((img_x1 + img_w // 2, img_y2 - 20), "[ASSEMBLED RESULT COMPOSITE DIORAMA — ANCHOR REFERENCE]", fill=gray, font=fonts["caption"], anchor="mm")
+
+    # Narration & Paradox area below image
+    narr_y = img_y2 + 12
+    narr = scene.get("narration") or "Tactile documentary investigation."
+    draw.text((left_x1 + 14, narr_y), "VOICEOVER NARRATION:", fill=gray, font=fonts["caption"])
+    words = narr.split()
+    l1, l2, l3 = "", "", ""
+    for w_i in words:
+        if len(l1) + len(w_i) + 1 <= 60:
+            l1 += (" " if l1 else "") + w_i
+        elif len(l2) + len(w_i) + 1 <= 60:
+            l2 += (" " if l2 else "") + w_i
+        elif len(l3) + len(w_i) + 1 <= 60:
+            l3 += (" " if l3 else "") + w_i
+    draw.text((left_x1 + 14, narr_y + 18), l1, fill=ink, font=fonts["typewriter_small"])
+    if l2:
+        draw.text((left_x1 + 14, narr_y + 36), l2, fill=ink, font=fonts["typewriter_small"])
+    if l3:
+        draw.text((left_x1 + 14, narr_y + 54), l3, fill=ink, font=fonts["typewriter_small"])
+
+    # =========================================================================
+    # RIGHT PANEL: MODULAR ASSET DECOMPOSITION ZOO (4 INDEPENDENT LAYERS)
+    # =========================================================================
+    right_x1, right_y1, right_x2, right_y2 = 905, 95, 1880, 780
+    draw.rectangle([right_x1, right_y1, right_x2, right_y2], fill=bg_color, outline=border_col, width=2)
+    
+    # Title bar
+    draw.rectangle([right_x1 + 2, right_y1 + 2, right_x2 - 2, right_y1 + 38], fill=ink)
+    draw.text((right_x1 + 12, right_y1 + 10), "MODULAR ASSET DECOMPOSITION ZOO (REMOTION INPUT LAYERS WITH ALPHA)", fill="#FFFFFF", font=fonts["label"])
+
+    decomp = scene.get("decomposed_prompts") or {}
+    tool_name = scene.get("interacting_tool") or "Forensic Brass Caliper / Red Yarn"
+    hero_name = scene.get("hero_cutout_object") or "Archival Subject Cutout"
+    stat_val = extract_stat_hero_from_text(narr) or "AUDIT DATA"
+
+    # 4 Grid Cards: 2 cols x 2 rows
+    # Col 1: 915 -> 1385, Col 2: 1400 -> 1870
+    # Row 1: 145 -> 445, Row 2: 460 -> 765
+    cw, ch = 470, 305
+
+    # --- CARD 1: STAGE BACKDROP ---
+    c1_x1, c1_y1 = right_x1 + 10, right_y1 + 48
+    draw.rectangle([c1_x1, c1_y1, c1_x1 + cw, c1_y1 + ch], fill=card_bg, outline=border_col, width=1)
+    draw.rectangle([c1_x1 + 2, c1_y1 + 2, c1_x1 + cw - 2, c1_y1 + 28], fill=border_col)
+    draw.text((c1_x1 + 8, c1_y1 + 6), "1. THE STAGE (BACKDROP CANVAS)", fill="#FFFFFF", font=fonts["caption"])
+    # Thumbnail
+    c1_thumb_box = [c1_x1 + 10, c1_y1 + 36, c1_x1 + cw - 10, c1_y1 + 160]
+    c1_loaded = False
+    if image_dir and image_dir.exists():
+        for cand_bg in [f"stage_{sc_id.lower()}.png", f"bg_{sc_id.lower()}.png", f"stage_{sc_id}.png"]:
+            cand_p = image_dir / cand_bg
+            if cand_p.exists():
+                try:
+                    bg_im = Image.open(cand_p).convert("RGB")
+                    bw, bh = cw - 20, 124
+                    bg_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+                    draw.rectangle(c1_thumb_box, fill="#FFFFFF", outline=gray, width=1)
+                    img.paste(bg_im, (c1_x1 + 10 + (bw - bg_im.width) // 2, c1_y1 + 36 + (bh - bg_im.height) // 2))
+                    c1_loaded = True
+                    break
+                except Exception:
+                    pass
+    if not c1_loaded:
+        draw.rectangle(c1_thumb_box, fill=(244, 241, 234), outline=gray, width=1)
+        for gx in range(c1_x1 + 10, c1_x1 + cw - 10, 25):
+            draw.line([(gx, c1_y1 + 36), (gx, c1_y1 + 160)], fill=(225, 220, 210), width=1)
+        draw.text((c1_x1 + cw // 2, c1_y1 + 98), "#F4F1EA AGED NEWSPRINT // ZERO OBJECTS", fill=gray, font=fonts["caption"], anchor="mm")
+    # Details
+    draw.text((c1_x1 + 10, c1_y1 + 170), "CANVAS: Fixed 1920x1080 Computer Frame Desk", fill=ink, font=fonts["caption"])
+    draw.text((c1_x1 + 10, c1_y1 + 190), "SPEC: Flat top-down desk view, fibrous paper grain", fill=gray, font=fonts["caption"])
+    draw.text((c1_x1 + 10, c1_y1 + 210), "ALPHA: 0% (Solid opaque background plane)", fill=gray, font=fonts["caption"])
+
+    # --- CARD 2: HERO CUTOUT OBJECT ---
+    c2_x1, c2_y1 = right_x1 + cw + 25, right_y1 + 48
+    draw.rectangle([c2_x1, c2_y1, c2_x1 + cw, c2_y1 + ch], fill=card_bg, outline=border_col, width=1)
+    draw.rectangle([c2_x1 + 2, c2_y1 + 2, c2_x1 + cw - 2, c2_y1 + 28], fill=border_col)
+    draw.text((c2_x1 + 8, c2_y1 + 6), "2. HERO CUTOUT (PRIMARY SUBJECT)", fill="#FFFFFF", font=fonts["caption"])
+    # Thumbnail: White deckle cutout on pure #FFFFFF
+    c2_thumb_box = [c2_x1 + 10, c2_y1 + 36, c2_x1 + cw - 10, c2_y1 + 160]
+    draw.rectangle(c2_thumb_box, fill="#FFFFFF", outline=gray, width=1)
+    c2_loaded = False
+    if image_dir and image_dir.exists():
+        for cand_hero in [f"hero_{sc_id.lower()}.png", f"cutout_{sc_id.lower()}.png", f"hero_{sc_id}.png"]:
+            cand_p = image_dir / cand_hero
+            if cand_p.exists():
+                try:
+                    h_im = Image.open(cand_p).convert("RGBA")
+                    bw, bh = cw - 20, 124
+                    h_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+                    paste_x = c2_x1 + 10 + (bw - h_im.width) // 2
+                    paste_y = c2_y1 + 36 + (bh - h_im.height) // 2
+                    img.paste(h_im, (paste_x, paste_y), h_im)
+                    c2_loaded = True
+                    break
+                except Exception:
+                    pass
+    if not c2_loaded:
+        draw.rectangle([c2_x1 + 180, c2_y1 + 44, c2_x1 + 290, c2_y1 + 152], fill=(214, 46, 31)) # shadow
+        draw.rectangle([c2_x1 + 174, c2_y1 + 38, c2_x1 + 284, c2_y1 + 146], fill="#FFFFFF", outline=ink, width=1) # deckle
+        draw.rectangle([c2_x1 + 180, c2_y1 + 44, c2_x1 + 278, c2_y1 + 140], fill=(45, 45, 45)) # halftone
+        draw.text((c2_x1 + cw // 2, c2_y1 + 92), f"[{hero_name[:18].upper()}]", fill="#FFFFFF", font=fonts["caption"], anchor="mm")
+    # Details
+    draw.text((c2_x1 + 10, c2_y1 + 170), f"SUBJECT: {hero_name[:38]}", fill=ink, font=fonts["caption"])
+    draw.text((c2_x1 + 10, c2_y1 + 190), "SPEC: 60lpi Halftone B&W, 2-4px deckle edge, #FFFFFF bg", fill=gray, font=fonts["caption"])
+    draw.text((c2_x1 + 10, c2_y1 + 210), "ALPHA: Clean alpha cutout boundary for Remotion ingress", fill=hot_red, font=fonts["caption"])
+
+    # --- CARD 3: STAT CARD HERO ---
+    c3_x1, c3_y1 = right_x1 + 10, right_y1 + ch + 60
+    draw.rectangle([c3_x1, c3_y1, c3_x1 + cw, c3_y1 + ch], fill=card_bg, outline=border_col, width=1)
+    draw.rectangle([c3_x1 + 2, c3_y1 + 2, c3_x1 + cw - 2, c3_y1 + 28], fill=border_col)
+    draw.text((c3_x1 + 8, c3_y1 + 6), "3. STAT HERO CARD (DATA CHIP)", fill="#FFFFFF", font=fonts["caption"])
+    # Thumbnail: Giant red stat on cream card
+    draw.rectangle([c3_x1 + 10, c3_y1 + 36, c3_x1 + cw - 10, c3_y1 + 160], fill=bg_color, outline=gray, width=1)
+    draw.rectangle([c3_x1 + 10, c3_y1 + 36, c3_x1 + cw - 10, c3_y1 + 60], fill=ink)
+    draw.text((c3_x1 + 20, c3_y1 + 42), "VERIFIED FORENSIC METRIC", fill="#FFFFFF", font=fonts["caption"])
+    draw.text((c3_x1 + cw // 2, c3_y1 + 110), stat_val, fill=hot_red, font=fonts["stat_medium"], anchor="mm")
+    # Details
+    draw.text((c3_x1 + 10, c3_y1 + 170), f"METRIC: {stat_val}", fill=hot_red, font=fonts["caption"])
+    draw.text((c3_x1 + 10, c3_y1 + 190), "SPEC: Giant bold condensed font, aged cardstock, red ink", fill=gray, font=fonts["caption"])
+    draw.text((c3_x1 + 10, c3_y1 + 210), "ALPHA: Independent floating card layer with drop shadow", fill=gray, font=fonts["caption"])
+
+    # --- CARD 4: INTERACTING TOOL / CONNECTOR ---
+    c4_x1, c4_y1 = right_x1 + cw + 25, right_y1 + ch + 60
+    draw.rectangle([c4_x1, c4_y1, c4_x1 + cw, c4_y1 + ch], fill=card_bg, outline=border_col, width=1)
+    draw.rectangle([c4_x1 + 2, c4_y1 + 2, c4_x1 + cw - 2, c4_y1 + 28], fill=border_col)
+    draw.text((c4_x1 + 8, c4_y1 + 6), "4. INTERACTING TOOL / CONNECTOR", fill="#FFFFFF", font=fonts["caption"])
+    # Thumbnail: Red connector line with brass pins on white or real image
+    c4_thumb_box = [c4_x1 + 10, c4_y1 + 36, c4_x1 + cw - 10, c4_y1 + 160]
+    draw.rectangle(c4_thumb_box, fill="#FFFFFF", outline=gray, width=1)
+    c4_loaded = False
+    if image_dir and image_dir.exists():
+        for cand_tool in [f"tool_{sc_id.lower()}.png", f"prop_{sc_id.lower()}.png", f"tool_{sc_id}.png"]:
+            cand_p = image_dir / cand_tool
+            if cand_p.exists():
+                try:
+                    t_im = Image.open(cand_p).convert("RGBA")
+                    bw, bh = cw - 20, 124
+                    t_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+                    paste_x = c4_x1 + 10 + (bw - t_im.width) // 2
+                    paste_y = c4_y1 + 36 + (bh - t_im.height) // 2
+                    img.paste(t_im, (paste_x, paste_y), t_im)
+                    c4_loaded = True
+                    break
+                except Exception:
+                    pass
+    if not c4_loaded:
+        draw.line([(c4_x1 + 40, c4_y1 + 98), (c4_x1 + cw - 40, c4_y1 + 98)], fill=hot_red, width=4)
+        draw.ellipse([c4_x1 + 34, c4_y1 + 92, c4_x1 + 46, c4_y1 + 104], fill=(217, 164, 65))
+        draw.ellipse([c4_x1 + cw - 46, c4_y1 + 92, c4_x1 + cw - 34, c4_y1 + 104], fill=(217, 164, 65))
+        draw.text((c4_x1 + cw // 2, c4_y1 + 130), f"[{tool_name[:24].upper()}]", fill=ink, font=fonts["caption"], anchor="mm")
+    # Details
+    draw.text((c4_x1 + 10, c4_y1 + 170), f"PROP: {tool_name[:38]}", fill=ink, font=fonts["caption"])
+    draw.text((c4_x1 + 10, c4_y1 + 190), "SPEC: Mechanical instrument, crimson yarn, brass pushpin", fill=gray, font=fonts["caption"])
+    draw.text((c4_x1 + 10, c4_y1 + 210), "ALPHA: Dynamic SVG/PNG overlay rendered by Remotion", fill=hot_red, font=fonts["caption"])
+
+    # =========================================================================
+    # BOTTOM PANEL: 6-IN-1 MASTER SHEET SPECIFICATION // WIRING & TRANSACTION PROMPT
+    # =========================================================================
+    bot_x1, bot_y1, bot_x2, bot_y2 = 40, 800, 1880, 1050
+    draw.rectangle([bot_x1, bot_y1, bot_x2, bot_y2], fill=(240, 237, 228), outline=border_col, width=2)
+    draw.rectangle([bot_x1 + 2, bot_y1 + 2, bot_x2 - 2, bot_y1 + 32], fill=ink)
+    draw.text((bot_x1 + 12, bot_y1 + 7), "6-IN-1 MASTER SHEET SPECIFICATION // WIRING COUPLING & TRANSACTION PROMPT (FT-201)", fill="#FFFFFF", font=fonts["label"])
+
+    col_w = (bot_x2 - bot_x1 - 50) // 4
+    
+    # Col 1: Phase 1 (Ingress)
+    p1_x = bot_x1 + 16
+    draw.text((p1_x, bot_y1 + 38), "1. KINETIC INGRESS (<=0.4s)", fill=hot_red, font=fonts["label"])
+    draw.text((p1_x, bot_y1 + 58), "- Entry from screen-right (X-axis)", fill=ink, font=fonts["caption"])
+    draw.text((p1_x, bot_y1 + 74), "- cubic-bezier(.7, 0, .2, 1) curve", fill=ink, font=fonts["caption"])
+    draw.text((p1_x, bot_y1 + 90), "- Settle within 12 frames @ 30fps", fill=gray, font=fonts["caption"])
+
+    # Col 2: Relational Wiring Spec
+    p2_x = p1_x + col_w + 10
+    draw.text((p2_x, bot_y1 + 38), "2. WIRING COUPLING SPEC", fill=hot_red, font=fonts["label"])
+    draw.text((p2_x, bot_y1 + 58), f"- Connector: {tool_name[:24]}", fill=ink, font=fonts["caption"])
+    draw.text((p2_x, bot_y1 + 74), "- Anchors: [450, 420] -> [1450, 240]", fill=ink, font=fonts["caption"])
+    draw.text((p2_x, bot_y1 + 90), "- Dead-stop spatial lock with 12fps paper hold", fill=gray, font=fonts["caption"])
+
+    # Col 3: Engine Roles
+    p3_x = p2_x + col_w + 10
+    draw.text((p3_x, bot_y1 + 38), "3. ENGINE ROLES (DIRECTION A+)", fill=hot_red, font=fonts["label"])
+    draw.text((p3_x, bot_y1 + 58), "• REMOTION: 100% spatial motion & alpha layering", fill=ink, font=fonts["caption"])
+    draw.text((p3_x, bot_y1 + 74), "• OMNI: Living texture plate (paper grain/scanlines)", fill=hot_red, font=fonts["caption"])
+    draw.text((p3_x, bot_y1 + 90), "• WHISPER: 0ms drift karaoke subtitle sync", fill=gray, font=fonts["caption"])
+
+    # Col 4: Information Spec Summary
+    p4_x = p3_x + col_w + 10
+    draw.text((p4_x, bot_y1 + 38), "4. INFORMATION SUMMARY", fill=hot_red, font=fonts["label"])
+    draw.text((p4_x, bot_y1 + 58), f"• STAT: {stat_val[:18]}", fill=hot_red, font=fonts["caption"])
+    draw.text((p4_x, bot_y1 + 74), f"• HERO: {hero_name[:22]}", fill=ink, font=fonts["caption"])
+    draw.text((p4_x, bot_y1 + 90), f"• HEADLINE: {headline[:22]}", fill=gray, font=fonts["caption"])
+
+    # Bottom Row: Transaction Prompt Banner
+    tx_p = decomp.get("relational_motion_mechanism") or scene.get("universal_video_prompt") or f"[{hero_name}] + interacts with + [{tool_name}], leaving permanent physical residue on aged desk with 12fps paper vibration."
+    draw.rectangle([bot_x1 + 10, bot_y1 + 112, bot_x2 - 10, bot_y1 + 134], fill=border_col)
+    draw.text((bot_x1 + 16, bot_y1 + 117), "5. TRANSACTION & KINETIC PROMPT (OMNI / VEO LIVING TEXTURE PLATE):", fill="#FFFFFF", font=fonts["caption"])
+
+    # Draw prompt text
+    draw.rectangle([bot_x1 + 10, bot_y1 + 136, bot_x2 - 10, bot_y2 - 10], fill="#FFFFFF", outline=gray, width=1)
+    words_tx = tx_p.split()
+    tw1, tw2, tw3 = "", "", ""
+    for w_i in words_tx:
+        if len(tw1) + len(w_i) + 1 <= 130:
+            tw1 += (" " if tw1 else "") + w_i
+        elif len(tw2) + len(w_i) + 1 <= 130:
+            tw2 += (" " if tw2 else "") + w_i
+        elif len(tw3) + len(w_i) + 1 <= 130:
+            tw3 += (" " if tw3 else "") + w_i
+    draw.text((bot_x1 + 16, bot_y1 + 142), tw1, fill=ink, font=fonts["typewriter_small"])
+    if tw2:
+        draw.text((bot_x1 + 16, bot_y1 + 162), tw2, fill=ink, font=fonts["typewriter_small"])
+    if tw3:
+        draw.text((bot_x1 + 16, bot_y1 + 182), tw3, fill=ink, font=fonts["typewriter_small"])
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(str(output_path), format="PNG", quality=95)
+    logger.info(f"Scene Master Asset Sheet rendered to: {output_path}")
+    return output_path
+
+
+def render_multiscene_master_asset_sheet_png(
+    scenes: List[Dict[str, Any]],
+    output_path: Path,
+    image_dir: Optional[Path] = None,
+) -> Path:
+    """Renders a combined 2-Scene Master Asset Sheet (matching scripts/create_multiscene_mastersheet.py)."""
+    from PIL import Image, ImageDraw
+
+    w, h = 1920, 1080
+    bg_color = (235, 232, 224)
+    ink = VOX_PALETTE["ink_black"]
+    hot_red = VOX_PALETTE["hot_red"]
+    cream_paper = VOX_PALETTE["cream_paper"]
+    border_col = VOX_PALETTE["aged_border"]
+    gray = VOX_PALETTE["halftone_gray"]
+    fonts = _get_pil_fonts()
+
+    img = Image.new("RGB", (w, h), color=bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Top Header
+    draw.rectangle([0, 0, w, 70], fill=ink)
+    draw.text((40, 20), "VOX ENGINE V3: MULTI-SCENE MASTER ASSET SHEET (ACT I SEQUENCE)", fill="#FFFFFF", font=fonts["title"])
+    draw.text((1200, 26), "SCENES: 2 // CAMERA: 100% LOCKED VIEWPORT // DIRECTION A+", fill=hot_red, font=fonts["label"], anchor="la")
+
+    s1 = scenes[0] if len(scenes) > 0 else {}
+    s2 = scenes[1] if len(scenes) > 1 else {}
+
+    # Scene 1 & 2 Left Thumbnails (Result Scene Anchors)
+    for s_idx, (sc, y_offset) in enumerate([(s1, 95), (s2, 575)]):
+        sc_id = sc.get("scene_id", f"SCENE_{s_idx+1:02d}")
+        sc_head = (sc.get("headline") or "FORENSIC FOCUS").upper()
+        # Box
+        draw.rectangle([40, y_offset, 850, y_offset + 460], fill="#FFFFFF", outline=ink, width=2)
+        draw.rectangle([40, y_offset, 480, y_offset + 32], fill=ink)
+        draw.text((48, y_offset + 7), f"{sc_id} RESULT: {sc_head[:28]}", fill="#FFFFFF", font=fonts["caption"])
+
+        # Try to load image
+        loaded = False
+        if image_dir and image_dir.exists():
+            for cn in [f"composite_{sc_id.lower()}.png", f"{sc_id.lower()}.png"]:
+                cp = image_dir / cn
+                if cp.exists():
+                    try:
+                        im = Image.open(cp).convert("RGB")
+                        im = im.resize((790, 410), Image.Resampling.LANCZOS)
+                        img.paste(im, (50, y_offset + 40))
+                        loaded = True
+                        break
+                    except Exception:
+                        pass
+        if not loaded:
+            draw.rectangle([50, y_offset + 40, 840, y_offset + 448], fill=(244, 241, 234), outline=gray, width=1)
+            hero_str = sc.get("hero_cutout_object") or "Forensic Subject"
+            draw.text((445, y_offset + 240), f"[{sc_id} ASSEMBLED ANCHOR: {hero_str[:24].upper()}]", fill=ink, font=fonts["label"], anchor="mm")
+
+    # Right side: Decomposed Modular Asset Zoo
+    rx1, ry1, rx2, ry2 = 880, 95, 1880, 1035
+    draw.rectangle([rx1, ry1, rx2, ry2], fill=cream_paper, outline=(200, 190, 175), width=2)
+    draw.text((910, 115), "MODULAR ASSET DECOMPOSITION ZOO (REMOTION & OMNI LAYERS)", fill=ink, font=fonts["label"])
+    draw.text((910, 140), "All assets rendered as independent orthogonal layers with zero pre-baked overlap.", fill=gray, font=fonts["caption"])
+
+    # Thumbnails of decomposed components (Stage, Hero, Stat, Tool)
+    # Stage S1 & S2
+    for s_idx, (sc, x1, x2) in enumerate([(s1, 910, 1140), (s2, 1170, 1400)]):
+        sc_id = sc.get("scene_id", f"SCENE_{s_idx+1:02d}")
+        draw.rectangle([x1, 170, x2, 290], fill="#FFFFFF", outline=gray, width=1)
+        st_loaded = False
+        if image_dir and image_dir.exists():
+            for c_bg in [f"stage_{sc_id.lower()}.png", f"bg_{sc_id.lower()}.png", f"stage_{sc_id}.png"]:
+                cp = image_dir / c_bg
+                if cp.exists():
+                    try:
+                        st_im = Image.open(cp).convert("RGB")
+                        bw, bh = x2 - x1 - 4, 116
+                        st_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+                        img.paste(st_im, (x1 + 2 + (bw - st_im.width)//2, 172 + (bh - st_im.height)//2))
+                        st_loaded = True
+                        break
+                    except Exception:
+                        pass
+        if not st_loaded:
+            draw.rectangle([x1 + 2, 172, x2 - 2, 288], fill=(244, 241, 234), outline=None)
+            for gx in range(x1 + 10, x2 - 10, 20):
+                draw.line([(gx, 172), (gx, 288)], fill=(228, 224, 214), width=1)
+            draw.text(((x1 + x2)//2, 230), f"Stage {sc_id[-2:]} Desk Canvas", fill=ink, font=fonts["caption"], anchor="mm")
+        draw.text((x1, 298), f"Stage {sc_id[-2:]} (#F4F1EA Desk)", fill=ink, font=fonts["caption"])
+
+    # Stat Cards S1 & S2 (Stylized Remotion Vector Card)
+    s1_stat = extract_stat_hero_from_text(s1.get("narration") or "") or "AUDIT DATA"
+    s2_stat = extract_stat_hero_from_text(s2.get("narration") or "") or "9 RETAIL"
+    for s_idx, (st_val, x1, x2) in enumerate([(s1_stat, 1430, 1640), (s2_stat, 1660, 1860)]):
+        draw.rectangle([x1, 170, x2, 290], fill=(244, 241, 234), outline=border_col, width=2)
+        draw.rectangle([x1, 170, x2, 198], fill=ink)
+        draw.text(((x1 + x2)//2, 184), "STAT CHIP // IBM PLEX", fill="#FFFFFF", font=fonts["caption"], anchor="mm")
+        draw.text(((x1 + x2)//2, 244), str(st_val)[:8], fill=hot_red, font=fonts["stat_medium"], anchor="mm")
+        draw.text((x1, 298), f"Stat S{s_idx+1} Metric Card", fill=hot_red, font=fonts["caption"])
+
+    # Hero Cutouts S1 & S2 (Real AI Cutout Images with Deckle Edge)
+    h1_name = s1.get("hero_cutout_object") or "Subject S1"
+    h2_name = s2.get("hero_cutout_object") or "Subject S2"
+    for s_idx, (sc, h_name, x1, x2) in enumerate([(s1, h1_name, 910, 1140), (s2, h2_name, 1170, 1400)]):
+        sc_id = sc.get("scene_id", f"SCENE_{s_idx+1:02d}")
+        draw.rectangle([x1, 335, x2, 520], fill="#FFFFFF", outline=gray, width=1)
+        h_loaded = False
+        if image_dir and image_dir.exists():
+            for c_h in [f"hero_{sc_id.lower()}.png", f"cutout_{sc_id.lower()}.png", f"hero_{sc_id}.png"]:
+                cp = image_dir / c_h
+                if cp.exists():
+                    try:
+                        h_im = Image.open(cp).convert("RGBA")
+                        bw, bh = x2 - x1 - 6, 178
+                        h_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+                        px = x1 + 3 + (bw - h_im.width)//2
+                        py = 338 + (bh - h_im.height)//2
+                        img.paste(h_im, (px, py), h_im)
+                        h_loaded = True
+                        break
+                    except Exception:
+                        pass
+        if not h_loaded:
+            draw.text(((x1 + x2)//2, 420), f"[{h_name[:14].upper()}]", fill=ink, font=fonts["caption"], anchor="mm")
+        draw.text((x1, 530), f"Hero S{s_idx+1}: {h_name[:20]}", fill=ink, font=fonts["caption"])
+
+    # Tools / Connectors S1 & S2 (Real AI Tool / Prop Images)
+    t1_name = s1.get("interacting_tool") or "Odometer Counter"
+    t2_name = s2.get("interacting_tool") or "Directional Route Arrow"
+    for s_idx, (sc, t_name, y1, y2) in enumerate([(s1, t1_name, 335, 420), (s2, t2_name, 455, 540)]):
+        sc_id = sc.get("scene_id", f"SCENE_{s_idx+1:02d}")
+        draw.rectangle([1430, y1, 1860, y2], fill="#FFFFFF", outline=gray, width=1)
+        t_loaded = False
+        if image_dir and image_dir.exists():
+            for c_t in [f"tool_{sc_id.lower()}.png", f"prop_{sc_id.lower()}.png", f"tool_{sc_id}.png"]:
+                cp = image_dir / c_t
+                if cp.exists():
+                    try:
+                        t_im = Image.open(cp).convert("RGBA")
+                        bw, bh = 424, y2 - y1 - 6
+                        t_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+                        px = 1433 + (bw - t_im.width)//2
+                        py = y1 + 3 + (bh - t_im.height)//2
+                        img.paste(t_im, (px, py), t_im)
+                        t_loaded = True
+                        break
+                    except Exception:
+                        pass
+        if not t_loaded:
+            draw.line([(1450, (y1 + y2)//2), (1840, (y1 + y2)//2)], fill=hot_red, width=3)
+            draw.text((1645, (y1 + y2)//2 + 18), f"[{t_name[:28]}]", fill=ink, font=fonts["caption"], anchor="mm")
+        draw.text((1430, y2 + 10), f"Tool S{s_idx+1}: {t_name[:36]}", fill=hot_red, font=fonts["caption"])
+
+    # Bottom Continuity Rules Box
+    draw.rectangle([910, 600, 1860, 1010], fill=(240, 237, 228), outline=hot_red, width=2)
+    draw.text((930, 620), "MULTI-SCENE CONTINUITY RULES (VOX ENGINE V3 / DIRECTION A+):", fill=ink, font=fonts["label"])
+    draw.text((930, 660), "1. Camera: Locked 1920x1080 computer screen frame (zero zoom, zero roll across scenes).", fill=hot_red, font=fonts["caption"])
+    draw.text((930, 695), "2. Ingress: Subject layers enter at high speed from screen-right (<= 0.4s cubic-bezier).", fill=ink, font=fonts["caption"])
+    draw.text((930, 730), "3. Connectors: S1 vector -> S2 evidence yarn mechanically lock causal claims across frames.", fill=ink, font=fonts["caption"])
+    draw.text((930, 765), "4. Dead-Stop Hold: Rigid spatial anchor lock with continuous 12fps paper grain/shadow breathing.", fill=ink, font=fonts["caption"])
+    draw.text((930, 800), "5. Whisper Sync: Remotion locks audio karaoke and subtitles with 0ms drift invariance.", fill=ink, font=fonts["caption"])
+    draw.text((930, 835), "6. Omni Guard: Google Flow/Omni serves as pure texture engine (paper grain, CRT scanlines).", fill=hot_red, font=fonts["caption"])
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(str(output_path), format="PNG", quality=95)
+    logger.info(f"Multi-Scene Master Asset Sheet rendered to: {output_path}")
+    return output_path
+
+
 # ==============================================================================
 # INTERACTIVE STANDALONE HTML GENERATOR (EXECUTIVE DASHBOARD)
 # ==============================================================================
@@ -908,6 +1402,7 @@ def generate_master_scene_dashboard_html(
 
     # Build scene cards HTML
     scene_cards_html = []
+    master_sheet_cards_html = []
     for idx, sc in enumerate(scenes):
         sc_id = sc.get("scene_id", f"SCENE_{idx+1:02d}")
         headline = sc.get("headline") or "FORENSIC FOCUS"
@@ -974,7 +1469,55 @@ def generate_master_scene_dashboard_html(
         """
         scene_cards_html.append(card_html)
 
+        # Master Asset Sheet Card for Tab 1 (Direction A+ / FT-201)
+        decomp = sc.get("decomposed_prompts") or {}
+        ms_p_file = f"master_asset_sheet_{sc_id.lower()}.png"
+        tool_label = sc.get("interacting_tool") or "Forensic Instrument / Red Yarn"
+        stat_label = stat_hero or "QUANTITATIVE METRIC"
+
+        ms_card = f"""
+        <div class="ms-card" id="ms_card_{sc_id.lower()}">
+            <div class="ms-card-header">
+                <span class="ms-tag">{sc_id} // {headline}</span>
+                <span class="ms-dur">{dur:.1f}s</span>
+            </div>
+            <div class="ms-body-grid">
+                <div class="ms-img-col">
+                    <img src="{ms_p_file}" alt="{sc_id} Master Asset Sheet" class="ms-sheet-img" onerror="this.style.display='none'; this.parentElement.classList.add('ms-fallback');" />
+                    <div class="ms-img-subtext">MASTER ASSET SHEET // ASSEMBLED ANCHOR + DECOMPOSED ZOO</div>
+                </div>
+                <div class="ms-layers-col">
+                    <div class="ms-layer-card">
+                        <div class="ms-layer-title">1. THE STAGE (BACKDROP CANVAS)</div>
+                        <div class="ms-layer-spec">Fixed 1920x1080 Computer Frame Desk // #F4F1EA Aged Newsprint // 0% Alpha</div>
+                        <pre class="ms-layer-prompt">{decomp.get('stage_backdrop_prompt', 'Clean aged archival newsprint diorama backdrop.')}</pre>
+                    </div>
+                    <div class="ms-layer-card">
+                        <div class="ms-layer-title">2. HERO CUTOUT OBJECT: {hero}</div>
+                        <div class="ms-layer-spec">60lpi Halftone B&W, 2-4px deckle edge // Solid #FFFFFF background for alpha extraction</div>
+                        <pre class="ms-layer-prompt">{decomp.get('hero_cutout_prompt', f'Authentic Vox tactile paper cutout: {hero}')}</pre>
+                    </div>
+                    <div class="ms-layer-card">
+                        <div class="ms-layer-title">3. STAT CARD HERO: {stat_label}</div>
+                        <div class="ms-layer-spec">Giant bold red numeral on cream cardstock // Floating alpha layer</div>
+                    </div>
+                    <div class="ms-layer-card">
+                        <div class="ms-layer-title">4. INTERACTING TOOL / CONNECTOR: {tool_label}</div>
+                        <div class="ms-layer-spec">Mechanical prop / crimson yarn with brass pins // Solid #FFFFFF background</div>
+                        <pre class="ms-layer-prompt">{decomp.get('interacting_tool_prompt', f'Authentic Vox tactile mechanical tool: {tool_label}')}</pre>
+                    </div>
+                    <div class="ms-layer-card ms-motion-card">
+                        <div class="ms-layer-title" style="color: var(--hot-red);">5. RELATIONAL MOTION COUPLING (REMOTION CONTRACT)</div>
+                        <p class="ms-motion-text">{decomp.get('relational_motion_mechanism', 'Unidirectional high-speed ingress on X-axis (<=0.4s, cubic-bezier): Hero locks, tool interacts, dead-stop hold with 12fps paper vibration.')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        master_sheet_cards_html.append(ms_card)
+
     all_scenes_joined = "\n".join(scene_cards_html)
+    all_mastersheets_joined = "\n".join(master_sheet_cards_html)
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1301,6 +1844,115 @@ def generate_master_scene_dashboard_html(
             overflow-y: auto;
         }}
 
+        /* MASTER ASSET SHEETS STYLES */
+        .multiscene-banner {{
+            background: #FFFFFF;
+            border: 2px solid var(--border-aged);
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 4px;
+            box-shadow: var(--card-shadow);
+        }}
+        .multiscene-banner h2 {{
+            font-family: var(--font-headline);
+            font-size: 1.4rem;
+            color: var(--ink-black);
+            margin-bottom: 4px;
+        }}
+        .multiscene-banner p {{
+            font-size: 0.85rem;
+            color: var(--halftone-gray);
+            margin-bottom: 12px;
+        }}
+        .multiscene-banner-img {{
+            width: 100%;
+            border: 1px solid var(--border-aged);
+            border-radius: 2px;
+            display: block;
+        }}
+        .mastersheets-list {{
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }}
+        .ms-card {{
+            background: #FFFFFF;
+            border: 2px solid var(--border-aged);
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+        }}
+        .ms-card-header {{
+            background: var(--ink-black);
+            color: #FFFFFF;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .ms-tag {{ font-family: var(--font-headline); font-size: 1.15rem; }}
+        .ms-dur {{ color: var(--hot-red); font-weight: bold; font-size: 1rem; }}
+        .ms-body-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 18px;
+            background: #FAF8F5;
+        }}
+        @media (max-width: 1200px) {{
+            .ms-body-grid {{ grid-template-columns: 1fr; }}
+        }}
+        .ms-img-col {{
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }}
+        .ms-sheet-img {{
+            width: 100%;
+            border: 1px solid var(--border-aged);
+            border-radius: 2px;
+            background: #EFE9DA;
+        }}
+        .ms-img-subtext {{
+            font-size: 0.75rem;
+            color: var(--halftone-gray);
+            font-weight: bold;
+            text-align: center;
+        }}
+        .ms-layers-col {{
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }}
+        .ms-layer-card {{
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-left: 3px solid var(--ink-black);
+            padding: 10px 12px;
+            border-radius: 2px;
+        }}
+        .ms-motion-card {{ border-left-color: var(--hot-red); background: #FFFDF9; }}
+        .ms-layer-title {{ font-weight: bold; font-size: 0.88rem; color: var(--ink-black); margin-bottom: 2px; }}
+        .ms-layer-spec {{ font-size: 0.78rem; color: var(--halftone-gray); margin-bottom: 6px; }}
+        .ms-layer-prompt {{
+            font-family: var(--font-typewriter);
+            font-size: 0.74rem;
+            color: #1E293B;
+            background: #F1F5F9;
+            padding: 6px 8px;
+            border-radius: 2px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 80px;
+            overflow-y: auto;
+        }}
+        .ms-motion-text {{
+            font-family: var(--font-sans);
+            font-size: 0.82rem;
+            color: #334155;
+            line-height: 1.4;
+        }}
+
         /* HUMAN GATE ACTION FOOTER */
         .human-gate-footer {{
             margin-top: 32px;
@@ -1368,12 +2020,25 @@ def generate_master_scene_dashboard_html(
 
     <!-- NAVIGATION TABS -->
     <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('tab-storyboard')">PER-SCENE STORYBOARDS ({total_scenes})</button>
-        <button class="tab-btn" onclick="switchTab('tab-system')">MASTER VISUAL SYSTEM</button>
+        <button class="tab-btn active" onclick="switchTab('tab-mastersheets')">1. MASTER ASSET SHEETS ({total_scenes})</button>
+        <button class="tab-btn" onclick="switchTab('tab-storyboard')">2. FULL STORYBOARD CONTACT SHEET</button>
+        <button class="tab-btn" onclick="switchTab('tab-system')">3. MASTER VISUAL SYSTEM & TOKENS</button>
     </div>
 
-    <!-- TAB 1: PER-SCENE STORYBOARDS -->
-    <div id="tab-storyboard" class="tab-panel active">
+    <!-- TAB 1: MASTER ASSET SHEETS (DIRECTION A+) -->
+    <div id="tab-mastersheets" class="tab-panel active">
+        <div class="multiscene-banner">
+            <h2>MULTI-SCENE MASTER ASSET SHEET (ACT I SEQUENCE // DIRECTION A+)</h2>
+            <p>Left: Result Scene Anchor (Phối cảnh kết quả hoàn thiện) // Right: Modular Asset Decomposition Zoo (Linh kiện phân rã độc lập) // Bottom: Motion Coupling</p>
+            <img src="master_sheet_multiscene.png" alt="Multi-Scene Master Asset Sheet" class="multiscene-banner-img" onerror="this.style.display='none';" />
+        </div>
+        <div class="mastersheets-list">
+            {all_mastersheets_joined}
+        </div>
+    </div>
+
+    <!-- TAB 2: PER-SCENE STORYBOARDS -->
+    <div id="tab-storyboard" class="tab-panel">
         <div class="scene-grid">
             {all_scenes_joined}
         </div>
@@ -1503,10 +2168,11 @@ def generate_master_scene_dashboard_html(
 # MASTER SERVICE ENTRYPOINT (CALLED BY S05, S07 & PIPELINE)
 # ==============================================================================
 def generate_master_scene_package(
-    ctx: Any,
-    scenes: List[Dict[str, Any]],
+    ctx: Any = None,
+    scenes: Optional[List[Dict[str, Any]]] = None,
     payload: Optional[Dict[str, Any]] = None,
     image_mode: bool = False,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """Generates the comprehensive Vox Master Scene and Master Sheet package.
 
@@ -1518,6 +2184,9 @@ def generate_master_scene_package(
     """
     start_ts = time.time()
     payload = payload or {}
+
+    if ctx is None and "episode_id" in kwargs:
+        ctx = kwargs["episode_id"]
 
     # Support string run_id or arbitrary objects gracefully
     if isinstance(ctx, str):
@@ -1534,6 +2203,21 @@ def generate_master_scene_package(
         from core.paths import RunPaths
         run_id = getattr(ctx, "run_id", "EPISODE")
         setattr(ctx, "paths", RunPaths(run_id))
+
+    if scenes is None:
+        dp_path = kwargs.get("director_plan_path") or (ctx.paths.root / "director_plan.json")
+        if dp_path and Path(dp_path).exists():
+            import json
+            try:
+                plan_data = json.loads(Path(dp_path).read_text(encoding="utf-8"))
+                scenes = plan_data.get("scenes") or plan_data.get("shots") or []
+                if not payload:
+                    payload = plan_data
+            except Exception as _e:
+                logger.warning(f"Failed to load director_plan from {dp_path}: {_e}")
+                scenes = []
+        else:
+            scenes = []
 
     out_dir = ctx.paths.root / "master_sheets"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1620,6 +2304,34 @@ def generate_master_scene_package(
         logger.warning(f"Failed to render master_sheet_scenes.png: {_sc_err}")
         scenes_png = None
 
+    # 2b. Multi-Scene Master Asset Sheet (matching scripts/create_multiscene_mastersheet.py)
+    multiscene_png = out_dir / "master_sheet_multiscene.png"
+    try:
+        render_multiscene_master_asset_sheet_png(
+            scenes=scenes[:2] if len(scenes) >= 2 else scenes,
+            output_path=multiscene_png,
+            image_dir=seeds_dir,
+        )
+    except Exception as _ms_err:
+        logger.warning(f"Failed to render master_sheet_multiscene.png: {_ms_err}")
+        multiscene_png = None
+
+    # 2c. Per-Scene Master Asset Sheets (FT-201 / Direction A+)
+    per_scene_master_sheets: Dict[str, str] = {}
+    for sc in scenes:
+        sc_id = sc.get("scene_id", "SCENE_01")
+        sc_png = out_dir / f"master_asset_sheet_{sc_id.lower()}.png"
+        try:
+            render_scene_master_asset_sheet_png(
+                scene=sc,
+                output_path=sc_png,
+                image_dir=seeds_dir,
+                market=market,
+            )
+            per_scene_master_sheets[sc_id] = str(sc_png)
+        except Exception as _p_err:
+            logger.warning(f"Failed to render master sheet for {sc_id}: {_p_err}")
+
     # 3. Interactive Master Scene Dashboard (HTML)
     dashboard_html = out_dir / "master_sheet_dashboard.html"
     generate_master_scene_dashboard_html(
@@ -1659,10 +2371,84 @@ def generate_master_scene_package(
 
     # Compute Stat Hero manifest coverage
     stat_heroes_summary: Dict[str, Optional[str]] = {}
+    decomposed_roster: Dict[str, Dict[str, Any]] = {}
     for idx, sc in enumerate(scenes):
         sc_id = sc.get("scene_id", f"SCENE_{idx+1:02d}")
         stat_heroes_summary[sc_id] = extract_stat_hero_from_text(sc.get("narration") or "")
+        decomposed_roster[sc_id] = {
+            "hero_cutout_object": sc.get("hero_cutout_object"),
+            "interacting_tool": sc.get("interacting_tool"),
+            "decomposed_prompts": sc.get("decomposed_prompts") or {},
+        }
     stat_heroes_count = sum(1 for v in stat_heroes_summary.values() if v is not None)
+
+    # Build 6-in-1 MasterSheetAssetBundle for every scene (FT-201)
+    candidate_dirs = search_dirs
+    master_sheet_bundles = {}
+    for sc in scenes:
+        sc_id = sc.get("scene_id", "SCENE_01")
+        decomp = sc.get("decomposed_prompts") or {}
+        h_obj = sc.get("hero_cutout_object") or "Archival Hero Subject"
+        t_obj = sc.get("interacting_tool") or "Forensic Brass Caliper / Red Evidence Yarn"
+        narr = sc.get("narration") or ""
+        stat_hero = extract_stat_hero_from_text(narr) or "AUDIT DATA"
+        headline = sc.get("headline") or "FORENSIC FOCUS"
+
+        resolved_anchor = ""
+        resolved_hero = ""
+        resolved_tool = ""
+        resolved_stage = ""
+
+        if effective_image_mode and candidate_dirs:
+            for cdir in candidate_dirs:
+                if not cdir.exists():
+                    continue
+                for f_name in [f"composite_{sc_id.lower()}.png", f"{sc_id.lower()}.png"]:
+                    if (cdir / f_name).exists():
+                        resolved_anchor = str((cdir / f_name).resolve())
+                        break
+                for f_name in [f"hero_{sc_id.lower()}.png", f"cutout_{sc_id.lower()}.png"]:
+                    if (cdir / f_name).exists():
+                        resolved_hero = str((cdir / f_name).resolve())
+                        break
+                for f_name in [f"tool_{sc_id.lower()}.png", f"prop_{sc_id.lower()}.png"]:
+                    if (cdir / f_name).exists():
+                        resolved_tool = str((cdir / f_name).resolve())
+                        break
+                for f_name in [f"stage_{sc_id.lower()}.png", f"bg_{sc_id.lower()}.png"]:
+                    if (cdir / f_name).exists():
+                        resolved_stage = str((cdir / f_name).resolve())
+                        break
+
+        tx_prompt = decomp.get("relational_motion_mechanism") or sc.get("universal_video_prompt") or f"[{h_obj}] + couples with + [{t_obj}], leaving permanent physical residue with 12fps paper vibration."
+
+        bundle_dict = generate_master_sheet_bundle(
+            scene_id=sc_id,
+            assembled_anchor_url=resolved_anchor or f"composite_seeds/composite_{sc_id.lower()}.png",
+            hero_cutout_url=resolved_hero or f"composite_seeds/hero_{sc_id.lower()}.png",
+            interacting_tool_url=resolved_tool or f"composite_seeds/tool_{sc_id.lower()}.png",
+            stage_backdrop_url=resolved_stage or f"composite_seeds/stage_{sc_id.lower()}.png",
+            stat_card_url=f"remotion/stat_card_{sc_id.lower()}.png",
+            connector_url=f"remotion/connector_{sc_id.lower()}.png",
+            information_spec={
+                "headline": headline,
+                "stat_hero": stat_hero,
+                "stat_label": "QUANTITATIVE EVIDENCE",
+                "narration": narr
+            },
+            transaction_prompt=tx_prompt,
+            wiring_spec={
+                "connector_type": "red_yarn" if "yarn" in t_obj.lower() else ("brass_caliper" if "caliper" in t_obj.lower() else "turned_wood_seal"),
+                "source_anchor": [450, 420],
+                "target_anchor": [1450, 240],
+                "ingress_axis": "X",
+                "ingress_duration_sec": 0.3,
+                "hold_fps": 12,
+                "snappy_physics": True
+            },
+            camera_movement="locked"
+        )
+        master_sheet_bundles[sc_id] = bundle_dict
 
     manifest = {
         "episode_id": episode_id,
@@ -1676,9 +2462,13 @@ def generate_master_scene_package(
         "runtime_seconds": runtime_s,
         "stat_heroes_count": stat_heroes_count,
         "stat_heroes": stat_heroes_summary,
+        "decomposed_roster": decomposed_roster,
+        "master_sheet_bundles": master_sheet_bundles,
         "files": {
             "master_sheet_system_png": str(sys_png) if sys_png and sys_png.exists() else None,
             "master_sheet_scenes_png": str(scenes_png) if scenes_png and scenes_png.exists() else None,
+            "master_sheet_multiscene_png": str(multiscene_png) if multiscene_png and multiscene_png.exists() else None,
+            "per_scene_master_sheets": per_scene_master_sheets,
             "master_sheet_dashboard_html": str(dashboard_html),
             "master_sheet_scenes_html": str(scenes_html),
             "master_sheet_system_html": str(sys_html),
@@ -1692,6 +2482,161 @@ def generate_master_scene_package(
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     logger.info(f"Master Scene Package generated successfully: {manifest_path} (Images: {len(resolved_scenes)}/{len(scenes)})")
     return manifest
+
+
+from pydantic import BaseModel, Field, ValidationError
+
+
+class WiringSpec(BaseModel):
+    """Khế ước cách đấu nối không gian & động học giữa các object (FT-201)."""
+    connector_type: str = Field(default="red_yarn", description="Loại đấu nối: red_yarn, brass_caliper, turned_wood_seal, index_arrow")
+    source_anchor: List[int] = Field(default_factory=lambda: [450, 420], description="Tọa độ điểm neo nguồn [x, y]")
+    target_anchor: List[int] = Field(default_factory=lambda: [1450, 240], description="Tọa độ điểm neo đích [x, y]")
+    ingress_axis: str = Field(default="X", description="Trục chuyển động vào (X đơn hướng)")
+    ingress_duration_sec: float = Field(default=0.3, le=0.4, description="Thời gian bứt tốc vào sân khấu (<= 0.4s)")
+    hold_fps: int = Field(default=12, description="Tốc độ vi rung nhịp thở stop-motion (12fps on twos)")
+    snappy_physics: bool = Field(default=True, description="Khóa cứng gia tốc stop-motion giật dứt khoát")
+
+
+class InformationSpec(BaseModel):
+    """Khế ước thông tin nội dung & dữ liệu định lượng (FT-201)."""
+    headline: str = Field(default="", description="Tiêu đề phân cảnh điều tra")
+    stat_hero: str = Field(default="", description="Con số định lượng khổng lồ màu đỏ")
+    stat_label: str = Field(default="", description="Nhãn định danh con số định lượng")
+    narration: str = Field(default="", description="Toàn văn lời đọc voiceover")
+
+
+class MasterSheetAssetBundle(BaseModel):
+    """Khế ước Bộ linh kiện Master Sheet toàn diện 6-trong-1 (FT-201).
+    
+    Bắt buộc đủ 6 khối:
+    1. Assembled Anchor (Image Result mong muốn)
+    2. Hero Cutout (Object chủ thể)
+    3. Interacting Tool (Object tương tác)
+    4. Information Spec (Thông tin định lượng)
+    5. Transaction Prompt (Prompt tương tác xúc giác Omni/Veo)
+    6. Wiring Spec (Cách đấu nối không gian & động học)
+    """
+    scene_id: str = Field(..., pattern=r"^SCENE_\d{2}$")
+    assembled_anchor_url: str = Field(..., description="1. Image Result mong muốn: Ảnh kết quả tổng thành 2560x1440")
+    hero_cutout_url: str = Field(..., description="2. Object Chủ thể: Ảnh tài liệu/nhân vật trên nền trắng #FFFFFF có Alpha")
+    interacting_tool_url: str = Field(..., description="3. Object Tương tác: Ảnh thước kẹp/con dấu/chỉ đỏ trên nền trắng #FFFFFF có Alpha")
+    stage_backdrop_url: str = Field(default="", description="Ảnh nền sân khấu bàn làm việc (#F4F1EA)")
+    stat_card_url: str = Field(default="", description="Ảnh thẻ số liệu đỏ (#D62E1F) hoặc vector chip")
+    connector_url: str = Field(default="", description="Ảnh hoặc vector sợi chỉ đỏ / thước kẹp kết nối")
+    information_spec: InformationSpec = Field(..., description="4. Thông tin: Headline, stat hero, narration")
+    transaction_prompt: str = Field(..., description="5. Transaction Prompt: Prompt tương tác cơ học xúc giác cho Omni/Veo plate")
+    wiring_spec: WiringSpec = Field(..., description="6. Cách đấu nối: Tọa độ điểm neo source/target, loại connector, ingress <= 0.4s")
+    ingress_direction: str = Field(default="screen_right_to_left", description="Hướng trượt vào duy nhất")
+    ingress_duration_sec: float = Field(default=0.3, le=0.4, description="Thời gian bứt tốc vào sân khấu (<= 0.4s)")
+    camera_movement: str = Field(default="locked", description="Khóa cứng khung máy tính 1920x1080, cấm zoom/pan")
+    dynamic_manifest: Optional[Dict[str, Any]] = Field(default=None, description="Bespoke Opus 5.5 Art Director Manifest")
+
+
+def generate_master_sheet_bundle(
+    scene_id: str,
+    assembled_anchor_url: str = "",
+    hero_cutout_url: str = "",
+    interacting_tool_url: str = "",
+    information_spec: Optional[Dict[str, Any]] = None,
+    transaction_prompt: str = "",
+    wiring_spec: Optional[Dict[str, Any]] = None,
+    stage_backdrop_url: str = "",
+    stat_card_url: str = "",
+    connector_url: str = "",
+    ingress_direction: str = "screen_right_to_left",
+    ingress_duration_sec: float = 0.3,
+    camera_movement: str = "locked",
+    dynamic_manifest: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Generates a canonical MasterSheetAssetBundle (FT-201) dict for Remotion/Pipeline consumption.
+
+    Enforces 6-in-1 complete Master Sheet specification (Result, Hero, Tool, Info, Transaction Prompt, Wiring Spec).
+    Supports dynamic manifest injection from Opus 5.5 Art Director (FT-206) to eliminate hardcoding.
+    Invariants (01_CONTRACTS.md):
+    - camera_movement MUST be 'locked' (zero zoom, zero pan).
+    - ingress_duration_sec <= 0.4s (snappy stop-motion).
+    - ingress_direction is unidirectional (default 'screen_right_to_left').
+    """
+    manifest_dict: Optional[Dict[str, Any]] = None
+    if dynamic_manifest is not None:
+        if hasattr(dynamic_manifest, "model_dump"):
+            manifest_dict = dynamic_manifest.model_dump()
+        elif hasattr(dynamic_manifest, "dict"):
+            manifest_dict = dynamic_manifest.dict()
+        elif isinstance(dynamic_manifest, dict):
+            manifest_dict = dynamic_manifest
+
+    if manifest_dict:
+        if not transaction_prompt:
+            transaction_prompt = manifest_dict.get("assembled_keyframe_prompt", "")
+        if ingress_duration_sec == 0.3 and "ingress_duration_sec" in manifest_dict:
+            ingress_duration_sec = float(manifest_dict["ingress_duration_sec"])
+
+    if ingress_duration_sec > 0.4:
+        raise ValueError(f"ingress_duration_sec ({ingress_duration_sec}) must be <= 0.4s per Rule 140 / FT-201")
+    if camera_movement != "locked":
+        raise ValueError(f"camera_movement ('{camera_movement}') must be 'locked' per Vox Style Invariant / FT-201")
+
+    info_obj = InformationSpec(**(information_spec or {
+        "headline": "FORENSIC FOCUS",
+        "stat_hero": "AUDIT DATA",
+        "stat_label": "VERIFIED METRIC",
+        "narration": "Documentary investigation."
+    }))
+
+    # Dynamic Wiring Spec based on manifest contact point
+    final_wiring_dict = dict(wiring_spec or {})
+    if manifest_dict and "contact_point" in manifest_dict:
+        cp = manifest_dict["contact_point"]
+        anchor_type = cp.get("anchor_type", "corner_pin")
+        host_area = cp.get("host_target_area", "document_face")
+        
+        # Calculate dynamic non-hardcoded coordinates based on target zone
+        area_coords = {
+            "top_right_corner": ([520, 480], [1480, 260]),
+            "left_margin": ([380, 520], [1380, 520]),
+            "paragraph_body": ([460, 420], [1420, 460]),
+            "bottom_seal_zone": ([500, 560], [1460, 780]),
+            "document_face": ([450, 450], [1450, 450]),
+        }
+        src_coord, tgt_coord = area_coords.get(host_area, ([480, 450], [1440, 450]))
+        
+        if "connector_type" not in final_wiring_dict:
+            final_wiring_dict["connector_type"] = anchor_type
+        if "source_anchor" not in final_wiring_dict:
+            final_wiring_dict["source_anchor"] = src_coord
+        if "target_anchor" not in final_wiring_dict:
+            final_wiring_dict["target_anchor"] = tgt_coord
+
+    wiring_obj = WiringSpec(**(final_wiring_dict or {
+        "connector_type": "red_yarn",
+        "source_anchor": [450, 420],
+        "target_anchor": [1450, 240],
+        "ingress_axis": "X",
+        "ingress_duration_sec": ingress_duration_sec,
+        "hold_fps": 12,
+        "snappy_physics": True
+    }))
+
+    bundle = MasterSheetAssetBundle(
+        scene_id=scene_id,
+        assembled_anchor_url=assembled_anchor_url or "images/assembled_anchor.png",
+        hero_cutout_url=hero_cutout_url or "images/hero_cutout.png",
+        interacting_tool_url=interacting_tool_url or "images/tool_prop.png",
+        stage_backdrop_url=stage_backdrop_url or "images/stage_backdrop.png",
+        stat_card_url=stat_card_url or "images/stat_card.png",
+        connector_url=connector_url or "images/connector_prop.png",
+        information_spec=info_obj,
+        transaction_prompt=transaction_prompt or "Authentic tactile paper interaction plate with locked camera",
+        wiring_spec=wiring_obj,
+        ingress_direction=ingress_direction,
+        ingress_duration_sec=ingress_duration_sec,
+        camera_movement=camera_movement,
+        dynamic_manifest=manifest_dict,
+    )
+
+    return bundle.model_dump() if hasattr(bundle, "model_dump") else bundle.dict()
 
 
 if __name__ == "__main__":

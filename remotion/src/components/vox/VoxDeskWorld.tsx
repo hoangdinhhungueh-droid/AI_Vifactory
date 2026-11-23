@@ -13,6 +13,9 @@ import {
 import { SPRING_PRESETS } from "./springPresets";
 import { VoxConnectingYarn } from "./papercraft/VoxConnectingYarn";
 import { VoxDimensionLine } from "./papercraft/VoxDimensionLine";
+import { OrganicRedYarn } from "./OrganicRedYarn";
+import { DynamicInteractingProp } from "./DynamicInteractingProp";
+import { TactileHostCard } from "./TactileHostCard";
 import { WordTimestamp } from "../../types";
 
 export interface EvidenceNode {
@@ -74,6 +77,27 @@ export interface DeskStationProps {
   semantic_yarns?: SemanticYarn[];
   dimension_lines?: DimensionLineSpec[];
   stamp?: StampSpec;
+  macro_punch_in?: {
+    target_scale?: number;
+    focal_x?: number;
+    focal_y?: number;
+    punch_start_frame_offset?: number;
+    punch_duration_frames?: number;
+  };
+  interacting_prop?: {
+    id?: string;
+    prop_type?: string;
+    src?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    rotation?: number;
+    start_frame?: number;
+    contact_frame_offset?: number;
+    impact_damping?: number;
+    ingress_direction?: "left_to_right" | "right_to_left" | "top_to_bottom" | "drop";
+  };
 }
 
 export interface GlobalYarnProps {
@@ -96,6 +120,7 @@ export interface VoxDeskWorldProps {
   global_yarns?: GlobalYarnProps[];
   subtitles?: WordTimestamp[];
   audio_src?: string;
+  enable_macro_punch_in?: boolean;
 }
 
 export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
@@ -107,6 +132,7 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
   global_yarns = [],
   subtitles = [],
   audio_src,
+  enable_macro_punch_in = true,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width: viewW, height: viewH } = useVideoConfig();
@@ -122,16 +148,53 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
   const f4_end = 962;
 
   const panFrames = 38; // ~1.25s pan duration
+  const punchFrames = 35; // ~1.15s macro punch-in duration
 
-  // --- CAMERA COORDINATE CHOREOGRAPHY (Continuous Journey) ---
+  // Helper to resolve focal coordinates for macro punch-in
+  const getStationFocal = (
+    sIdx: number,
+    defaultX: number,
+    defaultY: number
+  ): { focalX: number; focalY: number; targetScale: number } => {
+    const st = stations[sIdx];
+    if (!st) return { focalX: defaultX, focalY: defaultY, targetScale: 1.35 };
+    const targetScale: number = st.macro_punch_in?.target_scale ?? 1.35;
+    const focalX: number =
+      st.macro_punch_in?.focal_x ??
+      (st.hero_asset ? st.hero_asset.x + st.hero_asset.width * 0.5 : defaultX);
+    const focalY: number =
+      st.macro_punch_in?.focal_y ??
+      (st.hero_asset ? st.hero_asset.y + st.hero_asset.height * 0.5 : defaultY);
+    return { focalX, focalY, targetScale };
+  };
+
+  const s1Focal = getStationFocal(0, 960, 540);
+  const s2Focal = getStationFocal(1, 2880, 540);
+  const s3Focal = getStationFocal(2, 2880, 1620);
+  const s4Focal = getStationFocal(3, 960, 1620);
+
+  // --- CAMERA COORDINATE CHOREOGRAPHY (Continuous Journey with Macro Punch-In) ---
   let targetCamX = 960;
   let targetCamY = 540;
   let camZoom = 1.0;
 
   if (frame <= f1_end - panFrames) {
     // Station 1 Dwell
-    targetCamX = 960;
-    targetCamY = 540;
+    const dwellEnd = f1_end - panFrames;
+    if (enable_macro_punch_in && frame >= dwellEnd - punchFrames) {
+      const punchProgress = interpolate(frame, [dwellEnd - punchFrames, dwellEnd], [0, 1], {
+        easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+      camZoom = interpolate(punchProgress, [0, 1], [1.0, s1Focal.targetScale]) as number;
+      targetCamX = interpolate(punchProgress, [0, 1], [960, s1Focal.focalX]) as number;
+      targetCamY = interpolate(punchProgress, [0, 1], [540, s1Focal.focalY]) as number;
+    } else {
+      targetCamX = 960;
+      targetCamY = 540;
+      camZoom = 1.0;
+    }
   } else if (frame <= f1_end) {
     // Pan 1: Station 1 -> Station 2 (rightward pan)
     const panProgress = interpolate(frame, [f1_end - panFrames, f1_end], [0, 1], {
@@ -139,12 +202,26 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
-    targetCamX = interpolate(panProgress, [0, 1], [960, 2880]);
-    targetCamY = 540;
+    camZoom = interpolate(panProgress, [0, 0.4, 1], [s1Focal.targetScale, 1.0, 1.0]) as number;
+    targetCamX = interpolate(panProgress, [0, 1], [s1Focal.focalX, 2880]) as number;
+    targetCamY = interpolate(panProgress, [0, 1], [s1Focal.focalY, 540]) as number;
   } else if (frame <= f2_end - panFrames) {
     // Station 2 Dwell
-    targetCamX = 2880;
-    targetCamY = 540;
+    const dwellEnd = f2_end - panFrames;
+    if (enable_macro_punch_in && frame >= dwellEnd - punchFrames) {
+      const punchProgress = interpolate(frame, [dwellEnd - punchFrames, dwellEnd], [0, 1], {
+        easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+      camZoom = interpolate(punchProgress, [0, 1], [1.0, s2Focal.targetScale]) as number;
+      targetCamX = interpolate(punchProgress, [0, 1], [2880, s2Focal.focalX]) as number;
+      targetCamY = interpolate(punchProgress, [0, 1], [540, s2Focal.focalY]) as number;
+    } else {
+      targetCamX = 2880;
+      targetCamY = 540;
+      camZoom = 1.0;
+    }
   } else if (frame <= f2_end) {
     // Pan 2: Station 2 -> Station 3 (downward pan)
     const panProgress = interpolate(frame, [f2_end - panFrames, f2_end], [0, 1], {
@@ -152,12 +229,26 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
-    targetCamX = 2880;
-    targetCamY = interpolate(panProgress, [0, 1], [540, 1620]);
+    camZoom = interpolate(panProgress, [0, 0.4, 1], [s2Focal.targetScale, 1.0, 1.0]) as number;
+    targetCamX = interpolate(panProgress, [0, 1], [s2Focal.focalX, 2880]) as number;
+    targetCamY = interpolate(panProgress, [0, 1], [s2Focal.focalY, 1620]) as number;
   } else if (frame <= f3_end - panFrames) {
     // Station 3 Dwell
-    targetCamX = 2880;
-    targetCamY = 1620;
+    const dwellEnd = f3_end - panFrames;
+    if (enable_macro_punch_in && frame >= dwellEnd - punchFrames) {
+      const punchProgress = interpolate(frame, [dwellEnd - punchFrames, dwellEnd], [0, 1], {
+        easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+      camZoom = interpolate(punchProgress, [0, 1], [1.0, s3Focal.targetScale]) as number;
+      targetCamX = interpolate(punchProgress, [0, 1], [2880, s3Focal.focalX]) as number;
+      targetCamY = interpolate(punchProgress, [0, 1], [1620, s3Focal.focalY]) as number;
+    } else {
+      targetCamX = 2880;
+      targetCamY = 1620;
+      camZoom = 1.0;
+    }
   } else if (frame <= f3_end) {
     // Pan 3: Station 3 -> Station 4 (leftward pan)
     const panProgress = interpolate(frame, [f3_end - panFrames, f3_end], [0, 1], {
@@ -165,12 +256,26 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
-    targetCamX = interpolate(panProgress, [0, 1], [2880, 960]);
-    targetCamY = 1620;
+    camZoom = interpolate(panProgress, [0, 0.4, 1], [s3Focal.targetScale, 1.0, 1.0]) as number;
+    targetCamX = interpolate(panProgress, [0, 1], [s3Focal.focalX, 960]) as number;
+    targetCamY = interpolate(panProgress, [0, 1], [s3Focal.focalY, 1620]) as number;
   } else {
     // Station 4 Dwell
-    targetCamX = 960;
-    targetCamY = 1620;
+    const dwellEnd = f4_end;
+    if (enable_macro_punch_in && frame >= dwellEnd - punchFrames) {
+      const punchProgress = interpolate(frame, [dwellEnd - punchFrames, dwellEnd], [0, 1], {
+        easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+      camZoom = interpolate(punchProgress, [0, 1], [1.0, s4Focal.targetScale]) as number;
+      targetCamX = interpolate(punchProgress, [0, 1], [960, s4Focal.focalX]) as number;
+      targetCamY = interpolate(punchProgress, [0, 1], [1620, s4Focal.focalY]) as number;
+    } else {
+      targetCamX = 960;
+      targetCamY = 1620;
+      camZoom = 1.0;
+    }
   }
 
   // Camera world transform
@@ -321,19 +426,19 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
           const yarnStartFrame = Math.round(gy.delay_sec * fps);
           if (frame < yarnStartFrame) return null;
           return (
-            <VoxConnectingYarn
+            <OrganicRedYarn
               key={`global-yarn-${gIdx}`}
-              fromX={(gy.from_x / world_width) * 100}
-              fromY={(gy.from_y / world_height) * 100}
-              toX={(gy.to_x / world_width) * 100}
-              toY={(gy.to_y / world_height) * 100}
+              fromX={gy.from_x}
+              fromY={gy.from_y}
+              toX={gy.to_x}
+              toY={gy.to_y}
               color={gy.color || "#D62E1F"}
-              yarnThickness={5.5}
-              drawStartFrame={yarnStartFrame}
-              drawDuration={24}
+              startFrame={yarnStartFrame}
+              drawDurationFrames={24}
               label={gy.label}
-              showPins={true}
-              pinSize={32}
+              showAnchorPins={true}
+              width={world_width}
+              height={world_height}
             />
           );
         })}
@@ -430,6 +535,25 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
                 />
               </div>
 
+              {/* BESPOKE INTERACTING PROP (Dual-Pass Contact Shadow & Snappy Ingress) */}
+              {st.interacting_prop && (
+                <DynamicInteractingProp
+                  id={`prop-${st.station_id}`}
+                  propType={st.interacting_prop.prop_type}
+                  src={st.interacting_prop.src}
+                  x={st.interacting_prop.x ?? hero.x + hero.width * 0.7}
+                  y={st.interacting_prop.y ?? hero.y + hero.height * 0.4}
+                  width={st.interacting_prop.width ?? 220}
+                  height={st.interacting_prop.height ?? 220}
+                  rotation={st.interacting_prop.rotation ?? 12}
+                  startFrame={stationStartFrame + (st.interacting_prop.start_frame ?? 6)}
+                  contactFrameOffset={st.interacting_prop.contact_frame_offset ?? 12}
+                  impactDamping={st.interacting_prop.impact_damping ?? 0.75}
+                  ingressDirection={st.interacting_prop.ingress_direction ?? "top_to_bottom"}
+                  dualPassShadow={true}
+                />
+              )}
+
               {/* LOCAL EVIDENCE NODES (Sequential Word-Level Revelations) */}
               {st.evidence_nodes && st.evidence_nodes.map((node, nIdx) => {
                 const nodeDelayFrames = Math.round(
@@ -522,26 +646,26 @@ export const VoxDeskWorld: React.FC<VoxDeskWorldProps> = ({
                 );
               })}
 
-              {/* LOCAL SEMANTIC YARNS */}
+              {/* LOCAL SEMANTIC YARNS (Authentic Catenary Evidence Yarn) */}
               {st.semantic_yarns && st.semantic_yarns.map((sy, syIdx) => {
                 const sYarnDelayFrames = Math.round(
                   fps * (sy.delay_sec !== undefined ? sy.delay_sec : 1.2)
                 );
                 if (relFrame < sYarnDelayFrames) return null;
                 return (
-                  <VoxConnectingYarn
+                  <OrganicRedYarn
                     key={`local-yarn-${st.station_id}-${syIdx}`}
-                    fromX={(sy.from_x / world_width) * 100}
-                    fromY={(sy.from_y / world_height) * 100}
-                    toX={(sy.to_x / world_width) * 100}
-                    toY={(sy.to_y / world_height) * 100}
+                    fromX={sy.from_x}
+                    fromY={sy.from_y}
+                    toX={sy.to_x}
+                    toY={sy.to_y}
                     color={sy.color || "#D62E1F"}
-                    yarnThickness={4.5}
-                    drawStartFrame={sYarnDelayFrames}
-                    drawDuration={18}
+                    startFrame={stationStartFrame + sYarnDelayFrames}
+                    drawDurationFrames={18}
                     label={sy.label}
-                    showPins={true}
-                    pinSize={24}
+                    showAnchorPins={true}
+                    width={world_width}
+                    height={world_height}
                   />
                 );
               })}

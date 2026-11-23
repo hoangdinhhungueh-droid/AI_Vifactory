@@ -108,44 +108,42 @@ class RemotionSceneProp(BaseModel):
     whisper_subtitles: List[Dict[str, Any]] = Field(default_factory=list, description="Phụ đề word-level sync")
 
 # ==============================================================================
-# [FT-206] SCENE-SPECIFIC DYNAMIC LAYOUT ARCHETYPES & KINETIC COMPOSITION SCHEMA
+# [FT-206] OPUS 5.5 DYNAMIC ART DIRECTOR & TACTILE CONTACT KINEMATICS SCHEMA
 # ==============================================================================
-from enum import Enum
+class TactileContactPoint(BaseModel):
+    """Điểm chạm cơ học do Opus 5.5 quyết định."""
+    anchor_type: str = Field(..., description="Loại điểm chạm: corner_pin, edge_clip, center_stamp, slice_seam, highlight_band, catenary_yarn")
+    host_target_area: str = Field(..., description="Vùng tiếp xúc trên Host: top_right_corner, left_margin, document_face, paragraph_body, bottom_seal_zone")
+    contact_frame_offset: int = Field(default=12, ge=0, le=120, description="Frame tạo va chạm cơ học (12fps step motion)")
+    physical_residue: str = Field(..., description="Tồn dư để lại: red_ink_stain, yellow_glow, paper_tear, needle_hole, embossed_crease")
+    snappy_impact_damping: float = Field(default=0.75, ge=0.0, le=1.0, description="Hệ số nảy va chạm stop-motion")
 
-class LayoutArchetype(str, Enum):
+class DynamicMacroCamera(BaseModel):
+    """Quy chuẩn camera Macro Punch-In do Opus 5.5 chỉ đạo."""
+    start_scale: float = Field(default=1.0, ge=0.5, le=2.0)
+    target_scale: float = Field(default=1.35, ge=1.1, le=1.6, description="Độ zoom cận cảnh vào điểm chạm")
+    focal_point_norm: List[float] = Field(..., description="Tọa độ tiêu điểm chuẩn hóa [norm_x, norm_y] từ 0.0 đến 1.0 (len == 2)")
+    transition_punch_through: bool = Field(default=True, description="Phóng sâu choán màn hình rồi match-cut sang scene sau")
+
+class DynamicMasterArtManifest(BaseModel):
     """
-    5 Họ Bố Cục Phân Cảnh Bất Đối Xứng (Triệt tiêu 100% căn bệnh rập khuôn 1 màu):
-    1. CENTRAL_DOSSIER: Hồ sơ trung tâm chiếm diện tích lớn, công cụ đo/soi bên trái/phải.
-    2. NETWORK_SPIDER: Cấu trúc phân nhánh mẹ-con (spiderweb), chỉ đỏ tỏa tia đa hướng.
-    3. CASCADING_PILE: Chồng chất tài liệu/cửa hàng dồn toa, thẻ số liệu khổng lồ góc đối xứng.
-    4. TIMELINE_STRIP: Trục thời gian ngang/chéo, hiện vật lịch sử chuyển dịch sang dấu mộc chốt hạ.
-    5. SPLIT_COMPARISON: Phân tách đối lập 2 thực thể/hai cán cân đối trọng.
+    Khế ước Mỹ thuật Độc bản do Opus 5.5 / Astra 6 sinh ra cho từng Scene.
+    BẮT BUỘC viết thuần chuẩn kỹ thuật cho AI, không văn xuôi giải trí (Rule 128, 132).
     """
-    CENTRAL_DOSSIER = "central_dossier"
-    NETWORK_SPIDER = "network_spider"
-    CASCADING_PILE = "cascading_pile"
-    TIMELINE_STRIP = "timeline_strip"
-    SPLIT_COMPARISON = "split_comparison"
-
-class DynamicSpatialAnchor(BaseModel):
-    """Tọa độ không gian độc lập cho từng phân cảnh."""
-    x_pct: float = Field(..., ge=5.0, le=95.0)
-    y_pct: float = Field(..., ge=5.0, le=95.0)
-    width_pct: float = Field(..., ge=10.0, le=75.0)
-    rotation_deg: float = Field(default=0.0, ge=-25.0, le=25.0)
-    entrance_type: str = Field(default="slide_in_deal")
-    delay_sec: float = Field(default=0.5, ge=0.0)
-
-class SceneLayoutBlueprint(BaseModel):
-    """Bản thiết kế không gian & động học riêng biệt cho từng Scene."""
     scene_id: str = Field(..., pattern=r"^SCENE_\d{2}$")
-    archetype: LayoutArchetype = Field(...)
-    hero_anchor: DynamicSpatialAnchor = Field(...)
-    tool_anchor: DynamicSpatialAnchor = Field(...)
-    supporting_anchors: List[DynamicSpatialAnchor] = Field(default_factory=list)
-    connector_topology: str = Field(..., description="Kiểu kết nối: radial_star, linear_chain, tension_loop, timeline_axis")
-    yarn_paths: List[Dict[str, Any]] = Field(default_factory=list)
-    stamp_anchor: Optional[Dict[str, Any]] = None
+    narrative_rationale: str = Field(..., description="Lý do lựa chọn ngôn ngữ thị giác dựa trên kịch bản")
+    
+    # Prompts thuần AI cho tầng sinh ảnh
+    assembled_keyframe_prompt: str = Field(..., description="Prompt AI vẽ Ảnh Full Hoàn Chỉnh đỉnh cao")
+    hero_cutout_prompt: str = Field(..., description="Prompt AI vẽ Chủ thể cô lập trên nền trắng #FFFFFF")
+    interacting_tool_prompt: str = Field(..., description="Prompt AI vẽ Đạo cụ tương tác cô lập trên nền trắng #FFFFFF")
+    
+    # Chỉ đạo bóc tách & động học do chính Opus 5.5 quyết định
+    contact_point: TactileContactPoint = Field(..., description="Quy cách điểm chạm cơ học")
+    macro_camera: DynamicMacroCamera = Field(..., description="Chỉ đạo camera macro punch-in")
+    ingress_direction: str = Field(default="right_to_left", description="Hướng bứt tốc vào sân khấu")
+    ingress_duration_sec: float = Field(default=0.3, le=0.4, description="Thời gian bứt tốc <= 0.4s")
+    dual_pass_shadow: bool = Field(default=True, description="Bắt buộc đổ bóng tiếp xúc kép")
 
 # ==============================================================================
 # [FT-207] CONTINUOUS VOX DESKWORLD & CAMERA JOURNEY SCHEMA (VOX ENGINE V3)

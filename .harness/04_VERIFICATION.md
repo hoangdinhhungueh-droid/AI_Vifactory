@@ -66,15 +66,15 @@
 
 ---
 
-### [TEST-206] Kiểm thử Bố Cục Động Đa Dạng & Triệt Tiêu Trùng Lặp Tọa Độ (Mã FT-206)
+### [TEST-206] Kiểm thử Opus 5.5 Dynamic Art Director & Tactile Manifest (Mã FT-206)
 - **Mã Feature**: `FT-206`
-- **Test File**: `tests/test_dynamic_layout_archetypes.py`
-- **Lệnh chạy kiểm thử (CLI)**: `python -m pytest tests/test_dynamic_layout_archetypes.py -v`
+- **Test File**: `tests/test_opus_art_director.py`
+- **Lệnh chạy kiểm thử (CLI)**: `python -m pytest tests/test_opus_art_director.py -v`
 - **Tiêu chuẩn Gherkin (Acceptance Criteria)**:
-  - `Given`: Kế hoạch 4 phân cảnh liên tiếp của Act I.
-  - `When`: Hàm `assign_scene_layout_blueprint` sinh bố cục và props.
-  - `Then`: Không có hai phân cảnh liền kề nào có tọa độ Hero hoặc Tool giống nhau (delta vị trí $\ge 15\%$); Scene 02 phải có cấu trúc dây tỏa tia radial $\ge 3$ nhánh; Scene 04 phải dùng trục thời gian timeline nằm ngang với `stamp_slam`; 100% test assertions PASS.
-- **Trạng thái thực tế**: `PASS` (Verified: 2026-11-23 02:03:27) (Verified: 2026-11-21 16:26:52) (Khởi tạo: 2026-11-21)
+  - `Given`: Phân cảnh với lời đọc voiceover và tiêu đề điều tra.
+  - `When`: Hàm `generate_dynamic_art_manifest()` được thực thi.
+  - `Then`: Bắt buộc sinh ra `DynamicMasterArtManifest` hợp lệ, chứa đủ 3 prompt sinh ảnh (`assembled_keyframe_prompt`, `hero_cutout_prompt`, `interacting_tool_prompt`), điểm chạm `TactileContactPoint` thuộc họ H1-H7, camera `DynamicMacroCamera` với tiêu điểm chuẩn hóa và zoom scale $1.1 - 1.6$, `ingress_duration_sec <= 0.4s`, `dual_pass_shadow == True`; 100% test assertions PASS.
+- **Trạng thái thực tế**: `PASS` (Verified: 2026-11-23 04:45:00)
 
 ---
 

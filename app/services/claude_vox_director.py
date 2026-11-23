@@ -230,10 +230,16 @@ def _extract_sentence_exhibits(sentence: str, sc_idx: int) -> Dict[str, Any]:
         if clean_tok and clean_tok.upper() not in [t.upper() for t in primary_tokens]:
             primary_tokens.append(clean_tok)
 
-    # Add remaining content words, filtering out pure functional particles
-    stop_particles = {"등", "이", "가", "은", "는", "을", "를", "에", "의", "과", "와", "로", "으로", "에서", "도"}
+    # Add remaining content words, filtering out pure functional particles and common stopwords
+    stop_particles = {
+        "등", "이", "가", "은", "는", "을", "를", "에", "의", "과", "와", "로", "으로", "에서", "도",
+        "a", "an", "the", "according", "to", "in", "of", "and", "by", "for", "with", "from",
+        "at", "on", "as", "is", "are", "was", "were", "into", "that", "this", "these", "those",
+        "approximately", "nearly", "reportedly", "about", "around", "their", "its", "has", "have", "had",
+        "after", "before", "over", "under", "said", "noted", "confirmed", "alongside"
+    }
     for w in words:
-        if w not in stop_particles and w.upper() not in [t.upper() for t in primary_tokens]:
+        if w.lower() not in stop_particles and w.upper() not in [t.upper() for t in primary_tokens]:
             primary_tokens.append(w)
         if len(primary_tokens) >= 8:
             break
@@ -254,12 +260,23 @@ def _extract_sentence_exhibits(sentence: str, sc_idx: int) -> Dict[str, Any]:
     elif len(found_salient) >= 2:
         hero_label = f"{found_salient[0]} // {found_salient[1]}"
     elif found_salient:
-        other = [w for w in words if w not in found_salient and w not in stop_particles]
+        other = [w for w in words if w not in found_salient and w.lower() not in stop_particles]
         hero_label = f"{found_salient[0]} // {other[0]}" if other else found_salient[0]
-    elif primary_tokens:
-        hero_label = " ".join(primary_tokens[:3]).upper()
+    elif any(c.isupper() and len(c) >= 2 for c in codes):
+        # Specific regulatory/company acronym code found (e.g. ASIC, SEC, FTC)
+        code_lead = [c for c in codes if c.isupper() and len(c) >= 2][0]
+        other_tokens = [t for t in primary_tokens if t.upper() != code_lead.upper() and t.lower() not in stop_particles]
+        hero_label = f"{code_lead} // {' '.join(other_tokens[:2]).upper()}" if other_tokens else f"{code_lead} NOTICE"
     else:
-        hero_label = f"EXHIBIT #{sc_idx}"
+        # Fallback to Semantic Evidence Extractor for tangible forensic physical props
+        try:
+            from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+            ev = extract_evidence_for_sentence(sentence, market="EN")
+            anchor = ev.hero_anchor_prop.split(" on ")[0].split(" with ")[0].strip()
+            hero_label = anchor[:40].upper()
+        except Exception:
+            clean_tokens = [t for t in primary_tokens if t.lower() not in stop_particles]
+            hero_label = " ".join(clean_tokens[:3]).upper() if clean_tokens else f"EXHIBIT #{sc_idx}"
 
     editorial_title = _clamp_editorial_title("", primary_tokens[:3], sc_idx)
     metric_str = metrics[0].strip() if metrics else (codes[0].strip() if codes else "")
@@ -302,7 +319,7 @@ class ClaudeVoxDirector:
         self,
         story_text: str,
         market: str = "EN",
-        chunk_size: int = 25,
+        chunk_size: int = 5,
         gateway: Optional[Any] = None,
         sentences_override: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
@@ -375,7 +392,7 @@ class ClaudeVoxDirector:
                     system_prompt=self.system_prompt,
                     model=self.primary_model,
                     fallback=self.fallback_model,
-                    max_tokens=4000,
+                    max_tokens=5000,
                     temperature=0.3,
                     timeout=75.0,
                 )

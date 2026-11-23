@@ -26,6 +26,8 @@ class DeskStation(BaseModel):
     semantic_yarns: List[Dict[str, Any]] = Field(default_factory=list)
     dimension_lines: List[Dict[str, Any]] = Field(default_factory=list)
     stamp: Optional[Dict[str, Any]] = None
+    macro_punch_in: Optional[Dict[str, Any]] = None
+    interacting_prop: Optional[Dict[str, Any]] = None
 
 
 class CameraKeyframe(BaseModel):
@@ -137,6 +139,11 @@ def build_continuous_desk_world(
             "x": 1400,
             "y": 880,
             "delay_sec": 3.8
+        },
+        macro_punch_in={
+            "focal_x": 960.0,
+            "focal_y": 540.0,
+            "target_scale": 1.35,
         }
     )
 
@@ -201,6 +208,11 @@ def build_continuous_desk_world(
             "x": 3350,
             "y": 920,
             "delay_sec": 3.6
+        },
+        macro_punch_in={
+            "focal_x": 2880.0,
+            "focal_y": 540.0,
+            "target_scale": 1.35,
         }
     )
 
@@ -274,6 +286,11 @@ def build_continuous_desk_world(
             "x": 3380,
             "y": 1980,
             "delay_sec": 3.8
+        },
+        macro_punch_in={
+            "focal_x": 2880.0,
+            "focal_y": 1620.0,
+            "target_scale": 1.35,
         }
     )
 
@@ -347,6 +364,11 @@ def build_continuous_desk_world(
             "x": 1420,
             "y": 1980,
             "delay_sec": 3.8
+        },
+        macro_punch_in={
+            "focal_x": 960.0,
+            "focal_y": 1620.0,
+            "target_scale": 1.35,
         }
     )
 

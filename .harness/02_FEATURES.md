@@ -81,21 +81,18 @@
 
 ---
 
-### [FT-206] Dynamic Scene-Specific Layout Archetypes & Varied Kinetic Engine
+### [FT-206] Opus 5.5 Dynamic Art Director & Tactile Kinetic Engine (Vox Engine v3)
 - **Trạng thái**: `ACTIVE`
-- **File Code**: `app/services/scene_layout_director.py`
-- **Hàm/Service**: `assign_scene_layout_blueprint`
-- **Input Contract**: `SceneSubDirectorPlan` & `scene_index`
-- **Output Contract**: `SceneLayoutBlueprint` (xem `01_CONTRACTS.md`)
+- **File Code**: `app/services/opus_art_director.py`
+- **Hàm/Service**: `generate_dynamic_art_manifest`
+- **Input Contract**: `scene_id`, `narration`, `headline`
+- **Output Contract**: `DynamicMasterArtManifest` (xem `01_CONTRACTS.md`)
 - **Logic cốt lõi**:
-  1. Phân bổ luân phiên 5 họ Bố cục Không gian Bất đối xứng (`CENTRAL_DOSSIER`, `NETWORK_SPIDER`, `CASCADING_PILE`, `TIMELINE_STRIP`, `SPLIT_COMPARISON`).
-  2. Triệt tiêu 100% căn bệnh "1 màu rập khuôn vị trí": Cấm hai phân cảnh liền kề dùng chung tọa độ Hero hoặc Tool (khoảng cách sai khác $\ge 15\%$).
-  3. Đa dạng hóa cấu trúc Topology mạng lưới dây nối:
-     - `CENTRAL_DOSSIER`: Dây nối bao quanh (perimeter box) từ công cụ soi vào chi tiết hồ sơ trọng tâm.
-     - `NETWORK_SPIDER`: Dây chỉ đỏ tỏa tia đa hướng từ Thực thể mẹ sang các thực thể con.
-     - `CASCADING_PILE`: Vòng lặp căng dây (tension loop) từ thẻ số liệu khổng lồ ghim xuống chồng hồ sơ dồn toa.
-     - `TIMELINE_STRIP`: Trục dây nối thời gian nằm ngang nối từ mẫu vật lịch sử sang con dấu mộc chốt hạ.
-  4. Đa dạng hóa kiểu chuyển động vào: `slide_in_deal`, `delicate_tack`, `stamp_slam`, `drop` thay vì 1 kiểu duy nhất.
+  1. Opus 5.5 (HHTech API) đóng vai trò Giám đốc Mỹ thuật Tối cao, sáng tạo manifest độc bản cho từng Scene (zero hardcoding đạo cụ).
+  2. Tuân thủ Rule 132 Decoupled Engine: System prompt kỹ thuật lưu tại `config/prompts/cl3_vox_engine/opus_art_director.md`, nạp động qua `skill_loader.py`.
+  3. Quyết định điểm chạm cơ học xúc giác 7 họ ($H_1 \to H_7$) và tồn dư vật lý (`red_ink_stain`, `yellow_glow`, `paper_tear`, `needle_hole`, `embossed_crease`).
+  4. Quyết định camera Macro Punch-In lướt sâu vào tiêu điểm chuẩn hóa `[norm_x, norm_y]` ($1.25x - 1.55x$) thay thế lia máy trượt bàn (`pan`) lặp lại.
+  5. Hỗ trợ fallback đối kháng GPT-6-Astra và deterministic contextual fallback đảm bảo độ bền vững 100% trong mọi điều kiện mạng.
 
 ---
 

@@ -15,7 +15,7 @@
 | `[FT-203]` | `run` | `stages/s08_video_gen.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại Stage S08 để sinh các plate chất liệu xúc giác từ Omni | `python -m orchestrator.run_pipeline --only s08_video_gen` |
 | `[FT-204]` | `run` | `stages/s10_render.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại Stage S10 để kết xuất video tổng thành Remotion | `python -m orchestrator.run_pipeline --only s10_render` |
 | `[FT-205]` | `run` | `stages/s11_qc.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại Stage S11 để kiểm toán chất lượng và đồng bộ Chapter | `python -m orchestrator.run_pipeline --only s11_qc` |
-| `[FT-206]` | `assign_scene_layout_blueprint` | `app/services/scene_layout_director.py` | `stages/s05_director_plan.py` | Kích hoạt tại S05/S10 để gán bố cục không gian bất đối xứng và topology dây nối riêng biệt | `python -m pytest tests/test_dynamic_layout_archetypes.py -v` |
+| `[FT-206]` | `generate_dynamic_art_manifest` | `app/services/opus_art_director.py` | `stages/s05_director_plan.py` | Kích hoạt tại S05 để sinh khế ước mỹ thuật độc bản và điểm chạm cơ học xúc giác | `python -m pytest tests/test_opus_art_director.py -v` |
 | `[FT-207]` | `build_continuous_desk_world` | `app/services/desk_world_director.py` | `stages/s10_render.py` | Kích hoạt tại Stage S10 để kết xuất video hành trình camera qua bàn điều tra liên tục DeskWorld | `python -m pytest tests/test_desk_world_director.py -v` |
 
 ---

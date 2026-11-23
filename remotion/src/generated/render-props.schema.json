@@ -1,7 +1,7 @@
 {
   "$defs": {
     "KaraokeWord": {
-      "additionalProperties": false,
+      "additionalProperties": true,
       "description": "Word-level timestamp for Remotion karaoke subtitles.",
       "properties": {
         "word": {
@@ -15,6 +15,30 @@
         "end": {
           "title": "End",
           "type": "number"
+        },
+        "start_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Ms"
+        },
+        "end_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Ms"
         }
       },
       "required": [
@@ -95,6 +119,49 @@
           ],
           "default": null,
           "title": "Color Accent"
+        },
+        "render_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "veo",
+          "title": "Render Mode"
+        },
+        "h_family": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "H Family"
+        },
+        "tactile_props": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tactile Props",
+          "type": "array"
+        },
+        "narration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Narration"
         }
       },
       "required": [
@@ -171,6 +238,18 @@
       ],
       "default": null,
       "title": "Audio Spine Path"
+    },
+    "preset": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Preset"
     }
   },
   "required": [

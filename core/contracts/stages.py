@@ -153,6 +153,7 @@ class Scene(BaseModel):
     whisper_words: Optional[List[WhisperWord]] = Field(default=None, description="Whisper word-level timestamps (Rule 120)")
     bounding_box: Optional[BoundingBox] = Field(default=None, description="Spatial bounding box for kinematic targeting")
     object_roles: Optional[Dict[str, str]] = Field(default=None, description="Mapping of object IDs to semantic roles")
+    dynamic_art_manifest: Optional[Dict[str, Any]] = Field(default=None, description="Opus 5.5 Bespoke Art Director Manifest (FT-206)")
 
     @model_validator(mode="after")
     def validate_whisper_sequence(self) -> "Scene":

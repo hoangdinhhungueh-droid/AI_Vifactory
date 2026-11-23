@@ -237,9 +237,19 @@ def build_vox_scene_prompts(
             or "Forensic visual evidence" in raw_metaphor
             or "evidence exhibit for" in raw_metaphor
             or "evidence for B" in raw_metaphor
+            or "Tactile evidence" in raw_metaphor
+            or "tactile evidence" in raw_metaphor.lower()
+            or "evidence" in raw_metaphor.lower()
         )
     )
-    hero_obj = evidence.hero_anchor_prop if (is_narration_copy or not raw_metaphor) else raw_metaphor
+    # Resolve hero cutout object: prioritize planned hero object from ClaudeVoxDirector
+    planned_hero = getattr(scene, "hero_cutout_object", None) or (scene.get("hero_cutout_object") if isinstance(scene, dict) else None)
+    if planned_hero and not is_narration_copy and len(planned_hero) >= 5 and "evidence" not in planned_hero.lower():
+        hero_obj = planned_hero
+    elif is_narration_copy or not raw_metaphor:
+        hero_obj = evidence.hero_anchor_prop
+    else:
+        hero_obj = raw_metaphor
     tool_prop = evidence.interacting_tool_prop
     desk_surface = "Aged archival cream newsprint"
 
@@ -478,9 +488,33 @@ def build_vox_scene_prompts(
 
     resolved_interacting = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"] if sub_plan else ["tactile investigation tool", "forensic verification prop"]
 
+    decomposed_prompts = {
+        "assembled_anchor_prompt": image_prompt,
+        "hero_cutout_prompt": (
+            f"Authentic Vox tactile paper cutout: {hero_obj}. "
+            f"Halftone B&W 60lpi photographic cutout with crisp 2-4px white deckle border and offset crimson red ink accent line. "
+            f"Isolated cleanly on pure solid white background (#FFFFFF) with zero edge clipping and zero shadow bleed. Authentic archival papercraft."
+        ),
+        "interacting_tool_prompt": (
+            f"Authentic Vox tactile mechanical tool: {tool_prop}. "
+            f"Tactile physical investigation instrument with aged metal patina and deckle paper index tags. "
+            f"Isolated cleanly on pure solid white background (#FFFFFF). Zero background clutter."
+        ),
+        "stage_backdrop_prompt": (
+            f"Authentic Vox tactile diorama stage backdrop: {clean_bg_prompt} on aged archival cream newsprint (#F4F1EA) "
+            f"and tan kraft cardstock (#C9BB9C) with subtle micro-tabular grid and fine paper grain. Flat top-down desk view."
+        ),
+        "relational_motion_mechanism": (
+            f"Unidirectional high-speed ingress on X-axis (<=0.4s, cubic-bezier): {hero_obj} locks at center stage, "
+            f"then {tool_prop} slides in from screen-right and interacts ({evidence.tactile_action_verb}), "
+            f"leaving {evidence.tactile_residue} with continuous 12fps paper vibration."
+        ),
+    }
+
     return {
         "canvas_workspace": "Aged Cream Newsprint Desk with subtle print halftone grid",
         "hero_cutout_object": hero_obj,
+        "interacting_tool": tool_prop,
         "interacting_objects": resolved_interacting,
         "motion_track_and_assembly": motion_track,
         "graphic_typography": graphic_typo,
@@ -498,6 +532,7 @@ def build_vox_scene_prompts(
         "i2v_prompt_omni": i2v_omni,
         "i2v_prompt_google_flow": i2v_google_flow,
         "scene_sub_director_plan": sub_plan,
+        "decomposed_prompts": decomposed_prompts,
     }
 
 
@@ -1057,7 +1092,7 @@ def run(ctx: RunContext) -> StageArtifact:
             item = planned_storyboard[idx]
             if item.get("editorial_title") and (not scene.headline or scene.headline.startswith("BEAT ")):
                 scene.headline = item["editorial_title"]
-            if item.get("visual_metaphor") and (not scene.visual_metaphor or "Tactile editorial evidence" in scene.visual_metaphor):
+            if item.get("visual_metaphor") and (not scene.visual_metaphor or "Tactile editorial evidence" in scene.visual_metaphor or "Tactile evidence" in scene.visual_metaphor or "evidence" in scene.visual_metaphor.lower()):
                 scene.visual_metaphor = item["visual_metaphor"]
             if item.get("main_subject_cutout", {}).get("label"):
                 scene.hero_cutout_object = item["main_subject_cutout"]["label"]
@@ -1114,7 +1149,9 @@ def run(ctx: RunContext) -> StageArtifact:
         )
         scene.canvas_workspace = vox_meta["canvas_workspace"]
         scene.hero_cutout_object = vox_meta["hero_cutout_object"]
+        scene.interacting_tool = vox_meta.get("interacting_tool")
         scene.interacting_objects = vox_meta["interacting_objects"]
+        scene.decomposed_prompts = vox_meta.get("decomposed_prompts")
         scene.motion_track_and_assembly = vox_meta["motion_track_and_assembly"]
         scene.graphic_typography = vox_meta["graphic_typography"]
         scene.visual_continuity_link_to_next = vox_meta["visual_continuity_link_to_next"]
@@ -1130,6 +1167,29 @@ def run(ctx: RunContext) -> StageArtifact:
         scene.objects_roster = vox_meta["objects_roster"]
         scene.headline_typography = vox_meta["headline_typography"]
         scene.audio_foley_cues = vox_meta["audio_foley_cues"]
+
+        # Opus 5.5 Bespoke Art Director Manifest (FT-206)
+        try:
+            from app.services.opus_art_director import generate_dynamic_art_manifest
+            manifest = generate_dynamic_art_manifest(
+                scene_id=scene.scene_id,
+                narration=getattr(scene, "narration", "") or getattr(scene, "sentence", "") or "",
+                headline=getattr(scene, "headline", "") or "",
+            )
+            manifest_data = manifest.model_dump() if hasattr(manifest, "model_dump") else manifest.dict()
+            scene.dynamic_art_manifest = manifest_data
+
+            # Synchronize Opus 5.5 Bespoke Prompts into decomposed_prompts (FT-201 & FT-206 parity)
+            if not scene.decomposed_prompts:
+                scene.decomposed_prompts = {}
+            scene.decomposed_prompts["assembled_anchor_prompt"] = manifest.assembled_keyframe_prompt
+            scene.decomposed_prompts["hero_cutout_prompt"] = manifest.hero_cutout_prompt
+            scene.decomposed_prompts["interacting_tool_prompt"] = manifest.interacting_tool_prompt
+            scene.decomposed_prompts["contact_point"] = manifest_data.get("contact_point")
+            scene.decomposed_prompts["macro_camera"] = manifest_data.get("macro_camera")
+            scene.image_prompt = manifest.assembled_keyframe_prompt
+        except Exception as _manifest_err:
+            logger.warning(f"[s05_director_plan] Dynamic Art Director notice for {scene.scene_id}: {_manifest_err}")
 
         shot = Shot(
             shot_id=shot_id,

@@ -32,3 +32,7 @@ export * from "./PaperStatCard";
 export * from "./transitions/pushThrough";
 export * from "./VoxBuildOnStage";
 export * from "./VoxDeskWorld";
+export * from "./TactileHostCard";
+export * from "./DynamicInteractingProp";
+export * from "./OrganicRedYarn";
+

@@ -33,6 +33,9 @@ import {
   VoxGlobalPaperLife,
   VoxDimensionLine,
   VoxDeskWorld,
+  TactileHostCard,
+  DynamicInteractingProp,
+  OrganicRedYarn,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -2659,6 +2662,59 @@ const RemotionRoot = () => {
             width,
             height,
           };
+        }}
+      />
+      {/* Tactile Host Card (Dual-Pass Contact Shadow & Residue) */}
+      <Composition
+        id="TactileHostCard"
+        component={TactileHostCard as any}
+        durationInFrames={180}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{
+          title: "EXHIBIT AUDIT DOSSIER",
+          subtitle: "OFFICIAL REGULATORY EVIDENCE",
+          width: 800,
+          height: 560,
+          x: 560,
+          y: 260,
+          activeContactResidue: "red_ink_stain",
+          residueTriggerFrame: 12,
+        }}
+      />
+      {/* Bespoke Dynamic Interacting Prop (Snappy Ingress & Impact Micro-bounce) */}
+      <Composition
+        id="DynamicInteractingProp"
+        component={DynamicInteractingProp as any}
+        durationInFrames={180}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{
+          propType: "rubber_stamp",
+          x: 1100,
+          y: 480,
+          width: 240,
+          height: 240,
+          contactFrameOffset: 12,
+        }}
+      />
+      {/* Authentic Catenary Organic Red Yarn */}
+      <Composition
+        id="OrganicRedYarn"
+        component={OrganicRedYarn as any}
+        durationInFrames={180}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{
+          fromX: 450,
+          fromY: 320,
+          toX: 1450,
+          toY: 650,
+          label: "FORENSIC EVIDENCE NEXUS",
+          color: "#D62E1F",
         }}
       />
     </>

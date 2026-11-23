@@ -54,7 +54,7 @@ WHIP_LEFT_TO_RIGHT:
   camera_is_actor: true
 
 TOP_DOWN_TRACKING:
-  positive: "Camera: Overhead 90-degree flat-lay diorama plate. Camera maintains a stable tactile substrate with clean paper texture, drop shadow, and 12fps stop-motion vibration, zero unprompted zooming or camera rolls, decelerating into a dead-stop resting hold on the hero document."
+  positive: "Camera: Overhead 90-degree flat-lay diorama plate. Camera maintains a stable tactile substrate with clean paper texture, drop shadow, and 12fps stop-motion vibration, zero unprompted zooming or camera rolls, decelerating into a stable spatial anchor on twos on the hero document."
   strip_from_avoid:
     - "no static locked-off camera"
   add_to_avoid:
@@ -72,7 +72,7 @@ TOP_DOWN_TRACKING:
   camera_is_actor: true
 
 RAKE_30_RACK_FOCUS:
-  positive: "Camera: 30-degree low-angle rake skimming across the archival diorama plate. Camera holds rock-steady during physical tool impact, maintaining clean paper texture, shadow, and 12fps stop-motion vibration without unprompted zoom or camera roll, settling into a dead-stop resting hold."
+  positive: "Camera: 30-degree low-angle rake skimming across the archival diorama plate. Camera holds rock-steady during physical tool impact, maintaining clean paper texture, shadow, and 12fps stop-motion vibration without unprompted zoom or camera roll, settling into a stable spatial anchor on twos."
   add_to_avoid:
     - "no static locked-off camera"
     - "no sudden camera movement"
@@ -88,7 +88,7 @@ RAKE_30_RACK_FOCUS:
   camera_is_actor: true
 
 LATERAL_WHIP_PAN:
-  positive: "Camera: Motivated follow-pan tracking the evidence thread across the stable diorama plate. Decelerates with a crisp landing and locks into a dead-stop hold on the destination exhibit; zero unprompted zooming or camera rolls."
+  positive: "Camera: Motivated follow-pan tracking the evidence thread across the stable diorama plate. Decelerates with a crisp landing and settles into a stable spatial anchor on twos on the destination exhibit; zero unprompted zooming or camera rolls."
   add_to_avoid:
     - "no static locked-off camera"
     - "no sudden camera movement"
@@ -105,7 +105,7 @@ LATERAL_WHIP_PAN:
   camera_is_actor: true
 
 DUTCH_FORENSIC_SNAP:
-  positive: "Camera: Static overhead view tilted at a subtle fixed 5-degree angle without in-shot rotation. Stable tactile diorama substrate with clean paper texture, shadow, and 12fps stop-motion vibration, dead-stop locked on the highlighted contradictory clause."
+  positive: "Camera: Static overhead view tilted at a subtle fixed 5-degree angle without in-shot rotation. Stable tactile diorama substrate with clean paper texture, shadow, and 12fps stop-motion vibration, settling into a stable spatial anchor on twos on the highlighted contradictory clause."
   add_to_avoid:
     - "no static locked-off camera"
     - "no sudden camera movement"
