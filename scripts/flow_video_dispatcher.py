@@ -178,9 +178,35 @@ def dismiss_dialogs(page):
         except Exception as _eval_err:
             logger.debug(f"Dismiss dialog evaluate notice: {_eval_err}")
 
-        for name in ["Tiếp tục", "Continue", "Tiếp theo", "Next", "Get started", "Bắt đầu", "Accept", "Chấp nhận", "Got it", "Đã hiểu", "Hoàn tất", "Xong", "Done", "Dismiss", "Bỏ qua", "Close", "Đóng", "I agree", "Tôi đồng ý", "Allow", "Cho phép"]:
-            btn = page.get_by_role("button", name=name)
-            if btn.count() > 0 and btn.first.is_visible() and not btn.first.is_disabled():
+        # 1. Click forward arrow in onboarding carousel (e.g. 'A faster, easier-to-reach Flow Agent')
+        for arrow_sel in [
+            "[role='dialog'] button:has-text('arrow_forward')",
+            "[role='dialog'] button:has-text('east')",
+            "[role='dialog'] button:has(mat-icon:has-text('arrow_forward'))",
+            "[role='dialog'] button:has(mat-icon:has-text('east'))",
+            ".cdk-overlay-pane button:has-text('arrow_forward')",
+            ".cdk-overlay-pane button:has-text('east')",
+            ".cdk-overlay-pane button:has(mat-icon)",
+            "button:has-text('arrow_forward')",
+            "button:has-text('east')",
+        ]:
+            arrow = page.locator(arrow_sel).first
+            if arrow.count() > 0 and arrow.is_visible() and not arrow.is_disabled():
+                try:
+                    arrow.click(force=True)
+                    time.sleep(0.5)
+                except Exception as _a_err:
+                    logger.debug(f"Arrow click notice: {_a_err}")
+
+        # 2. Text-based buttons
+        for name in [
+            "Tiếp tục", "Continue", "Tiếp theo", "Next", "Get started", "Bắt đầu",
+            "Accept", "Chấp nhận", "Got it", "Đã hiểu", "Hoàn tất", "Xong", "Done",
+            "Dismiss", "Bỏ qua", "Close", "Đóng", "I agree", "Tôi đồng ý", "Allow",
+            "Cho phép", "시작하기", "확인", "동의"
+        ]:
+            btn = page.locator(f"[role='dialog'] button:has-text('{name}'), .cdk-overlay-pane button:has-text('{name}'), button:has-text('{name}')").first
+            if btn.count() > 0 and btn.is_visible() and not btn.first.is_disabled():
                 try:
                     btn.first.click(force=True)
                     time.sleep(1)
@@ -949,7 +975,7 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
             print("   Chờ giao diện trang chủ sẵn sàng...")
             dismiss_dialogs(page)
             try:
-                page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
+                page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('새 프로젝트'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo'), button:has(mat-icon:has-text('add'))", timeout=25000)
             except Exception as _sel_err:
                 logger.debug(f"Project selector wait notice: {_sel_err}")
             time.sleep(2)
@@ -963,7 +989,12 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 print(f"   Mở project chuyên biệt {ep_id} ({len(ep_cards)} found)...")
                 ep_cards[0].click(force=True)
             else:
-                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
+                new_btn = page.locator(
+                    "button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('새 프로젝트'), "
+                    "[role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), [role='button']:has-text('새 프로젝트'), "
+                    "button:has-text('Start Creating'), button:has-text('Bắt đầu tạo'), button:has-text('시작하기'), "
+                    "button:has(mat-icon:has-text('add')), a[href*='/project/new'], button.create-project-btn"
+                ).first
                 if new_btn.count() > 0 and new_btn.is_visible():
                     print("   Tạo project mới sạch sẽ cho episode qua nút New project / Dự án mới...")
                     new_btn.click(force=True)
@@ -975,9 +1006,12 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                     else:
                         print("   Click New project / Dự án mới bằng text...")
                         try:
-                            page.get_by_text(re.compile(r'(New project|Dự án mới|Start Creating|Bắt đầu tạo)', re.I)).first.click(force=True, timeout=8000)
+                            page.get_by_text(re.compile(r'(New project|Dự án mới|새 프로젝트|Start Creating|Bắt đầu tạo|시작하기)', re.I)).first.click(force=True, timeout=8000)
                         except Exception as _btn_err:
-                            print(f"   ⚠️ Không tìm thấy nút tạo project ({_btn_err}). Chuyển giao clips!")
+                            debug_dir = episode_dir / "debug_flow"
+                            debug_dir.mkdir(parents=True, exist_ok=True)
+                            page.screenshot(path=str(debug_dir / f"no_project_btn_{acc_key}.png"))
+                            print(f"   ⚠️ Không tìm thấy nút tạo project ({_btn_err}). Đã lưu: no_project_btn_{acc_key}.png. Chuyển giao clips!")
                             return {"_status": "NO_PROJECT_BTN", "_unprocessed": clips}
 
         print("   Đợi canvas và prompt editor tải xong...")
@@ -998,16 +1032,21 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 page.goto("https://flow.google.com/?pli=1", wait_until="domcontentloaded", timeout=45000)
                 dismiss_dialogs(page)
                 try:
-                    page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
+                    page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('새 프로젝트'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo'), button:has(mat-icon:has-text('add'))", timeout=25000)
                 except Exception as _sel_err:
                     logger.debug(f"Retry project selector wait notice: {_sel_err}")
                 time.sleep(2)
                 dismiss_dialogs(page)
-                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
+                new_btn = page.locator(
+                    "button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('새 프로젝트'), "
+                    "[role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), [role='button']:has-text('새 프로젝트'), "
+                    "button:has-text('Start Creating'), button:has-text('Bắt đầu tạo'), button:has-text('시작하기'), "
+                    "button:has(mat-icon:has-text('add')), a[href*='/project/new'], button.create-project-btn"
+                ).first
                 if new_btn.count() > 0 and new_btn.is_visible():
                     new_btn.click(force=True)
                 else:
-                    page.get_by_text(re.compile(r'(New project|Dự án mới|Start Creating|Bắt đầu tạo)', re.I)).first.click(force=True)
+                    page.get_by_text(re.compile(r'(New project|Dự án mới|새 프로젝트|Start Creating|Bắt đầu tạo|시작하기)', re.I)).first.click(force=True)
                 page.wait_for_selector("div.ProseMirror, [contenteditable='true']", timeout=30000)
                 time.sleep(3)
                 dismiss_dialogs(page)

@@ -241,6 +241,8 @@ def _validate_and_assemble_video(
     audio_file: str,
     s9_data: dict,
     final_mp4: Path,
+    scene_props: Optional[list[SceneRenderProp]] = None,
+    fps: float = 30.0,
 ) -> None:
     """Validates inputs and calls assemble_final_video."""
     clip_paths = _validate_rendered_clips(ctx, clips)
@@ -257,8 +259,15 @@ def _validate_and_assemble_video(
     if not ass_file.exists() or ass_file.stat().st_size == 0:
         raise MissingSubtitlesError(f"Stage S10 requires valid subtitles file at '{ass_file}'")
 
+    scene_durations = [sc.duration_in_frames / fps for sc in scene_props] if scene_props else None
+
     # Delegate strictly to canonical vox assembly engine with two-pass loudnorm (Rule 125 & 139)
-    assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4)
+    import inspect
+    sig = inspect.signature(assemble_final_video)
+    if "scene_durations" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4, scene_durations=scene_durations)
+    else:
+        assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4)
     if not final_mp4.exists() or final_mp4.stat().st_size < 1000:
         raise RuntimeError(f"assemble_final_video failed to produce master MP4 at {final_mp4}")
 
@@ -484,7 +493,7 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
     final_mp4 = ctx.paths.final_render_dir / "final.mp4"
 
     if ctx.force or not _probe_existing_final_video(final_mp4):
-        _validate_and_assemble_video(ctx, clips, audio_file, s9_data, final_mp4)
+        _validate_and_assemble_video(ctx, clips, audio_file, s9_data, final_mp4, scene_props=scene_props, fps=render_props.fps)
 
     sz = final_mp4.stat().st_size if final_mp4.exists() else 0
     sha = compute_file_sha256(final_mp4) if final_mp4.exists() else "none"
