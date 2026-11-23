@@ -311,10 +311,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     logger.debug(f"Notice reading narration from director_plan.json: {_read_err}")
             market_val = resolve_canonical_market("KR" if "KR_" in str(episode_dir) else "EN")
             ev = extract_evidence_for_sentence(narration or scene_id, market=market_val, scene_id=scene_id)
-            h_fam = clip.get("h_family") or "H1_IMPACT"
-            clip_dur = float(clip.get("duration_sec", 5.0))
-            t_assembly = max(2.5, min(5.0, round(clip_dur * 0.65, 1)))
-            t_living = max(1.5, round(clip_dur - t_assembly, 1))
             raw_prompt = (
                 f"Slow continuous documentary camera dolly-in (~8% push-in toward the focal evidence over the full shot) with 3-plane parallax depth. "
                 f"Handcrafted tactile paper-collage diorama on aged archival cream newsprint. "
@@ -754,7 +750,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             # Kiem tra nút 'Thử lại' / 'Try again' khi gặp lỗi tạm thời của Google Flow
             retry_btn = page.locator("button:has-text('Thử lại'), button:has-text('Try again'), button[aria-label*='Thử lại' i], button[aria-label*='Try again' i]").first
             if retry_btn.count() > 0 and retry_btn.is_visible():
-                print(f"\n      🔄 Phát hiện thông báo lỗi tạm thời ('Đã xảy ra lỗi. Hãy thử lại'). Đang bấm 'Thử lại'...")
+                print("\n      🔄 Phát hiện thông báo lỗi tạm thời ('Đã xảy ra lỗi. Hãy thử lại'). Đang bấm 'Thử lại'...")
                 try:
                     retry_btn.click(force=True)
                     time.sleep(3)

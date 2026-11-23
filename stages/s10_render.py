@@ -459,7 +459,7 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
     subtitles = s9_data.get("payload", {}).get("subtitles", [])
 
     audio_duration_sec = float(s9_data.get("payload", {}).get("total_duration_sec") or 0.0)
-    
+
     # Extract scene narrations from S5 (or S3 fallback)
     scene_narrations: dict[str, str] = {}
     s5_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
