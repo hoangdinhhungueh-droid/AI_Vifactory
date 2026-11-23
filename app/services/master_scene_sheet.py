@@ -2207,7 +2207,6 @@ def generate_master_scene_package(
     if scenes is None:
         dp_path = kwargs.get("director_plan_path") or (ctx.paths.root / "director_plan.json")
         if dp_path and Path(dp_path).exists():
-            import json
             try:
                 plan_data = json.loads(Path(dp_path).read_text(encoding="utf-8"))
                 scenes = plan_data.get("scenes") or plan_data.get("shots") or []
