@@ -949,8 +949,8 @@ def render_scene_master_asset_sheet_png(
                     img.paste(s_img, (img_x1, img_y1))
                     img_loaded = True
                     break
-                except Exception:
-                    pass
+                except Exception as _cand_err:
+                    logger.debug(f"Candidate image read bypass: {_cand_err}")
 
     if not img_loaded:
         # Draw high-fidelity tactile diorama preview
@@ -1051,8 +1051,8 @@ def render_scene_master_asset_sheet_png(
                     img.paste(bg_im, (c1_x1 + 10 + (bw - bg_im.width) // 2, c1_y1 + 36 + (bh - bg_im.height) // 2))
                     c1_loaded = True
                     break
-                except Exception:
-                    pass
+                except Exception as _cand_err:
+                    logger.debug(f"Candidate image read bypass: {_cand_err}")
     if not c1_loaded:
         draw.rectangle(c1_thumb_box, fill=(244, 241, 234), outline=gray, width=1)
         for gx in range(c1_x1 + 10, c1_x1 + cw - 10, 25):
@@ -1085,8 +1085,8 @@ def render_scene_master_asset_sheet_png(
                     img.paste(h_im, (paste_x, paste_y), h_im)
                     c2_loaded = True
                     break
-                except Exception:
-                    pass
+                except Exception as _cand_err:
+                    logger.debug(f"Candidate image read bypass: {_cand_err}")
     if not c2_loaded:
         draw.rectangle([c2_x1 + 180, c2_y1 + 44, c2_x1 + 290, c2_y1 + 152], fill=(214, 46, 31)) # shadow
         draw.rectangle([c2_x1 + 174, c2_y1 + 38, c2_x1 + 284, c2_y1 + 146], fill="#FFFFFF", outline=ink, width=1) # deckle
@@ -1134,8 +1134,8 @@ def render_scene_master_asset_sheet_png(
                     img.paste(t_im, (paste_x, paste_y), t_im)
                     c4_loaded = True
                     break
-                except Exception:
-                    pass
+                except Exception as _cand_err:
+                    logger.debug(f"Candidate image read bypass: {_cand_err}")
     if not c4_loaded:
         draw.line([(c4_x1 + 40, c4_y1 + 98), (c4_x1 + cw - 40, c4_y1 + 98)], fill=hot_red, width=4)
         draw.ellipse([c4_x1 + 34, c4_y1 + 92, c4_x1 + 46, c4_y1 + 104], fill=(217, 164, 65))
@@ -1261,8 +1261,8 @@ def render_multiscene_master_asset_sheet_png(
                         img.paste(im, (50, y_offset + 40))
                         loaded = True
                         break
-                    except Exception:
-                        pass
+                    except Exception as _cand_err:
+                        logger.debug(f"Candidate image read bypass: {_cand_err}")
         if not loaded:
             draw.rectangle([50, y_offset + 40, 840, y_offset + 448], fill=(244, 241, 234), outline=gray, width=1)
             hero_str = sc.get("hero_cutout_object") or "Forensic Subject"
@@ -1291,8 +1291,8 @@ def render_multiscene_master_asset_sheet_png(
                         img.paste(st_im, (x1 + 2 + (bw - st_im.width)//2, 172 + (bh - st_im.height)//2))
                         st_loaded = True
                         break
-                    except Exception:
-                        pass
+                    except Exception as _cand_err:
+                        logger.debug(f"Candidate image read bypass: {_cand_err}")
         if not st_loaded:
             draw.rectangle([x1 + 2, 172, x2 - 2, 288], fill=(244, 241, 234), outline=None)
             for gx in range(x1 + 10, x2 - 10, 20):
@@ -1330,8 +1330,8 @@ def render_multiscene_master_asset_sheet_png(
                         img.paste(h_im, (px, py), h_im)
                         h_loaded = True
                         break
-                    except Exception:
-                        pass
+                    except Exception as _cand_err:
+                        logger.debug(f"Candidate image read bypass: {_cand_err}")
         if not h_loaded:
             draw.text(((x1 + x2)//2, 420), f"[{h_name[:14].upper()}]", fill=ink, font=fonts["caption"], anchor="mm")
         draw.text((x1, 530), f"Hero S{s_idx+1}: {h_name[:20]}", fill=ink, font=fonts["caption"])
@@ -1356,8 +1356,8 @@ def render_multiscene_master_asset_sheet_png(
                         img.paste(t_im, (px, py), t_im)
                         t_loaded = True
                         break
-                    except Exception:
-                        pass
+                    except Exception as _cand_err:
+                        logger.debug(f"Candidate image read bypass: {_cand_err}")
         if not t_loaded:
             draw.line([(1450, (y1 + y2)//2), (1840, (y1 + y2)//2)], fill=hot_red, width=3)
             draw.text((1645, (y1 + y2)//2 + 18), f"[{t_name[:28]}]", fill=ink, font=fonts["caption"], anchor="mm")
