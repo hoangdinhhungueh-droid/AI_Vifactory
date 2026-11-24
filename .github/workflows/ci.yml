@@ -22,17 +22,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       
-      - name: Install system dependencies (ffmpeg)
-        timeout-minutes: 1
-        shell: bash
-        run: |
-          set +e
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            echo "Installing static ffmpeg binary..."
-            sudo curl -sL https://github.com/eugeneware/ffmpeg-static/releases/latest/download/linux-x64 -o /usr/local/bin/ffmpeg || true
-            sudo chmod +x /usr/local/bin/ffmpeg || true
-          fi
-          exit 0
+      - name: Setup FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
