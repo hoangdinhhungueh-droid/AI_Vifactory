@@ -242,7 +242,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 render_papertrails_on_vps(
                     timeline_path=pt_timeline_file,
                     output_mp4=master_papertrails_mp4,
-                    quality="high",
+                    quality="med",
                     sfx=True,
                     gpu=False,
                 )

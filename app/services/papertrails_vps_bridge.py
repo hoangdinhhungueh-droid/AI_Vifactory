@@ -25,7 +25,7 @@ def render_papertrails_on_vps(
     quality: str = "high",
     sfx: bool = True,
     gpu: bool = False,
-    timeout_sec: int = 900,
+    timeout_sec: int = 1800,
 ) -> Dict[str, Any]:
     """Renders a Papertrails timeline into an MP4 video using Playwright on VPS.
 
@@ -101,9 +101,14 @@ def _render_local_vps(
 
     logger.info(f"[papertrails_vps_bridge] Executing VPS render: {' '.join(cmd)}")
     t0 = time.time()
+    clean_env = os.environ.copy()
+    clean_env.pop("NODE_CHANNEL_FD", None)
+    clean_env.pop("NODE_CHANNEL_SERIALIZATION_MODE", None)
+    clean_env.pop("NODE_APP_INSTANCE", None)
     res = subprocess.run(
         cmd,
         cwd=str(engine_dir),
+        env=clean_env,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -172,7 +177,7 @@ def _render_via_vps_runner(
     write_cmd = f"python3 -c 'import base64; open(\"{vps_timeline}\", \"wb\").write(base64.b64decode(\"{b64_timeline}\"))'"
     run_vps_cmd(write_cmd)
 
-    # If audio exists locally, upload it if needed
+    # If audio exists locally, upload it using chunked upload
     local_audio = Path(t_json.get("audio", ""))
     if not local_audio.exists():
         local_audio = timeline_path.parent / "audio" / "voice_narration.mp3"
@@ -180,9 +185,11 @@ def _render_via_vps_runner(
         local_audio = timeline_path.parent / "voice_narration.mp3"
 
     if local_audio.exists():
-        b64_audio = base64.b64encode(local_audio.read_bytes()).decode("ascii")
-        write_audio_cmd = f"python3 -c 'import base64; open(\"{vps_audio}\", \"wb\").write(base64.b64decode(\"{b64_audio}\"))'"
-        run_vps_cmd(write_audio_cmd)
+        from scripts.upload_vps_asset import upload_file
+        logger.info(f"[papertrails_vps_bridge] Uploading audio ({local_audio.stat().st_size} bytes) to VPS...")
+        up_ok = upload_file(str(local_audio), vps_audio)
+        if not up_ok:
+            raise RuntimeError(f"Failed to upload audio to VPS: {vps_audio}")
 
     # 2. Trigger render script on VPS in background with log monitoring
     vps_log = f"{vps_run_dir}/render.log"
@@ -231,17 +238,24 @@ def _render_via_vps_runner(
 
     logger.info("[papertrails_vps_bridge] VPS Render command succeeded.")
 
-    # 3. Retrieve output MP4 from VPS to local output_mp4
-    download_cmd = f"python3 -c 'import base64; print(base64.b64encode(open(\"{vps_output}\", \"rb\").read()).decode(\"ascii\"))'"
-    res_dl = run_vps_cmd(download_cmd, timeout=120)
-    b64_out = res_dl.get("stdout", "")
-    b_err = res_dl.get("stderr", "")
-    b_code = res_dl.get("exit_code", 1)
-    if b_code == 0 and b64_out.strip():
-        output_mp4.write_bytes(base64.b64decode(b64_out.strip()))
-        logger.info(f"[papertrails_vps_bridge] Downloaded final.mp4 ({output_mp4.stat().st_size} bytes)")
+    # 3. Retrieve output MP4 from VPS to local output_mp4 using robust chunked downloader
+    logger.info(f"[papertrails_vps_bridge] Downloading rendered MP4 from VPS to {output_mp4}...")
+    from scripts.download_vps_asset import download_file_chunked
+    dl_ok = download_file_chunked(vps_output, str(output_mp4), chunk_size=32768)
+    if not dl_ok or not output_mp4.exists() or output_mp4.stat().st_size < 1000:
+        logger.warning(f"[papertrails_vps_bridge] Chunked download failed, trying direct base64 fallback...")
+        download_cmd = f"python3 -c 'import base64; print(base64.b64encode(open(\"{vps_output}\", \"rb\").read()).decode(\"ascii\"))'"
+        res_dl = run_vps_cmd(download_cmd, timeout=180)
+        b64_out = res_dl.get("stdout", "")
+        b_err = res_dl.get("stderr", "")
+        b_code = res_dl.get("exit_code", 1)
+        if b_code == 0 and b64_out.strip():
+            output_mp4.write_bytes(base64.b64decode(b64_out.strip()))
+            logger.info(f"[papertrails_vps_bridge] Downloaded final.mp4 via fallback ({output_mp4.stat().st_size} bytes)")
+        else:
+            logger.warning(f"Could not retrieve video payload directly: {b_err}")
     else:
-        logger.warning(f"Could not retrieve video payload directly: {b_err}")
+        logger.info(f"[papertrails_vps_bridge] Downloaded final.mp4 ({output_mp4.stat().st_size} bytes)")
 
     return {
         "vps_output_path": vps_output,
