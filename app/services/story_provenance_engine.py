@@ -943,7 +943,8 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "unverified", "preliminary reports", "initial reports", "early reports",
             "yet to be verified", "unconfirmed", "unconfirmed reports", "early unverified",
             "pending verification", "initial reporting", "preliminary industry reporting",
-            "preliminary industry reports", "industry census",
+            "preliminary industry reports", "industry census", "preliminary reporting",
+            "according to preliminary reporting", "unconfirmed press reports", "unconfirmed accounts",
         ],
         "proposed": ["proposed", "draft", "under consideration", "planned", "pending regulatory", "proposals"],
     },
@@ -1084,6 +1085,9 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
         r"^[“\"‘']?(?:"
         r"According to\s+[^,:\n]{1,60}[,:;]\s*|"
         r"As\s+[^,:\n]{1,40}(?:reported|documented|disclosed|revealed)[^,:\n]*[,:;]\s*|"
+        r"(?:Internal\s+)?(?:procurement\s+)?(?:audits|audit\s+reports?)\s+(?:uncovered|revealed|identified|showed|documented|found)\s+|"
+        r"(?:Prosecutors|Regulators|Auditors|Investigators)\s+(?:alleged|stated|noted|found|charged)(?:\s+in\s+the\s+[^,:\n]{1,40})?\s+that\s+|"
+        r"(?:Charging documents|The indictment|Court records|Audit exhibits)\s+(?:state|states|allege|alleges|show|shows|reflect|reflects)\s+that\s+|"
         r"(?:Published|Media|Press|Industry)\s+(?:reporting|reports|investigations|accounts)\s+(?:indicate|indicates|reflect|reflects|note|notes|show|shows|documented|document|confirm|confirms)(?:\s+that)?(?:,\s*|\s+)|"
         r"(?:Regulatory|Official|Statutory)\s+(?:filings|notices|records)\s+(?:establish|confirms|confirm|indicate|indicates|reflect|reflects|show|shows)(?:\s+that)?(?:,\s*|\s+)|"
         r"(?:An?|The)\s+[\w\s.-]{2,30}?\s+(?:report|investigation|article|disclosure)\s+(?:stated|reported|described|noted|indicated|found|revealed|alleged)(?:\s+that)?(?:,\s*|\s+)|"

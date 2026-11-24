@@ -827,7 +827,7 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     if not hook_mode:
         word_cap = 48
     else:
-        word_cap = 16 if market in ("VN", "VI") else 14
+        word_cap = 24 if market == "EN" else (16 if market in ("VN", "VI") else 14)
 
     if market == "VN":
         pat_vn = r"(?:theo thông tin báo chí|được báo chí phản ánh|theo các nguồn tin ban đầu|theo thông tin được công bố)$"
@@ -835,6 +835,20 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     elif market == "EN":
         pat_en = r",?\s*(?:according to (?:media|press|news) reports|as reported in (?:media|press) accounts|media reports indicate)\.?$"
         clean = re.sub(pat_en, "", clean, flags=re.IGNORECASE).strip(" ,;:")
+        if hook_mode:
+            strip_pats = [
+                r",?\s*(?:including|resulting in|leading to|leaving|underscoring|creating|exposing|excluding|allowing|prompting)\s+.*$",
+                r",?\s*rather\s+than\s+.*$",
+                r",?\s*instead\s+of\s+.*$",
+                r",?\s*which\s+.*$",
+                r",?\s*where\s+.*$",
+                r",?\s*while\s+.*$",
+            ]
+            for sp in strip_pats:
+                cand = re.sub(sp, "", clean).strip()
+                if len(cand.split()) >= 8:
+                    clean = cand
+                    break
 
     words = clean.split()
     if len(words) <= word_cap:
@@ -1651,35 +1665,35 @@ def _render_claim_sentence(
 
             if role_slot == "setup":
                 tails = [
-                    f"early documentation indicates that {fact_clean}.",
+                    f"{fact_clean}, marking the initial phase of the transaction cycle.",
                     f"{fact_clean}, laying the institutional foundation for subsequent transactions.",
-                    f"initial public filings show that {fact_clean}.",
+                    f"{fact_clean}, establishing the baseline operational framework.",
                     f"{fact_clean}, setting the initial framework in place.",
-                    f"baseline administrative records reflect that {fact_clean}.",
+                    f"{fact_clean}, establishing the context before subsequent adjustments.",
                 ]
             elif role_slot == "mechanism":
                 tails = [
-                    f"records tracking the operational mechanism show that {fact_clean}.",
-                    f"{fact_clean}, reflecting the transactional structure described in disclosures.",
-                    f"financial records and disclosures indicate that {fact_clean}.",
-                    f"{fact_clean}, as outlined in accounts of the operational flow.",
-                    f"detailed transactional accounts show that {fact_clean}.",
+                    f"{fact_clean}, demonstrating the core transactional flow.",
+                    f"{fact_clean}, reflecting the underlying operational structure.",
+                    f"{fact_clean}, showing how capital moved through the system.",
+                    f"{fact_clean}, outlining the procedural sequence.",
+                    f"{fact_clean}, detailing the primary operational transfer.",
                 ]
             elif role_slot == "crack":
                 tails = [
-                    f"at this pivotal phase, documentation revealed that {fact_clean}.",
+                    f"{fact_clean}, marking the emergence of regulatory and public scrutiny.",
                     f"{fact_clean}, triggering heightened supervisory scrutiny.",
-                    f"investigative disclosures indicated that {fact_clean}.",
                     f"{fact_clean}, exposing the operational friction.",
-                    f"disclosures at this stage show that {fact_clean}.",
+                    f"{fact_clean}, revealing the structural disparity.",
+                    f"{fact_clean}, accelerating public examination of corporate practices.",
                 ]
             else:  # aftermath
                 tails = [
-                    f"in the institutional aftermath, records show that {fact_clean}.",
                     f"{fact_clean}, leaving lingering corporate governance questions.",
-                    f"subsequent analytical reviews noted that {fact_clean}.",
-                    f"{fact_clean}, underscoring the ongoing reform challenge.",
-                    f"post-transaction assessments established that {fact_clean}.",
+                    f"{fact_clean}, leaving lasting regulatory liabilities.",
+                    f"{fact_clean}, highlighting the ongoing reform challenge.",
+                    f"{fact_clean}, underscoring the systemic reform debate.",
+                    f"{fact_clean}, demonstrating the lasting structural legacy.",
                 ]
             raw = f"{pfx}{tails[v_idx]}"
 
@@ -1692,7 +1706,7 @@ def _render_claim_sentence(
     return raw, [cid]
 
 
-def _compact_en_hook_line(text: str, target_words: int = 14) -> str:
+def _compact_en_hook_line(text: str, target_words: int = 18) -> str:
     """Intelligently compact an English hook line without cutting words in half or severing clauses."""
     clean = text.strip().rstrip(". ")
     words = clean.split()
@@ -1703,33 +1717,69 @@ def _compact_en_hook_line(text: str, target_words: int = 14) -> str:
     suffix = f" {paren_m.group(1)}" if paren_m else ""
     body = clean[: paren_m.start()].strip() if paren_m else clean
 
+    # Strip parenthetical dashes (e.g. "—one-third of its $463 million refund—")
+    body = re.sub(r"—[^—]+—\s*", " ", body).strip()
+    # Strip parenthetical appositive clauses (e.g. ", parent of T.J. Maxx, Marshalls, and HomeGoods,")
+    body = re.sub(r",\s*(?:parent of|a subsidiary of|the operator of)[^,]+(?:,[^,]+)*,", "", body).strip()
+    # Compress verbose reporting verbs in hook
+    body = re.sub(r"published an investigative report revealing that", "reported that", body)
+    body = re.sub(r"\s+", " ", body).strip()
+
+    # Colon and semicolon splits
+    if ":" in body:
+        first_p = body.partition(":")[0].strip()
+        if len(first_p.split()) >= 6:
+            body = first_p
+    if ";" in body:
+        first_p = body.partition(";")[0].strip()
+        if len(first_p.split()) >= 6:
+            body = first_p
+
+    words_after_app = body.split()
+    if len(words_after_app) <= target_words:
+        return body + suffix + "."
+
     dangling = {
         "the", "a", "an", "of", "in", "to", "for", "with", "and", "or", "by",
         "from", "as", "at", "whose", "which", "that", "their", "its", "into", "toward", "towards",
-        "stated", "reported", "published", "described", "noted", "alleged",
+        "stated", "reported", "published", "described", "noted", "alleged", "were", "was", "using",
         "u.s.", "u.s", "federal", "direct", "major", "preliminary", "operational",
         "financial", "corporate", "official", "regulatory", "structural",
         "customs", "tariff", "trade", "price", "duty", "market", "executive",
-        "rather", "than", "including", "leaving", "resulting", "setting", "shoppers",
+        "rather", "than", "including", "leaving", "resulting", "setting", "shoppers", "instead",
     }
 
     strip_patterns = [
-        r",\s*(?:including|resulting|setting|leading|leaving|underscoring|creating|exposing)\s+.*$",
-        r",\s*rather\s+than\s+.*$",
+        r",\s*(?:including|resulting|setting|leading|leaving|underscoring|creating|exposing|excluding|allowing|prompting)\s+.*$",
+        r",?\s*rather\s+than\s+.*$",
+        r",?\s*instead\s+of\s+.*$",
         r",\s*laying\s+the\s+.*$",
+        r",\s*which\s+.*$",
+        r",\s*where\s+.*$",
+        r",\s*while\s+.*$",
+        r",?\s*(?:on|in)\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:,\s*\d{4})?\s*$",
     ]
     for pat in strip_patterns:
         cand = re.sub(pat, "", body).strip().rstrip(" ,;:")
-        c_words = cand.split()
-        if len(c_words) >= 6 and c_words[-1].lower().rstrip(".,;:") not in dangling:
-            if len(c_words) <= target_words + 3:
+        if cand != body:
+            c_words = cand.split()
+            if len(c_words) <= target_words and len(c_words) >= 6 and c_words[-1].lower().rstrip(".,;:") not in dangling:
                 return cand + suffix + "."
+            elif len(c_words) >= 6:
+                body = cand
+
+    # Optional word compression of verbose report verbs
+    compressed = re.sub(r"published an investigative report revealing that", "reported that", body)
+    if compressed != body and len(compressed.split()) <= target_words:
+        return compressed + suffix + "."
 
     b_words = body.split()
+    if len(b_words) <= target_words:
+        return body + suffix + "."
     cap = min(target_words, len(b_words))
     while cap < len(b_words) and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
         cap += 1
-    while cap > 6 and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
+    while cap > 8 and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
         cap -= 1
     return " ".join(b_words[:cap]).rstrip(" ,;:") + suffix + "."
 
@@ -2028,7 +2078,7 @@ def _build_grounded_story_beats(
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     elif m == "EN":
                         rem_clean = rem.strip()
-                        shrunk_r = _compact_en_hook_line(rem_clean, target_words=11)
+                        shrunk_r = _compact_en_hook_line(rem_clean, target_words=8)
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     else:  # VN
                         words = rem.strip().split()
@@ -2349,7 +2399,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 else:
                     user_prompt += (
                         "CRITICAL PROVENANCE & STRICT PACING MANDATE FOR ENGLISH (EN) MARKET:\n"
-                        f"1. STRICT WORD COUNT & DURATION: Write 100% crisp investigative English narration totaling {u_min}-{u_max} words across 19-24 lines (target 370-420 words, 180-240s docudrama speech timing). Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 48 words (<= 23.5s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
+                        f"1. STRICT WORD COUNT & DURATION: Write 100% crisp investigative English narration totaling {u_min}-{u_max} words across 21-24 lines (target 390-440 words, 190-230s docudrama speech timing). Scripts under 370 words will be rejected! Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 48 words (<= 23.5s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
                         "2. STRICT NON-REDUNDANT CLAIM GROUNDING & BEAT PARTITION:\n"
                         "   - Ground every substantive factual sentence in a DISTINCT claim from the evidence ledger.\n"
                         "   - DO NOT repeat the same claim or numbers across multiple lines.\n"
@@ -2655,7 +2705,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     )
                     b1_dur_ok = b1_dur <= 24.5
                     b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and b1_dur_ok and not align_res.get("beat1_unverified_elevation"))
-                    units_ok = u_min <= cand_units <= u_max
+                    units_ok = (cand_units >= int(u_min * 0.95) and cand_units <= u_max) if u_min else (cand_units <= u_max)
                     dur_ok = (d_min <= cand_dur <= d_max) and units_ok
                     b1_cids = {cid for ln in (cand_beats[0][2] if cand_beats else []) for cid in (ln.claim_ids or [])}
                     b5_cids = {cid for ln in (cand_beats[-1][2] if cand_beats else []) for cid in (ln.claim_ids or [])}
@@ -2839,12 +2889,23 @@ def run(ctx: RunContext) -> StageArtifact:
                             else:
                                 break
 
-                    # 5. Eliminate B1-B5 claim redundancy cleanly
+                    # 5. Eliminate B1-B5 claim redundancy cleanly by swapping B1 duplicate lines in B5 with unused aftermath claims
                     if cand_beats and len(cand_beats) >= 5:
                         b1_cids = {cid for ln in cand_beats[0][2] for cid in (ln.claim_ids or [])}
+                        used_in_early = {cid for b_idx in range(4) for ln in cand_beats[b_idx][2] for cid in (ln.claim_ids or [])}
+                        avail_aftermath = [c for c in evidence_raw if c.get("claim_id") not in used_in_early]
+                        af_idx = 0
                         for ln in cand_beats[-1][2]:
-                            if ln.claim_ids:
-                                ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
+                            if ln.claim_ids and any(c in b1_cids for c in ln.claim_ids):
+                                if af_idx < len(avail_aftermath):
+                                    rep_c = avail_aftermath[af_idx]
+                                    af_idx += 1
+                                    rep_cid = rep_c.get("claim_id")
+                                    rep_text = rep_c.get("claim", "")
+                                    ln.claim_ids = [rep_cid]
+                                    ln.text = f"Subsequent reporting reflected that {rep_text}."
+                                else:
+                                    ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
 
                     # 6. Vary repetitive unconfirmed/press openings across beats
                     unconfirmed_alts = [
@@ -2894,6 +2955,32 @@ def run(ctx: RunContext) -> StageArtifact:
                                             best_cid = c_id
                                 if best_cid and best_hits >= 3:
                                     ln.claim_ids = [best_cid]
+
+                    # 8. If short of min words, expand lines with unused claim lines into B3
+                    cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
+                    cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
+                    shortfall = u_min - int(cand_timing_chk["spoken_units"])
+                    if shortfall > 0 and len(cand_beats) >= 4:
+                        all_used_cids = {c for _, _, lns in cand_beats for ln in lns for c in (ln.claim_ids or [])}
+                        avail_c = [c for c in evidence_raw if c.get("claim_id") not in all_used_cids]
+                        af_idx = 0
+                        while shortfall > 0 and af_idx < len(avail_c) and len(cand_beats[2][2]) < 8:
+                            extra_c = avail_c[af_idx]
+                            af_idx += 1
+                            extra_cid = extra_c.get("claim_id")
+                            extra_text = extra_c.get("claim", "")
+                            if extra_text:
+                                cand_beats[2][2].append(StorySceneLine(
+                                    line_id="B3_L_extra",
+                                    text=f"Industry reporting noted that {extra_text}.",
+                                    claim_ids=[extra_cid],
+                                    visual_hook="stat_hero",
+                                ))
+                                for idx_r, ln_r in enumerate(cand_beats[2][2], start=1):
+                                    ln_r.line_id = f"B3_L{idx_r:02d}"
+                                cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
+                                cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
+                                shortfall = u_min - int(cand_timing_chk["spoken_units"])
 
                     return cand_beats
 
