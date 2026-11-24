@@ -2374,79 +2374,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 line_matches_expected_qualifier as _m_qual,
                 strip_attribution_prefix as _strip_pfx,
             )
-            # 1. Fix qualifier mismatches cleanly (once per line)
-            for b_id, _, lns in cand_beats:
-                for ln in lns:
-                    if not ln.claim_ids:
-                        continue
-                    peer_dicts = [
-                        (evidence_map[c].model_dump() if hasattr(evidence_map[c], "model_dump") else dict(evidence_map[c]))
-                        for c in ln.claim_ids
-                        if c in evidence_map
-                    ]
-                    line_needs_repair = False
-                    target_bkt = None
-                    for cid in ln.claim_ids:
-                        c_obj = evidence_map.get(cid)
-                        if c_obj is not None:
-                            c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
-                            ok_q, _ = _m_qual(ln.text, c_dict, market=market, peer_claims=peer_dicts)
-                            if not ok_q:
-                                line_needs_repair = True
-                                bkt = _exp_bkt(
-                                    legal_status=str(c_dict.get("legal_status", "alleged")),
-                                    source_type=str(c_dict.get("source_type", "press")),
-                                    doc_type=str(c_dict.get("doc_type", "unknown")),
-                                    speaker=c_dict.get("speaker"),
-                                    procedural_status=str(c_dict.get("procedural_status", "unknown")),
-                                    verification_status=str(c_dict.get("verification_status", "corroborated_secondary")),
-                                    credibility_tier=str(c_dict.get("credibility_tier", "") or ""),
-                                )
-                                if target_bkt is None or target_bkt == "fact":
-                                    target_bkt = bkt
-                                elif bkt in ("unverified", "alleged_regulator", "court_record", "audit_finding"):
-                                    target_bkt = bkt
-                    if line_needs_repair and target_bkt and target_bkt != "fact":
-                        clean_txt, _ = _strip_pfx(ln.text, market=market)
-                        clean_txt = clean_txt.lstrip()
-                        if market == "EN":
-                            clean_txt = re.sub(r"\b(?:was reportedly|reportedly|was alleged to be)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
-                            clean_txt = re.sub(r"\b(?:according to the court ruling|as ruled by the court|court ruled that)\b,?\s*", "", clean_txt, flags=re.IGNORECASE).strip()
-                            clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory|Investigative|Financial|Industry|Early|Initial)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
-                            clean_txt = re.sub(r"^(?:Investigative reports described that|Investigative reporting described that|Investigative reports described)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
-                            clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
-                            clean_txt = re.sub(r"\blacked any legal right\b", "lacked a legal right", clean_txt, flags=re.IGNORECASE).strip()
-                            clean_txt = re.sub(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+directing\b", r"\1 directed", clean_txt).strip()
-                        src = str(c_dict.get("source_name") or "").strip()
-                        if target_bkt == "alleged_regulator":
-                            pfx_opts = [
-                                f"According to regulatory filings by {src}, " if src else "According to regulatory filings, ",
-                                f"As noted in regulatory disclosures from {src}, " if src else "As noted in regulatory disclosures, ",
-                                "Regulatory records reflect that ",
-                            ]
-                        elif target_bkt in ("alleged", "corroborated_secondary"):
-                            pfx_opts = [
-                                f"According to {src} reporting, " if src else "According to press reports, ",
-                                f"Published reporting by {src} indicates that " if src else "Published reports reflect that ",
-                                f"As reported by {src}, " if src else "Press accounts reported that ",
-                                "Media reporting reflects that ",
-                            ]
-                        elif target_bkt == "unverified":
-                            pfx_opts = [
-                                f"According to early unverified reports by {src}, " if src else "According to preliminary reporting, ",
-                                f"According to initial reports yet to be verified in {src}, " if src else "Early unverified accounts indicate that ",
-                                f"According to preliminary reporting by {src}, " if src else "Initial reports suggest that ",
-                                f"Pending independent corroboration, {src} reported that " if src else "Pending independent corroboration, early reporting noted that ",
-                            ]
-                        else:
-                            pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
-                        pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)] if market == "EN" else ("당국 발표에 따르면, " if target_bkt == "alleged_regulator" else ("보도에 따르면, " if target_bkt == "alleged" else ("초기 미확인 보도에 따르면, " if target_bkt == "unverified" else "공식 기록에 따르면, ")))
-                        if len(clean_txt.split()) >= 4:
-                            if clean_txt and clean_txt[0].isupper():
-                                fw = clean_txt.split()[0]
-                                if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial"):
-                                    clean_txt = fw.lower() + clean_txt[len(fw):]
-                            ln.text = f"{pfx}{clean_txt}"
+            # 1. Qualifier mismatches are unified and repaired cleanly in Step 6 (single-pass source enrichment)
 
             # 2. Prevent double hedging & strip forbidden court ruling phrasing in all lines
             if market == "EN":
@@ -2650,10 +2578,14 @@ def run(ctx: RunContext) -> StageArtifact:
                         continue
 
                     src = str(c_dict.get("source_name") or "").strip()
-                    clean_txt, _ = _strip_pfx(ln.text, market=market)
-                    clean_txt = clean_txt.lstrip()
+                    clean_txt = ln.text.strip()
+                    while True:
+                        stripped, pfx_found = _strip_pfx(clean_txt, market=market)
+                        if pfx_found and stripped != clean_txt:
+                            clean_txt = stripped.strip()
+                        else:
+                            break
                     if market == "EN":
-                        clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory|Investigative|Financial|Industry|Early|Initial|Unconfirmed|Preliminary|Pending)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:(?:Unconfirmed|Published|Media|Press|Financial)\s+reports\s+(?:indicated|reported|described|stated)(?:\s+that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:(?:Industry|Financial|Market)\s+analysts\s+(?:were\s+reported\s+to\s+say|reported|stated|said|noted)\s+(?:that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:Investigative\s+reports\s+(?:described|reported|revealed|indicated)\s+(?:that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
@@ -2781,10 +2713,14 @@ def run(ctx: RunContext) -> StageArtifact:
                                     credibility_tier=str(c_dict.get("credibility_tier", "") or ""),
                                 )
                                 if bkt != "fact":
-                                    clean_txt, _ = _strip_pfx(ln.text, market=market)
-                                    clean_txt = clean_txt.lstrip()
+                                    clean_txt = ln.text.strip()
+                                    while True:
+                                        stripped, pfx_found = _strip_pfx(clean_txt, market=market)
+                                        if pfx_found and stripped != clean_txt:
+                                            clean_txt = stripped.strip()
+                                        else:
+                                            break
                                     if market == "EN":
-                                        clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory|Investigative|Financial|Industry|Early|Initial)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
                                         clean_txt = re.sub(r"^(?:Investigative reports described that|Investigative reporting described that|Investigative reports described)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                                         clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
                                         clean_txt = re.sub(r"\blacked any legal right\b", "lacked a legal right", clean_txt, flags=re.IGNORECASE).strip()
