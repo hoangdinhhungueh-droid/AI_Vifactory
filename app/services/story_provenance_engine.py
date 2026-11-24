@@ -1088,7 +1088,8 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
     pat = (
         r"^[“\"‘'\(]?(?:"
         r"According to\s+[^,:\n]{1,60}[,:;]\s*|"
-        r"As\s+[^,:\n]{1,40}(?:reported|documented|disclosed|revealed|noted)[^,:\n]*[,:;]\s*|"
+        r"As\s+(?:[^,:\n]{1,40}\s+)?(?:reported|documented|disclosed|revealed|noted|stated|alleged)[^,:\n]*[,:;]\s*|"
+        r"(?:in\s+)?(?:published|press|news|public)\s+(?:accounts|reports|reporting|disclosures)[,:;]\s*|"
         r"Pending\s+[^,:\n]{1,60}[,:;]\s*|"
         r"(?:Internal\s+)?(?:procurement\s+)?(?:audits|audit\s+reports?)\s+(?:uncovered|revealed|identified|showed|documented|found)\s+|"
         r"(?:Prosecutors|Regulators|Auditors|Investigators)\s+(?:alleged|stated|noted|found|charged)(?:\s+in\s+the\s+[^,:\n]{1,40})?\s+that\s+|"

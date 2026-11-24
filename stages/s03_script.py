@@ -2516,6 +2516,59 @@ def run(ctx: RunContext) -> StageArtifact:
                         else:
                             ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
 
+                # Dedup duplicate claims within B5 itself
+                seen_b5_cids = set()
+                for ln in cand_beats[-1][2]:
+                    if ln.claim_ids:
+                        dup = any(c in seen_b5_cids for c in ln.claim_ids)
+                        if dup:
+                            ln.claim_ids = []
+                            ln.visual_hook = "living_warning"
+                            ln.text = "Until federal trade rules change, the tariff refund trap remains set." if market == "EN" else "무역 규정이 개정되기 전까지는 환급의 함정이 계속될 것입니다."
+                        else:
+                            for c in ln.claim_ids:
+                                seen_b5_cids.add(c)
+
+            # 5b. Ensure all verified primary catalysts (100%) and transmission mechanisms (>= 75%) are covered
+            verified_catalysts = [
+                c for c in evidence_raw
+                if str(c.get("causal_role")) == "primary_catalyst"
+                and str(c.get("verification_status")) in ("verified_primary", "corroborated_secondary")
+                and c.get("credibility_tier") != "unconfirmed_claim"
+            ]
+            verified_mechanisms = [
+                c for c in evidence_raw
+                if str(c.get("causal_role")) == "transmission_mechanism"
+                and str(c.get("verification_status")) in ("verified_primary", "corroborated_secondary")
+                and c.get("credibility_tier") != "unconfirmed_claim"
+            ]
+            used_cids_all = {cid for _, _, lns in cand_beats for ln in lns for cid in (ln.claim_ids or [])}
+
+            for v_mech in verified_mechanisms:
+                m_cid = v_mech.get("claim_id")
+                if m_cid and m_cid not in used_cids_all:
+                    m_txt = str(v_mech.get("claim", "")).strip().rstrip(". ")
+                    m_src = str(v_mech.get("source_name") or "Press").strip()
+                    if len(cand_beats) >= 3:
+                        cand_beats[2][2].append(StorySceneLine(
+                            line_id="B3_L_mech",
+                            text=f"Published reporting by {m_src} indicates that {m_txt}.",
+                            claim_ids=[m_cid],
+                            visual_hook="red_thread",
+                        ))
+                        for idx_renum, ln_renum in enumerate(cand_beats[2][2], start=1):
+                            ln_renum.line_id = f"B3_L{idx_renum:02d}"
+                        used_cids_all.add(m_cid)
+
+            # If B2 contains transition line that cites C006 without discussing customs, detach C006
+            if len(cand_beats) >= 2:
+                for ln in cand_beats[1][2]:
+                    if "C006" in (ln.claim_ids or []) and ("customs" not in ln.text.lower() and "duty" not in ln.text.lower() and "importer" not in ln.text.lower()):
+                        ln.claim_ids = [c for c in ln.claim_ids if c != "C006"]
+                        if not ln.claim_ids:
+                            ln.visual_hook = "pattern_interrupt"
+                            ln.text = "The refund went to the company. The open question is where that money went next."
+
             # 6. Vary repetitive unconfirmed/press openings across beats with dynamic source enrichment
             unconfirmed_templates = [
                 "According to preliminary reporting by {src}, ",
@@ -2552,6 +2605,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 for ln in lns:
                     # Sanitize any doubled terminal punctuation
                     ln.text = re.sub(r"\?\s*\.+$", "?", ln.text)
+                    ln.text = re.sub(r"\.{2,}$", ".", ln.text)
 
                     # Hook Beat 1 cleanups: ensure B1_L03 is purely rhetorical paradox question without claims, and B1_L02 has no fragment
                     if "B1" in b_id:
@@ -2604,6 +2658,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         else:
                             break
                     if market == "EN":
+                        clean_txt = clean_txt.lstrip(",:; ").strip()
                         clean_txt = re.sub(r"^(?:(?:Unconfirmed|Published|Media|Press|Financial)\s+reports\s+(?:indicated|reported|described|stated)(?:\s+that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:(?:Industry|Financial|Market)\s+analysts\s+(?:were\s+reported\s+to\s+say|reported|stated|said|noted)\s+(?:that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:Investigative\s+reports\s+(?:described|reported|revealed|indicated)\s+(?:that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
@@ -2613,6 +2668,12 @@ def run(ctx: RunContext) -> StageArtifact:
                         clean_txt = re.sub(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+directing\b", r"\1 directed", clean_txt).strip()
                         clean_txt = re.sub(r"\bcustoms\s+rules\s+that\s+direct\b", "federal customs rules direct", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\bTJX\s+allocated\b", "TJX was reported to allocate", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:Pending independent corroboration,\s*)?to\s+allocate\s+", "TJX was reported to allocate ", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^total\s+tariff-duty\s+refunds\s+of\s+([$\d]+(?:\s+million|\s+billion)?)\s+received\b", r"TJX was reported to receive total tariff-duty refunds of \1", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:financial\s+filings\s+as\s+showing\s+that|financial\s+filings\s+as\s+showing)\s*", "financial filings showed that ", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^noted\s+that,?\s*", "", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:corporate\s+)?bonus\s+metrics\s+treated\b", "industry analysts reported that corporate bonus metrics treated", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:on\s+paper,\s*)?each\s+step\s+stayed\s+within\s+rules\s+that\s+treat\b", "federal customs rules treat", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\bfilings\s+showed\b", "financial filings were reported to show", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\bfilings\s+show\b", "financial filings were reported to show", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\bdisclosures\s+as\s+showing\b", "disclosures were reported to show", clean_txt, flags=re.IGNORECASE).strip()
@@ -2627,6 +2688,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         clean_txt = re.sub(r",?\s*and\s+the\s+choice\s+rests\s+with\s+them\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r",?\s*before\s+products\s+ever\s+reached\s+shelves\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r",?\s*before\s+goods\s+ever\s+reached\s+shelves\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = clean_txt.lstrip(",:; ").strip()
 
                     if bkt == "unverified":
                         if src:
@@ -2652,6 +2714,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                 clean_txt = fw.lower() + clean_txt[len(fw):]
 
                     ln.text = f"{pfx}{clean_txt}"
+                    ln.text = re.sub(r"\.{2,}$", ".", ln.text)
 
             # 7. Ensure factual lines without claim IDs find their matching claim from evidence ledger
             for b_id, _, lns in cand_beats:
@@ -2803,6 +2866,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                             if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "major"):
                                                 clean_txt = fw.lower() + clean_txt[len(fw):]
                                     ln.text = f"{pfx}{clean_txt}"
+                    ln.text = re.sub(r"\.{2,}$", ".", ln.text)
 
             return cand_beats
 

@@ -37,7 +37,8 @@ IMAGE_PROFILE_DIR = Path(r"C:\Users\hunghd2\.gemini\browser_profile")
 
 # Danh sách tài khoản vô hiệu hóa / hết hạn Pro (Loại bỏ 100% khỏi vòng xoay để chống kẹt)
 DISABLED_ACCOUNTS = {
-    'acc_06': 'Hết gói Pro / Đã tắt khỏi vòng xoay để chống kẹt hệ thống'
+    'acc_06': 'Hết gói Pro / Đã tắt khỏi vòng xoay để chống kẹt hệ thống',
+    'acc_05': 'Bị rớt gói Pro / Đã tắt khỏi vòng xoay Omni để chống lỗi'
 }
 
 class FlowQuotaExhaustedError(RuntimeError):

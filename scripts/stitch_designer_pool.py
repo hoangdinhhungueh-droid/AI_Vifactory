@@ -52,7 +52,7 @@ ACCOUNT_POOL = [
         "email": "untoldstorieskr@gmail.com",
         "name": "Hưng Hoàng",
         "profile_dir": r"C:\Users\hunghd2\.gemini\profiles\acc_05",
-        "status": "configured"
+        "status": "disabled_dropped_pro"
     },
     {
         "id": "acc_07",
@@ -70,7 +70,7 @@ def get_available_accounts():
     valid = []
     for acc in ACCOUNT_POOL:
         p = Path(acc["profile_dir"])
-        if p.exists():
+        if p.exists() and acc.get("status") not in ("disabled", "disabled_dropped_pro"):
             valid.append(acc)
     return valid
 
