@@ -1,24 +1,24 @@
 # 📜 01_CONTRACTS.md - KHẾ ƯỚC DỮ LIỆU VIDEO FACTORY (SSOT)
 
-> **NGUỒN SỰ THẬT DUY NHẤT CHO PIPELINE S1–S11 & VOX ENGINE V3.**
-> Mọi thay đổi về cấu trúc kịch bản, đạo diễn xúc giác, hay render Remotion bắt buộc phải khai báo ở đây.
+> **NGUỒN SỰ THẬT DUY NHẤT CHO PIPELINE S1–S11 & PAPERTRAILS 3D ENGINE.**
+> Mọi thay đổi về cấu trúc kịch bản, đạo diễn thế giới giấy 3D, hay render VPS bắt buộc phải khai báo ở đây.
 > Tuân thủ Hiến pháp R118 (Zero-Mock), R128 (Generic Contract), R132 (Decoupled Engine), và R140 (Kinetic Coupling).
 
 ---
 
-## 1. STATE MACHINE PIPELINE CHUẨN (CANONICAL PIPELINE 2.0)
+## 1. STATE MACHINE PIPELINE CHUẨN (CANONICAL PIPELINE 2.0 - PAPERTRAILS REVOLUTION)
 ```mermaid
 stateDiagram-v2
     [*] --> S01_IDEATION : Quét Google Trends RSS live
     S01_IDEATION --> S02_RESEARCH : Trích xuất Grounding Table & Causal Epochs
     S02_RESEARCH --> S03_SCRIPT : Kịch bản 5 Beat Docudrama
     S03_SCRIPT --> S04_CRITIC : Thẩm định kịch bản Hội đồng Critic
-    S04_CRITIC --> S05_DIRECTOR : Kế hoạch Đạo diễn Xúc giác H1..H7
-    S05_DIRECTOR --> S07_IMAGE_GEN : Sinh Master Sheet & Cắt tách Alpha Layers (FT-201)
-    S07_IMAGE_GEN --> S08_VIDEO_GEN : Sinh Omni Tactile Texture Plates (FT-203)
-    S08_VIDEO_GEN --> S09_VOICE_TTS : Tạo giọng đọc ElevenLabs + Whisper Timestamps
-    S09_VOICE_TTS --> S10_RENDER : Remotion Master Compositor Render MP4 (FT-204)
-    S10_RENDER --> S11_QC : Đồng bộ YouTube Chapter & QC Nghiệm thu (FT-205)
+    S04_CRITIC --> HUMAN_GATE_1 : Phê duyệt kịch bản & Chốt Story
+    HUMAN_GATE_1 --> S09_VOICE_TTS : Tạo giọng đọc ElevenLabs + Whisper Timestamps
+    S09_VOICE_TTS --> S05_PAPERTRAILS_DIRECTOR : Chuyển thể Story sang Papertrails Timeline v1 (FT-301)
+    S05_PAPERTRAILS_DIRECTOR --> S08_PAPERTRAILS_RENDER : Playwright WebGL2 Frame-by-Frame Render trên VPS (FT-302)
+    S08_PAPERTRAILS_RENDER --> S10_FINAL_ASSEMBLY : Đóng gói video tổng thành MP4 1080p
+    S10_FINAL_ASSEMBLY --> S11_QC : Đồng bộ YouTube Chapter & QC Nghiệm thu (FT-205)
     S11_QC --> [*]
 ```
 
@@ -28,63 +28,79 @@ stateDiagram-v2
 
 ```python
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 # ==============================================================================
-# [FT-201] MASTER SHEET ASSET BUNDLE SCHEMA (COMPREHENSIVE 6-IN-1)
+# [FT-301] PAPERTRAILS 3D TIMELINE SCHEMA (CANONICAL V1 - SSOT)
 # ==============================================================================
-class WiringSpec(BaseModel):
-    """Khế ước cách đấu nối không gian & động học giữa các object."""
-    connector_type: str = Field(..., description="Loại đấu nối: red_yarn, brass_caliper, turned_wood_seal, index_arrow")
-    source_anchor: List[int] = Field(..., description="Tọa độ điểm neo nguồn [x, y] trên khung 1920x1080")
-    target_anchor: List[int] = Field(..., description="Tọa độ điểm neo đích [x, y] trên khung 1920x1080")
-    ingress_axis: str = Field(default="X", description="Trục chuyển động vào (X đơn hướng)")
-    ingress_duration_sec: float = Field(default=0.3, le=0.4, description="Thời gian bứt tốc vào sân khấu (<= 0.4s)")
-    hold_fps: int = Field(default=12, description="Tốc độ vi rung nhịp thở stop-motion (12fps on twos)")
-    snappy_physics: bool = Field(default=True, description="Khóa cứng gia tốc stop-motion giật dứt khoát")
+class PapertrailsCaptionWord(BaseModel):
+    """Khế ước từ vựng đồng bộ âm thanh phục vụ highlight đỏ chữ karaoke."""
+    word: str = Field(..., description="Từ đơn hoặc cụm từ")
+    start: float = Field(..., ge=0.0, description="Thời điểm bắt đầu (giây)")
+    end: float = Field(..., ge=0.0, description="Thời điểm kết thúc (giây)")
 
-class InformationSpec(BaseModel):
-    """Khế ước thông tin nội dung & dữ liệu định lượng."""
-    headline: str = Field(..., description="Tiêu đề phân cảnh điều tra")
-    stat_hero: str = Field(..., description="Con số định lượng khổng lồ màu đỏ (ví dụ: '500+', '9 RETAIL')")
-    stat_label: str = Field(..., description="Nhãn định danh con số định lượng")
-    narration: str = Field(..., description="Toàn văn lời đọc voiceover")
+class PapertrailsCaption(BaseModel):
+    """Khế ước dải phụ đề giấy rách torn-paper."""
+    start: float = Field(..., ge=0.0, description="Mốc thời gian bắt đầu")
+    end: float = Field(..., ge=0.0, description="Mốc thời gian kết thúc")
+    text: str = Field(..., description="Toàn văn câu phụ đề")
+    words: Optional[List[PapertrailsCaptionWord]] = Field(default=None, description="Danh sách từ đồng bộ karaoke")
 
-class MasterSheetAssetBundle(BaseModel):
+class PapertrailsSceneCard(BaseModel):
+    """Khế ước thẻ giấy dán đè trên sân khấu 3D (note hoặc photo)."""
+    kind: str = Field(..., regex=r"^(note|photo)$", description="Loại thẻ: note hoặc photo")
+    head: Optional[str] = Field(default=None, description="Tiêu đề thẻ ghi chú")
+    lines: Optional[List[str]] = Field(default=None, description="Các dòng nội dung ghi chú (hỗ trợ code backtick)")
+    numbered: Optional[bool] = Field(default=True, description="Hiển thị số thứ tự")
+    side: str = Field(default="right", regex=r"^(left|right|center)$", description="Vị trí hiển thị thẻ")
+    big: Optional[bool] = Field(default=False, description="Chế độ thẻ chương lớn (khi ở giữa)")
+    lineAt: Optional[List[float]] = Field(default=None, description="Mốc thời gian hiện từng dòng (giây)")
+    img: Optional[str] = Field(default=None, description="Data URI base64 của ảnh tư liệu (dành cho photo)")
+    aspect: Optional[float] = Field(default=0.5625, description="Tỷ lệ chiều cao / chiều rộng")
+    hl: Optional[List[float]] = Field(default=None, description="Tọa độ elip highlight [x, y, w, h] trong 0..1")
+    hlAt: Optional[float] = Field(default=0.9, description="Mốc thời gian vẽ elip đỏ (giây)")
+    badge: Optional[str] = Field(default=None, description="Chữ trên con dấu mộc pháp y (ví dụ: EXHIBIT A)")
+    badgeAt: Optional[float] = Field(default=None, description="Mốc thời gian đóng dấu (giây)")
+    caption: Optional[str] = Field(default=None, description="Chú thích ảnh tư liệu")
+
+class PapertrailsScene(BaseModel):
+    """Khế ước một phân cảnh thế giới giấy 3D Pop-Up."""
+    id: str = Field(..., pattern=r"^shot-\d{3}$", description="Định danh phân cảnh (shot-001, shot-002...)")
+    start: float = Field(..., ge=0.0, description="Mốc bắt đầu (giây)")
+    end: float = Field(..., ge=0.0, description="Mốc kết thúc (giây)")
+    narration: str = Field(..., description="Lời đọc voiceover của phân cảnh")
+    title: str = Field(..., description="Tiêu đề ghim ở góc trên màn hình (dưới 6 từ)")
+    biome: str = Field(..., regex=r"^(heartland|desert|snow|blossom|pinewood)$", description="Hệ sinh thái giấy 3D")
+    night: bool = Field(default=False, description="Chế độ ban đêm / bóng tối")
+    action: str = Field(default="reveal", regex=r"^(walk|idle|reveal|celebrate|grow)$", description="Hành động của chủ thể / prop")
+    prop: str = Field(default="book", regex=r"^(none|village|forest|bridge|mountain|sun|moon|house|tree|book|coin|chart|factory|clock|people|water|globe|voice-note|edit-board|pop-up|film|bubble|mic)$")
+    camera: str = Field(default="wide", regex=r"^(wide|close|orbit|top|push|low|crane)$", description="Góc quay và chuyển động camera 3D")
+    color: str = Field(default="#d79a45", pattern=r"^#[0-9a-fA-F]{6}$", description="Mã màu RGB điểm nhấn")
+    visual: str = Field(..., description="Ghi chú đạo diễn về ý đồ thị giác")
+    card: Optional[PapertrailsSceneCard] = Field(default=None, description="Thẻ tài liệu dán đè nếu có")
+
+class PapertrailsTimelineSpec(BaseModel):
     """
-    Khế ước Bộ linh kiện Master Sheet toàn diện 6-trong-1 (FT-201).
-    BẮT BUỘC có đủ: (1) Image Result, (2) Object Chủ thể, (3) Object Tương tác,
-    (4) Thông tin, (5) Transaction Prompt, và (6) Cách đấu nối.
-    Thiếu bất kỳ thành phần nào sẽ fail-closed ngay lập tức.
+    Khế ước Timeline tổng thành của Papertrails Engine (Single Source of Truth cho S08/S10).
     """
-    scene_id: str = Field(..., pattern=r"^SCENE_\d{2}$")
-    assembled_anchor_url: str = Field(..., description="1. Image Result mong muốn: Ảnh kết quả tổng thành 2560x1440")
-    hero_cutout_url: str = Field(..., description="2. Object Chủ thể: Ảnh tài liệu/nhân vật trên nền trắng #FFFFFF có Alpha")
-    interacting_tool_url: str = Field(..., description="3. Object Tương tác: Ảnh thước kẹp/con dấu/chỉ đỏ trên nền trắng #FFFFFF có Alpha")
-    stage_backdrop_url: str = Field(default="", description="Ảnh nền sân khấu bàn làm việc (#F4F1EA)")
-    stat_card_url: str = Field(default="", description="Ảnh thẻ số liệu đỏ (#D62E1F) hoặc vector chip")
-    connector_url: str = Field(default="", description="Ảnh hoặc vector sợi chỉ đỏ / thước kẹp kết nối")
-    information_spec: InformationSpec = Field(..., description="4. Thông tin: Headline, stat hero, narration")
-    transaction_prompt: str = Field(..., description="5. Transaction Prompt: Prompt tương tác cơ học xúc giác cho Omni/Veo plate")
-    wiring_spec: WiringSpec = Field(..., description="6. Cách đấu nối: Tọa độ điểm neo source/target, loại connector, ingress <= 0.4s")
-    ingress_direction: str = Field(default="screen_right_to_left", description="Hướng trượt vào duy nhất")
-    ingress_duration_sec: float = Field(default=0.3, le=0.4, description="Thời gian bứt tốc vào sân khấu (<= 0.4s)")
-    camera_movement: str = Field(default="locked", description="Khóa cứng khung máy tính 1920x1080, cấm zoom/pan")
+    version: int = Field(default=1)
+    width: int = Field(default=1920)
+    height: int = Field(default=1080)
+    fps: int = Field(default=30)
+    seed: int = Field(default=42)
+    duration: float = Field(..., gt=0.0, description="Tổng thời lượng khớp đúng 100% audio gốc (giây)")
+    audio: str = Field(..., description="Đường dẫn file giọng đọc audio thực tế")
+    captions: List[PapertrailsCaption] = Field(..., min_length=1)
+    scenes: List[PapertrailsScene] = Field(..., min_length=1)
+    timing: Dict[str, Any] = Field(default_factory=dict)
+    direction: Dict[str, Any] = Field(default_factory=dict)
 
 # ==============================================================================
-# [FT-203] OMNI TACTILE TEXTURE PLATE SCHEMA
+# [QUARANTINED] CÁC KHẾ ƯỚC CŨ ĐÃ ĐƯỢC CÔ LẬP
 # ==============================================================================
-class OmniTactilePlate(BaseModel):
-    """
-    Khế ước Clip chất liệu môi trường động sinh từ Omni 1.1 Flash / Veo (FT-203).
-    Chỉ dùng làm background plate hoặc overlay thớ giấy sống; CẤM giao layer cho Omni.
-    """
-    scene_id: str = Field(..., pattern=r"^SCENE_\d{2}$")
-    plate_type: str = Field(..., regex=r"^(paper_grain|crt_scanline|archival_fume|desk_surface)$")
-    prompt_used: str = Field(..., description="Bắt buộc có tiền tố 'Locked static computer screen frame, no zoom'")
-    video_clip_url: str = Field(..., description="Đường dẫn file MP4 1280x720 hoặc 1920x1080")
-    duration_sec: float = Field(..., ge=3.0, le=10.0)
-    temporal_motion_delta: float = Field(..., ge=0.5, description="Độ biến thiên pixel tối thiểu (chống freeze-frame)")
+# MasterSheetAssetBundle (FT-201 cũ) và OmniTactilePlate (FT-203 cũ)
+# đã được cô lập khỏi luồng thực thi chính sau Human Gate 1.
+```
 
 # ==============================================================================
 # [FT-204] REMOTION SCENE RENDER PROPS SCHEMA

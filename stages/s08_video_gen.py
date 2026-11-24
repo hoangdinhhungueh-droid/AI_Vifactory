@@ -213,6 +213,42 @@ def run(ctx: RunContext) -> StageArtifact:
         for i, sc in enumerate(scenes):
             scene_durations[i] = float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec)
 
+    # [FT-302 / Papertrails Revolution]
+    # Build timeline.json if not present and render master 3D pop-up world on VPS
+    pt_timeline_file = ctx.paths.root / "timeline.json"
+    if not pt_timeline_file.exists():
+        try:
+            from app.services.papertrails_director import build_papertrails_timeline
+            audio_f = ctx.paths.audio_dir / "voice_narration.mp3"
+            if not audio_f.exists() and (ctx.paths.root / "voice_narration.mp3").exists():
+                audio_f = ctx.paths.root / "voice_narration.mp3"
+            pt_timeline = build_papertrails_timeline(
+                scenes_script=scenes,
+                audio_path=audio_f,
+                audio_duration=audio_dur if audio_dur > 0 else sum(scene_durations.values()),
+                orientation="landscape",
+                fps=ctx.config.render.fps,
+            )
+            pt_timeline_file.write_text(json.dumps(pt_timeline, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception as _pt_build_err:
+            logger.warning(f"[s08_video_gen] Notice generating Papertrails timeline: {_pt_build_err}")
+
+    master_papertrails_mp4 = ctx.paths.root / "master_papertrails.mp4"
+    if pt_timeline_file.exists() and not ctx.dry_run and ctx.config.name != "e2e_min":
+        if not master_papertrails_mp4.exists() or ctx.force:
+            try:
+                from app.services.papertrails_vps_bridge import render_papertrails_on_vps
+                logger.info("[s08_video_gen] Initiating Papertrails 3D WebGL render on VPS (FT-302)...")
+                render_papertrails_on_vps(
+                    timeline_path=pt_timeline_file,
+                    output_mp4=master_papertrails_mp4,
+                    quality="high",
+                    sfx=True,
+                    gpu=False,
+                )
+            except Exception as _vps_pt_err:
+                logger.warning(f"[s08_video_gen] VPS Papertrails render notice: {_vps_pt_err}")
+
     for idx, sc in enumerate(scenes):
         if not isinstance(sc, dict):
             raise ValueError(f"[s08_video_gen] Malformed scene record at index {idx}: expected dict, got {type(sc).__name__}")
@@ -406,6 +442,28 @@ def run(ctx: RunContext) -> StageArtifact:
                 or decomposed.get("production_route")
                 or "REMOTION_COLLAGE_MOTION"
             )
+
+            # Option 0: Slice authentic 3D clip from master_papertrails.mp4 (FT-302)
+            if not clip_valid and master_papertrails_mp4.exists() and master_papertrails_mp4.stat().st_size > 1000:
+                try:
+                    sc_start = sum(scene_durations.get(i, 5.0) for i in range(idx))
+                    sc_dur = scene_durations.get(idx, 5.0)
+                    target_video.parent.mkdir(parents=True, exist_ok=True)
+                    slice_cmd = [
+                        ffmpeg_bin, "-y", "-ss", f"{sc_start:.3f}", "-t", f"{sc_dur:.3f}",
+                        "-i", str(master_papertrails_mp4),
+                        "-c:v", "libx264", "-c:a", "aac",
+                        "-pix_fmt", "yuv420p",
+                        str(target_video)
+                    ]
+                    subprocess.run(slice_cmd, capture_output=True, check=True, timeout=60)
+                    if target_video.exists() and target_video.stat().st_size > 1000:
+                        validate_video_motion_temporal_delta(target_video)
+                        clip_valid = True
+                        shot_render_mode = "papertrails_3d"
+                        logger.info(f"[s08_video_gen] Extracted authentic 3D Papertrails clip for {sc_id} (PASS)")
+                except Exception as _slice_err:
+                    logger.warning(f"[s08_video_gen] Papertrails slice notice for {sc_id}: {_slice_err}")
 
             # Option A: Playwright Live Web / Digital Document Recording
             if prod_route == "PLAYWRIGHT_LIVE_BROWSER":

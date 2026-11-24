@@ -10,38 +10,32 @@
 
 | Feature ID | Service / Hàm | File Code | Caller File (Nơi gọi) | Vị trí / Điều kiện kích hoạt | Lệnh CLI Thực Thi Đích Danh |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `[FT-201]` | `generate_master_sheet_bundle` | `app/services/master_scene_sheet.py` | `stages/s07_image_gen.py` | Kích hoạt trong Stage S07 khi sinh tài sản thị giác phân cảnh | `python -m orchestrator.run_pipeline --only s07_image_gen` |
-| `[FT-202]` | `run` | `stages/s05_director_plan.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại Stage S05 sau khi kịch bản được phê duyệt | `python -m orchestrator.run_pipeline --only s05_director_plan` |
-| `[FT-203]` | `run` | `stages/s08_video_gen.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại Stage S08 để sinh các plate chất liệu xúc giác từ Omni | `python -m orchestrator.run_pipeline --only s08_video_gen` |
-| `[FT-204]` | `run` | `stages/s10_render.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại Stage S10 để kết xuất video tổng thành Remotion | `python -m orchestrator.run_pipeline --only s10_render` |
-| `[FT-205]` | `run` | `stages/s11_qc.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại Stage S11 để kiểm toán chất lượng và đồng bộ Chapter | `python -m orchestrator.run_pipeline --only s11_qc` |
-| `[FT-206]` | `generate_dynamic_art_manifest` | `app/services/opus_art_director.py` | `stages/s05_director_plan.py` | Kích hoạt tại S05 để sinh khế ước mỹ thuật độc bản và điểm chạm cơ học xúc giác | `python -m pytest tests/test_opus_art_director.py -v` |
-| `[FT-207]` | `build_continuous_desk_world` | `app/services/desk_world_director.py` | `stages/s10_render.py` | Kích hoạt tại Stage S10 để kết xuất video hành trình camera qua bàn điều tra liên tục DeskWorld | `python -m pytest tests/test_desk_world_director.py -v` |
+| `[FT-301]` | `build_papertrails_timeline` | `app/services/papertrails_director.py` | `stages/s05_director_plan.py` | Kích hoạt tại S05 sau khi chốt kịch bản tại HG1 và có giọng đọc S09 | `python -m orchestrator.run_pipeline --only s05_director_plan` |
+| `[FT-302]` | `render_papertrails_on_vps` | `app/services/papertrails_vps_bridge.py` | `stages/s08_video_gen.py` | Kích hoạt tại S08 để render Playwright WebGL2 Three.js frame-by-frame trên VPS | `python -m orchestrator.run_pipeline --only s08_video_gen` |
+| `[FT-303]` | `run` | `stages/s10_render.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại S10 để đóng gói master video MP4 và xuất bản phẩm | `python -m orchestrator.run_pipeline --only s10_render` |
+| `[FT-205]` | `run` | `stages/s11_qc.py` | `orchestrator/run_pipeline.py` | Kích hoạt tại S11 để kiểm toán chất lượng và đồng bộ Chapter từ timeline.json | `python -m orchestrator.run_pipeline --only s11_qc` |
 
 ---
 
-## 2. CALL-CHAIN FLOWCHART TỔNG THỂ & HẠ TẦNG BROWSER FLEET
+## 2. CALL-CHAIN FLOWCHART TỔNG THỂ (CANONICAL 2.0 PAPERTRAILS)
 
 ```mermaid
 flowchart TD
     MAIN["orchestrator/run_pipeline.py:main()"] --> ORCH["orchestrator/run_pipeline.py:run_pipeline()"]
     
-    ORCH --> S05["[FT-202] stages/s05_director_plan.py:run()<br/>(Phân rã 5 tầng Prompt: Assembled Anchor, Hero Cutout, Tool, Stage, Motion Coupling)"]
+    ORCH --> S01["stages/s01_ideation.py:run()<br/>(Cào từ khóa live Google Trends RSS)"]
+    S01 --> S02["stages/s02_research.py:run()<br/>(Chốt từ khóa, Grounding Table, Factual Hook)"]
+    S02 --> S03["stages/s03_script.py:run()<br/>(Kịch bản điều tra docudrama 5-Beat)"]
+    S03 --> S04["stages/s04_critic_script.py:run()<br/>(Phản biện kịch bản Astra 6 + Opus 5.5)"]
+    S04 --> HG1{{"HUMAN GATE 1: Chốt Kịch bản & Khóa Story"}}
     
-    S05 --> S06["stages/s06_critic_visual.py:run()<br/>(DACL Visual Loop: Claude Opus 5.5 ⇄ GPT-6-Astra >= 8.0/10 -> Bắn Telegram HG2)"]
+    HG1 --> S09["stages/s09_voice_tts.py:run()<br/>(Sinh giọng đọc ElevenLabs & Faster-Whisper Word Timestamps)"]
     
-    S06 --> FLEET_IMG["scripts/gemini_browser_gen.py --episode &lt;EP_ID&gt; --acc all<br/>(Playwright xoay vòng 6 Chrome Profiles acc_01..acc_07 sinh ảnh seed thật 2560x1440)"]
+    S09 --> S05["[FT-301] stages/s05_director_plan.py:run()<br/>app/services/papertrails_director.py:build_papertrails_timeline()<br/>(Ánh xạ kịch bản sang timeline.json: Biome, 3D Prop, Camera 3D, Torn Subtitles)"]
     
-    FLEET_IMG --> S07["stages/s07_image_gen.py:run()"]
-    S07 --> MS["[FT-201] app/services/master_scene_sheet.py:generate_master_sheet_bundle()<br/>(Xác thực SHA256 ảnh seed + Cắt tách Alpha Layers: hero, stat, tool, stage)"]
+    S05 --> S08["[FT-302] stages/s08_video_gen.py:run()<br/>app/services/papertrails_vps_bridge.py:render_papertrails_on_vps()<br/>(Playwright WebGL2 Three.js Frame-by-Frame Renderer trên VPS Linux)"]
     
-    S07 --> FLEET_VID["scripts/flow_video_dispatcher.py --episode &lt;EP_ID&gt; --model omni<br/>(Google Flow 7 Acc I2V sinh living texture plates: paper grain, CRT scanlines)"]
+    S08 --> S10["[FT-303] stages/s10_render.py:run()<br/>(Đóng gói final.mp4 1080p @ 30fps kèm Tactile Paper Flip SFX)"]
     
-    FLEET_VID --> S08["[FT-203] stages/s08_video_gen.py:run()<br/>(Kiểm định độ biến thiên pixel validate_video_motion_temporal_delta >= 0.5)"]
-    
-    S08 --> S09["stages/s09_voice_tts.py:run()<br/>(Tạo Audio ElevenLabs & Whisper Timestamps 0ms drift)"]
-    
-    S09 --> S10["[FT-204] stages/s10_render.py:run()<br/>(Remotion Master Director: Khung máy tính cố định 1920x1080,<br/>layer vào nhanh cùng 1 chiều X, vẽ chỉ đỏ khóa khớp 2 chủ thể)"]
-    
-    S10 --> S11["[FT-205] stages/s11_qc.py:run()<br/>(Đồng bộ YouTube Chapters từ Remotion Timeline thực tế)"]
+    S10 --> S11["[FT-205] stages/s11_qc.py:run()<br/>(Đồng bộ YouTube Chapters từ timeline.json & nghiệm thu 0ms drift)"]
 ```

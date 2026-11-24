@@ -6,50 +6,74 @@
 
 ---
 
-### [FT-201] Master Sheet Component Kit & Layer Slicer
+### [FT-301] Papertrails Director & Semantic Timeline Forge
 - **Trạng thái**: `ACTIVE`
-- **File Code**: `app/services/master_scene_sheet.py`
-- **Hàm/Service**: `generate_master_sheet_bundle`
-- **Input Contract**: `SceneSubDirectorPlan` từ Stage S05
-- **Output Contract**: `MasterSheetAssetBundle` (xem `01_CONTRACTS.md`)
+- **File Code**: `app/services/papertrails_director.py`
+- **Hàm/Service**: `build_papertrails_timeline`
+- **Input Contract**: `S03_ScriptOutput` & `WhisperTimestamps` (từ S09)
+- **Output Contract**: `PapertrailsTimelineSpec` (xem `01_CONTRACTS.md`)
 - **Logic cốt lõi**:
-  1. Sinh trọn vẹn Bộ Master Sheet 6-trong-1 bắt buộc:
-     - (1) Image Result mong muốn: Ảnh kết quả tổng thành 2560x1440 (`assembled_anchor_url`).
-     - (2) Object Chủ thể: Ảnh nhân vật/tài liệu cô lập trên nền trắng #FFFFFF có Alpha (`hero_cutout_url`).
-     - (3) Object Tương tác: Ảnh dụng cụ cơ khí thước kẹp/con dấu/chỉ đỏ trên nền trắng #FFFFFF có Alpha (`interacting_tool_url`).
-     - (4) Thông tin dữ liệu định lượng: Headline, stat hero đỏ, narration (`information_spec`).
-     - (5) Transaction Prompt: Prompt tương tác xúc giác chuyển động H1..H7 cho Omni/Veo living texture (`transaction_prompt`).
-     - (6) Sơ đồ & Khế ước Đấu nối: Tọa độ neo source -> target, loại connector, ingress <= 0.4s cubic-bezier, dead-stop hold 12fps (`wiring_spec`).
-  2. Tự động bóc tách (slice) thành các file ảnh PNG có kênh Alpha trong suốt.
-  3. Xuất Master Asset Sheet trực quan (1920x1080) và Dashboard HTML đồng bộ.
-  4. Cấp phát bundle đầy đủ cho Remotion và Omni; triệt tiêu hoàn toàn căn bệnh nạp ảnh composite phẳng vào model video hoặc thiếu linh kiện kết nối.
+  1. Đọc kịch bản 5-Beat đã chốt tại Human Gate 1 và timestamps giọng đọc.
+  2. Tự động phân tích ngữ nghĩa (bilingual Vietnamese & English):
+     - Gán Biome 3D phù hợp: `heartland`, `desert`, `snow`, `blossom`, `pinewood`.
+     - Gán 3D Prop tương thích: `factory`, `chart`, `coin`, `clock`, `book`, `globe`, `bridge`, `forest`, `mountain`, `water`, `sun`, `moon`, `village`, `house`, `people`, `mic`, `bubble`.
+     - Gán Camera 3D biến đổi liên tục: `push` (dolly tiến), `low` (góc anh hùng cận sàn giấy), `crane` (nâng tầm nhìn bao quát), `orbit`, `wide`, `top`.
+  3. Tự động ngắt nhịp phụ đề (split captions) $\le 3.5\text{s}$ hoặc theo dấu câu, bảo toàn danh sách `words` với mốc thời gian thực để phục vụ tô đỏ chữ karaoke (0ms drift).
+  4. Hỗ trợ tạo `card` kiểu `note` (ghi chú dán băng dính) và `photo` (ảnh tư liệu có elip highlight đỏ và tem mộc pháp y).
+  5. Xuất file `timeline.json` chuẩn v1.
 
 ---
 
-### [FT-202] Kinetic Sub-Director Planner (Vox Engine v3)
+### [FT-302] Papertrails VPS Playwright WebGL2 Headless Renderer
 - **Trạng thái**: `ACTIVE`
-- **File Code**: `stages/s05_director_plan.py`
-- **Hàm/Service**: `run`
-- **Input Contract**: `S03_ScriptOutput` & `S04_CriticApproval`
-- **Output Contract**: `SceneSubDirectorPlan` ($H_1 \to H_7$)
+- **File Code**: `app/services/papertrails_vps_bridge.py` & `vox/papertrails_engine/scripts/render.mjs`
+- **Hàm/Service**: `render_papertrails_on_vps`
+- **Input Contract**: `PapertrailsTimelineSpec` (`timeline.json`) & `voice_narration.mp3`
+- **Output Contract**: `final.mp4` (1080p @ 30fps, H.264/AAC, có tactile paper flip SFX)
 - **Logic cốt lõi**:
-  1. Phân rã mỗi Scene thành 4..7 Micro-Beats xúc giác theo 7 Họ tương tác vật lý ($H_1$ Dập dấu, $H_2$ Thước kẹp, $H_4$ Chỉ đỏ...).
-  2. Khóa cứng quy tắc chuyển động đơn hướng: các layer đưa vào tốc độ cao theo cùng 1 chiều ($X$-axis, $\le 0.4\text{s}$, cubic-bezier), dead-stop spatial hold.
-  3. Neo cứng từng mốc chuyển động với Whisper word timestamps ($0\text{ms}$ drift).
+  1. Khởi chạy Vite server và Chromium headless trên VPS Linux thông qua Playwright.
+  2. Bơm timeline và Voice Envelope RMS tính từ audio gốc vào Three.js WebGL2 context.
+  3. Mô phỏng thời gian tất định từng frame (`renderFrame(frame)`), chụp canvas screenshot và pipe thẳng vào `ffmpeg` qua `stdin`.
+  4. Tự động tổng hợp dải giấy rách torn paper có phụ đề chữ đỏ karaoke theo thời gian thực.
+  5. Chèn âm thanh lật giấy tactile sfx tại các điểm cắt chuyển cảnh (cut transitions) hòa quyện dưới giọng đọc gốc.
+  6. Kiểm tra tính toàn vẹn của MP4, thời lượng, số frame và độ trôi âm thanh (0ms drift).
 
 ---
 
-### [FT-203] Omni Tactile Texture Engine (Google Flow I2V)
+### [FT-303] Unified Voice-First Papertrails Orchestration Bridge
 - **Trạng thái**: `ACTIVE`
-- **File Code**: `stages/s08_video_gen.py`
+- **File Code**: `stages/s08_video_gen.py` & `stages/s10_render.py`
 - **Hàm/Service**: `run`
-- **Input Contract**: `OmniTactilePlateRequest`
-- **Output Contract**: `OmniTactilePlate` (xem `01_CONTRACTS.md`)
+- **Input Contract**: RunContext kèm kịch bản S3 và giọng đọc S9
+- **Output Contract**: StageArtifact
 - **Logic cốt lõi**:
-  1. Chỉ sử dụng Omni 1.1 Flash / Veo 3.1 để sinh các đoạn video chất liệu môi trường sống (living paper texture, scanlines CRT, archival fumes).
-  2. Bắt buộc prompt chứa mệnh lệnh triệt tiêu camera motion: `Locked static computer screen frame, no zoom, no pan, zero camera movement`.
-  3. CẤM TUYỆT ĐỐI giao layer định vị, di chuyển chủ thể hoặc chữ số cho Omni.
-  4. Kiểm định chuyển động vật lý bằng `validate_video_motion_temporal_delta >= 0.5`.
+  1. Đấu nối trực tiếp sau Human Gate 1: Lấy kịch bản từ S3/S4, giọng đọc từ S9.
+  2. Tự động gọi FT-301 sinh `timeline.json`, sau đó gọi FT-302 render MP4 master trên VPS.
+  3. Hoàn toàn loại bỏ việc chờ ảnh thủ công, loại bỏ Google Flow Veo 7 tài khoản, loại bỏ các prompt tạo ảnh tốn phí.
+
+---
+
+### [FT-201] Master Sheet Component Kit & Layer Slicer [QUARANTINED]
+- **Trạng thái**: `QUARANTINED_LEGACY`
+- **Ghi chú**: Đã được cô lập vào khu vực cách ly, nhường chỗ cho Papertrails 3D Engine.
+
+---
+
+### [FT-203] Omni Tactile Texture Engine [QUARANTINED]
+- **Trạng thái**: `QUARANTINED_LEGACY`
+- **Ghi chú**: Đã được cô lập vào khu vực cách ly, không còn sử dụng trong pipeline chính.
+
+---
+
+### [FT-205] Ground-Truth Timeline & Subtitle Chapter Sync
+- **Trạng thái**: `ACTIVE`
+- **File Code**: `stages/s11_qc.py`
+- **Hàm/Service**: `run`
+- **Input Contract**: `final.mp4` & `timeline.json`
+- **Output Contract**: `YouTubeMetadata` & `QCReport`
+- **Logic cốt lõi**:
+  1. Trích xuất chính xác mốc thời gian chương hồi (`00:00`, `MM:SS`) từ các cảnh của `timeline.json` thực tế kết xuất.
+  2. Nghiệm thu dung sai Karaoke Subtitle Drift = 0ms.
 
 ---
 

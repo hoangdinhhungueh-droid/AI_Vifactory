@@ -1403,6 +1403,36 @@ def run(ctx: RunContext) -> StageArtifact:
                 with open(ep_dir / "dp_plan.json", "w", encoding="utf-8") as f:
                     json.dump({"episode_id": ctx.run_id, "scenes": payload.get("scenes", [])}, f, indent=2, ensure_ascii=False)
 
+                # [FT-301] Build and synchronize canonical Papertrails timeline.json
+                try:
+                    from app.services.papertrails_director import build_papertrails_timeline
+                    pt_scenes = payload.get("scenes", [])
+                    audio_cand = ctx.paths.audio_dir / "voice_narration.mp3"
+                    audio_dur = sum(float(s.duration_est_sec or 5.0) for s in scenes)
+                    whisper_segs = None
+                    s9_file = ctx.paths.artifact_file(StageID.S9_VOICE_TTS.value)
+                    if s9_file.exists():
+                        try:
+                            s9_data = json.loads(s9_file.read_text(encoding="utf-8"))
+                            whisper_segs = s9_data.get("payload", {}).get("segments")
+                            if s9_data.get("payload", {}).get("total_duration_sec"):
+                                audio_dur = float(s9_data["payload"]["total_duration_sec"])
+                        except Exception:
+                            pass
+                    pt_timeline = build_papertrails_timeline(
+                        scenes_script=pt_scenes,
+                        audio_path=audio_cand,
+                        audio_duration=audio_dur,
+                        transcript_segments=whisper_segs,
+                        orientation="landscape",
+                        fps=getattr(ctx.config.render, "fps", 30) if ctx.config else 30,
+                    )
+                    pt_file = ep_dir / "timeline.json"
+                    pt_file.write_text(json.dumps(pt_timeline, indent=2, ensure_ascii=False), encoding="utf-8")
+                    logger.info(f"[s05_director_plan] Synchronized Papertrails timeline.json to {pt_file}")
+                except Exception as _pt_err:
+                    logger.warning(f"[s05_director_plan] Notice generating Papertrails timeline: {_pt_err}")
+
                 prompts_manifest = {
                     "episode_id": ctx.run_id,
                     "market": market,

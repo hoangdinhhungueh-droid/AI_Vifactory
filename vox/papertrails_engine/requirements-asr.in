@@ -1,0 +1,4 @@
+# CPU-local speech recognition. Python 3.12 recommended.
+faster-whisper>=1.2,<2
+# faster-whisper 1.2.1 passes metadata_errors to av.open; PyAV 19 rejects it.
+av>=11,<17

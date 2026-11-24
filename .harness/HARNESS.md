@@ -1,6 +1,6 @@
 # 🎬 AI VIDEO FACTORY HARNESS - SINGLE SOURCE OF TRUTH (SSOT)
 
-> **QUY CHUẨN ĐẶC TẢ SẢN XUẤT VIDEO TỰ ĐỘNG (CANONICAL PIPELINE 2.0 & VOX ENGINE V3)**
+> **QUY CHUẨN ĐẶC TẢ SẢN XUẤT VIDEO TỰ ĐỘNG (CANONICAL PIPELINE 2.0 & PAPERTRAILS 3D ENGINE)**
 > Ràng buộc 100% Agent/Subagent. Áp dụng cơ chế **Cập nhật Trực Tiếp (In-Place Living State)**.
 > Tuyệt đối cấm tạo các file changelog hay ghi log song song gây nhiễu loạn giữa trạng thái cũ và mới.
 
@@ -8,38 +8,48 @@
 
 ## 🏛️ I. QUYẾT ĐỊNH KIẾN TRÚC TỐI THƯỢNG (EXECUTIVE ARCHITECTURAL MANDATE)
 
-Dựa trên kết quả thực nghiệm đa phân cảnh (Multi-Scene Benchmark S1: The Breach $\to$ S2: The Multiplier), hệ thống chính thức đóng băng kiến trúc sản xuất theo **Mô Hình Lai Hướng A+ (Hybrid Vox Architecture)**:
+Hệ thống chính thức đóng băng kiến trúc sản xuất toàn diện:
+1. **Giai đoạn Tiền kỳ (Upstream - Trước & Tại Human Gate 1)**:
+   - **S01 Ideation**: Cào từ khóa nóng thời gian thực (Google Trends RSS live).
+   - **S02 Research**: Đào sâu bối cảnh, trích xuất Grounding Table lượng hóa.
+   - **S03 Script**: Viết kịch bản docudrama điều tra 5-Beat.
+   - **S04 Critic**: Hội đồng phản biện (Astra + Opus) thẩm định kịch bản $\rightarrow$ **Chốt kịch bản tại Human Gate 1**.
+   - **S09 Voice & Audio Sync**: Sinh giọng đọc và trích xuất Whisper word-level timestamps (frame đọc, 0ms drift).
+
+2. **Giai đoạn Hậu kỳ (Downstream - Sau Human Gate 1: CÔ LẬP TOÀN BỘ MÃ CŨ & CHUYỂN GIAO SANG PAPERTRAILS 3D ENGINE)**:
+   - Toàn bộ cơ chế cũ (FLEET_IMG chờ ảnh vẽ, Google Flow Veo 3.1 7 tài khoản, crude PIL boxes) chính thức bị **CÔ LẬP VÀO QUARANTINE**.
+   - **Papertrails 3D Engine (Loc Studio Papertrails v0.2.1 lite - Upstream git: https://github.com/xikhar/papertrails)** trở thành động cơ sản xuất video duy nhất:
+     + Chuyển thể trực tiếp kịch bản và frame đọc thành `timeline.json` (Biomes, 3D Props, Camera 3D, Torn-paper captions, Paper cards).
+     + Render WebGL2 Three.js frame-by-frame trên VPS Linux bằng Playwright headless, kết xuất trực tiếp MP4 master 1080p 16:9 với độ trôi lệch âm thanh 0ms drift và hiệu ứng lật giấy xúc giác `--sfx`.
 
 ```mermaid
 flowchart TD
-    subgraph STAGE_7["S07: Visual Asset Engine"]
-        MS["Master Sheet Generator<br/>(Stage + Hero + Stat + Connector)"]
-        SL["Automated Alpha Slicer<br/>(Cắt tách thành các file PNG trong suốt)"]
-        MS --> SL
+    subgraph UPSTREAM["GIAI ĐOẠN 1: UPSTREAM (GIỮ VỮNG CHẤT LƯỢNG NỘI DUNG)"]
+        S01["S01: Cào từ khóa (Google Trends RSS)"] --> S02["S02: Chốt từ khóa & Grounding Table"]
+        S02 --> S03["S03: Chốt Story (Kịch bản 5-Beat)"]
+        S03 --> S04["S04: Thẩm định Story (Critic Council)"]
+        S04 --> HG1{{"HUMAN GATE 1: Phê duyệt Kịch bản"}}
+        HG1 --> S09["S09: Voice Narration & Whisper Frame Timestamps (0ms drift)"]
     end
 
-    subgraph STAGE_8["S08: Omni Tactile Engine"]
-        OM["Omni 1.1 Flash / Veo 3.1<br/>(Chỉ sinh Texture xúc giác, thớ giấy sống,<br/>khói bụi, scanline CRT - ZERO layer coordination)"]
+    subgraph ISOLATED["CÔ LẬP TOÀN BỘ ĐOẠN CŨ SAU HG1 (QUARANTINED)"]
+        OLD_IMG["FLEET_IMG: Gemini Browser 6 Profiles (QUARANTINED)"]
+        OLD_VEO["FLEET_VID: Google Flow Veo 7 Accs (QUARANTINED)"]
+        OLD_BOX["Crude PIL placeholders / Midjourney waits (QUARANTINED)"]
     end
 
-    subgraph STAGE_10["S10: Remotion Master Director"]
-        RM["Remotion Code-Driven Compositor<br/>- Khóa cứng Khung máy tính 1920x1080 (0 zoom/pan)<br/>- Layer trượt vào cùng 1 chiều X (<=0.4s cubic-bezier)<br/>- Khóa khớp: vẽ sợi chỉ đỏ / thước kẹp nối 2 chủ thể<br/>- Bảo toàn 100% độ sắc nét số liệu ($42.8M, 10X)<br/>- Khớp Whisper word-level audio (0ms drift)"]
+    subgraph PAPERTRAILS["GIAI ĐOẠN 2: PAPERTRAILS 3D ENGINE (SKILL-DRIVEN ON VPS)"]
+        DIR["[FT-301] Papertrails Director & Timeline Forge<br/>- Phân tích ngữ nghĩa câu văn tiếng Việt/Anh<br/>- Gán Biome (heartland, desert, snow, blossom, pinewood)<br/>- Gán 3D Prop (factory, coin, clock, chart, book, globe, etc.)<br/>- Camera 3D (push, low, crane, orbit, wide, top)<br/>- Taped Notes & Photo Cards có tem mác & elip highlight"]
+        
+        VPS_RENDER["[FT-302] Papertrails VPS Playwright WebGL2 Renderer<br/>- Chromium headless trên VPS (Node v24 + Three.js + Vite)<br/>- Simulation frame-by-frame kết hợp Voice Envelope RMS<br/>- Pipe trực tiếp PNG uncompressed vào FFmpeg<br/>- Subtitle dải giấy rách torn paper tô đỏ chữ karaoke"]
+        
+        DIR --> VPS_RENDER
     end
 
-    SL -->|Nạp Layer Cutouts có Alpha| RM
-    OM -->|Nạp B-roll Texture Môi trường sống| RM
-    RM --> FINAL["Master Video MP4 (1080p @ 30/60fps)"]
+    S09 --> DIR
+    VPS_RENDER --> FINAL["Master Video MP4 (1080p @ 30fps, Tactile Paper SFX, 0ms Drift)"]
+    FINAL --> S11["S11: QC & Đồng bộ YouTube Chapter (FT-205)"]
 ```
-
-### 1. Phân Định Rạch Ròi Trách Nhiệm (Separation of Concerns)
-1. **Remotion (Direction A) = Đạo Diễn Khung Hình (Master Director)**:
-   - Sở hữu $100\%$ quyền điều phối không gian và thời gian: Viewport khung máy tính cố định, layer trượt vào tốc độ cao cùng chiều, quán tính dừng khựng (dead-stop spatial hold), vẽ vector chỉ đỏ nối các chủ thể, đồng bộ phụ đề Whisper.
-2. **Omni (Direction B) = Động Cơ Chất Liệu Xúc Giác (Tactile Texture Engine)**:
-   - Được giải phóng hoàn toàn khỏi nhiệm vụ điều phối layer, định vị vật thể và vẽ số liệu.
-   - Chỉ nhận prompt sinh background/plate môi trường sống: thớ giấy ngả vàng vi rung 12fps, màn hình CRT scanlines, bề mặt tài liệu lưu trữ cổ.
-3. **Master Sheet = Bộ Linh Kiện Nhà Máy (Factory Component Kit)**:
-   - Cung cấp điểm neo thẩm mỹ thống nhất xuyên suốt mọi phân cảnh.
-   - Tự động bóc tách thành các layer độc lập, triệt tiêu hoàn toàn căn bệnh "đưa ảnh phẳng composite vào model video rồi cầu may".
 
 ---
 
@@ -47,7 +57,7 @@ flowchart TD
 
 | File | Trách nhiệm duy nhất trong Video Factory |
 | :--- | :--- |
-| `01_CONTRACTS.md` | Khế ước dữ liệu cứng: `MasterSheetAssetBundle`, `OmniTactilePlate`, `RemotionSceneProps`, `EpisodeContext`. Cấm hoàn toàn `None` hoặc trường rỗng. |
-| `02_FEATURES.md` | Danh mục tính năng sống `[FT-201]` $\to$ `[FT-205]`. File luôn phản ánh trạng thái thực tế hiện tại, không ghi nhật ký chắp vá. |
-| `03_WIRING.md` | Bản đồ đấu nối: `orchestrator/run_pipeline.py` gọi hàm nào, truyền props nào. Triệt tiêu 100% mã mồ côi (Ghost Code). |
-| `04_VERIFICATION.md` | Ma trận kiểm thử tất định: Lệnh CLI thực tế, tiêu chuẩn Gherkin PASS/FAIL, bằng chứng runtime sống. |
+| `01_CONTRACTS.md` | Khế ước dữ liệu cứng: `PapertrailsTimelineSpec`, `SceneSubDirectorPlan`, `WhisperCaptionWord`. Cấm hoàn toàn `None` hoặc trường rỗng. |
+| `02_FEATURES.md` | Danh mục tính năng sống `[FT-301]` $\to$ `[FT-303]` (mới) và đánh dấu cô lập `[FT-201]`, `[FT-203]`. In-place update. |
+| `03_WIRING.md` | Bản đồ đấu nối: `orchestrator/run_pipeline.py` gọi service nào, truyền props nào. Triệt tiêu 100% mã mồ côi (Ghost Code). |
+| `04_VERIFICATION.md` | Ma trận kiểm thử tất định: Lệnh CLI thực tế trên VPS/Local, tiêu chuẩn Gherkin PASS/FAIL, bằng chứng runtime sống. |

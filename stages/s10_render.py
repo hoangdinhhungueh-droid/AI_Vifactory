@@ -455,6 +455,14 @@ def _validate_and_assemble_video(
     if not ass_file.exists() or ass_file.stat().st_size == 0:
         raise MissingSubtitlesError(f"Stage S10 requires valid subtitles file at '{ass_file}'")
 
+    # [FT-303] Check for Papertrails Master 3D Video
+    pt_master = ctx.paths.root / "master_papertrails.mp4"
+    if pt_master.exists() and pt_master.stat().st_size > 1000:
+        logger.info(f"[s10_render] Master Papertrails 3D video found ({pt_master.stat().st_size} bytes). Establishing as final.mp4.")
+        import shutil
+        shutil.copy2(str(pt_master), str(final_mp4))
+        return
+
     # Check for Remotion CLI first (VPS or environment with Remotion installed)
     remotion_cmd = _find_remotion_cli(getattr(ctx.paths, "repo_root", None))
     remotion_silent_mp4 = final_mp4.parent / "remotion_silent_master.mp4"

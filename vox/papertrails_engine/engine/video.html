@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Papertrails — deterministic video stage</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#30271f;font-family:"Segoe UI","Noto Sans","Helvetica Neue",Arial,sans-serif}
+#atlas{width:100%;height:100%;display:block}
+/* Scene title: a small paper tag pinned in the upper safe area (no dark slab). */
+#title{position:absolute;top:5.5%;left:5.5%;max-width:62%;padding:.42em .9em .46em 1.05em;font-size:clamp(13px,3.1vh,58px);font-weight:800;line-height:1.15;color:#3a2a1c;
+  background:linear-gradient(176deg,#fbf3e1,#efe0bf);border-radius:.18em;box-shadow:0 .28em .7em rgba(40,24,10,.35),inset 0 0 0 .06em rgba(120,90,50,.18);transform-origin:12% 50%;letter-spacing:.01em}
+#title::before{content:"";position:absolute;left:.38em;top:50%;width:.34em;height:.34em;margin-top:-.17em;border-radius:50%;background:#c4532f;box-shadow:inset -.05em -.05em 0 rgba(0,0,0,.25)}
+#title:empty{display:none}
+/* Captions: a cream paper strip with torn edges, ink text; the word being spoken is inked red. */
+#capwrap{position:absolute;left:0;right:0;bottom:7%;display:flex;justify-content:center;pointer-events:none;filter:drop-shadow(0 .5vh .9vh rgba(35,20,8,.45))}
+#caption{position:relative;max-width:80%;padding:.38em .95em .44em;text-align:center;font-weight:800;font-size:clamp(12px,4.3vh,78px);line-height:1.28;color:#3b2a1a;
+  background:linear-gradient(178deg,#fbf2dc 0%,#f1e1bd 100%);white-space:pre-wrap;overflow-wrap:anywhere}
+#caption .w{display:inline-block;transition:none}
+#caption .w.on{color:#b8381f;transform:translateY(-.04em) scale(1.06)}
+#caption .w.done{color:#3b2a1a}
+#caption .w.todo{color:rgba(59,42,26,.62)}
+#capwrap.empty{display:none}
+/* Page wipe at cuts: a sheet of paper slides across, like turning a pop-up page. */
+#wipe{position:absolute;top:-5%;bottom:-5%;width:150%;left:-160%;background:linear-gradient(90deg,#efe1c3 0%,#f8efdb 70%,#d9c49c 100%);box-shadow:0 0 3vh rgba(40,25,10,.45);display:none}
+#wipe::after{content:"";position:absolute;top:0;bottom:0;right:-2.2vh;width:2.2vh;background:linear-gradient(90deg,rgba(60,40,15,.35),rgba(60,40,15,0))}
+/* Optional paper cards: a taped note with lines that write in, or a pinned photo with a marker circle and a stamp. */
+#card{position:absolute;top:13%;bottom:22%;display:none;align-items:center;justify-content:center;width:46%;pointer-events:none}
+#card.right{right:3.5%}#card.left{left:3.5%}#card.center{left:50%;margin-left:-31%;width:62%}
+#card .note{position:relative;width:100%;padding:1.6em 1.7em 1.5em;background:linear-gradient(178deg,#fdf6e6,#f1e3c3);color:#3a2a1c;font-size:clamp(11px,2.55vh,46px);line-height:1.35;
+  box-shadow:0 .9em 2em rgba(40,24,10,.42);transform-origin:50% 0}
+#card .note::before{content:"";position:absolute;top:-.55em;left:50%;width:5.5em;height:1.25em;margin-left:-2.75em;background:rgba(232,210,150,.82);transform:rotate(-2deg);box-shadow:0 .06em .2em rgba(0,0,0,.15)}
+#card .note h3{margin:0 0 .55em;font-size:1.45em;line-height:1.15;color:#2c1f14;font-weight:800}
+#card .note .ln{display:flex;gap:.55em;align-items:baseline;margin:.36em 0;font-weight:700}
+#card .note .ln .dot{flex:none;width:1.45em;height:1.45em;border-radius:50%;background:#c4532f;color:#fff;font-size:.78em;display:flex;align-items:center;justify-content:center;font-weight:800}
+#card .note .ln code{font-family:Consolas,"Cascadia Mono","Courier New",monospace;font-weight:700;background:rgba(60,40,20,.08);padding:.08em .35em;border-radius:.2em;font-size:.92em}
+#card .photo{position:relative;background:#fbf8f1;padding:2.2% 2.2% 7%;box-shadow:0 1.2em 2.4em rgba(30,18,8,.45);width:100%}
+#card .photo img{display:block;width:100%;height:auto}
+#card .photo .ph{position:relative}#card .photo svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
+#card .photo .cap{position:absolute;left:0;right:0;bottom:1.2%;text-align:center;font-weight:800;color:#3a2a1c;font-size:clamp(10px,2.2vh,40px)}
+#card .stamp{position:absolute;right:-4%;top:-7%;padding:.25em .6em;border:.16em solid #c4321f;color:#c4321f;font-weight:900;font-size:clamp(14px,4.2vh,80px);transform:rotate(8deg);background:rgba(255,248,236,.85);letter-spacing:.02em;white-space:pre-line;text-align:center;line-height:1.05}
+#card .note.big{text-align:center;padding:1.4em 2em 1.5em}#card .note.big h3{font-size:2.6em;color:#b8381f;margin:0 0 .25em}#card .note.big .ln{justify-content:center;font-size:1.9em;margin:0}
+</style></head><body><canvas id="atlas"></canvas><div id="title"></div><div id="capwrap" class="empty"><div id="caption" aria-live="off"></div></div><div id="card"></div><div id="wipe"></div><script type="module" src="/src/video/index.js"></script></body></html>

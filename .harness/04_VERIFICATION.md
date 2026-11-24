@@ -6,15 +6,27 @@
 
 ---
 
-### [TEST-201] Kiểm thử Khởi tạo Master Sheet 6-trong-1 & Cắt tách Alpha Layers (Mã FT-201)
-- **Mã Feature**: `FT-201`
-- **Test File**: `tests/test_master_sheet_slicer.py`
-- **Lệnh chạy kiểm thử (CLI)**: `python -m pytest tests/test_master_sheet_slicer.py -v`
+### [TEST-301] Kiểm thử Papertrails Director & Timeline Forge (Mã FT-301)
+- **Mã Feature**: `FT-301`
+- **Test File**: `tests/test_papertrails_director.py`
+- **Lệnh chạy kiểm thử (CLI)**: `python -m pytest tests/test_papertrails_director.py -v`
 - **Tiêu chuẩn Gherkin (Acceptance Criteria)**:
-  - `Given`: Kế hoạch phân cảnh từ S05.
-  - `When`: Hàm `generate_master_sheet_bundle()` được thực thi.
-  - `Then`: Bắt buộc sinh đủ 6 thành phần: `assembled_anchor_url`, `hero_cutout_url`, `interacting_tool_url`, `information_spec`, `transaction_prompt`, `wiring_spec`; `camera_movement == "locked"`, `ingress_duration_sec <= 0.4s`, ném lỗi nếu thiếu trường.
-- **Trạng thái thực tế**: `PASS` (Verified: 2026-11-23 02:03:27) (Verified: 2026-11-21 16:26:52) (Verified: 2026-11-21 01:32:59) (Verified: 2026-11-21 01:16:22)
+  - `Given`: Kịch bản điều tra S03 kèm file giọng đọc và Whisper timestamps.
+  - `When`: Hàm `build_papertrails_timeline()` được thực thi.
+  - `Then`: Bắt buộc sinh `timeline.json` chuẩn v1; duration khớp 100% audio; 100% scenes có Biome, 3D Prop, Camera hợp lệ; Captions chia nhỏ $\le 3.5\text{s}$ kèm mốc `words` chính xác để phục vụ karaoke.
+- **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
+
+---
+
+### [TEST-302] Kiểm thử Papertrails VPS Renderer Bridge (Mã FT-302)
+- **Mã Feature**: `FT-302`
+- **Test File**: `tests/test_papertrails_vps_bridge.py`
+- **Lệnh chạy kiểm thử (CLI)**: `python -m pytest tests/test_papertrails_vps_bridge.py -v`
+- **Tiêu chuẩn Gherkin (Acceptance Criteria)**:
+  - `Given`: File `timeline.json` và file giọng đọc `voice.mp3`.
+  - `When`: Lệnh render Playwright WebGL2 được kích hoạt trên VPS Linux.
+  - `Then`: Kết xuất video `final.mp4` hợp lệ; ffprobe xác nhận luồng video h264 và luồng audio aac; độ sai lệch thời lượng $\le 0.08\text{s}$; hiệu ứng âm thanh tactile lật giấy `--sfx` hòa quyện dưới giọng đọc.
+- **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
 
 ---
 
