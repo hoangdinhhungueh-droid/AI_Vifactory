@@ -2340,6 +2340,327 @@ def run(ctx: RunContext) -> StageArtifact:
                 target_run_s = float(getattr(dw, "target", 240.0) or 240.0)
         u_min, u_max = get_market_unit_bounds(market, preset_obj=preset_obj)
 
+        def _auto_repair_beats(cand_beats: List[Tuple[str, float, List[StorySceneLine]]]) -> List[Tuple[str, float, List[StorySceneLine]]]:
+            from app.services.story_provenance_engine import (
+                expected_qualifier_bucket as _exp_bkt,
+                line_matches_expected_qualifier as _m_qual,
+                strip_attribution_prefix as _strip_pfx,
+            )
+            # 1. Fix qualifier mismatches cleanly (once per line)
+            for b_id, _, lns in cand_beats:
+                for ln in lns:
+                    if not ln.claim_ids:
+                        continue
+                    peer_dicts = [
+                        (evidence_map[c].model_dump() if hasattr(evidence_map[c], "model_dump") else dict(evidence_map[c]))
+                        for c in ln.claim_ids
+                        if c in evidence_map
+                    ]
+                    line_needs_repair = False
+                    target_bkt = None
+                    for cid in ln.claim_ids:
+                        c_obj = evidence_map.get(cid)
+                        if c_obj is not None:
+                            c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
+                            ok_q, _ = _m_qual(ln.text, c_dict, market=market, peer_claims=peer_dicts)
+                            if not ok_q:
+                                line_needs_repair = True
+                                bkt = _exp_bkt(
+                                    legal_status=str(c_dict.get("legal_status", "alleged")),
+                                    source_type=str(c_dict.get("source_type", "press")),
+                                    doc_type=str(c_dict.get("doc_type", "unknown")),
+                                    speaker=c_dict.get("speaker"),
+                                    procedural_status=str(c_dict.get("procedural_status", "unknown")),
+                                    verification_status=str(c_dict.get("verification_status", "corroborated_secondary")),
+                                    credibility_tier=str(c_dict.get("credibility_tier", "") or ""),
+                                )
+                                if target_bkt is None or target_bkt == "fact":
+                                    target_bkt = bkt
+                                elif bkt in ("unverified", "alleged_regulator", "court_record", "audit_finding"):
+                                    target_bkt = bkt
+                    if line_needs_repair and target_bkt and target_bkt != "fact":
+                        clean_txt, _ = _strip_pfx(ln.text, market=market)
+                        clean_txt = clean_txt.lstrip()
+                        if market == "EN":
+                            clean_txt = re.sub(r"\b(?:was reportedly|reportedly|was alleged to be)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
+                            clean_txt = re.sub(r"\b(?:according to the court ruling|as ruled by the court|court ruled that)\b,?\s*", "", clean_txt, flags=re.IGNORECASE).strip()
+                            clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
+                            clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
+                        if target_bkt == "alleged_regulator":
+                            pfx_opts = ["According to regulatory filings, ", "As noted in regulatory disclosures, ", "Regulatory records reflect that "]
+                        elif target_bkt == "alleged":
+                            pfx_opts = ["According to press reports, ", "Media accounts indicate that ", "Published reports reflect that ", "Press accounts reported that "]
+                        elif target_bkt == "unverified":
+                            pfx_opts = ["According to preliminary reporting, ", "Early unverified accounts indicate that ", "Initial reports suggest that "]
+                        else:
+                            pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
+                        pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)] if market == "EN" else ("당국 발표에 따르면, " if target_bkt == "alleged_regulator" else ("보도에 따르면, " if target_bkt == "alleged" else ("초기 미확인 보도에 따르면, " if target_bkt == "unverified" else "공식 기록에 따르면, ")))
+                        if len(clean_txt.split()) >= 4:
+                            if clean_txt and clean_txt[0].isupper():
+                                fw = clean_txt.split()[0]
+                                if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial"):
+                                    clean_txt = fw.lower() + clean_txt[len(fw):]
+                            ln.text = f"{pfx}{clean_txt}"
+
+            # 2. Prevent double hedging & strip forbidden court ruling phrasing in all lines
+            if market == "EN":
+                for b_id, _, lns in cand_beats:
+                    for ln in lns:
+                        ln.text = re.sub(r"\b(?:according to the court ruling|as ruled by the court|court ruled that)\b,?\s*", "", ln.text, flags=re.IGNORECASE).strip()
+                        stripped, pfx_found = _strip_pfx(ln.text, market="EN")
+                        if pfx_found and re.search(r"\b(?:was reportedly|reportedly|was alleged to be)\b", stripped, re.IGNORECASE):
+                            cleaned_b = re.sub(r"\b(?:was reportedly|reportedly|was alleged to be)\s*", "", stripped, flags=re.IGNORECASE).strip()
+                            if cleaned_b:
+                                ln.text = f"{pfx_found} {cleaned_b}"
+
+            # 3. Beat 1 duration repair: ensure B1 speech <= 22.0s
+            if cand_beats and len(cand_beats[0][2]) >= 3:
+                b1_lines = [ln.text for ln in cand_beats[0][2]]
+                b1_timing = estimate_script_speech_duration(b1_lines, market=market, docudrama_tempo=True)
+                if float(b1_timing["estimated_duration_sec"]) > 22.0:
+                    for ln in cand_beats[0][2]:
+                        if market == "EN":
+                            ln.text = _compact_en_hook_line(ln.text, target_words=16)
+                        elif market == "KR":
+                            ln.text = _compact_kr_hook_line(ln.text, max_chars=40)
+                        else:
+                            words = ln.text.split()
+                            if len(words) > 16:
+                                ln.text = " ".join(words[:15]).rstrip(",:;") + "."
+
+            # 3b. Beat 2 pattern interrupt gap repair: ensure an interrupt occurs near start of B2 (< 25s gap)
+            for b_id, _, lns in cand_beats:
+                if "B2" in b_id and len(lns) >= 4:
+                    first_int_idx = None
+                    for idx_l, ln in enumerate(lns):
+                        if getattr(ln, "visual_hook", "") == "pattern_interrupt" or not ln.claim_ids:
+                            first_int_idx = idx_l
+                            break
+                    if first_int_idx is None or first_int_idx >= 2:
+                        lns.insert(1, StorySceneLine(
+                            line_id="B2_L02_int",
+                            text="The warning signs were clear." if market == "EN" else "경고 신호는 분명했습니다.",
+                            claim_ids=[],
+                            visual_hook="pattern_interrupt",
+                        ))
+                        for idx_renum, ln_renum in enumerate(lns, start=1):
+                            ln_renum.line_id = f"B2_L{idx_renum:02d}"
+
+            # 3c. Beat 3 pattern interrupt gap repair: ensure first interrupt occurs within <= 25s
+            for b_id, _, lns in cand_beats:
+                if "B3" in b_id and len(lns) >= 4:
+                    first_int_idx = None
+                    for idx_l, ln in enumerate(lns):
+                        if getattr(ln, "visual_hook", "") == "pattern_interrupt" or not ln.claim_ids:
+                            first_int_idx = idx_l
+                            break
+                    if first_int_idx is None or first_int_idx >= 2:
+                        # Ensure line 2 (index 1) is a pattern interrupt
+                        if len(lns) >= 4 and getattr(lns[1], "visual_hook", "") != "pattern_interrupt":
+                            lns.insert(1, StorySceneLine(
+                                line_id="B3_L02_int",
+                                text="The crack was already widening." if market == "EN" else "균열은 이미 벌어지고 있었습니다.",
+                                claim_ids=[],
+                                visual_hook="pattern_interrupt",
+                            ))
+                            # Renumber lines
+                            for idx_renum, ln_renum in enumerate(lns, start=1):
+                                ln_renum.line_id = f"B3_L{idx_renum:02d}"
+
+            # 4. Clean filler adverbs and trim words if units > target
+            cand_lines = [ln.text for _, _, lns in cand_beats for ln in lns]
+            cand_timing = estimate_script_speech_duration(cand_lines, market=market, docudrama_tempo=True)
+            target_units = min(u_max - 20, 515) if u_max else 515
+            excess = int(cand_timing["spoken_units"]) - target_units
+            if excess > 0:
+                for b_id, _, lns in cand_beats:
+                    if "B1" in b_id:
+                        continue
+                    for ln in lns:
+                        if excess <= 0:
+                            break
+                        old_len = len(ln.text.split())
+                        ln.text = re.sub(r"\b(?:specifically|indeed|furthermore|moreover|in fact|at this point|consequently)\b,?\s*", "", ln.text, flags=re.IGNORECASE).strip()
+                        ln.text = re.sub(r"\s+", " ", ln.text)
+                        excess -= (old_len - len(ln.text.split()))
+
+                while excess > 0:
+                    # Drop an optional commentary line (no claim_id) in beats with >= 5 lines
+                    droppable = None
+                    droppable_lns = None
+                    for b_id, _, lns in cand_beats:
+                        if "B1" in b_id or len(lns) <= 4:
+                            continue
+                        for ln in lns:
+                            if not ln.claim_ids and len(ln.text.split()) >= 10 and not getattr(ln, "pattern_interrupt", False):
+                                droppable = ln
+                                droppable_lns = lns
+                                break
+                        if droppable:
+                            break
+                    if droppable and droppable_lns:
+                        excess -= len(droppable.text.split())
+                        droppable_lns.remove(droppable)
+                    else:
+                        break
+
+            # 5. Eliminate B1-B5 claim redundancy cleanly by swapping B1 duplicate lines in B5 with unused aftermath claims
+            if cand_beats and len(cand_beats) >= 5:
+                b1_cids = {cid for ln in cand_beats[0][2] for cid in (ln.claim_ids or [])}
+                used_in_early = {cid for b_idx in range(4) for ln in cand_beats[b_idx][2] for cid in (ln.claim_ids or [])}
+                avail_aftermath = [c for c in evidence_raw if c.get("claim_id") not in used_in_early]
+                af_idx = 0
+                for ln in cand_beats[-1][2]:
+                    if ln.claim_ids and any(c in b1_cids for c in ln.claim_ids):
+                        if af_idx < len(avail_aftermath):
+                            rep_c = avail_aftermath[af_idx]
+                            af_idx += 1
+                            rep_cid = rep_c.get("claim_id")
+                            rep_text = rep_c.get("claim", "")
+                            ln.claim_ids = [rep_cid]
+                            ln.text = f"Subsequent reporting reflected that {rep_text}."
+                        else:
+                            ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
+
+            # 6. Vary repetitive unconfirmed/press openings across beats
+            unconfirmed_alts = [
+                "Unconfirmed press reports indicated that ",
+                "According to preliminary reporting, ",
+                "According to initial reports yet to be verified, ",
+                "Early unverified reports indicated that ",
+                "Pending independent corroboration, early reporting noted that ",
+                "Preliminary accounts at the time noted that ",
+            ]
+            press_alts = [
+                "Press reports indicate that ",
+                "According to press reports, ",
+                "Published reporting notes that ",
+                "Media accounts describe that ",
+            ]
+            u_alt_idx = 0
+            p_alt_idx = 0
+            for b_id, _, lns in cand_beats:
+                for ln in lns:
+                    if ln.text.startswith("Unconfirmed press reports indicated that "):
+                        ln.text = unconfirmed_alts[u_alt_idx % len(unconfirmed_alts)] + ln.text[len("Unconfirmed press reports indicated that "):]
+                        u_alt_idx += 1
+                    elif ln.text.startswith("Unconfirmed press reports indicated "):
+                        ln.text = unconfirmed_alts[u_alt_idx % len(unconfirmed_alts)] + ln.text[len("Unconfirmed press reports indicated "):]
+                        u_alt_idx += 1
+                    elif ln.text.startswith("Press reports indicate that "):
+                        ln.text = press_alts[p_alt_idx % len(press_alts)] + ln.text[len("Press reports indicate that "):]
+                        p_alt_idx += 1
+                    elif ln.text.startswith("Press reports indicate "):
+                        ln.text = press_alts[p_alt_idx % len(press_alts)] + ln.text[len("Press reports indicate "):]
+                        p_alt_idx += 1
+
+            # 7. Ensure factual lines without claim IDs find their matching claim from evidence ledger
+            for b_id, _, lns in cand_beats:
+                for ln in lns:
+                    if not ln.claim_ids and len(ln.text.split()) >= 8 and not getattr(ln, "pattern_interrupt", False):
+                        best_cid = None
+                        best_hits = 0
+                        for ev_item in evidence_raw:
+                            c_id = ev_item.get("claim_id")
+                            c_text = ev_item.get("claim", "")
+                            if c_id and c_text:
+                                kw_matches = sum(1 for w in c_text.lower().split() if len(w) >= 4 and w in ln.text.lower())
+                                if kw_matches > best_hits:
+                                    best_hits = kw_matches
+                                    best_cid = c_id
+                        if best_cid and best_hits >= 3:
+                            ln.claim_ids = [best_cid]
+
+            # 8. If short of min words or min duration, expand lines with unused claim lines into B3
+            cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
+            cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
+            min_target_units = max(u_min, int(d_min * 2.15)) if market == "EN" else u_min
+            shortfall = min_target_units - int(cand_timing_chk["spoken_units"])
+            dur_shortfall = d_min - float(cand_timing_chk["estimated_duration_sec"])
+            if (shortfall > 0 or dur_shortfall > 0) and len(cand_beats) >= 4:
+                all_used_cids = {c for _, _, lns in cand_beats for ln in lns for c in (ln.claim_ids or [])}
+                avail_c = [c for c in evidence_raw if c.get("claim_id") not in all_used_cids]
+                af_idx = 0
+                while (shortfall > 0 or dur_shortfall > 0) and af_idx < len(avail_c) and len(cand_beats[2][2]) < 8:
+                    extra_c = avail_c[af_idx]
+                    af_idx += 1
+                    extra_cid = extra_c.get("claim_id")
+                    extra_text = extra_c.get("claim", "")
+                    if extra_text:
+                        cand_beats[2][2].append(StorySceneLine(
+                            line_id="B3_L_extra",
+                            text=f"Industry reporting noted that {extra_text}.",
+                            claim_ids=[extra_cid],
+                            visual_hook="stat_hero",
+                        ))
+                        for idx_r, ln_r in enumerate(cand_beats[2][2], start=1):
+                            ln_r.line_id = f"B3_L{idx_r:02d}"
+                        cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
+                        cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
+                        shortfall = min_target_units - int(cand_timing_chk["spoken_units"])
+                        dur_shortfall = d_min - float(cand_timing_chk["estimated_duration_sec"])
+
+            # 9. Merge lowercase continuation fragments into previous line
+            for b_id, _, lns in cand_beats:
+                idx_m = 1
+                while idx_m < len(lns):
+                    cur_t = lns[idx_m].text.strip()
+                    if cur_t and cur_t[0].islower() and not lns[idx_m].claim_ids:
+                        lns[idx_m - 1].text = lns[idx_m - 1].text.rstrip(".") + ", " + cur_t
+                        lns.pop(idx_m)
+                    else:
+                        idx_m += 1
+                for idx_re, ln_re in enumerate(lns, start=1):
+                    b_pfx = b_id.split("_")[0]
+                    ln_re.line_id = f"{b_pfx}_L{idx_re:02d}"
+
+            # 10. Final qualifier reconciliation pass across all lines
+            for b_id, _, lns in cand_beats:
+                for ln in lns:
+                    if not ln.claim_ids:
+                        continue
+                    line_peer_dicts = [
+                        (evidence_map[c].model_dump() if hasattr(evidence_map[c], "model_dump") else dict(evidence_map[c]))
+                        for c in ln.claim_ids
+                        if c in evidence_map
+                    ]
+                    for cid in ln.claim_ids:
+                        c_obj = evidence_map.get(cid)
+                        if c_obj is not None:
+                            c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
+                            ok_q, _ = _m_qual(ln.text, c_dict, market=market, peer_claims=line_peer_dicts)
+                            if not ok_q:
+                                bkt = _exp_bkt(
+                                    legal_status=str(c_dict.get("legal_status", "alleged")),
+                                    source_type=str(c_dict.get("source_type", "press")),
+                                    doc_type=str(c_dict.get("doc_type", "unknown")),
+                                    speaker=c_dict.get("speaker"),
+                                    procedural_status=str(c_dict.get("procedural_status", "unknown")),
+                                    verification_status=str(c_dict.get("verification_status", "corroborated_secondary")),
+                                    credibility_tier=str(c_dict.get("credibility_tier", "") or ""),
+                                )
+                                if bkt != "fact":
+                                    clean_txt, _ = _strip_pfx(ln.text, market=market)
+                                    clean_txt = clean_txt.lstrip()
+                                    if market == "EN":
+                                        clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
+                                    if bkt == "unverified":
+                                        pfx = "According to preliminary reporting, " if market == "EN" else "초기 미확인 보도에 따르면, "
+                                    elif bkt == "alleged_regulator":
+                                        pfx = "According to regulatory filings, " if market == "EN" else "당국 발표에 따르면, "
+                                    elif bkt == "alleged":
+                                        pfx = "According to press reports, " if market == "EN" else "보도에 따르면, "
+                                    else:
+                                        pfx = "According to official records, " if market == "EN" else "공식 기록에 따르면, "
+                                    if len(clean_txt.split()) >= 4:
+                                        if clean_txt and clean_txt[0].isupper():
+                                            fw = clean_txt.split()[0]
+                                            if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several"):
+                                                clean_txt = fw.lower() + clean_txt[len(fw):]
+                                    ln.text = f"{pfx}{clean_txt}"
+
+            return cand_beats
+
         raw_beats: List[Tuple[str, float, List[Any]]] = []
         if not ctx.dry_run and system_prompt:
             try:
@@ -2719,268 +3040,6 @@ def run(ctx: RunContext) -> StageArtifact:
                         and align_res.get("passed", False)
                     )
                     return passed, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler, has_b1_b5_redundancy
-
-                def _auto_repair_beats(cand_beats: List[Tuple[str, float, List[StorySceneLine]]]) -> List[Tuple[str, float, List[StorySceneLine]]]:
-                    from app.services.story_provenance_engine import (
-                        expected_qualifier_bucket as _exp_bkt,
-                        line_matches_expected_qualifier as _m_qual,
-                        strip_attribution_prefix as _strip_pfx,
-                    )
-                    # 1. Fix qualifier mismatches cleanly (once per line)
-                    for b_id, _, lns in cand_beats:
-                        for ln in lns:
-                            if not ln.claim_ids:
-                                continue
-                            peer_dicts = [
-                                (evidence_map[c].model_dump() if hasattr(evidence_map[c], "model_dump") else dict(evidence_map[c]))
-                                for c in ln.claim_ids
-                                if c in evidence_map
-                            ]
-                            line_needs_repair = False
-                            target_bkt = None
-                            for cid in ln.claim_ids:
-                                c_obj = evidence_map.get(cid)
-                                if c_obj is not None:
-                                    c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
-                                    ok_q, _ = _m_qual(ln.text, c_dict, market=market, peer_claims=peer_dicts)
-                                    if not ok_q:
-                                        line_needs_repair = True
-                                        bkt = _exp_bkt(
-                                            legal_status=str(c_dict.get("legal_status", "alleged")),
-                                            source_type=str(c_dict.get("source_type", "press")),
-                                            doc_type=str(c_dict.get("doc_type", "unknown")),
-                                            speaker=c_dict.get("speaker"),
-                                            procedural_status=str(c_dict.get("procedural_status", "unknown")),
-                                            verification_status=str(c_dict.get("verification_status", "corroborated_secondary")),
-                                            credibility_tier=str(c_dict.get("credibility_tier", "") or ""),
-                                        )
-                                        if target_bkt is None or target_bkt == "fact":
-                                            target_bkt = bkt
-                                        elif bkt in ("unverified", "alleged_regulator", "court_record", "audit_finding"):
-                                            target_bkt = bkt
-                            if line_needs_repair and target_bkt and target_bkt != "fact":
-                                clean_txt, _ = _strip_pfx(ln.text, market=market)
-                                clean_txt = clean_txt.lstrip()
-                                if market == "EN":
-                                    clean_txt = re.sub(r"\b(?:was reportedly|reportedly|was alleged to be)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
-                                    clean_txt = re.sub(r"\b(?:according to the court ruling|as ruled by the court|court ruled that)\b,?\s*", "", clean_txt, flags=re.IGNORECASE).strip()
-                                    clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
-                                    clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
-                                if target_bkt == "alleged_regulator":
-                                    pfx_opts = ["According to regulatory filings, ", "As noted in regulatory disclosures, ", "Regulatory records reflect that "]
-                                elif target_bkt == "alleged":
-                                    pfx_opts = ["According to press reports, ", "Media accounts indicate that ", "Published reports reflect that ", "Press accounts reported that "]
-                                elif target_bkt == "unverified":
-                                    pfx_opts = ["According to preliminary reporting, ", "Early unverified accounts indicate that ", "Initial reports suggest that "]
-                                else:
-                                    pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
-                                pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)] if market == "EN" else ("당국 발표에 따르면, " if target_bkt == "alleged_regulator" else ("보도에 따르면, " if target_bkt == "alleged" else ("초기 미확인 보도에 따르면, " if target_bkt == "unverified" else "공식 기록에 따르면, ")))
-                                if len(clean_txt.split()) >= 4:
-                                    if clean_txt and clean_txt[0].isupper():
-                                        fw = clean_txt.split()[0]
-                                        if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial"):
-                                            clean_txt = fw.lower() + clean_txt[len(fw):]
-                                    ln.text = f"{pfx}{clean_txt}"
-
-                    # 2. Prevent double hedging & strip forbidden court ruling phrasing in all lines
-                    if market == "EN":
-                        for b_id, _, lns in cand_beats:
-                            for ln in lns:
-                                ln.text = re.sub(r"\b(?:according to the court ruling|as ruled by the court|court ruled that)\b,?\s*", "", ln.text, flags=re.IGNORECASE).strip()
-                                stripped, pfx_found = _strip_pfx(ln.text, market="EN")
-                                if pfx_found and re.search(r"\b(?:was reportedly|reportedly|was alleged to be)\b", stripped, re.IGNORECASE):
-                                    cleaned_b = re.sub(r"\b(?:was reportedly|reportedly|was alleged to be)\s*", "", stripped, flags=re.IGNORECASE).strip()
-                                    if cleaned_b:
-                                        ln.text = f"{pfx_found} {cleaned_b}"
-
-                    # 3. Beat 1 duration repair: ensure B1 speech <= 22.0s
-                    if cand_beats and len(cand_beats[0][2]) >= 3:
-                        b1_lines = [ln.text for ln in cand_beats[0][2]]
-                        b1_timing = estimate_script_speech_duration(b1_lines, market=market, docudrama_tempo=True)
-                        if float(b1_timing["estimated_duration_sec"]) > 22.0:
-                            for ln in cand_beats[0][2]:
-                                if market == "EN":
-                                    ln.text = _compact_en_hook_line(ln.text, target_words=11)
-                                elif market == "KR":
-                                    ln.text = _compact_kr_hook_line(ln.text, max_chars=40)
-                                else:
-                                    words = ln.text.split()
-                                    if len(words) > 16:
-                                        ln.text = " ".join(words[:15]).rstrip(",:;") + "."
-
-                    # 3b. Beat 2 pattern interrupt gap repair: ensure an interrupt occurs near start of B2 (< 25s gap)
-                    for b_id, _, lns in cand_beats:
-                        if "B2" in b_id and len(lns) >= 4:
-                            first_int_idx = None
-                            for idx_l, ln in enumerate(lns):
-                                if getattr(ln, "visual_hook", "") == "pattern_interrupt" or not ln.claim_ids:
-                                    first_int_idx = idx_l
-                                    break
-                            if first_int_idx is None or first_int_idx >= 2:
-                                lns.insert(1, StorySceneLine(
-                                    line_id="B2_L02_int",
-                                    text="The warning signs were clear." if market == "EN" else "경고 신호는 분명했습니다.",
-                                    claim_ids=[],
-                                    visual_hook="pattern_interrupt",
-                                ))
-                                for idx_renum, ln_renum in enumerate(lns, start=1):
-                                    ln_renum.line_id = f"B2_L{idx_renum:02d}"
-
-                    # 3c. Beat 3 pattern interrupt gap repair: ensure first interrupt occurs within <= 25s
-                    for b_id, _, lns in cand_beats:
-                        if "B3" in b_id and len(lns) >= 4:
-                            first_int_idx = None
-                            for idx_l, ln in enumerate(lns):
-                                if getattr(ln, "visual_hook", "") == "pattern_interrupt" or not ln.claim_ids:
-                                    first_int_idx = idx_l
-                                    break
-                            if first_int_idx is None or first_int_idx >= 2:
-                                # Ensure line 2 (index 1) is a pattern interrupt
-                                if len(lns) >= 4 and getattr(lns[1], "visual_hook", "") != "pattern_interrupt":
-                                    lns.insert(1, StorySceneLine(
-                                        line_id="B3_L02_int",
-                                        text="The crack was already widening." if market == "EN" else "균열은 이미 벌어지고 있었습니다.",
-                                        claim_ids=[],
-                                        visual_hook="pattern_interrupt",
-                                    ))
-                                    # Renumber lines
-                                    for idx_renum, ln_renum in enumerate(lns, start=1):
-                                        ln_renum.line_id = f"B3_L{idx_renum:02d}"
-
-                    # 4. Clean filler adverbs and trim words if units > target
-                    cand_lines = [ln.text for _, _, lns in cand_beats for ln in lns]
-                    cand_timing = estimate_script_speech_duration(cand_lines, market=market, docudrama_tempo=True)
-                    target_units = min(u_max - 20, 515) if u_max else 515
-                    excess = int(cand_timing["spoken_units"]) - target_units
-                    if excess > 0:
-                        for b_id, _, lns in cand_beats:
-                            if "B1" in b_id:
-                                continue
-                            for ln in lns:
-                                if excess <= 0:
-                                    break
-                                old_len = len(ln.text.split())
-                                ln.text = re.sub(r"\b(?:specifically|indeed|furthermore|moreover|in fact|at this point|consequently)\b,?\s*", "", ln.text, flags=re.IGNORECASE).strip()
-                                ln.text = re.sub(r"\s+", " ", ln.text)
-                                excess -= (old_len - len(ln.text.split()))
-
-                        while excess > 0:
-                            # Drop an optional commentary line (no claim_id) in beats with >= 5 lines
-                            droppable = None
-                            droppable_lns = None
-                            for b_id, _, lns in cand_beats:
-                                if "B1" in b_id or len(lns) <= 4:
-                                    continue
-                                for ln in lns:
-                                    if not ln.claim_ids and len(ln.text.split()) >= 10 and not getattr(ln, "pattern_interrupt", False):
-                                        droppable = ln
-                                        droppable_lns = lns
-                                        break
-                                if droppable:
-                                    break
-                            if droppable and droppable_lns:
-                                excess -= len(droppable.text.split())
-                                droppable_lns.remove(droppable)
-                            else:
-                                break
-
-                    # 5. Eliminate B1-B5 claim redundancy cleanly by swapping B1 duplicate lines in B5 with unused aftermath claims
-                    if cand_beats and len(cand_beats) >= 5:
-                        b1_cids = {cid for ln in cand_beats[0][2] for cid in (ln.claim_ids or [])}
-                        used_in_early = {cid for b_idx in range(4) for ln in cand_beats[b_idx][2] for cid in (ln.claim_ids or [])}
-                        avail_aftermath = [c for c in evidence_raw if c.get("claim_id") not in used_in_early]
-                        af_idx = 0
-                        for ln in cand_beats[-1][2]:
-                            if ln.claim_ids and any(c in b1_cids for c in ln.claim_ids):
-                                if af_idx < len(avail_aftermath):
-                                    rep_c = avail_aftermath[af_idx]
-                                    af_idx += 1
-                                    rep_cid = rep_c.get("claim_id")
-                                    rep_text = rep_c.get("claim", "")
-                                    ln.claim_ids = [rep_cid]
-                                    ln.text = f"Subsequent reporting reflected that {rep_text}."
-                                else:
-                                    ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
-
-                    # 6. Vary repetitive unconfirmed/press openings across beats
-                    unconfirmed_alts = [
-                        "Unconfirmed press reports indicated that ",
-                        "Media accounts at the time noted that ",
-                        "Published reports reflected that ",
-                        "Press accounts described that ",
-                        "Early reporting indicated that ",
-                        "Financial reporting reflected that ",
-                    ]
-                    press_alts = [
-                        "Press reports indicate that ",
-                        "According to press reports, ",
-                        "Published reporting notes that ",
-                        "Media accounts describe that ",
-                    ]
-                    u_alt_idx = 0
-                    p_alt_idx = 0
-                    for b_id, _, lns in cand_beats:
-                        for ln in lns:
-                            if ln.text.startswith("Unconfirmed press reports indicated that "):
-                                ln.text = unconfirmed_alts[u_alt_idx % len(unconfirmed_alts)] + ln.text[len("Unconfirmed press reports indicated that "):]
-                                u_alt_idx += 1
-                            elif ln.text.startswith("Unconfirmed press reports indicated "):
-                                ln.text = unconfirmed_alts[u_alt_idx % len(unconfirmed_alts)] + ln.text[len("Unconfirmed press reports indicated "):]
-                                u_alt_idx += 1
-                            elif ln.text.startswith("Press reports indicate that "):
-                                ln.text = press_alts[p_alt_idx % len(press_alts)] + ln.text[len("Press reports indicate that "):]
-                                p_alt_idx += 1
-                            elif ln.text.startswith("Press reports indicate "):
-                                ln.text = press_alts[p_alt_idx % len(press_alts)] + ln.text[len("Press reports indicate "):]
-                                p_alt_idx += 1
-
-                    # 7. Ensure factual lines without claim IDs find their matching claim from evidence ledger
-                    for b_id, _, lns in cand_beats:
-                        for ln in lns:
-                            if not ln.claim_ids and len(ln.text.split()) >= 8 and not getattr(ln, "pattern_interrupt", False):
-                                best_cid = None
-                                best_hits = 0
-                                for ev_item in evidence_raw:
-                                    c_id = ev_item.get("claim_id")
-                                    c_text = ev_item.get("claim", "")
-                                    if c_id and c_text:
-                                        kw_matches = sum(1 for w in c_text.lower().split() if len(w) >= 4 and w in ln.text.lower())
-                                        if kw_matches > best_hits:
-                                            best_hits = kw_matches
-                                            best_cid = c_id
-                                if best_cid and best_hits >= 3:
-                                    ln.claim_ids = [best_cid]
-
-                    # 8. If short of min words or min duration, expand lines with unused claim lines into B3
-                    cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
-                    cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
-                    min_target_units = max(u_min, int(d_min * 2.15)) if market == "EN" else u_min
-                    shortfall = min_target_units - int(cand_timing_chk["spoken_units"])
-                    dur_shortfall = d_min - float(cand_timing_chk["estimated_duration_sec"])
-                    if (shortfall > 0 or dur_shortfall > 0) and len(cand_beats) >= 4:
-                        all_used_cids = {c for _, _, lns in cand_beats for ln in lns for c in (ln.claim_ids or [])}
-                        avail_c = [c for c in evidence_raw if c.get("claim_id") not in all_used_cids]
-                        af_idx = 0
-                        while (shortfall > 0 or dur_shortfall > 0) and af_idx < len(avail_c) and len(cand_beats[2][2]) < 8:
-                            extra_c = avail_c[af_idx]
-                            af_idx += 1
-                            extra_cid = extra_c.get("claim_id")
-                            extra_text = extra_c.get("claim", "")
-                            if extra_text:
-                                cand_beats[2][2].append(StorySceneLine(
-                                    line_id="B3_L_extra",
-                                    text=f"Industry reporting noted that {extra_text}.",
-                                    claim_ids=[extra_cid],
-                                    visual_hook="stat_hero",
-                                ))
-                                for idx_r, ln_r in enumerate(cand_beats[2][2], start=1):
-                                    ln_r.line_id = f"B3_L{idx_r:02d}"
-                                cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
-                                cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
-                                shortfall = min_target_units - int(cand_timing_chk["spoken_units"])
-                                dur_shortfall = d_min - float(cand_timing_chk["estimated_duration_sec"])
-
-                    return cand_beats
 
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
