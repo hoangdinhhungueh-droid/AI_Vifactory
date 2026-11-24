@@ -50,7 +50,7 @@ node_modules/
 remotion/node_modules/
 
 # Large media / render artifacts
-assets/
+/assets/
 remotion/public/*
 remotion/public/*.json
 !remotion/public/sfx/
