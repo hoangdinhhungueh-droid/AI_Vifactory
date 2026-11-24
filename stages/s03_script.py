@@ -2717,7 +2717,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         f"1. STRICT WORD COUNT & DURATION: Write 100% crisp investigative English narration totaling {u_min}-{u_max} words across 21-24 lines (target 390-440 words, 190-230s docudrama speech timing). Scripts under 370 words will be rejected! Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 48 words (<= 23.5s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
                         "2. STRICT NON-REDUNDANT CLAIM GROUNDING & BEAT PARTITION:\n"
                         "   - Ground every substantive factual sentence in a DISTINCT claim from the evidence ledger.\n"
-                        "   - DO NOT repeat the same claim or numbers across multiple lines.\n"
+                        "   - DO NOT repeat the same claim or numbers across multiple beats or lines (e.g. introduce C006 only in B1 or B2, never both; introduce C008 only in B4, never repeat in B1).\n"
                         "   - Follow the chronological/investigative beat progression:\n"
                         "     * B1_hook: Primary catalyst & regulatory scope (e.g. initial reports of tariff refunds & consumer cost asymmetry).\n"
                         "     * B2_setup: Institutional context & baseline retail mechanics.\n"
@@ -2731,6 +2731,8 @@ def run(ctx: RunContext) -> StageArtifact:
                         "     * corroborated_secondary / press_allegation: 'According to press reports,...', 'Published reports indicate that...', 'Media accounts describe that...'\n"
                         "     * unverified_secondary / unconfirmed_claim: VARY OPENINGS (e.g. 'Unconfirmed press reports indicated that...', 'Media accounts noted that...', 'Published reports described that...', 'Early reporting reflected that...', 'Financial reporting indicated that...'). NEVER repeat the identical opening phrase consecutively or across more than two lines.\n"
                         "   - Exactly ONE clean attribution per line (NO double hedging, NO stacked attributions like 'Press reporting indicates... reportedly').\n"
+                        "   - DO NOT use 'investigators' when referring to investigative journalists or press reports (use 'investigative reporting' or 'reporters').\n"
+                        "   - Every line must be a complete grammatical sentence with conjugated main verbs. DO NOT output verbless participle fragments like 'financial filings showing that...' or 'consumer-advocate criticism of...'.\n"
                         "   - Include short 2-5 word neutral pattern interrupts in B2, B3, B4, B5 with visual_hook='pattern_interrupt' and NO claim_ids (e.g. 'Store numbers contracted.', 'The losses accumulated.', 'Operating deficits mounted.', 'Trading continued.', 'The gap remains open.').\n"
                         "   - NEVER invent ungrounded details, motives, or causal mechanisms not stated in the evidence ledger.\n"
                     )
@@ -2779,6 +2781,11 @@ def run(ctx: RunContext) -> StageArtifact:
                             text = ln.get("text", "")
                             if (market or "EN").upper() in ("KR", "KO"):
                                 text = _normalize_spoken_korean_numbers(text)
+                            elif (market or "EN").upper() == "EN":
+                                text = re.sub(r"\binvestigators described\b", "investigative reports described", text, flags=re.IGNORECASE)
+                                text = re.sub(r"\bsend refunds only to\b", "direct duty refunds to", text, flags=re.IGNORECASE)
+                                text = re.sub(r"\bconsumer-advocate criticism of\b", "consumer advocates criticized", text, flags=re.IGNORECASE)
+                                text = re.sub(r"\bfinancial filings showing that\b", "financial filings showed that", text, flags=re.IGNORECASE)
 
                             # Handle editorial pattern interrupts cleanly
                             is_rhetorical_q = text.strip().endswith("?") and not any(ch.isdigit() for ch in text)
