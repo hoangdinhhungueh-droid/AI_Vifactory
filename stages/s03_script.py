@@ -2443,6 +2443,24 @@ def run(ctx: RunContext) -> StageArtifact:
                             for idx_renum, ln_renum in enumerate(lns, start=1):
                                 ln_renum.line_id = f"B3_L{idx_renum:02d}"
 
+            # 3d. Beat 4 pattern interrupt gap repair: ensure an interrupt occurs near start of B4 (< 25s gap)
+            for b_id, _, lns in cand_beats:
+                if "B4" in b_id and len(lns) >= 4:
+                    first_int_idx = None
+                    for idx_l, ln in enumerate(lns):
+                        if getattr(ln, "visual_hook", "") == "pattern_interrupt" or not ln.claim_ids:
+                            first_int_idx = idx_l
+                            break
+                    if first_int_idx is None or first_int_idx >= 2:
+                        lns.insert(1, StorySceneLine(
+                            line_id="B4_L02_int",
+                            text="The pressure mounted." if market == "EN" else "압박은 거세졌습니다.",
+                            claim_ids=[],
+                            visual_hook="pattern_interrupt",
+                        ))
+                        for idx_renum, ln_renum in enumerate(lns, start=1):
+                            ln_renum.line_id = f"B4_L{idx_renum:02d}"
+
             # 4. Clean filler adverbs and trim words if units > target
             cand_lines = [ln.text for _, _, lns in cand_beats for ln in lns]
             cand_timing = estimate_script_speech_duration(cand_lines, market=market, docudrama_tempo=True)
@@ -2601,6 +2619,14 @@ def run(ctx: RunContext) -> StageArtifact:
                         clean_txt = re.sub(r",?\s*with\s+no\s+consumer-facing\s+mechanism\s+attached\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:an\s+asymmetry\s+in\s+which\s+)", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\bindicates\s+that\s+an\s+asymmetry\s+in\s+which\s+", "", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\bindustry\s+analysts\s+found\b", "industry analysts were reported to note that", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\banalysts\s+found\b", "analysts were reported to note that", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\bprompted\s+consumer\s+advocates\s+criticized\b", "prompted consumer-advocate criticism of", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\badvocates\s+criticized\s+governance\s+rules\b", "advocate criticism of governance rules", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r",?\s*and\s+the\s+choice\s+rests\s+entirely\s+with\s+them\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r",?\s*and\s+the\s+choice\s+rests\s+with\s+them\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r",?\s*before\s+products\s+ever\s+reached\s+shelves\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r",?\s*before\s+goods\s+ever\s+reached\s+shelves\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
 
                     if bkt == "unverified":
                         if src:
@@ -2622,7 +2648,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     if len(clean_txt.split()) >= 4:
                         if clean_txt and clean_txt[0].isupper():
                             fw = clean_txt.split()[0]
-                            if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial"):
+                            if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial", "major"):
                                 clean_txt = fw.lower() + clean_txt[len(fw):]
 
                     ln.text = f"{pfx}{clean_txt}"
@@ -2658,11 +2684,33 @@ def run(ctx: RunContext) -> StageArtifact:
                     extra_c = avail_c[af_idx]
                     af_idx += 1
                     extra_cid = extra_c.get("claim_id")
-                    extra_text = extra_c.get("claim", "")
+                    extra_text = str(extra_c.get("claim", "")).strip().rstrip(". ")
+                    extra_src = str(extra_c.get("source_name") or "Press").strip()
+                    extra_bkt = _exp_bkt(
+                        legal_status=str(extra_c.get("legal_status", "alleged")),
+                        source_type=str(extra_c.get("source_type", "press")),
+                        doc_type=str(extra_c.get("doc_type", "unknown")),
+                        speaker=extra_c.get("speaker"),
+                        procedural_status=str(extra_c.get("procedural_status", "unknown")),
+                        verification_status=str(extra_c.get("verification_status", "corroborated_secondary")),
+                        credibility_tier=str(extra_c.get("credibility_tier", "") or ""),
+                    )
+                    if extra_bkt == "unverified":
+                        pfx_extra = f"According to preliminary reporting by {extra_src}, " if extra_src else "According to preliminary reporting, "
+                    elif extra_bkt in ("alleged", "corroborated_secondary"):
+                        pfx_extra = f"According to {extra_src} reporting, " if extra_src else "According to press reports, "
+                    elif extra_bkt == "alleged_regulator":
+                        pfx_extra = f"According to regulatory filings by {extra_src}, " if extra_src else "According to regulatory filings, "
+                    else:
+                        pfx_extra = "Public records establish that "
+                    if extra_text and extra_text[0].isupper():
+                        fw = extra_text.split()[0]
+                        if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "major"):
+                            extra_text = fw.lower() + extra_text[len(fw):]
                     if extra_text:
                         cand_beats[2][2].append(StorySceneLine(
                             line_id="B3_L_extra",
-                            text=f"Industry reporting noted that {extra_text}.",
+                            text=f"{pfx_extra}{extra_text}.",
                             claim_ids=[extra_cid],
                             visual_hook="stat_hero",
                         ))
@@ -2752,7 +2800,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                     if len(clean_txt.split()) >= 4:
                                         if clean_txt and clean_txt[0].isupper():
                                             fw = clean_txt.split()[0]
-                                            if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several"):
+                                            if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "major"):
                                                 clean_txt = fw.lower() + clean_txt[len(fw):]
                                     ln.text = f"{pfx}{clean_txt}"
 
