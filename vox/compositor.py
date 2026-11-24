@@ -17,7 +17,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from vox.camera import move_transform
@@ -201,7 +204,7 @@ def cue_transform(
     canvas_wh: tuple[int, int] = (2400, 1350),
     out_wh: tuple[int, int] = (1920, 1080),
     depth: float = 0.0,
-) -> np.ndarray:
+) -> Any:
     """Computes continuous interpolated affine camera matrix from CameraCueSheet."""
     t_ms = t_sec * 1000.0
     cw, ch = canvas_wh
@@ -211,7 +214,9 @@ def cue_transform(
         s0 = ow / float(cw)
         tx0 = (ow - cw * s0) / 2.0
         ty0 = (oh - ch * s0) / 2.0
-        return np.array([[s0, 0.0, tx0], [0.0, s0, ty0]])
+        if np is not None:
+            return np.array([[s0, 0.0, tx0], [0.0, s0, ty0]])
+        return [[s0, 0.0, tx0], [0.0, s0, ty0]]
 
     cue_times = [float(c.get("time_ms") if isinstance(c, dict) else getattr(c, "time_ms", 0.0)) for c in cues]
 
@@ -262,7 +267,9 @@ def cue_transform(
     tx = cx_out - cx_in * scale
     ty = cy_out - cy_in * scale
 
-    return np.array([[scale, 0.0, tx], [0.0, scale, ty]])
+    if np is not None:
+        return np.array([[scale, 0.0, tx], [0.0, scale, ty]])
+    return [[scale, 0.0, tx], [0.0, scale, ty]]
 
 
 def render_scene_clip(
@@ -378,11 +385,30 @@ def render_scene_clip(
                 M_bg = cue_transform(cues_list, t_sec, canvas_wh=canvas_wh, out_wh=out_wh, depth=0.0)
             else:
                 M_bg = move_transform(scene.camera, t_norm, canvas_wh=canvas_wh, out_wh=out_wh, depth=0.0)
-            inv_m_bg = np.linalg.inv(np.vstack([M_bg, [0.0, 0.0, 1.0]]))
-            aff_tuple = (
-                inv_m_bg[0, 0], inv_m_bg[0, 1], inv_m_bg[0, 2],
-                inv_m_bg[1, 0], inv_m_bg[1, 1], inv_m_bg[1, 2]
-            )
+            if np is not None:
+                inv_m_bg = np.linalg.inv(np.vstack([M_bg, [0.0, 0.0, 1.0]]))
+                aff_tuple = (
+                    float(inv_m_bg[0, 0]), float(inv_m_bg[0, 1]), float(inv_m_bg[0, 2]),
+                    float(inv_m_bg[1, 0]), float(inv_m_bg[1, 1]), float(inv_m_bg[1, 2])
+                )
+            else:
+                a = float(M_bg[0][0])
+                b = float(M_bg[0][1])
+                c = float(M_bg[0][2])
+                d = float(M_bg[1][0])
+                e = float(M_bg[1][1])
+                f = float(M_bg[1][2])
+                det = a * e - b * d
+                if abs(det) > 1e-9:
+                    inv_a = e / det
+                    inv_b = -b / det
+                    inv_c = (b * f - e * c) / det
+                    inv_d = -d / det
+                    inv_e = a / det
+                    inv_f = (d * c - a * f) / det
+                    aff_tuple = (inv_a, inv_b, inv_c, inv_d, inv_e, inv_f)
+                else:
+                    aff_tuple = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
             frame_bg = bg_img.transform(out_wh, Image.Transform.AFFINE, aff_tuple, resample=Image.Resampling.BILINEAR)
             frame_rgba = frame_bg.convert("RGBA")
 
@@ -407,9 +433,19 @@ def render_scene_clip(
                 src_y = fg_obj.anchor_y * ch
 
                 # Destination center on output viewport
-                dest_pt = M_fg @ np.array([src_x, src_y, 1.0])
-                dx = dest_pt[0] + jitter_x
-                dy = dest_pt[1] + jitter_y
+                if np is not None and hasattr(M_fg, "__matmul__"):
+                    dest_pt = M_fg @ np.array([src_x, src_y, 1.0])
+                    dx = float(dest_pt[0]) + jitter_x
+                    dy = float(dest_pt[1]) + jitter_y
+                else:
+                    m00 = float(M_fg[0][0])
+                    m01 = float(M_fg[0][1])
+                    m02 = float(M_fg[0][2])
+                    m10 = float(M_fg[1][0])
+                    m11 = float(M_fg[1][1])
+                    m12 = float(M_fg[1][2])
+                    dx = (m00 * src_x + m01 * src_y + m02) + jitter_x
+                    dy = (m10 * src_x + m11 * src_y + m12) + jitter_y
 
                 # Snappy overshoot spring on ingress
                 if ingress_prog < 1.0:

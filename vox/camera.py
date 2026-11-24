@@ -11,8 +11,12 @@ Implements deterministic 2x3 affine transformation matrices for:
 from __future__ import annotations
 
 import math
+from typing import Any
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 from vox.schemas import CameraMove
 
@@ -33,7 +37,7 @@ def move_transform(
     canvas_wh: tuple[int, int] = (2400, 1350),
     out_wh: tuple[int, int] = (1920, 1080),
     depth: float = 0.0,
-) -> np.ndarray:
+) -> Any:
     """Computes a 2x3 affine matrix mapping canvas coordinates to output viewport coordinates.
 
     Args:
@@ -158,7 +162,12 @@ def move_transform(
     m11 = s * cos_a
     m12 = oy - (s * (sin_a * tx_src + cos_a * ty_src))
 
-    return np.array([
-        [m00, m01, m02],
-        [m10, m11, m12]
-    ], dtype=np.float64)
+    if np is not None:
+        return np.array([
+            [m00, m01, m02],
+            [m10, m11, m12]
+        ], dtype=np.float64)
+    return [
+        [float(m00), float(m01), float(m02)],
+        [float(m10), float(m11), float(m12)]
+    ]

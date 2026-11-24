@@ -497,8 +497,8 @@ def _find_modular_asset_file(
         for entry in d.iterdir():
             if entry.is_file() and entry.name.lower() in lower_targets and entry.stat().st_size > 1000:
                 return entry.resolve()
-    except OSError:
-        pass
+    except OSError as _e:
+        logger.debug("Directory scanning error for %s: %s", d, _e)
     return None
 
 

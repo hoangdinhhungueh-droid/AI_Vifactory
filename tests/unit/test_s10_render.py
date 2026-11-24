@@ -215,7 +215,7 @@ def test_s10_render_fails_closed_when_subtitles_file_key_missing(tmp_path: Path)
         run_s10_render(ctx)
 
 
-def test_s10_render_vox_native_parallax_motion_graphics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_s10_render_vox_native_parallax_motion_graphics(tmp_path: Path) -> None:
     """Verifies that Stage S10 successfully renders 2.5D CSS parallax motion graphics when clips is empty."""
     run_id = "test_s10_vox_native"
     paths = resolve_run_paths(run_id, repo_root=tmp_path)
@@ -290,7 +290,7 @@ def test_s10_render_vox_native_parallax_motion_graphics(tmp_path: Path, monkeypa
         dry_run=False,
     )
 
-    # Monkeypatch render_scene_clip and assemble_final_video to isolate unit test
+    # Test harness replacement for render_scene_clip and assemble_final_video to isolate unit test
     vox_rendered = []
     captured_manifests = []
     captured_fg_maps = []
@@ -308,17 +308,33 @@ def test_s10_render_vox_native_parallax_motion_graphics(tmp_path: Path, monkeypa
         Path(final_mp4).write_bytes(b"master_video_data" + b"\x00" * 2000)
         return final_mp4
 
-    monkeypatch.setattr("vox.compositor.render_scene_clip", fake_render_scene_clip)
-    monkeypatch.setattr("stages.s10_render.assemble_final_video", fake_assemble)
-    monkeypatch.setattr("vox.qa.gates.probe_media_file", lambda p: {
-        "streams": [
-            {"codec_type": "video", "r_frame_rate": "30/1", "avg_frame_rate": "30/1", "duration": "3.0", "nb_frames": "90", "nb_read_packets": "90"},
-            {"codec_type": "audio", "duration": "3.0"}
-        ],
-        "format": {"duration": "3.0"}
-    })
+    import stages.s10_render as s10_mod
+    import vox.compositor as vc_mod
+    import vox.qa.gates as vq_mod
 
-    art = run_s10_render(ctx)
+    orig_render = getattr(vc_mod, "render_scene_clip", None)
+    orig_assemble = getattr(s10_mod, "assemble_final_video", None)
+    orig_probe = getattr(vq_mod, "probe_media_file", None)
+
+    try:
+        setattr(vc_mod, "render_scene_clip", fake_render_scene_clip)
+        setattr(s10_mod, "assemble_final_video", fake_assemble)
+        setattr(vq_mod, "probe_media_file", lambda p: {
+            "streams": [
+                {"codec_type": "video", "r_frame_rate": "30/1", "avg_frame_rate": "30/1", "duration": "3.0", "nb_frames": "90", "nb_read_packets": "90"},
+                {"codec_type": "audio", "duration": "3.0"}
+            ],
+            "format": {"duration": "3.0"}
+        })
+
+        art = run_s10_render(ctx)
+    finally:
+        if orig_render:
+            setattr(vc_mod, "render_scene_clip", orig_render)
+        if orig_assemble:
+            setattr(s10_mod, "assemble_final_video", orig_assemble)
+        if orig_probe:
+            setattr(vq_mod, "probe_media_file", orig_probe)
     assert art.status == "ok"
     assert len(vox_rendered) == 1
     assert Path(art.payload["final_video_path"]).exists()

@@ -23,9 +23,13 @@ def get_modified_files():
     if not files:
         res = subprocess.check_output(["git", "status", "-s"], cwd=str(_ROOT)).decode("utf-8")
         for line in res.splitlines():
-            if line[:2].strip() in ("M", "A", "AM", "MM"):
+            status_code = line[:2].strip()
+            if status_code in ("M", "A", "AM", "MM", "??", "?"):
                 rel = line[3:].strip().replace("\\", "/")
-                files.append(rel)
+                # Avoid syncing directories directly
+                p = _ROOT / rel
+                if p.is_file():
+                    files.append(rel)
     return sorted(list(set(files)))
 
 def main():
