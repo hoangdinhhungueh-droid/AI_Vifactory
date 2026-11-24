@@ -1507,42 +1507,42 @@ def _render_claim_sentence(
         fact_clean = fact_stripped if existing_pfx_en else fact
         if role_slot == "hook_catalyst":
             if bucket == "final_judgment":
-                raw = f"In {loc_topic}, the court ruled that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"The court ruled that {fact_clean}."
+                raw = f"The court ruled that {fact_clean}."
             elif bucket == "audit_finding":
-                raw = f"In {loc_topic}, the audit report established that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"The audit report established that {fact_clean}."
+                raw = f"The audit report established that {fact_clean}."
             elif bucket == "indictment":
-                raw = f"In {loc_topic}, the indictment alleges that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"The indictment alleges that {fact_clean}."
+                raw = f"The indictment alleges that {fact_clean}."
             elif bucket == "court_record":
-                raw = f"In {loc_topic}, court records reflect that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Court records reflect that {fact_clean}."
+                raw = f"Court records reflect that {fact_clean}."
             elif bucket == "alleged_regulator":
-                raw = f"In {loc_topic}, regulatory filings indicate that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Regulatory filings indicate that {fact_clean}."
+                raw = f"Regulatory filings indicate that {fact_clean}."
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"In {loc_topic}, press reports indicate that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"According to press reports, {fact_clean}."
+                raw = f"According to press reports, {fact_clean}."
             elif bucket == "settled":
-                raw = f"In {loc_topic}, the matter concluded under settlement terms: {fact_clean}."
+                raw = f"Official settlement records reflect that {fact_clean}."
             elif bucket == "unverified":
-                raw = f"In {loc_topic}, preliminary reports indicate that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Preliminary reports indicate that {fact_clean}."
+                raw = f"Preliminary reporting reflects that {fact_clean}."
             else:
-                raw = f"In {loc_topic}, {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"{fact_clean}."
+                raw = f"{fact_clean}."
         elif role_slot == "hook_scale":
             if bucket == "final_judgment":
-                raw = f"Judicial findings establish documented scale: {fact_clean}."
+                raw = f"Judicial findings establish that {fact_clean}."
             elif bucket == "audit_finding":
-                raw = f"Audit findings establish documented scale: {fact_clean}."
+                raw = f"Audit findings establish that {fact_clean}."
             elif bucket == "indictment":
-                raw = f"Charging documents state documented scale: {fact_clean}."
+                raw = f"Charging documents state that {fact_clean}."
             elif bucket == "court_record":
-                raw = f"According to court records, documented scale reached: {fact_clean}."
+                raw = f"Court records establish that {fact_clean}."
             elif bucket == "alleged_regulator":
-                raw = f"Regulatory filings establish documented scale: {fact_clean}."
+                raw = f"Regulatory records establish that {fact_clean}."
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"According to press reports, documented scale reached: {fact_clean}."
+                raw = f"Published reporting indicates that {fact_clean}."
             elif bucket == "settled":
-                raw = f"Documented scale under resolved terms: {fact_clean} (settled without admitting wrongdoing)."
+                raw = f"Settlement disclosures reflect that {fact_clean}."
             elif bucket == "unverified":
-                raw = f"Early unverified reports suggest documented scale: {fact_clean}."
+                raw = f"Initial reporting indicates that {fact_clean}."
             else:
-                raw = f"Documented scale confirmed: {fact_clean}."
+                raw = f"Public records confirm that {fact_clean}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Where did the structural tension begin?"
             if not q_short.endswith("?"):
@@ -1665,37 +1665,29 @@ def _render_claim_sentence(
 
             if role_slot == "setup":
                 tails = [
-                    f"{fact_clean}, marking the initial phase of the transaction cycle.",
-                    f"{fact_clean}, laying the institutional foundation for subsequent transactions.",
-                    f"{fact_clean}, establishing the baseline operational framework.",
-                    f"{fact_clean}, setting the initial framework in place.",
-                    f"{fact_clean}, establishing the context before subsequent adjustments.",
+                    f"{fact_clean}, establishing the documented baseline.",
+                    f"{fact_clean}, forming the operational starting point.",
+                    f"{fact_clean}, setting the documented context in place.",
                 ]
             elif role_slot == "mechanism":
                 tails = [
-                    f"{fact_clean}, demonstrating the core transactional flow.",
-                    f"{fact_clean}, reflecting the underlying operational structure.",
-                    f"{fact_clean}, showing how capital moved through the system.",
-                    f"{fact_clean}, outlining the procedural sequence.",
-                    f"{fact_clean}, detailing the primary operational transfer.",
+                    f"{fact_clean}, forming the core operational mechanism.",
+                    f"{fact_clean}, demonstrating how transactions moved through the system.",
+                    f"{fact_clean}, reflecting the underlying transactional sequence.",
                 ]
             elif role_slot == "crack":
                 tails = [
-                    f"{fact_clean}, marking the emergence of regulatory and public scrutiny.",
-                    f"{fact_clean}, triggering heightened supervisory scrutiny.",
-                    f"{fact_clean}, exposing the operational friction.",
-                    f"{fact_clean}, revealing the structural disparity.",
-                    f"{fact_clean}, accelerating public examination of corporate practices.",
+                    f"{fact_clean}, exposing the central structural disparity.",
+                    f"{fact_clean}, revealing the underlying system friction.",
+                    f"{fact_clean}, bringing the operational divide to light.",
                 ]
             else:  # aftermath
                 tails = [
-                    f"{fact_clean}, leaving lingering corporate governance questions.",
-                    f"{fact_clean}, leaving lasting regulatory liabilities.",
-                    f"{fact_clean}, highlighting the ongoing reform challenge.",
-                    f"{fact_clean}, underscoring the systemic reform debate.",
-                    f"{fact_clean}, demonstrating the lasting structural legacy.",
+                    f"{fact_clean}, remaining an active subject of policy scrutiny.",
+                    f"{fact_clean}, highlighting the ongoing systemic debate.",
+                    f"{fact_clean}, leaving lingering questions for market reform.",
                 ]
-            raw = f"{pfx}{tails[v_idx]}"
+            raw = f"{pfx}{tails[v_idx % len(tails)]}"
 
     if m == "KR":
         raw = re.sub(r"\b[Pp]ackage\b", "지원책", raw)
@@ -1722,7 +1714,8 @@ def _compact_en_hook_line(text: str, target_words: int = 18) -> str:
     # Strip parenthetical appositive clauses (e.g. ", parent of T.J. Maxx, Marshalls, and HomeGoods,")
     body = re.sub(r",\s*(?:parent of|a subsidiary of|the operator of)[^,]+(?:,[^,]+)*,", "", body).strip()
     # Compress verbose reporting verbs in hook
-    body = re.sub(r"published an investigative report revealing that", "reported that", body)
+    body = re.sub(r"published an investigative report\s+(?:revealing|stating|indicating|noting|that)?\s*", "reported that ", body)
+    body = re.sub(r"published an investigative report\b", "reported", body)
     body = re.sub(r"\s+", " ", body).strip()
 
     # Colon and semicolon splits
@@ -1747,6 +1740,7 @@ def _compact_en_hook_line(text: str, target_words: int = 18) -> str:
         "financial", "corporate", "official", "regulatory", "structural",
         "customs", "tariff", "trade", "price", "duty", "market", "executive",
         "rather", "than", "including", "leaving", "resulting", "setting", "shoppers", "instead",
+        "investigative", "report", "stating", "revealing", "claiming",
     }
 
     strip_patterns = [

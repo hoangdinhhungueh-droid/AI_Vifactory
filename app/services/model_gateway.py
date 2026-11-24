@@ -23,8 +23,14 @@ from app.services.cost_tracker import get_global_tracker
 logger = logging.getLogger(__name__)
 
 
+_FAILED_PROXIES: set[str] = set()
+
+
 def _is_local_proxy_running(port: int = 40000) -> bool:
     """Checks if local SOCKS5 proxy (e.g. Cloudflare WARP proxy mode) is listening."""
+    p_url = f"socks5://127.0.0.1:{port}"
+    if p_url in _FAILED_PROXIES:
+        return False
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=0.2):
             return True
@@ -485,6 +491,7 @@ class ModelGateway:
                     or "host unreachable" in err_low
                 ):
                     logger.warning(f"[GATEWAY] Dropping flaky proxy ({attempt_proxy}) for direct connection on next attempt.")
+                    _FAILED_PROXIES.add(str(attempt_proxy))
                     attempt_proxy = None
                 if attempt < max_retries:
                     import time
