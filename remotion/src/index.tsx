@@ -2316,6 +2316,7 @@ export const TwoLayerEpisode: React.FC<{
   const currentSceneInfo = getCurrentSceneInfo(scenes, currentFrame);
   const isVideoScene = Boolean(
     currentSceneInfo &&
+      currentSceneInfo.scene.render_mode !== "vox_native" &&
       ((currentSceneInfo.scene.background &&
         /\.(mp4|webm)($|\?)/i.test(currentSceneInfo.scene.background)) ||
         (currentSceneInfo.scene.backgroundSrc &&
@@ -2331,8 +2332,11 @@ export const TwoLayerEpisode: React.FC<{
     ? "locked"
     : currentSceneInfo
     ? currentSceneInfo.scene.cameraMovement ||
+      currentSceneInfo.scene.camera_movement ||
       (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.movement : undefined) ||
-      currentSceneInfo.scene.motionDirective
+      currentSceneInfo.scene.motion_thumbnail_code ||
+      currentSceneInfo.scene.motionDirective ||
+      "slow_push_in"
     : undefined;
   const currentDur = currentSceneInfo ? currentSceneInfo.durationInFrames : 300;
 

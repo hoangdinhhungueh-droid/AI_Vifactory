@@ -1196,16 +1196,23 @@ def run(ctx: RunContext) -> StageArtifact:
             )
             manifest_data = manifest.model_dump() if hasattr(manifest, "model_dump") else manifest.dict()
             scene.dynamic_art_manifest = manifest_data
+            if hasattr(scene, "production_route"):
+                scene.production_route = manifest_data.get("production_route", "REMOTION_COLLAGE_MOTION")
 
             # Synchronize Opus 5.5 Bespoke Prompts into decomposed_prompts (FT-201 & FT-206 parity)
             if not scene.decomposed_prompts:
                 scene.decomposed_prompts = {}
-            scene.decomposed_prompts["assembled_anchor_prompt"] = manifest.assembled_keyframe_prompt
-            scene.decomposed_prompts["hero_cutout_prompt"] = manifest.hero_cutout_prompt
-            scene.decomposed_prompts["interacting_tool_prompt"] = manifest.interacting_tool_prompt
+            scene.decomposed_prompts["assembled_anchor_prompt"] = manifest.assembled_keyframe_prompt or manifest_data.get("assembled_scene_prompt", "")
+            scene.decomposed_prompts["hero_cutout_prompt"] = manifest.hero_cutout_prompt or manifest_data.get("hero_asset_prompt", "")
+            scene.decomposed_prompts["interacting_tool_prompt"] = manifest.interacting_tool_prompt or manifest_data.get("tool_asset_prompt", "")
             scene.decomposed_prompts["contact_point"] = manifest_data.get("contact_point")
             scene.decomposed_prompts["macro_camera"] = manifest_data.get("macro_camera")
-            scene.image_prompt = manifest.assembled_keyframe_prompt
+            scene.decomposed_prompts["production_route"] = manifest_data.get("production_route", "REMOTION_COLLAGE_MOTION")
+            scene.decomposed_prompts["atmosphere"] = manifest_data.get("atmosphere")
+            scene.decomposed_prompts["hero_artifact"] = manifest_data.get("hero_artifact")
+            scene.decomposed_prompts["interaction"] = manifest_data.get("interaction")
+            scene.decomposed_prompts["causal_link"] = manifest_data.get("causal_link")
+            scene.image_prompt = manifest.assembled_keyframe_prompt or scene.image_prompt
         except Exception as _manifest_err:
             logger.warning(f"[s05_director_plan] Dynamic Art Director notice for {scene.scene_id}: {_manifest_err}")
 

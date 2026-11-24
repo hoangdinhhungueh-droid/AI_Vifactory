@@ -137,14 +137,25 @@ def _build_and_save_remotion_props(
         if not sc_narration and cl.get("narration"):
             sc_narration = cl.get("narration")
 
+        # Resolve Master Sheet 3-Layer assets if available
+        seeds_dir = ctx.paths.composite_seeds_dir if hasattr(ctx.paths, "composite_seeds_dir") else ctx.paths.root / "composite_seeds"
+        bg_cand = seeds_dir / f"stage_{sc_id.lower()}.png"
+        hero_cand = seeds_dir / f"hero_{sc_id.lower()}.png"
+        supp_cand = seeds_dir / f"supp_{sc_id.lower()}.png"
+
         scene_props.append(SceneRenderProp(
             scene_id=sc_id,
             duration_in_frames=frames,
             video_clip_path=cl.get("file_path", ""),
             audio_path=audio_file,
             subtitles=sc_words,
-            render_mode=cl.get("render_mode", "veo"),
+            render_mode=cl.get("render_mode") or "vox_native",
             narration=sc_narration,
+            headline=cl.get("headline"),
+            background_desk_path=str(bg_cand) if bg_cand.exists() else None,
+            hero_cutout_path=str(hero_cand) if hero_cand.exists() else None,
+            supporting_cutout_paths=[str(supp_cand)] if supp_cand.exists() else [],
+            stop_motion_fps=12,
         ))
 
     if scene_props and target_total_frames > 0 and accum_frames != target_total_frames:
@@ -472,19 +483,20 @@ def _validate_and_assemble_video(
         except Exception as _r_err:
             logger.warning(f"[s10_render] Notice during Remotion master render ({_r_err}), falling back to Vox motion assembly engine")
 
-    # If declared S8 clips are present (with file paths), validate them fail-closed
+    # If scenes are vox_native (true Vox motion graphics mode), render via 2.5D Parallax Compositor!
+    is_vox_native_pipeline = any(cl.get("render_mode") == "vox_native" for cl in clips) if clips else True
+    if is_vox_native_pipeline and scene_props:
+        logger.info(f"[s10_render] Rendering {len(scene_props)} scenes via Vox 2.5D Parallax motion engine...")
+        clip_paths = _render_vox_native_scene_clips(ctx, scene_props, fps=fps, s5_scenes=s5_scenes)
+        scene_durations = [sc.duration_in_frames / fps for sc in scene_props]
+        _call_assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4, scene_durations=scene_durations)
+        return
+
+    # If declared S8 clips are present (with file paths) and NOT vox_native, validate them fail-closed
     has_declared_s8_files = any(bool(cl.get("file_path")) for cl in clips)
     if has_declared_s8_files:
         clip_paths = _validate_rendered_clips(ctx, clips)
         scene_durations = [sc.duration_in_frames / fps for sc in scene_props] if scene_props else None
-        _call_assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4, scene_durations=scene_durations)
-        return
-
-    # If clips list is empty or vox_native (true Vox motion graphics mode), render via 2.5D Parallax Compositor!
-    if scene_props:
-        logger.info(f"[s10_render] Rendering {len(scene_props)} scenes via Vox 2.5D Parallax motion engine...")
-        clip_paths = _render_vox_native_scene_clips(ctx, scene_props, fps=fps, s5_scenes=s5_scenes)
-        scene_durations = [sc.duration_in_frames / fps for sc in scene_props]
         _call_assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4, scene_durations=scene_durations)
         return
 
