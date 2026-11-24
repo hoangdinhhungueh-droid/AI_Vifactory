@@ -6,25 +6,34 @@ import os
 import subprocess
 import sys
 
-def download_file_chunked(vps_path: str, local_path: str, chunk_size: int = 3500) -> bool:
+try:
+    from scripts.vps_runner import run_vps_cmd
+except ImportError:
+    run_vps_cmd = None
+
+def download_file_chunked(vps_path: str, local_path: str, chunk_size: int = 65536) -> bool:
     # 1. Get total size
     cmd_size = f"stat -c %s {vps_path}"
-    res = subprocess.run(["python", "scripts/vps_runner.py", cmd_size], capture_output=True, text=True, encoding="utf-8")
-    size_str = ""
-    rec = False
-    for line in res.stdout.splitlines():
-        if line.startswith("STDOUT:"):
-            rec = True
-            continue
-        if line.startswith("STDERR:") or line.startswith("EXIT_CODE:"):
-            rec = False
-            continue
-        if rec and line.strip().isdigit():
-            size_str = line.strip()
-            break
+    if run_vps_cmd:
+        res_size = run_vps_cmd(cmd_size)
+        size_str = res_size.get("stdout", "").strip()
+    else:
+        res = subprocess.run(["python", "scripts/vps_runner.py", cmd_size], capture_output=True, text=True, encoding="utf-8")
+        size_str = ""
+        rec = False
+        for line in res.stdout.splitlines():
+            if line.startswith("STDOUT:"):
+                rec = True
+                continue
+            if line.startswith("STDERR:") or line.startswith("EXIT_CODE:"):
+                rec = False
+                continue
+            if rec and line.strip().isdigit():
+                size_str = line.strip()
+                break
             
-    if not size_str:
-        print(f"❌ Cannot get size for {vps_path}: {res.stderr}")
+    if not size_str or not size_str.isdigit():
+        print(f"❌ Cannot get size for {vps_path}: {size_str}")
         return False
         
     total_size = int(size_str)
@@ -37,18 +46,22 @@ def download_file_chunked(vps_path: str, local_path: str, chunk_size: int = 3500
             read_len = min(chunk_size, total_size - offset)
             snippet = f"import sys, base64; f=open('{vps_path}', 'rb'); f.seek({offset}); sys.stdout.write(base64.b64encode(f.read({read_len})).decode())"
             py_cmd = f"python3 -c \"{snippet}\""
-            res = subprocess.run(["python", "scripts/vps_runner.py", py_cmd], capture_output=True, text=True, encoding="utf-8")
-            b64_part = ""
-            rec = False
-            for line in res.stdout.splitlines():
-                if line.startswith("STDOUT:"):
-                    rec = True
-                    continue
-                if line.startswith("STDERR:") or line.startswith("EXIT_CODE:"):
-                    rec = False
-                    continue
-                if rec:
-                    b64_part += line.strip()
+            if run_vps_cmd:
+                res_c = run_vps_cmd(py_cmd)
+                b64_part = res_c.get("stdout", "").strip()
+            else:
+                res = subprocess.run(["python", "scripts/vps_runner.py", py_cmd], capture_output=True, text=True, encoding="utf-8")
+                b64_part = ""
+                rec = False
+                for line in res.stdout.splitlines():
+                    if line.startswith("STDOUT:"):
+                        rec = True
+                        continue
+                    if line.startswith("STDERR:") or line.startswith("EXIT_CODE:"):
+                        rec = False
+                        continue
+                    if rec:
+                        b64_part += line.strip()
             if not b64_part:
                 print(f"❌ Failed to fetch chunk at offset {offset}")
                 return False

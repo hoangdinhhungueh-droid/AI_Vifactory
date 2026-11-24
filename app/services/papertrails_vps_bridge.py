@@ -47,8 +47,8 @@ def render_papertrails_on_vps(
     if not timeline_path.exists():
         raise FileNotFoundError(f"Timeline JSON not found: {timeline_path}")
 
-    # Detect if we are running directly on VPS or locally via vps_runner
-    is_vps_host = Path("/root/video_factory").exists()
+    # Detect if we are running directly on VPS (Linux) or locally via vps_runner
+    is_vps_host = os.name != "nt" and Path("/root/video_factory").exists()
 
     if is_vps_host:
         return _render_local_vps(
