@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ==============================================================================
 # S1: IDEATION CONTRACTS
@@ -321,6 +321,11 @@ class StorySceneLine(BaseModel):
         default=None,
         description="stamp | ruler_measure | compass_arc | cutout | none"
     )
+
+    @field_validator("line_id", mode="before")
+    @classmethod
+    def coerce_line_id(cls, v: Any) -> str:
+        return str(v) if v is not None else ""
 
 
 class StoryScriptBeat(BaseModel):

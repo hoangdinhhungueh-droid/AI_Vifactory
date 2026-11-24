@@ -1666,7 +1666,7 @@ def _render_claim_sentence(
                     f"{fact_clean}, demonstrating the core transactional flow.",
                     f"evidence tracking the financial architecture shows that {fact_clean}.",
                     f"{fact_clean}, creating an underlying structural distortion.",
-                    f"detailed operational audit records show that {fact_clean}.",
+                    f"detailed operational records show that {fact_clean}.",
                 ]
             elif role_slot == "crack":
                 tails = [
