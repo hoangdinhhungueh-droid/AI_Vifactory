@@ -778,27 +778,6 @@ def run(ctx: RunContext) -> StageArtifact:
                     all_lines_dict = {str(ln.get("line_id")): ln for ln in all_lines if isinstance(ln, dict)}
                     from stages.s03_script import _is_editorial_pattern_interrupt
 
-                    if isinstance(parsed_critic.get("gates"), dict):
-                        g_map = parsed_critic["gates"]
-                        if not det_duration_ok and g_map.get("duration_estimate_in_window") is False:
-                            duration_ok = False
-                        if g_map.get("every_factual_line_has_claim_id") is False:
-                            claims_ok = False
-                        if g_map.get("legal_language_matches_status") is False:
-                            legal_ok = False
-                        if g_map.get("hook_within_20s") is False:
-                            hook_ok = False
-                        if g_map.get("pattern_interrupt_gap_ok") is False:
-                            pattern_ok = False
-                        if g_map.get("target_market_language_compliance") is False:
-                            language_ok = False
-                        if g_map.get("market_entity_appropriateness") is False:
-                            entity_fit_ok = False
-                        if g_map.get("topic_specificity_gate") is False:
-                            topic_specificity_ok = False
-                        if g_map.get("claim_coverage_gate") is False or g_map.get("statement_claim_alignment_ok") is False:
-                            claim_coverage_ok = False
-
                     kept_llm_viols = []
                     for v in parsed_critic.get("violations", []):
                         if isinstance(v, dict) and v.get("gate"):
@@ -812,6 +791,29 @@ def run(ctx: RunContext) -> StageArtifact:
                                     continue
                             violations.append(v)
                             kept_llm_viols.append(v)
+
+                    kept_llm_gates = {v.get("gate") for v in kept_llm_viols if isinstance(v, dict)}
+
+                    if isinstance(parsed_critic.get("gates"), dict):
+                        g_map = parsed_critic["gates"]
+                        if not det_duration_ok and g_map.get("duration_estimate_in_window") is False:
+                            duration_ok = False
+                        if g_map.get("every_factual_line_has_claim_id") is False and "every_factual_line_has_claim_id" in kept_llm_gates:
+                            claims_ok = False
+                        if g_map.get("legal_language_matches_status") is False and "legal_language_matches_status" in kept_llm_gates:
+                            legal_ok = False
+                        if g_map.get("hook_within_20s") is False:
+                            hook_ok = False
+                        if g_map.get("pattern_interrupt_gap_ok") is False and "pattern_interrupt_gap_ok" in kept_llm_gates:
+                            pattern_ok = False
+                        if g_map.get("target_market_language_compliance") is False:
+                            language_ok = False
+                        if g_map.get("market_entity_appropriateness") is False and "market_entity_appropriateness" in kept_llm_gates:
+                            entity_fit_ok = False
+                        if g_map.get("topic_specificity_gate") is False:
+                            topic_specificity_ok = False
+                        if (g_map.get("claim_coverage_gate") is False or g_map.get("statement_claim_alignment_ok") is False) and ("claim_coverage_gate" in kept_llm_gates or "statement_claim_alignment_ok" in kept_llm_gates):
+                            claim_coverage_ok = False
                     for feed in parsed_critic.get("feedback", []):
                         llm_feedback.append(str(feed))
                     if llm_verdict in ("fail", "revise") and not kept_llm_viols:

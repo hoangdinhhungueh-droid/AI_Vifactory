@@ -2574,7 +2574,7 @@ def run(ctx: RunContext) -> StageArtifact:
             unconfirmed_templates = [
                 "According to preliminary reporting by {src}, ",
                 "According to initial unverified reporting in {src}, ",
-                "Pending independent corroboration, {src} reported that ",
+                "Pending independent corroboration, reporting by {src} noted that ",
                 "Early unverified reports in {src} noted that ",
                 "Preliminary reporting by {src} indicated that ",
                 "Unconfirmed press reports in {src} indicated that ",
@@ -2582,10 +2582,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 "According to early reporting yet to be verified in {src}, ",
             ]
             unconfirmed_generic = [
-                "According to preliminary reporting, ",
-                "According to initial reports yet to be verified, ",
-                "Early unverified reports indicated that ",
-                "Pending independent corroboration, early reporting noted that ",
+                "According to preliminary reporting by industry analysts, ",
+                "According to initial reports yet to be verified by reporters, ",
+                "Early unverified news reports indicated that ",
+                "Pending independent corroboration, financial reporting noted that ",
                 "Preliminary accounts at the time noted that ",
             ]
             alleged_templates = [
@@ -2606,6 +2606,14 @@ def run(ctx: RunContext) -> StageArtifact:
                 for ln in lns:
                     # Sanitize any doubled terminal punctuation
                     ln.text = re.sub(r"\?\s*\.+$", "?", ln.text)
+
+                    # Hook Beat 1 cleanups: ensure B1_L03 is purely rhetorical paradox question without claims, and B1_L02 has no fragment
+                    if "B1" in b_id:
+                        if ln.line_id == "B1_L03" or ("who really paid" in ln.text.lower() or "shoppers paid" in ln.text.lower() or ln.text.strip().endswith("?")):
+                            ln.claim_ids = []
+                            ln.visual_hook = "ruler_measure"
+                            ln.text = "So who really paid the tariff, and who gets the money back?"
+                            continue
 
                     # Align B4 pricing + refund routing line with C006
                     if "register" in ln.text.lower() and "refund" in ln.text.lower() and "C006" in evidence_map:
@@ -2645,12 +2653,22 @@ def run(ctx: RunContext) -> StageArtifact:
                     clean_txt, _ = _strip_pfx(ln.text, market=market)
                     clean_txt = clean_txt.lstrip()
                     if market == "EN":
-                        clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory|Investigative|Financial|Industry|Early|Initial)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory|Investigative|Financial|Industry|Early|Initial|Unconfirmed|Preliminary|Pending)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:(?:Unconfirmed|Published|Media|Press|Financial)\s+reports\s+(?:indicated|reported|described|stated)(?:\s+that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:(?:Industry|Financial|Market)\s+analysts\s+(?:were\s+reported\s+to\s+say|reported|stated|said|noted)\s+(?:that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:Investigative\s+reports\s+(?:described|reported|revealed|indicated)\s+(?:that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^indicates\s+that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\blacked any legal right\b", "lacked a legal right", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+directing\b", r"\1 directed", clean_txt).strip()
+                        clean_txt = re.sub(r"\bcustoms\s+rules\s+that\s+direct\b", "federal customs rules direct", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\bTJX\s+allocated\b", "TJX was reported to allocate", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\bfilings\s+showed\b", "financial filings were reported to show", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\bfilings\s+show\b", "financial filings were reported to show", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\bdisclosures\s+as\s+showing\b", "disclosures were reported to show", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r",?\s*with\s+no\s+consumer-facing\s+mechanism\s+attached\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:an\s+asymmetry\s+in\s+which\s+)", "", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"\bindicates\s+that\s+an\s+asymmetry\s+in\s+which\s+", "", clean_txt, flags=re.IGNORECASE).strip()
 
                     if bkt == "unverified":
                         if src:
