@@ -239,20 +239,26 @@ def _validate_rendered_clips(ctx: RunContext, clips: list[dict]) -> list[Path]:
 def _find_remotion_cli(repo_root: Optional[Path] = None) -> Optional[list[str]]:
     """Detects Remotion CLI command if available on VPS or local system."""
     import shutil
-    remotion_vps = Path("/root/video_factory/remotion/node_modules/.bin/remotion")
-    if remotion_vps.exists() and os.access(str(remotion_vps), os.X_OK):
-        return [str(remotion_vps)]
+    try:
+        remotion_vps = Path("/root/video_factory/remotion/node_modules/.bin/remotion")
+        if remotion_vps.is_file() and os.access(str(remotion_vps), os.X_OK):
+            return [str(remotion_vps)]
+    except (PermissionError, OSError) as _vps_err:
+        logger.debug("VPS Remotion CLI probe error: %s", _vps_err)
+
     if repo_root:
-        local_cand = repo_root / "remotion" / "node_modules" / ".bin" / "remotion"
-        if local_cand.exists():
-            return [str(local_cand)]
-        local_cmd = repo_root / "remotion" / "node_modules" / ".bin" / "remotion.cmd"
-        if local_cmd.exists():
-            return [str(local_cmd)]
+        try:
+            local_cand = repo_root / "remotion" / "node_modules" / ".bin" / "remotion"
+            if local_cand.is_file() and os.access(str(local_cand), os.X_OK):
+                return [str(local_cand)]
+            local_cmd = repo_root / "remotion" / "node_modules" / ".bin" / "remotion.cmd"
+            if local_cmd.is_file():
+                return [str(local_cmd)]
+        except (PermissionError, OSError) as _loc_err:
+            logger.debug("Local Remotion CLI probe error: %s", _loc_err)
+
     if shutil.which("remotion"):
         return ["remotion"]
-    if shutil.which("npx"):
-        return ["npx", "remotion"]
     return None
 
 
