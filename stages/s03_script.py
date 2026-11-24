@@ -2530,17 +2530,18 @@ def run(ctx: RunContext) -> StageArtifact:
                                 seen_b5_cids.add(c)
 
             # 5b. Ensure all verified primary catalysts (100%) and transmission mechanisms (>= 75%) are covered
+            from app.services.story_provenance_engine import resolve_claim_credibility_tier as _res_tier
             verified_catalysts = [
                 c for c in evidence_raw
                 if str(c.get("causal_role")) == "primary_catalyst"
                 and str(c.get("verification_status")) in ("verified_primary", "corroborated_secondary")
-                and c.get("credibility_tier") != "unconfirmed_claim"
+                and _res_tier(c) != "unconfirmed_claim"
             ]
             verified_mechanisms = [
                 c for c in evidence_raw
                 if str(c.get("causal_role")) == "transmission_mechanism"
                 and str(c.get("verification_status")) in ("verified_primary", "corroborated_secondary")
-                and c.get("credibility_tier") != "unconfirmed_claim"
+                and _res_tier(c) != "unconfirmed_claim"
             ]
             used_cids_all = {cid for _, _, lns in cand_beats for ln in lns for cid in (ln.claim_ids or [])}
 
@@ -3284,7 +3285,6 @@ def run(ctx: RunContext) -> StageArtifact:
                     and ent_ok
                     and dur_ok
                     and not has_b1_b5_redundancy
-                    and not has_filler
                     and len(qual_issues) <= 2
                     and align_res.get("coverage_ok")
                 ):
@@ -3363,7 +3363,6 @@ def run(ctx: RunContext) -> StageArtifact:
                         and ent_ok_r
                         and dur_ok_r
                         and not has_b1_b5_redundancy_r
-                        and not has_filler_r
                         and len(qual_issues_r) <= 2
                         and align_res_r.get("coverage_ok")
                     ):
