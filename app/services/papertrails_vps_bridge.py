@@ -25,7 +25,7 @@ def render_papertrails_on_vps(
     quality: str = "high",
     sfx: bool = True,
     gpu: bool = False,
-    timeout_sec: int = 7200,
+    timeout_sec: int = 18000,
 ) -> Dict[str, Any]:
     """Renders a Papertrails timeline into an MP4 video using Playwright on VPS.
 
@@ -196,43 +196,59 @@ def _render_via_vps_runner(
             if not up_ok:
                 raise RuntimeError(f"Failed to upload audio to VPS: {vps_audio}")
 
-    # 2. Trigger render script on VPS in background with log monitoring
+    # 2. Check if final video already exists or a render process is currently running on VPS
     vps_log = f"{vps_run_dir}/render.log"
-    run_vps_cmd(f"rm -f '{vps_log}'")
-    sfx_flag = "--sfx" if sfx else ""
-    gpu_flag = "--gpu" if gpu else ""
-    bg_cmd = (
-        f"cd /root/video_factory/vox/papertrails_engine && "
-        f"env -u NODE_CHANNEL_FD -u NODE_CHANNEL_SERIALIZATION_MODE -u NODE_APP_INSTANCE "
-        f"nohup node scripts/render.mjs '{vps_timeline}' '{vps_output}' --quality {quality} {sfx_flag} {gpu_flag} > '{vps_log}' 2>&1 & echo $!"
-    )
 
-    logger.info(f"[papertrails_vps_bridge] Dispatching background render on VPS: {bg_cmd}")
-    res = run_vps_cmd(bg_cmd, timeout=30)
-    pid_str = res.get("stdout", "").strip()
-    pid = pid_str.splitlines()[-1].strip() if pid_str else ""
-    logger.info(f"[papertrails_vps_bridge] Render started with PID {pid}")
+    # Check if final output already rendered and non-empty (>1MB)
+    stat_out = run_vps_cmd(f"stat -c %s '{vps_output}' 2>/dev/null || echo 0")
+    out_size = int(stat_out.get("stdout", "0").strip()) if stat_out.get("stdout", "").strip().isdigit() else 0
 
-    poll_start = time.time()
-    last_log_line = ""
-    while time.time() - poll_start < timeout_sec:
-        time.sleep(5)
-        # Check if process is still running
-        ps_chk = run_vps_cmd(f"ps -p {pid} -o pid=")
-        running = bool(ps_chk.get("stdout", "").strip())
-
-        # Read latest log progress
-        tail_chk = run_vps_cmd(f"tail -n 2 '{vps_log}'")
-        latest = tail_chk.get("stdout", "").strip()
-        if latest and latest != last_log_line:
-            last_log_line = latest
-            logger.info(f"[papertrails_vps_bridge] VPS: {latest}")
-
-        if not running:
-            logger.info(f"[papertrails_vps_bridge] Process PID {pid} exited.")
-            break
+    pid = None
+    if out_size > 1000000:
+        logger.info(f"[papertrails_vps_bridge] Final video already exists on VPS ({out_size} bytes). Skipping render dispatch.")
     else:
-        raise TimeoutError(f"VPS render timed out after {timeout_sec} seconds")
+        # Check if an existing render process is already active
+        ps_chk = run_vps_cmd(f"pgrep -f 'node scripts/render.mjs.*{ep_id}'")
+        pids = [p.strip() for p in ps_chk.get("stdout", "").splitlines() if p.strip().isdigit()]
+        if pids:
+            pid = pids[0]
+            logger.info(f"[papertrails_vps_bridge] Found existing active render process on VPS with PID {pid}. Attaching to monitor...")
+        else:
+            run_vps_cmd(f"rm -f '{vps_log}'")
+            sfx_flag = "--sfx" if sfx else ""
+            gpu_flag = "--gpu" if gpu else ""
+            bg_cmd = (
+                f"cd /root/video_factory/vox/papertrails_engine && "
+                f"env -u NODE_CHANNEL_FD -u NODE_CHANNEL_SERIALIZATION_MODE -u NODE_APP_INSTANCE "
+                f"nohup node scripts/render.mjs '{vps_timeline}' '{vps_output}' --quality {quality} {sfx_flag} {gpu_flag} > '{vps_log}' 2>&1 & echo $!"
+            )
+            logger.info(f"[papertrails_vps_bridge] Dispatching background render on VPS: {bg_cmd}")
+            res = run_vps_cmd(bg_cmd, timeout=30)
+            pid_str = res.get("stdout", "").strip()
+            pid = pid_str.splitlines()[-1].strip() if pid_str else ""
+            logger.info(f"[papertrails_vps_bridge] Render started with PID {pid}")
+
+    if pid:
+        poll_start = time.time()
+        last_log_line = ""
+        while time.time() - poll_start < timeout_sec:
+            time.sleep(10)
+            # Check if process is still running
+            ps_chk = run_vps_cmd(f"ps -p {pid} -o pid=")
+            running = bool(ps_chk.get("stdout", "").strip())
+
+            # Read latest log progress
+            tail_chk = run_vps_cmd(f"tail -n 1 '{vps_log}'")
+            latest = tail_chk.get("stdout", "").strip()
+            if latest and latest != last_log_line:
+                last_log_line = latest
+                logger.info(f"[papertrails_vps_bridge] VPS: {latest}")
+
+            if not running:
+                logger.info(f"[papertrails_vps_bridge] Process PID {pid} exited.")
+                break
+        else:
+            raise TimeoutError(f"VPS render timed out after {timeout_sec} seconds")
 
     # Verify output exists
     chk_res = run_vps_cmd(f"ls -la '{vps_output}'")
@@ -246,7 +262,7 @@ def _render_via_vps_runner(
     # 3. Retrieve output MP4 from VPS to local output_mp4 using robust chunked downloader
     logger.info(f"[papertrails_vps_bridge] Downloading rendered MP4 from VPS to {output_mp4}...")
     from scripts.download_vps_asset import download_file_chunked
-    dl_ok = download_file_chunked(vps_output, str(output_mp4), chunk_size=32768)
+    dl_ok = download_file_chunked(vps_output, str(output_mp4), chunk_size=262144)
     if not dl_ok or not output_mp4.exists() or output_mp4.stat().st_size < 1000:
         logger.warning(f"[papertrails_vps_bridge] Chunked download failed, trying direct base64 fallback...")
         download_cmd = f"python3 -c 'import base64; print(base64.b64encode(open(\"{vps_output}\", \"rb\").read()).decode(\"ascii\"))'"
