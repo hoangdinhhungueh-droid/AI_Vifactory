@@ -1,77 +1,201 @@
 #!/usr/bin/env python3
-"""scripts/download_vps_asset.py — Safe chunked downloader from Hetzner VPS via vps_runner."""
+"""scripts/download_vps_asset.py — Multi-endpoint parallel chunked downloader from Hetzner VPS."""
 
 import base64
+import hashlib
+import json
 import os
-import subprocess
 import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
-try:
-    from scripts.vps_runner import run_vps_cmd
-except ImportError:
-    run_vps_cmd = None
+import requests
+from requests.adapters import HTTPAdapter
 
-def download_file_chunked(vps_path: str, local_path: str, chunk_size: int = 65536) -> bool:
-    # 1. Get total size
-    cmd_size = f"stat -c %s {vps_path}"
-    if run_vps_cmd:
-        res_size = run_vps_cmd(cmd_size)
-        size_str = res_size.get("stdout", "").strip()
-    else:
-        res = subprocess.run(["python", "scripts/vps_runner.py", cmd_size], capture_output=True, text=True, encoding="utf-8")
-        size_str = ""
-        rec = False
-        for line in res.stdout.splitlines():
-            if line.startswith("STDOUT:"):
-                rec = True
-                continue
-            if line.startswith("STDERR:") or line.startswith("EXIT_CODE:"):
-                rec = False
-                continue
-            if rec and line.strip().isdigit():
-                size_str = line.strip()
-                break
-            
-    if not size_str or not size_str.isdigit():
-        print(f"❌ Cannot get size for {vps_path}: {size_str}")
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.vps_runner import ENDPOINTS, FastVPSClient, get_client
+
+
+def _make_worker_session(ep_idx: int, verify_tls: bool):
+    client = FastVPSClient(endpoint_idx=ep_idx, auto_connect=True)
+    ep = client.ep
+    sess = requests.Session()
+    adapter = HTTPAdapter(pool_connections=4, pool_maxsize=4)
+    sess.mount("https://", adapter)
+    sess.mount("http://", adapter)
+    headers = {
+        "Authorization": f"Bearer {ep['token']}",
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Antigravity/2.0",
+    }
+    if ep.get("cf_id"):
+        headers["CF-Access-Client-Id"] = ep["cf_id"]
+    if ep.get("cf_secret"):
+        headers["CF-Access-Client-Secret"] = ep["cf_secret"]
+    return {
+        "client": client,
+        "url": ep["url"],
+        "session": sess,
+        "headers": headers,
+        "session_id": client.session_id,
+        "lock": threading.Lock(),
+        "verify_tls": verify_tls,
+    }
+
+
+def download_file_chunked(
+    vps_path: str,
+    local_path: str,
+    chunk_size: int = 5997,
+    max_workers: int = 16,
+) -> bool:
+    """Downloads a file from VPS using parallel independent sessions across available endpoints."""
+    # MCP run_command truncates stdout at 8000 chars; 5997 raw bytes = 7996 base64 chars.
+    eff_chunk = min(max(int(chunk_size), 1024), 5997)
+    # Keep multiple of 3 for clean base64 alignment
+    eff_chunk = eff_chunk - (eff_chunk % 3)
+
+    client = get_client()
+    meta_res = client.run_command(
+        f"test -f '{vps_path}' && stat -c %s '{vps_path}' && sha256sum '{vps_path}' | awk '{{print $1}}'"
+    )
+    lines = [ln.strip() for ln in (meta_res.get("stdout") or "").splitlines() if ln.strip()]
+    if len(lines) < 1 or not lines[0].isdigit():
+        print(f"[download_vps_asset] Cannot stat remote file {vps_path}: {meta_res}", flush=True)
         return False
-        
-    total_size = int(size_str)
-    print(f"📥 Downloading {vps_path} ({total_size:,} bytes) ➔ {local_path}...")
+
+    total_size = int(lines[0])
+    remote_sha = lines[1] if len(lines) > 1 and len(lines[1]) == 64 else None
+    print(
+        f"[download_vps_asset] Downloading {vps_path} ({total_size:,} bytes) -> {local_path} "
+        f"(chunk={eff_chunk}, workers={max_workers})...",
+        flush=True,
+    )
+
+    if total_size == 0:
+        os.makedirs(os.path.dirname(os.path.abspath(local_path)), exist_ok=True)
+        Path(local_path).write_bytes(b"")
+        return True
+
+    verify_tls = os.getenv("ALLOW_INSECURE_TLS", "").lower() not in ("1", "true", "yes")
+    num_eps = max(1, len(ENDPOINTS))
+    with ThreadPoolExecutor(max_workers=max_workers) as init_pool:
+        worker_pool = list(
+            init_pool.map(lambda idx: _make_worker_session(idx % num_eps, verify_tls), range(max_workers))
+        )
+
+    chunks = []
+    req_id = 1000
+    for idx, offset in enumerate(range(0, total_size, eff_chunk)):
+        read_len = min(eff_chunk, total_size - offset)
+        req_id += 1
+        chunks.append((idx, offset, read_len, req_id))
+
+    def fetch_one(item):
+        idx, offset, read_len, r_id = item
+        w = worker_pool[idx % len(worker_pool)]
+        cmd = f"tail -c +{offset + 1} '{vps_path}' | head -c {read_len} | base64 -w 0"
+        payload = {
+            "jsonrpc": "2.0",
+            "id": r_id,
+            "method": "tools/call",
+            "params": {"name": "run_command", "arguments": {"command": cmd, "confirm": True, "timeout": 30}},
+        }
+        last_err = None
+        for attempt in range(5):
+            with w["lock"]:
+                headers = dict(w["headers"])
+                if w["session_id"]:
+                    headers["mcp-session-id"] = w["session_id"]
+                try:
+                    resp = w["session"].post(
+                        w["url"],
+                        json=payload,
+                        headers=headers,
+                        timeout=35,
+                        verify=w["verify_tls"],
+                    )
+                    if resp.status_code in (400, 404, 410):
+                        w["session_id"] = w["client"].init_session()
+                        continue
+                    resp.raise_for_status()
+                    for line in resp.text.splitlines():
+                        if line.startswith("data: "):
+                            data = json.loads(line[6:])
+                            content = data.get("result", {}).get("content", [])
+                            if content:
+                                ret = json.loads(content[0].get("text", "{}"))
+                                b64_str = (ret.get("stdout") or "").strip()
+                                if b64_str:
+                                    raw = base64.b64decode(b64_str)
+                                    if len(raw) == read_len:
+                                        return offset, raw
+                                    last_err = ValueError(f"Expected {read_len}B, got {len(raw)}B")
+                except Exception as exc:
+                    last_err = exc
+            time.sleep(0.3 * (attempt + 1))
+        raise RuntimeError(f"Failed chunk offset={offset} len={read_len}: {last_err}")
 
     os.makedirs(os.path.dirname(os.path.abspath(local_path)), exist_ok=True)
-    with open(local_path, "wb") as out_f:
-        offset = 0
-        while offset < total_size:
-            read_len = min(chunk_size, total_size - offset)
-            snippet = f"import sys, base64; f=open('{vps_path}', 'rb'); f.seek({offset}); sys.stdout.write(base64.b64encode(f.read({read_len})).decode())"
-            py_cmd = f"python3 -c \"{snippet}\""
-            if run_vps_cmd:
-                res_c = run_vps_cmd(py_cmd)
-                b64_part = res_c.get("stdout", "").strip()
-            else:
-                res = subprocess.run(["python", "scripts/vps_runner.py", py_cmd], capture_output=True, text=True, encoding="utf-8")
-                b64_part = ""
-                rec = False
-                for line in res.stdout.splitlines():
-                    if line.startswith("STDOUT:"):
-                        rec = True
-                        continue
-                    if line.startswith("STDERR:") or line.startswith("EXIT_CODE:"):
-                        rec = False
-                        continue
-                    if rec:
-                        b64_part += line.strip()
-            if not b64_part:
-                print(f"❌ Failed to fetch chunk at offset {offset}")
-                return False
-            raw_chunk = base64.b64decode(b64_part)
-            out_f.write(raw_chunk)
-            offset += len(raw_chunk)
-            pct = (offset / total_size) * 100
-            print(f"   [{pct:5.1f}%] {offset:,} / {total_size:,} bytes", end="\r")
-    print(f"\n✅ Finished downloading {local_path} ({os.path.getsize(local_path):,} bytes).")
+    tmp_path = f"{local_path}.part"
+    write_lock = threading.Lock()
+    t0 = time.time()
+    completed = 0
+    total_chunks = len(chunks)
+
+    with open(tmp_path, "wb") as out_f:
+        out_f.truncate(total_size)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(fetch_one, c) for c in chunks]
+            for fut in as_completed(futures):
+                offset, raw = fut.result()
+                with write_lock:
+                    out_f.seek(offset)
+                    out_f.write(raw)
+                completed += 1
+                if completed % 250 == 0 or completed == total_chunks:
+                    elapsed = max(0.1, time.time() - t0)
+                    pct = (completed / total_chunks) * 100.0
+                    kbps = (completed * eff_chunk) / 1024.0 / elapsed
+                    print(
+                        f"   [{pct:5.1f}%] {completed}/{total_chunks} chunks ({kbps:.1f} KB/s)",
+                        flush=True,
+                    )
+
+    for w in worker_pool:
+        try:
+            w["session"].close()
+            w["client"].close()
+        except Exception:
+            pass
+
+    if os.path.exists(local_path):
+        os.replace(tmp_path, local_path)
+    else:
+        os.rename(tmp_path, local_path)
+
+    if remote_sha:
+        h = hashlib.sha256()
+        with open(local_path, "rb") as f:
+            while True:
+                blk = f.read(65536)
+                if not blk:
+                    break
+                h.update(blk)
+        local_sha = h.hexdigest()
+        if local_sha != remote_sha:
+            print(f"[download_vps_asset] SHA256 mismatch! remote={remote_sha} local={local_sha}", flush=True)
+            return False
+        print(f"[download_vps_asset] Verified SHA256={local_sha[:16]}... ({os.path.getsize(local_path):,} bytes)", flush=True)
+
     return True
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

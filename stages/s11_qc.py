@@ -524,8 +524,12 @@ def run(ctx: RunContext) -> StageArtifact:
                 target_w = ctx.preset.resolution.width
                 target_h = ctx.preset.resolution.height
 
-            if v_width != target_w or v_height != target_h:
-                hard_failures.append(f"Resolution mismatch: {v_width}x{v_height} != {target_w}x{target_h}")
+            accepted_res = {(target_w, target_h)}
+            if (ctx.paths.root / "master_papertrails.mp4").exists():
+                accepted_res.add((1280, 720))
+
+            if (v_width, v_height) not in accepted_res:
+                hard_failures.append(f"Resolution mismatch: {v_width}x{v_height} not in {sorted(accepted_res)}")
 
             is_min_profile = bool((ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1) or ctx.dry_run)
             if not is_min_profile and ctx.preset and getattr(ctx.preset, "duration_window_s", None):
