@@ -145,7 +145,7 @@ def _render_via_vps_runner(
     timeout_sec: int,
 ) -> Dict[str, Any]:
     """Executes render remotely from Windows workstation to VPS via vps_runner."""
-    from scripts.vps_runner import run_vps_command
+    from scripts.vps_runner import run_vps_cmd
 
     vps_episodes_dir = Path("/root/video_factory/runs")
     ep_id = timeline_path.parent.name
@@ -163,14 +163,14 @@ def _render_via_vps_runner(
     vps_timeline_content = json.dumps(t_json, indent=2, ensure_ascii=False)
 
     setup_cmd = f"mkdir -p {vps_run_dir} /root/video_factory/vox/papertrails_engine"
-    run_vps_command(setup_cmd)
+    run_vps_cmd(setup_cmd)
 
     # Upload timeline.json to VPS
     # Using python base64 write on VPS to avoid shell escaping issues
     import base64
     b64_timeline = base64.b64encode(vps_timeline_content.encode("utf-8")).decode("ascii")
     write_cmd = f"python3 -c 'import base64; open(\"{vps_timeline}\", \"wb\").write(base64.b64decode(\"{b64_timeline}\"))'"
-    run_vps_command(write_cmd)
+    run_vps_cmd(write_cmd)
 
     # If audio exists locally, upload it if needed
     local_audio = Path(t_json.get("audio", ""))
@@ -182,26 +182,61 @@ def _render_via_vps_runner(
     if local_audio.exists():
         b64_audio = base64.b64encode(local_audio.read_bytes()).decode("ascii")
         write_audio_cmd = f"python3 -c 'import base64; open(\"{vps_audio}\", \"wb\").write(base64.b64decode(\"{b64_audio}\"))'"
-        run_vps_command(write_audio_cmd)
+        run_vps_cmd(write_audio_cmd)
 
-    # 2. Trigger render script on VPS
+    # 2. Trigger render script on VPS in background with log monitoring
+    vps_log = f"{vps_run_dir}/render.log"
+    run_vps_cmd(f"rm -f '{vps_log}'")
     sfx_flag = "--sfx" if sfx else ""
     gpu_flag = "--gpu" if gpu else ""
-    render_cmd = (
+    bg_cmd = (
         f"cd /root/video_factory/vox/papertrails_engine && "
-        f"node scripts/render.mjs {vps_timeline} {vps_output} --quality {quality} {sfx_flag} {gpu_flag}"
+        f"env -u NODE_CHANNEL_FD -u NODE_CHANNEL_SERIALIZATION_MODE -u NODE_APP_INSTANCE "
+        f"nohup node scripts/render.mjs '{vps_timeline}' '{vps_output}' --quality {quality} {sfx_flag} {gpu_flag} > '{vps_log}' 2>&1 & echo $!"
     )
 
-    logger.info(f"[papertrails_vps_bridge] Dispatching render to VPS: {render_cmd}")
-    stdout, stderr, code = run_vps_command(render_cmd, timeout_seconds=timeout_sec)
-    if code != 0:
-        raise RuntimeError(f"VPS Render failed (exit {code}):\nSTDERR: {stderr}\nSTDOUT: {stdout}")
+    logger.info(f"[papertrails_vps_bridge] Dispatching background render on VPS: {bg_cmd}")
+    res = run_vps_cmd(bg_cmd, timeout=30)
+    pid_str = res.get("stdout", "").strip()
+    pid = pid_str.splitlines()[-1].strip() if pid_str else ""
+    logger.info(f"[papertrails_vps_bridge] Render started with PID {pid}")
+
+    poll_start = time.time()
+    last_log_line = ""
+    while time.time() - poll_start < timeout_sec:
+        time.sleep(5)
+        # Check if process is still running
+        ps_chk = run_vps_cmd(f"ps -p {pid} -o pid=")
+        running = bool(ps_chk.get("stdout", "").strip())
+
+        # Read latest log progress
+        tail_chk = run_vps_cmd(f"tail -n 2 '{vps_log}'")
+        latest = tail_chk.get("stdout", "").strip()
+        if latest and latest != last_log_line:
+            last_log_line = latest
+            logger.info(f"[papertrails_vps_bridge] VPS: {latest}")
+
+        if not running:
+            logger.info(f"[papertrails_vps_bridge] Process PID {pid} exited.")
+            break
+    else:
+        raise TimeoutError(f"VPS render timed out after {timeout_sec} seconds")
+
+    # Verify output exists
+    chk_res = run_vps_cmd(f"ls -la '{vps_output}'")
+    chk_out = chk_res.get("stdout", "")
+    if "No such file" in chk_out or not chk_out.strip():
+        err_log = run_vps_cmd(f"cat '{vps_log}'").get("stdout", "")
+        raise RuntimeError(f"VPS Render failed: output MP4 not found. Full log:\n{err_log}")
 
     logger.info("[papertrails_vps_bridge] VPS Render command succeeded.")
 
     # 3. Retrieve output MP4 from VPS to local output_mp4
     download_cmd = f"python3 -c 'import base64; print(base64.b64encode(open(\"{vps_output}\", \"rb\").read()).decode(\"ascii\"))'"
-    b64_out, b_err, b_code = run_vps_command(download_cmd, timeout_seconds=120)
+    res_dl = run_vps_cmd(download_cmd, timeout=120)
+    b64_out = res_dl.get("stdout", "")
+    b_err = res_dl.get("stderr", "")
+    b_code = res_dl.get("exit_code", 1)
     if b_code == 0 and b64_out.strip():
         output_mp4.write_bytes(base64.b64decode(b64_out.strip()))
         logger.info(f"[papertrails_vps_bridge] Downloaded final.mp4 ({output_mp4.stat().st_size} bytes)")
