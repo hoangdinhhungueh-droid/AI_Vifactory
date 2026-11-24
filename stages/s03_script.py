@@ -2652,6 +2652,10 @@ def run(ctx: RunContext) -> StageArtifact:
                     b1_ok = bool(cand_beats and len(cand_beats[0][2]) >= 3 and b1_dur_ok and not align_res.get("beat1_unverified_elevation"))
                     units_ok = u_min <= cand_units <= u_max
                     dur_ok = (d_min <= cand_dur <= d_max) and units_ok
+                    b1_cids = {cid for ln in (cand_beats[0][2] if cand_beats else []) for cid in (ln.claim_ids or [])}
+                    b5_cids = {cid for ln in (cand_beats[-1][2] if cand_beats else []) for cid in (ln.claim_ids or [])}
+                    shared_b1_b5 = b1_cids & b5_cids
+                    has_b1_b5_redundancy = bool(shared_b1_b5) and len(evidence_raw) >= 8
                     passed = (
                         len(cand_beats) == 5
                         and b1_ok
@@ -2661,9 +2665,10 @@ def run(ctx: RunContext) -> StageArtifact:
                         and not qual_issues
                         and not has_filler
                         and not has_hollow_line
+                        and not has_b1_b5_redundancy
                         and align_res.get("passed", False)
                     )
-                    return passed, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler
+                    return passed, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler, has_b1_b5_redundancy
 
                 def _auto_repair_beats(cand_beats: List[Tuple[str, float, List[StorySceneLine]]]) -> List[Tuple[str, float, List[StorySceneLine]]]:
                     from app.services.story_provenance_engine import (
@@ -2834,16 +2839,18 @@ def run(ctx: RunContext) -> StageArtifact:
                 )
                 llm_beats = _parse_and_build_llm_beats(raw_response)
                 llm_beats = _auto_repair_beats(llm_beats)
-                passed_pre, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler = _eval_llm_beats(llm_beats)
+                passed_pre, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler, has_b1_b5_redundancy = _eval_llm_beats(llm_beats)
 
                 if not passed_pre and (
                     len(llm_beats) == 5
                     and b1_ok
                     and lang_ok
                     and ent_ok
+                    and dur_ok
+                    and not has_b1_b5_redundancy
+                    and not has_filler
                     and len(qual_issues) <= 1
                     and align_res.get("coverage_ok")
-                    and u_min <= cand_timing["spoken_units"] <= u_max
                 ):
                     passed_pre = True
 
@@ -2851,6 +2858,8 @@ def run(ctx: RunContext) -> StageArtifact:
                     repair_notes: List[str] = []
                     if has_filler:
                         repair_notes.append("Repetitive attribution disclaimers or repetitive sentence openings detected. Vary sentence beginnings and qualify assertions naturally in sentence predicates (~한 것으로 보도됐습니다 / ~한 것으로 전해졌습니다).")
+                    if has_b1_b5_redundancy:
+                        repair_notes.append("Do NOT repeat Beat 1 claims in Beat 5. Beat 5 must focus on ongoing reform, systemic consequences, and living warning.")
                     if not dur_ok or not units_ok:
                         if cand_timing["spoken_units"] < u_min:
                             shortfall = u_min - int(cand_timing["spoken_units"])
@@ -2910,15 +2919,17 @@ def run(ctx: RunContext) -> StageArtifact:
                     )
                     llm_beats_retry = _parse_and_build_llm_beats(raw_retry)
                     llm_beats_retry = _auto_repair_beats(llm_beats_retry)
-                    passed_retry, cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r, has_filler_r = _eval_llm_beats(llm_beats_retry)
+                    passed_retry, cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r, has_filler_r, has_b1_b5_redundancy_r = _eval_llm_beats(llm_beats_retry)
                     if passed_retry or (
                         len(llm_beats_retry) == 5
                         and b1_ok_r
                         and lang_ok_r
                         and ent_ok_r
+                        and dur_ok_r
+                        and not has_b1_b5_redundancy_r
+                        and not has_filler_r
                         and len(qual_issues_r) <= 1
                         and align_res_r.get("coverage_ok")
-                        and u_min <= cand_timing_r["spoken_units"] <= u_max
                     ):
                         llm_beats = llm_beats_retry
                         cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok = cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r
