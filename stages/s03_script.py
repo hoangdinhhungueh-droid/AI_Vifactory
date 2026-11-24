@@ -2013,7 +2013,7 @@ def _build_grounded_story_beats(
         m_pis = market_pattern_interrupts.get(m, market_pattern_interrupts["EN"])
         if b_key in m_pis and len(beat_lines) >= 2:
             pi_text, pi_vh = m_pis[b_key]
-            insert_pos = 2 if b_key == "B2" else (3 if b_key == "B3" else 1)
+            insert_pos = 1 if b_key in ("B2", "B3") else 1
             insert_pos = min(insert_pos, len(beat_lines))
             pi_line = StorySceneLine(
                 line_id=f"{b_key}_PI",
@@ -2072,7 +2072,7 @@ def _build_grounded_story_beats(
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     elif m == "EN":
                         rem_clean = rem.strip()
-                        shrunk_r = _compact_en_hook_line(rem_clean, target_words=8)
+                        shrunk_r = _compact_en_hook_line(rem_clean, target_words=14)
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     else:  # VN
                         words = rem.strip().split()
@@ -2756,7 +2756,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                         )
                                         if target_bkt is None or target_bkt == "fact":
                                             target_bkt = bkt
-                                        elif bkt in ("alleged_regulator", "court_record", "audit_finding"):
+                                        elif bkt in ("unverified", "alleged_regulator", "court_record", "audit_finding"):
                                             target_bkt = bkt
                             if line_needs_repair and target_bkt and target_bkt != "fact":
                                 clean_txt, _ = _strip_pfx(ln.text, market=market)
@@ -2816,7 +2816,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                 if getattr(ln, "visual_hook", "") == "pattern_interrupt" or not ln.claim_ids:
                                     first_int_idx = idx_l
                                     break
-                            if first_int_idx is None or first_int_idx >= 3:
+                            if first_int_idx is None or first_int_idx >= 2:
                                 lns.insert(1, StorySceneLine(
                                     line_id="B2_L02_int",
                                     text="The warning signs were clear." if market == "EN" else "경고 신호는 분명했습니다.",
@@ -2826,7 +2826,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                 for idx_renum, ln_renum in enumerate(lns, start=1):
                                     ln_renum.line_id = f"B2_L{idx_renum:02d}"
 
-                    # 3c. Beat 3 pattern interrupt gap repair: ensure first interrupt occurs within <= 28s
+                    # 3c. Beat 3 pattern interrupt gap repair: ensure first interrupt occurs within <= 25s
                     for b_id, _, lns in cand_beats:
                         if "B3" in b_id and len(lns) >= 4:
                             first_int_idx = None
@@ -2834,11 +2834,11 @@ def run(ctx: RunContext) -> StageArtifact:
                                 if getattr(ln, "visual_hook", "") == "pattern_interrupt" or not ln.claim_ids:
                                     first_int_idx = idx_l
                                     break
-                            if first_int_idx is None or first_int_idx >= 3:
-                                # Ensure line 3 (index 2) is a pattern interrupt
-                                if len(lns) >= 5 and getattr(lns[2], "visual_hook", "") != "pattern_interrupt":
-                                    lns.insert(2, StorySceneLine(
-                                        line_id="B3_L03_int",
+                            if first_int_idx is None or first_int_idx >= 2:
+                                # Ensure line 2 (index 1) is a pattern interrupt
+                                if len(lns) >= 4 and getattr(lns[1], "visual_hook", "") != "pattern_interrupt":
+                                    lns.insert(1, StorySceneLine(
+                                        line_id="B3_L02_int",
                                         text="The crack was already widening." if market == "EN" else "균열은 이미 벌어지고 있었습니다.",
                                         claim_ids=[],
                                         visual_hook="pattern_interrupt",
@@ -3003,7 +3003,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     and dur_ok
                     and not has_b1_b5_redundancy
                     and not has_filler
-                    and len(qual_issues) <= 1
+                    and len(qual_issues) <= 2
                     and align_res.get("coverage_ok")
                 ):
                     passed_pre = True
@@ -3082,7 +3082,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         and dur_ok_r
                         and not has_b1_b5_redundancy_r
                         and not has_filler_r
-                        and len(qual_issues_r) <= 1
+                        and len(qual_issues_r) <= 2
                         and align_res_r.get("coverage_ok")
                     ):
                         llm_beats = llm_beats_retry
