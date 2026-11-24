@@ -1644,45 +1644,42 @@ def _render_claim_sentence(
 
             pfx = p_opts[v_idx]
             fact_clean = fact_clean.strip().rstrip(". ")
-            if pfx:
-                if pfx.rstrip().endswith("that") and fact_clean and fact_clean[0].isupper():
-                    first_word = fact_clean.split()[0]
-                    if not first_word.isupper() and first_word not in (
-                        "European", "American", "Korean", "Japanese", "Vietnamese", "Article", "Under", "Review",
-                    ):
-                        fact_clean = fact_clean[0].lower() + fact_clean[1:]
+            if pfx and pfx.rstrip().endswith("that") and fact_clean:
+                first_word = fact_clean.split()[0]
+                if first_word.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several"):
+                    fact_clean = first_word.lower() + fact_clean[len(first_word):]
 
             if role_slot == "setup":
                 tails = [
-                    f"early documentation establishes that {fact_clean}.",
+                    f"early documentation indicates that {fact_clean}.",
                     f"{fact_clean}, laying the institutional foundation for subsequent transactions.",
-                    f"baseline records confirm that {fact_clean}.",
+                    f"initial public filings show that {fact_clean}.",
                     f"{fact_clean}, setting the initial framework in place.",
-                    f"initial public disclosures reveal that {fact_clean}.",
+                    f"baseline administrative records reflect that {fact_clean}.",
                 ]
             elif role_slot == "mechanism":
                 tails = [
-                    f"examining the operational mechanism confirms that {fact_clean}.",
-                    f"{fact_clean}, demonstrating the core transactional flow.",
-                    f"evidence tracking the financial architecture shows that {fact_clean}.",
-                    f"{fact_clean}, creating an underlying structural distortion.",
-                    f"detailed operational records show that {fact_clean}.",
+                    f"records tracking the operational mechanism show that {fact_clean}.",
+                    f"{fact_clean}, reflecting the transactional structure described in disclosures.",
+                    f"financial records and disclosures indicate that {fact_clean}.",
+                    f"{fact_clean}, as outlined in accounts of the operational flow.",
+                    f"detailed transactional accounts show that {fact_clean}.",
                 ]
             elif role_slot == "crack":
                 tails = [
-                    f"at the critical turning point, documentation revealed that {fact_clean}.",
-                    f"{fact_clean}, triggering escalating supervisory scrutiny.",
-                    f"subsequent investigative findings established that {fact_clean}.",
-                    f"{fact_clean}, exposing the operational breakdown.",
-                    f"evidentiary filings at this stage confirm that {fact_clean}.",
+                    f"at this pivotal phase, documentation revealed that {fact_clean}.",
+                    f"{fact_clean}, triggering heightened supervisory scrutiny.",
+                    f"investigative disclosures indicated that {fact_clean}.",
+                    f"{fact_clean}, exposing the operational friction.",
+                    f"disclosures at this stage show that {fact_clean}.",
                 ]
             else:  # aftermath
                 tails = [
-                    f"in the institutional aftermath, records confirm that {fact_clean}.",
-                    f"{fact_clean}, resulting in lasting regulatory liabilities.",
-                    f"post-investigation reviews concluded that {fact_clean}.",
+                    f"in the institutional aftermath, records show that {fact_clean}.",
+                    f"{fact_clean}, leaving lingering corporate governance questions.",
+                    f"subsequent analytical reviews noted that {fact_clean}.",
                     f"{fact_clean}, underscoring the ongoing reform challenge.",
-                    f"final documented reviews established that {fact_clean}.",
+                    f"post-transaction assessments established that {fact_clean}.",
                 ]
             raw = f"{pfx}{tails[v_idx]}"
 
@@ -1706,31 +1703,33 @@ def _compact_en_hook_line(text: str, target_words: int = 14) -> str:
     suffix = f" {paren_m.group(1)}" if paren_m else ""
     body = clean[: paren_m.start()].strip() if paren_m else clean
 
-    strip_patterns = [
-        r",\s*(?:including|resulting|setting|leading|leaving|underscoring|creating|exposing)\s+.*$",
-        r",?\s*rather\s+than\s+.*$",
-        r"\s+to\s+(?:fund|claim|pass|direct|cover|expand|support)\s+.*$",
-        r"\s+to\s+(?:the\s+importer|consumers|end\s+consumers|retailers).*$",
-        r",\s*laying\s+the\s+.*$",
-    ]
-    for pat in strip_patterns:
-        cand = re.sub(pat, "", body).strip().rstrip(" ,;:")
-        if len(cand.split()) <= target_words + 2 and len(cand.split()) >= 6:
-            return cand + suffix + "."
-
     dangling = {
         "the", "a", "an", "of", "in", "to", "for", "with", "and", "or", "by",
-        "from", "as", "at", "whose", "which", "that", "their", "its", "into",
+        "from", "as", "at", "whose", "which", "that", "their", "its", "into", "toward", "towards",
         "stated", "reported", "published", "described", "noted", "alleged",
         "u.s.", "u.s", "federal", "direct", "major", "preliminary", "operational",
         "financial", "corporate", "official", "regulatory", "structural",
         "customs", "tariff", "trade", "price", "duty", "market", "executive",
+        "rather", "than", "including", "leaving", "resulting", "setting", "shoppers",
     }
+
+    strip_patterns = [
+        r",\s*(?:including|resulting|setting|leading|leaving|underscoring|creating|exposing)\s+.*$",
+        r",\s*rather\s+than\s+.*$",
+        r",\s*laying\s+the\s+.*$",
+    ]
+    for pat in strip_patterns:
+        cand = re.sub(pat, "", body).strip().rstrip(" ,;:")
+        c_words = cand.split()
+        if len(c_words) >= 6 and c_words[-1].lower().rstrip(".,;:") not in dangling:
+            if len(c_words) <= target_words + 3:
+                return cand + suffix + "."
+
     b_words = body.split()
-    cap = target_words
+    cap = min(target_words, len(b_words))
     while cap < len(b_words) and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
         cap += 1
-    while cap > 5 and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
+    while cap > 6 and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
         cap -= 1
     return " ".join(b_words[:cap]).rstrip(" ,;:") + suffix + "."
 
@@ -2029,7 +2028,7 @@ def _build_grounded_story_beats(
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     elif m == "EN":
                         rem_clean = rem.strip()
-                        shrunk_r = _compact_en_hook_line(rem_clean, target_words=10)
+                        shrunk_r = _compact_en_hook_line(rem_clean, target_words=11)
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
                     else:  # VN
                         words = rem.strip().split()
@@ -2044,7 +2043,7 @@ def _build_grounded_story_beats(
                     main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
 
                     if m == "EN":
-                        shrunk_main = _compact_en_hook_line(main_body, target_words=14).rstrip(". ")
+                        shrunk_main = _compact_en_hook_line(main_body, target_words=11).rstrip(". ")
                         if paren_suffix:
                             ln_cur.text = f"{shrunk_main} {paren_suffix}."
                         else:
@@ -2717,16 +2716,19 @@ def run(ctx: RunContext) -> StageArtifact:
                                     clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
                                     clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
                                 if target_bkt == "alleged_regulator":
-                                    pfx = "According to regulatory filings, " if market == "EN" else "당국 발표에 따르면, "
+                                    pfx_opts = ["According to regulatory filings, ", "As noted in regulatory disclosures, ", "Regulatory records reflect that "]
                                 elif target_bkt == "alleged":
-                                    pfx = "According to press reports, " if market == "EN" else "보도에 따르면, "
+                                    pfx_opts = ["According to press reports, ", "Media accounts indicate that ", "Published reports reflect that ", "Press accounts reported that "]
                                 elif target_bkt == "unverified":
-                                    pfx = "According to preliminary industry reporting, " if market == "EN" else "초기 미확인 보도에 따르면, "
+                                    pfx_opts = ["According to preliminary reporting, ", "Early unverified accounts indicate that ", "Initial reports suggest that "]
                                 else:
-                                    pfx = "According to official records, " if market == "EN" else "공식 기록에 따르면, "
+                                    pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
+                                pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)] if market == "EN" else ("당국 발표에 따르면, " if target_bkt == "alleged_regulator" else ("보도에 따르면, " if target_bkt == "alleged" else ("초기 미확인 보도에 따르면, " if target_bkt == "unverified" else "공식 기록에 따르면, ")))
                                 if len(clean_txt.split()) >= 4:
-                                    if clean_txt and clean_txt[0].isupper() and len(clean_txt) > 1 and clean_txt[1].islower() and not clean_txt.startswith(("Jason", "Glen", "Alvarez", "General", "Alquemie", "Australia")):
-                                        clean_txt = clean_txt[0].lower() + clean_txt[1:]
+                                    if clean_txt and clean_txt[0].isupper():
+                                        fw = clean_txt.split()[0]
+                                        if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial"):
+                                            clean_txt = fw.lower() + clean_txt[len(fw):]
                                     ln.text = f"{pfx}{clean_txt}"
 
                     # 2. Prevent double hedging & strip forbidden court ruling phrasing in all lines
@@ -2747,7 +2749,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         if float(b1_timing["estimated_duration_sec"]) > 22.0:
                             for ln in cand_beats[0][2]:
                                 if market == "EN":
-                                    ln.text = _compact_en_hook_line(ln.text, target_words=14)
+                                    ln.text = _compact_en_hook_line(ln.text, target_words=11)
                                 elif market == "KR":
                                     ln.text = _compact_kr_hook_line(ln.text, max_chars=40)
                                 else:
@@ -2830,6 +2832,13 @@ def run(ctx: RunContext) -> StageArtifact:
                                 droppable_lns.remove(droppable)
                             else:
                                 break
+
+                    # 5. Eliminate B1-B5 claim redundancy cleanly
+                    if cand_beats and len(cand_beats) >= 5:
+                        b1_cids = {cid for ln in cand_beats[0][2] for cid in (ln.claim_ids or [])}
+                        for ln in cand_beats[-1][2]:
+                            if ln.claim_ids:
+                                ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
 
                     return cand_beats
 
