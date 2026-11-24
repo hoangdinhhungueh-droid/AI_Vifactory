@@ -808,7 +808,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                 continue
                             target_ln = all_lines_dict.get(lid)
                             if target_ln and _is_editorial_pattern_interrupt(target_ln, str(target_ln.get("text", "")), market=market):
-                                if g_name in ("statement_claim_alignment_ok", "legal_language_matches_status", "every_factual_line_has_claim_id", "market_entity_appropriateness"):
+                                if g_name in ("statement_claim_alignment_ok", "legal_language_matches_status", "every_factual_line_has_claim_id", "market_entity_appropriateness", "pattern_interrupt_gap_ok"):
                                     continue
                             violations.append(v)
                             kept_llm_viols.append(v)
