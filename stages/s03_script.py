@@ -2746,9 +2746,14 @@ def run(ctx: RunContext) -> StageArtifact:
                         b1_timing = estimate_script_speech_duration(b1_lines, market=market, docudrama_tempo=True)
                         if float(b1_timing["estimated_duration_sec"]) > 22.0:
                             for ln in cand_beats[0][2]:
-                                words = ln.text.split()
-                                if len(words) > 16:
-                                    ln.text = " ".join(words[:15]).rstrip(",:;") + "."
+                                if market == "EN":
+                                    ln.text = _compact_en_hook_line(ln.text, target_words=14)
+                                elif market == "KR":
+                                    ln.text = _compact_kr_hook_line(ln.text, max_chars=40)
+                                else:
+                                    words = ln.text.split()
+                                    if len(words) > 16:
+                                        ln.text = " ".join(words[:15]).rstrip(",:;") + "."
 
                     # 3b. Beat 2 pattern interrupt gap repair: ensure an interrupt occurs near start of B2 (< 25s gap)
                     for b_id, _, lns in cand_beats:
