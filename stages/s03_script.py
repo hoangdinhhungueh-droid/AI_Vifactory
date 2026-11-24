@@ -601,12 +601,35 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
 
 
 
+def _is_narrative_bridge(text_str: str) -> bool:
+    """Detect whether a line is an authorial narrative bridge / rhetorical transition rather than a factual evidentiary claim."""
+    t = (text_str or "").strip().lower()
+    patterns = [
+        r"\bfollow the money\b",
+        r"\bnever the real question\b",
+        r"\bthe question is who\b",
+        r"\bthe real question\b",
+        r"\bwhere,?\s*in that chain\b",
+        r"\bask where\b",
+        r"\bpattern begins to emerge\b",
+        r"\bthe mechanics were straightforward\b",
+        r"\bthe logic was simple\b",
+        r"\bthe warning signs were clear\b",
+        r"\bthe crack was already widening\b",
+    ]
+    return any(re.search(p, t) for p in patterns)
+
+
 def _is_editorial_pattern_interrupt(ln_dict: Dict[str, Any], text_str: str, market: str = "EN") -> bool:
     """Detect whether a line is a short dramatic pattern interrupt / rhythm shift rather than a factual evidentiary claim."""
     m = (market or "EN").upper()
     vh = str(ln_dict.get("visual_hook", "")).lower()
     t = (text_str or "").strip()
-    if not t or re.search(r"\d", t):
+    if not t:
+        return False
+    if _is_narrative_bridge(t):
+        return True
+    if re.search(r"\d", t):
         return False
     from app.services.story_provenance_engine import strip_attribution_prefix
     t_clean, _ = strip_attribution_prefix(t, market=market)
@@ -2384,14 +2407,32 @@ def run(ctx: RunContext) -> StageArtifact:
                         if market == "EN":
                             clean_txt = re.sub(r"\b(?:was reportedly|reportedly|was alleged to be)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                             clean_txt = re.sub(r"\b(?:according to the court ruling|as ruled by the court|court ruled that)\b,?\s*", "", clean_txt, flags=re.IGNORECASE).strip()
-                            clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
+                            clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory|Investigative|Financial|Industry|Early|Initial)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
+                            clean_txt = re.sub(r"^(?:Investigative reports described that|Investigative reporting described that|Investigative reports described)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                             clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
+                            clean_txt = re.sub(r"\blacked any legal right\b", "lacked a legal right", clean_txt, flags=re.IGNORECASE).strip()
+                            clean_txt = re.sub(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+directing\b", r"\1 directed", clean_txt).strip()
+                        src = str(c_dict.get("source_name") or "").strip()
                         if target_bkt == "alleged_regulator":
-                            pfx_opts = ["According to regulatory filings, ", "As noted in regulatory disclosures, ", "Regulatory records reflect that "]
-                        elif target_bkt == "alleged":
-                            pfx_opts = ["According to press reports, ", "Media accounts indicate that ", "Published reports reflect that ", "Press accounts reported that "]
+                            pfx_opts = [
+                                f"According to regulatory filings by {src}, " if src else "According to regulatory filings, ",
+                                f"As noted in regulatory disclosures from {src}, " if src else "As noted in regulatory disclosures, ",
+                                "Regulatory records reflect that ",
+                            ]
+                        elif target_bkt in ("alleged", "corroborated_secondary"):
+                            pfx_opts = [
+                                f"According to {src} reporting, " if src else "According to press reports, ",
+                                f"Published reporting by {src} indicates that " if src else "Published reports reflect that ",
+                                f"As reported by {src}, " if src else "Press accounts reported that ",
+                                "Media reporting reflects that ",
+                            ]
                         elif target_bkt == "unverified":
-                            pfx_opts = ["According to preliminary reporting, ", "Early unverified accounts indicate that ", "Initial reports suggest that "]
+                            pfx_opts = [
+                                f"According to early unverified reports by {src}, " if src else "According to preliminary reporting, ",
+                                f"According to initial reports yet to be verified in {src}, " if src else "Early unverified accounts indicate that ",
+                                f"According to preliminary reporting by {src}, " if src else "Initial reports suggest that ",
+                                f"Pending independent corroboration, {src} reported that " if src else "Pending independent corroboration, early reporting noted that ",
+                            ]
                         else:
                             pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
                         pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)] if market == "EN" else ("당국 발표에 따르면, " if target_bkt == "alleged_regulator" else ("보도에 따르면, " if target_bkt == "alleged" else ("초기 미확인 보도에 따르면, " if target_bkt == "unverified" else "공식 기록에 따르면, ")))
@@ -2407,6 +2448,8 @@ def run(ctx: RunContext) -> StageArtifact:
                 for b_id, _, lns in cand_beats:
                     for ln in lns:
                         ln.text = re.sub(r"\b(?:according to the court ruling|as ruled by the court|court ruled that)\b,?\s*", "", ln.text, flags=re.IGNORECASE).strip()
+                        ln.text = re.sub(r"\blacked any legal right\b", "lacked a legal right", ln.text, flags=re.IGNORECASE).strip()
+                        ln.text = re.sub(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+directing\b", r"\1 directed", ln.text).strip()
                         stripped, pfx_found = _strip_pfx(ln.text, market="EN")
                         if pfx_found and re.search(r"\b(?:was reportedly|reportedly|was alleged to be)\b", stripped, re.IGNORECASE):
                             cleaned_b = re.sub(r"\b(?:was reportedly|reportedly|was alleged to be)\s*", "", stripped, flags=re.IGNORECASE).strip()
@@ -2557,7 +2600,7 @@ def run(ctx: RunContext) -> StageArtifact:
             # 7. Ensure factual lines without claim IDs find their matching claim from evidence ledger
             for b_id, _, lns in cand_beats:
                 for ln in lns:
-                    if not ln.claim_ids and len(ln.text.split()) >= 8 and not getattr(ln, "pattern_interrupt", False):
+                    if not ln.claim_ids and len(ln.text.split()) >= 8 and getattr(ln, "visual_hook", "") not in ("pattern_interrupt", "grease_pencil") and not _is_narrative_bridge(ln.text):
                         best_cid = None
                         best_hits = 0
                         for ev_item in evidence_raw:
@@ -2643,15 +2686,35 @@ def run(ctx: RunContext) -> StageArtifact:
                                     clean_txt, _ = _strip_pfx(ln.text, market=market)
                                     clean_txt = clean_txt.lstrip()
                                     if market == "EN":
-                                        clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
-                                    if bkt == "unverified":
-                                        pfx = "According to preliminary reporting, " if market == "EN" else "초기 미확인 보도에 따르면, "
-                                    elif bkt == "alleged_regulator":
-                                        pfx = "According to regulatory filings, " if market == "EN" else "당국 발표에 따르면, "
-                                    elif bkt == "alleged":
-                                        pfx = "According to press reports, " if market == "EN" else "보도에 따르면, "
+                                        clean_txt = re.sub(r"^(?:(?:According to|Press|Published|Media|Regulatory|Official|Statutory|Investigative|Financial|Industry|Early|Initial)[^,]+(?:,\s*|\s+))+", "", clean_txt, flags=re.IGNORECASE).strip()
+                                        clean_txt = re.sub(r"^(?:Investigative reports described that|Investigative reporting described that|Investigative reports described)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
+                                        clean_txt = re.sub(r"^that\s+", "", clean_txt, flags=re.IGNORECASE).strip()
+                                        clean_txt = re.sub(r"\blacked any legal right\b", "lacked a legal right", clean_txt, flags=re.IGNORECASE).strip()
+                                        clean_txt = re.sub(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+directing\b", r"\1 directed", clean_txt).strip()
+                                    src = str(c_dict.get("source_name") or "").strip()
+                                    if bkt == "alleged_regulator":
+                                        pfx_opts = [
+                                            f"According to regulatory filings by {src}, " if src else "According to regulatory filings, ",
+                                            f"As noted in regulatory disclosures from {src}, " if src else "As noted in regulatory disclosures, ",
+                                            "Regulatory records reflect that ",
+                                        ]
+                                    elif bkt in ("alleged", "corroborated_secondary"):
+                                        pfx_opts = [
+                                            f"According to {src} reporting, " if src else "According to press reports, ",
+                                            f"Published reporting by {src} indicates that " if src else "Published reports reflect that ",
+                                            f"As reported by {src}, " if src else "Press accounts reported that ",
+                                            f"Media reporting by {src} reflects that " if src else "Media reporting reflects that ",
+                                        ]
+                                    elif bkt == "unverified":
+                                        pfx_opts = [
+                                            f"According to early unverified reports by {src}, " if src else "According to preliminary reporting, ",
+                                            f"According to initial reports yet to be verified in {src}, " if src else "Early unverified accounts indicate that ",
+                                            f"Preliminary reporting by {src} noted that " if src else "Initial reports suggest that ",
+                                            f"Pending independent corroboration, {src} reported that " if src else "Pending independent corroboration, early reporting noted that ",
+                                        ]
                                     else:
-                                        pfx = "According to official records, " if market == "EN" else "공식 기록에 따르면, "
+                                        pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
+                                    pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)] if market == "EN" else ("당국 발표에 따르면, " if bkt == "alleged_regulator" else ("보도에 따르면, " if bkt == "alleged" else ("초기 미확인 보도에 따르면, " if bkt == "unverified" else "공식 기록에 따르면, ")))
                                     if len(clean_txt.split()) >= 4:
                                         if clean_txt and clean_txt[0].isupper():
                                             fw = clean_txt.split()[0]
@@ -2786,13 +2849,20 @@ def run(ctx: RunContext) -> StageArtifact:
                                 text = re.sub(r"\bsend refunds only to\b", "direct duty refunds to", text, flags=re.IGNORECASE)
                                 text = re.sub(r"\bconsumer-advocate criticism of\b", "consumer advocates criticized", text, flags=re.IGNORECASE)
                                 text = re.sub(r"\bfinancial filings showing that\b", "financial filings showed that", text, flags=re.IGNORECASE)
+                                text = re.sub(r"\blacked any legal right\b", "lacked a legal right", text, flags=re.IGNORECASE)
+                                text = re.sub(r"\bBurlington Stores directing\b", "Burlington Stores directed", text, flags=re.IGNORECASE)
+                                text = re.sub(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+directing\b", r"\1 directed", text)
 
-                            # Handle editorial pattern interrupts cleanly
+                            # Handle editorial pattern interrupts and narrative transitions cleanly
                             is_rhetorical_q = text.strip().endswith("?") and not any(ch.isdigit() for ch in text)
-                            if _is_editorial_pattern_interrupt(ln, text, market=market) or is_rhetorical_q:
+                            is_bridge = _is_narrative_bridge(text)
+                            if _is_editorial_pattern_interrupt(ln, text, market=market) or is_rhetorical_q or is_bridge:
                                 from app.services.story_provenance_engine import strip_attribution_prefix
                                 text_clean, _ = strip_attribution_prefix(text, market=market)
                                 text_clean = text_clean.strip()
+                                text_clean = re.sub(r"^[,\s]+", "", text_clean)
+                                if text_clean and text_clean[0].islower():
+                                    text_clean = text_clean[0].upper() + text_clean[1:]
                                 lines_data.append(StorySceneLine(
                                     line_id=ln.get("line_id", f"{b_id}_L{l_idx:02d}"),
                                     text=text_clean,
@@ -2835,11 +2905,11 @@ def run(ctx: RunContext) -> StageArtifact:
                                         c_ids.append(cand_cid)
                                         break
 
-                            # Fallback 2: If still empty, check whether it is a short dramatic pattern interrupt
+                            # Fallback 2: If still empty, check whether it is a short dramatic pattern interrupt or narrative bridge
                             if not c_ids:
                                 words = text.split()
                                 has_digits = any(ch.isdigit() for ch in text)
-                                if len(words) <= 10 and not has_digits:
+                                if (len(words) <= 12 and not has_digits) or _is_narrative_bridge(text):
                                     v_hook = "pattern_interrupt"
                                 else:
                                     # Fallback 3: Substantive/factual line without claim_id -> assign contextual beat claim
