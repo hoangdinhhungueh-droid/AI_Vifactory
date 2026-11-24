@@ -1085,7 +1085,9 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
         r"According to\s+[^,:\n]{1,60}[,:;]\s*|"
         r"As\s+[^,:\n]{1,40}(?:reported|documented|disclosed|revealed)[^,:\n]*[,:;]\s*|"
         r"(?:Published|Media|Press|Industry)\s+(?:reporting|reports|investigations|accounts)\s+(?:indicate|indicates|reflect|reflects|note|notes|show|shows|documented|document|confirm|confirms)(?:\s+that)?(?:,\s*|\s+)|"
-        r"(?:Regulatory|Official|Statutory)\s+(?:filings|notices|records)\s+(?:establish|confirms|confirm|indicate|indicates|reflect|reflects|show|shows)(?:\s+that)?(?:,\s*|\s+)"
+        r"(?:Regulatory|Official|Statutory)\s+(?:filings|notices|records)\s+(?:establish|confirms|confirm|indicate|indicates|reflect|reflects|show|shows)(?:\s+that)?(?:,\s*|\s+)|"
+        r"(?:An?|The)\s+[\w\s.-]{2,30}?\s+(?:report|investigation|article|disclosure)\s+(?:stated|reported|described|noted|indicated|found|revealed|alleged)(?:\s+that)?(?:,\s*|\s+)|"
+        r"[A-Z][\w\s.-]{1,25}?\s+(?:published a report stating that|reported that|revealed that|disclosed that)(?:,\s*|\s+)"
         r")[”\"’']?\s*"
     )
     pfx_list = []

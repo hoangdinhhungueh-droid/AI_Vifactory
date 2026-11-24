@@ -853,10 +853,13 @@ def _trim_clause_smart(text: str, elems: Dict[str, Any], market: str, hook_mode:
     while word_cap < len(words) and word_cap < 30 and words[word_cap - 1][0].isupper() and words[word_cap][0].isupper():
         word_cap += 1
 
-    # Avoid leaving dangling prepositions, conjunctions, or articles at the end of the sentence
+    # Avoid leaving dangling prepositions, conjunctions, articles, or modifiers at the end of the sentence
     dangling_words = {
         "the", "a", "an", "of", "in", "to", "for", "with", "and", "or", "by",
         "from", "as", "at", "whose", "which", "that", "their", "its", "into",
+        "stated", "reported", "published", "described", "noted", "alleged",
+        "executive", "federal", "direct", "major", "preliminary", "operational",
+        "financial", "corporate", "official", "regulatory", "structural",
     }
     while word_cap < len(words) and words[word_cap - 1].lower().rstrip(".,;:") in dangling_words:
         word_cap += 1
@@ -1490,23 +1493,23 @@ def _render_claim_sentence(
         fact_clean = fact_stripped if existing_pfx_en else fact
         if role_slot == "hook_catalyst":
             if bucket == "final_judgment":
-                raw = f"Critical turning point in {loc_topic}: According to the court ruling, {fact_clean}."
+                raw = f"In {loc_topic}, the court ruled that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"The court ruled that {fact_clean}."
             elif bucket == "audit_finding":
-                raw = f"Crisis trigger in {loc_topic}: According to the audit report, {fact_clean}."
+                raw = f"In {loc_topic}, the audit report established that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"The audit report established that {fact_clean}."
             elif bucket == "indictment":
-                raw = f"Crisis trigger in {loc_topic}: According to the indictment, {fact_clean}."
+                raw = f"In {loc_topic}, the indictment alleges that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"The indictment alleges that {fact_clean}."
             elif bucket == "court_record":
-                raw = f"Crisis trigger in {loc_topic}: According to court records, {fact_clean}."
+                raw = f"In {loc_topic}, court records reflect that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Court records reflect that {fact_clean}."
             elif bucket == "alleged_regulator":
-                raw = f"Crisis trigger in {loc_topic}: According to regulatory filings, {fact_clean}."
+                raw = f"In {loc_topic}, regulatory filings indicate that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Regulatory filings indicate that {fact_clean}."
             elif bucket in ("alleged", "press_allegation", "press_charge"):
-                raw = f"Crisis trigger in {loc_topic}: According to press reports, {fact_clean}."
+                raw = f"In {loc_topic}, press reports indicate that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"According to press reports, {fact_clean}."
             elif bucket == "settled":
-                raw = f"{loc_topic} concluded under terms of settlement: {fact_clean}."
+                raw = f"In {loc_topic}, the matter concluded under settlement terms: {fact_clean}."
             elif bucket == "unverified":
-                raw = f"According to preliminary unconfirmed reports regarding {loc_topic}: {fact_clean}."
+                raw = f"In {loc_topic}, preliminary reports indicate that {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Preliminary reports indicate that {fact_clean}."
             else:
-                raw = f"Crisis trigger in {loc_topic}: {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"Crisis trigger: {fact_clean}."
+                raw = f"In {loc_topic}, {fact_clean}." if loc_topic and loc_topic not in fact_clean else f"{fact_clean}."
         elif role_slot == "hook_scale":
             if bucket == "final_judgment":
                 raw = f"Judicial findings establish documented scale: {fact_clean}."
@@ -1525,7 +1528,7 @@ def _render_claim_sentence(
             elif bucket == "unverified":
                 raw = f"Early unverified reports suggest documented scale: {fact_clean}."
             else:
-                raw = f"Verified scale: {fact_clean}."
+                raw = f"Documented scale confirmed: {fact_clean}."
         elif role_slot == "hook_paradox":
             q_short = cq_clean if (cq_clean and len(cq_clean.split()) <= 8) else "Where did the structural tension begin?"
             if not q_short.endswith("?"):
@@ -1692,6 +1695,46 @@ def _render_claim_sentence(
     return raw, [cid]
 
 
+def _compact_en_hook_line(text: str, target_words: int = 14) -> str:
+    """Intelligently compact an English hook line without cutting words in half or severing clauses."""
+    clean = text.strip().rstrip(". ")
+    words = clean.split()
+    if len(words) <= target_words:
+        return clean + "."
+
+    paren_m = re.search(r"\s*(\([^()]+\))\s*$", clean)
+    suffix = f" {paren_m.group(1)}" if paren_m else ""
+    body = clean[: paren_m.start()].strip() if paren_m else clean
+
+    strip_patterns = [
+        r",\s*(?:including|resulting|setting|leading|leaving|underscoring|creating|exposing)\s+.*$",
+        r",?\s*rather\s+than\s+.*$",
+        r"\s+to\s+(?:fund|claim|pass|direct|cover|expand|support)\s+.*$",
+        r"\s+to\s+(?:the\s+importer|consumers|end\s+consumers|retailers).*$",
+        r",\s*laying\s+the\s+.*$",
+    ]
+    for pat in strip_patterns:
+        cand = re.sub(pat, "", body).strip().rstrip(" ,;:")
+        if len(cand.split()) <= target_words + 2 and len(cand.split()) >= 6:
+            return cand + suffix + "."
+
+    dangling = {
+        "the", "a", "an", "of", "in", "to", "for", "with", "and", "or", "by",
+        "from", "as", "at", "whose", "which", "that", "their", "its", "into",
+        "stated", "reported", "published", "described", "noted", "alleged",
+        "u.s.", "u.s", "federal", "direct", "major", "preliminary", "operational",
+        "financial", "corporate", "official", "regulatory", "structural",
+        "customs", "tariff", "trade", "price", "duty", "market", "executive",
+    }
+    b_words = body.split()
+    cap = target_words
+    while cap < len(b_words) and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
+        cap += 1
+    while cap > 5 and ("-" in b_words[cap - 1] or b_words[cap - 1].lower().rstrip(".,;:") in dangling):
+        cap -= 1
+    return " ".join(b_words[:cap]).rstrip(" ,;:") + suffix + "."
+
+
 def _build_grounded_story_beats(
     topic: str,
     evidence_ledger: List[Any],
@@ -1707,7 +1750,7 @@ def _build_grounded_story_beats(
     grounded strictly in `evidence_ledger` with zero topic-specific hardcoding.
     """
     from app.schemas.story_contracts import StorySceneLine
-    from app.services.story_provenance_engine import normalize_market_code
+    from app.services.story_provenance_engine import extract_claim_elements, normalize_market_code
 
     def _get(obj: Any, attr: str, default: Any = "") -> Any:
         return obj.get(attr, default) if isinstance(obj, dict) else getattr(obj, attr, default)
@@ -1984,18 +2027,29 @@ def _build_grounded_story_beats(
                         rem_clean = rem.strip()
                         shrunk_r = _compact_kr_hook_line(rem_clean, max_chars=40)
                         ln_cur.text = f"{q_text} {shrunk_r}".strip()
-                    else:
-                        rem_words = rem.strip().split()
-                        rem_shrunk = " ".join(rem_words[:8]).rstrip(" ,;:")
-                        if rem_shrunk and not rem_shrunk.endswith((".", "!", "?")):
-                            rem_shrunk += "."
-                        ln_cur.text = f"{q_text} {rem_shrunk}".strip()
+                    elif m == "EN":
+                        rem_clean = rem.strip()
+                        shrunk_r = _compact_en_hook_line(rem_clean, target_words=10)
+                        ln_cur.text = f"{q_text} {shrunk_r}".strip()
+                    else:  # VN
+                        words = rem.strip().split()
+                        cap_words = 8 if len(words) > 10 else len(words)
+                        shrunk_rem = " ".join(words[:cap_words]).rstrip(" ,;:")
+                        if not shrunk_rem.endswith((".", "!", "?")):
+                            shrunk_rem += "."
+                        ln_cur.text = f"{q_text} {shrunk_rem}".strip()
                 else:
                     paren_match = re.search(r"\s*(\([^()]+\))\s*[.。!?]?$", cur_t)
                     paren_suffix = paren_match.group(1) if paren_match else ""
                     main_body = cur_t[: paren_match.start()].strip() if paren_match else cur_t.strip().rstrip(".。!?")
 
-                    if m in ("EN", "VN"):
+                    if m == "EN":
+                        shrunk_main = _compact_en_hook_line(main_body, target_words=14).rstrip(". ")
+                        if paren_suffix:
+                            ln_cur.text = f"{shrunk_main} {paren_suffix}."
+                        else:
+                            ln_cur.text = f"{shrunk_main}."
+                    elif m == "VN":
                         words = main_body.split()
                         cap_words = 12 if len(words) > 14 else len(words)
                         shrunk_main = " ".join(words[:cap_words]).rstrip(" ,;:")
