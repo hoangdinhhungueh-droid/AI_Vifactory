@@ -2673,7 +2673,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         clean_txt = re.sub(r"^total\s+tariff-duty\s+refunds\s+of\s+([$\d]+(?:\s+million|\s+billion)?)\s+received\b", r"TJX was reported to receive total tariff-duty refunds of \1", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:financial\s+filings\s+as\s+showing\s+that|financial\s+filings\s+as\s+showing)\s*", "financial filings showed that ", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^noted\s+that,?\s*", "", clean_txt, flags=re.IGNORECASE).strip()
-                        clean_txt = re.sub(r"^(?:corporate\s+)?bonus\s+metrics\s+treated\b", "industry analysts reported that corporate bonus metrics treated", clean_txt, flags=re.IGNORECASE).strip()
+                        clean_txt = re.sub(r"^(?:corporate\s+)?bonus\s+metrics\s+treated\b", "corporate bonus metrics treated", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:on\s+paper,\s*)?each\s+step\s+stayed\s+within\s+rules\s+that\s+treat\b", "federal customs rules treat", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\bfilings\s+showed\b", "financial filings were reported to show", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\bfilings\s+show\b", "financial filings were reported to show", clean_txt, flags=re.IGNORECASE).strip()
@@ -3447,15 +3447,16 @@ def run(ctx: RunContext) -> StageArtifact:
                 # Ensure single-hedging: if line has attribution prefix, deduplicate stacked prefixes and dehedge predicate
                 stripped_t, pfx = strip_attribution_prefix(t, market=market)
                 if pfx:
-                    # If multiple prefixes stacked (e.g. "Pending ... early ... Media ..."), keep only the first clean prefix
-                    first_pfx = pfx.split(",")[0].strip()
-                    if first_pfx and not first_pfx.endswith((",", "—", "、", "에 따르면", "theo")):
-                        if market in ("EN", "VN"):
-                            first_pfx += ","
-                    if stripped_t and market in ("EN", "VN") and first_pfx.endswith(","):
-                        if not stripped_t[0].isupper() and len(stripped_t) > 1 and stripped_t[1].islower():
-                            stripped_t = stripped_t[0].lower() + stripped_t[1:]
-                    t = f"{first_pfx} {stripped_t}".strip() if first_pfx else stripped_t
+                    if market in ("EN", "VN"):
+                        stripped_t = re.sub(r"^to\s+allocate\s+", "TJX was reported to allocate ", stripped_t, flags=re.IGNORECASE).strip()
+                        stripped_t = re.sub(r",?\s*before\s+(?:the\s+)?(?:goods|products)\s+ever\s+reached\s+(?:store\s+)?shelves\.?", ".", stripped_t, flags=re.IGNORECASE).strip()
+                        # Ensure no stray comma right after 'that,'
+                        pfx = re.sub(r"\bthat,\s*$", "that ", pfx)
+                        if stripped_t and not stripped_t[0].isupper() and len(stripped_t) > 1 and stripped_t[1].islower():
+                            if not pfx.rstrip().endswith(("that", ":")):
+                                if pfx.rstrip().endswith(","):
+                                    stripped_t = stripped_t[0].lower() + stripped_t[1:]
+                    t = f"{pfx} {stripped_t}".strip() if pfx else stripped_t
                     t = dehedge_predicate(t, market=market)
                 ln.text = t
 
