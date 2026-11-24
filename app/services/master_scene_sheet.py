@@ -32,7 +32,7 @@ import math
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("master_scene_sheet")
 
@@ -366,7 +366,337 @@ def extract_stat_hero_from_text(text: str) -> Optional[str]:
     if m_year:
         return m_year.group(1)
 
+    # 9. Fractions / Ratios
+    m_frac = re.search(r"\b(one-third|1/3|half|1/2|two-thirds|2/3|quarter|1/4|three-quarters|3/4)\b", clean_text, re.IGNORECASE)
+    if m_frac:
+        f_val = m_frac.group(1).lower()
+        frac_map = {
+            "one-third": "1/3", "1/3": "1/3",
+            "half": "1/2", "1/2": "1/2",
+            "two-thirds": "2/3", "2/3": "2/3",
+            "quarter": "1/4", "1/4": "1/4",
+            "three-quarters": "3/4", "3/4": "3/4",
+        }
+        return frac_map.get(f_val, f_val.upper())
+
+    # 10. Entity / subject counts
+    m_entity = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(corporations?|companies?|retailers?|executives?)\b", clean_text, re.IGNORECASE)
+    if m_entity:
+        cnt_raw = m_entity.group(1)
+        cnt_val = str(_words_to_num(cnt_raw)) if not cnt_raw.isdigit() else cnt_raw
+        ent_unit = m_entity.group(2).upper()
+        return f"{cnt_val} {ent_unit}"
+
     return None
+
+
+# ==============================================================================
+# DYNAMIC STAT & LABEL RESOLUTION ENGINE (RULE 128 & 140)
+# ==============================================================================
+def resolve_scene_stat_and_label(scene: Dict[str, Any], index: int = 0) -> Tuple[str, str]:
+    """Dynamically resolves authentic quantitative stat and descriptive label for any scene.
+
+    Eliminates all hardcoded 'AUDIT DATA' and 'QUANTITATIVE EVIDENCE' defaults without
+    hardcoding episode-specific dictionaries into the core engine (Rule 128 & 132).
+    Hierarchically resolves from:
+    1. Direct scene properties ('stat_hero', 'stat_label')
+    2. 'information_spec' ('stat_hero', 'stat_label')
+    3. Grounding regex extraction from narration
+    4. Scene headline / core idea / key visual / hero cutout subject metadata
+    """
+    # 1. Direct scene properties
+    if scene.get("stat_hero") and scene.get("stat_label"):
+        return str(scene["stat_hero"]).strip(), str(scene["stat_label"]).strip()
+
+    # 2. information_spec
+    info = scene.get("information_spec") or {}
+    if info.get("stat_hero") and info.get("stat_label"):
+        return str(info["stat_hero"]).strip(), str(info["stat_label"]).strip()
+    if scene.get("stat_hero"):
+        return str(scene["stat_hero"]).strip(), str(info.get("stat_label") or scene.get("stat_label") or "VERIFIED METRIC").strip()
+    if info.get("stat_hero"):
+        return str(info["stat_hero"]).strip(), str(scene.get("stat_label") or "VERIFIED METRIC").strip()
+
+    # 3. Extract from narration
+    narr = str(scene.get("narration") or "")
+    extracted = extract_stat_hero_from_text(narr)
+    if extracted:
+        label = "VERIFIED METRIC"
+        if "%" in extracted:
+            label = "PERCENTAGE METRIC"
+        elif any(c in extracted for c in ("$", "WON", "€", "¥", "VND")):
+            label = "FINANCIAL METRIC"
+        elif any(t in extracted for t in ("HOURS", "DAYS", "WEEKS", "MONTHS", "YEARS")):
+            label = "TIMEFRAME METRIC"
+        elif extracted.isdigit() and len(extracted) == 4:
+            label = "MILESTONE YEAR"
+        elif "/" in extracted:
+            label = "RATIO METRIC"
+        elif any(w in extracted.upper() for w in ("CORP", "COMPAN", "RETAIL", "EXEC")):
+            label = "ENTITY COUNT"
+        return extracted, label
+
+    # 4. Dynamic metadata-driven fallback (Headline, Core Idea, Hero Object)
+    sc_id = str(scene.get("scene_id") or f"SCENE_{index+1:02d}").upper()
+    m_num = re.search(r"(\d+)", sc_id)
+    scene_num = m_num.group(1) if m_num else f"{index+1:02d}"
+
+    headline = str(scene.get("headline") or "").strip().upper()
+    core_idea = str(scene.get("core_idea") or "").strip().upper()
+    hero_obj = str(scene.get("hero_cutout_object") or "").strip().upper()
+
+    if headline and len(headline) <= 20:
+        fallback_hero = headline
+    elif hero_obj and len(hero_obj) <= 20:
+        fallback_hero = hero_obj
+    elif headline:
+        fallback_hero = headline[:18].strip()
+    else:
+        fallback_hero = f"ACT {scene_num}"
+
+    fallback_label = core_idea[:28].strip() if core_idea else "FORENSIC FOCUS"
+    return fallback_hero, fallback_label
+
+
+def _find_modular_asset_file(
+    image_dir: Optional[Path],
+    prefixes: List[str],
+    scene_id: str,
+) -> Optional[Path]:
+    """Finds a modular asset cutout (hero, tool, stage) across naming variations and ext4 cases."""
+    if not image_dir or not Path(image_dir).exists():
+        return None
+    d = Path(image_dir)
+    sc_clean = str(scene_id).strip()
+    m = re.search(r"(\d+)", sc_clean)
+    num_str = f"{int(m.group(1)):02d}" if m else sc_clean
+
+    cand_names: List[str] = []
+    seen = set()
+    for pfx in prefixes:
+        for suffix in (
+            f"_{sc_clean.lower()}.png",
+            f"_{sc_clean}.png",
+            f"_{sc_clean.upper()}.png",
+            f"_scene_{num_str}.png",
+            f"_SCENE_{num_str}.png",
+            f"_{num_str}.png",
+        ):
+            fn = f"{pfx}{suffix}"
+            if fn not in seen:
+                seen.add(fn)
+                cand_names.append(fn)
+
+    for cn in cand_names:
+        p = d / cn
+        if p.exists() and p.is_file() and p.stat().st_size > 1000:
+            return p.resolve()
+
+    lower_targets = {cn.lower() for cn in cand_names}
+    try:
+        for entry in d.iterdir():
+            if entry.is_file() and entry.name.lower() in lower_targets and entry.stat().st_size > 1000:
+                return entry.resolve()
+    except OSError:
+        pass
+    return None
+
+
+def compute_dynamic_wiring_spec(scene: Dict[str, Any]) -> Dict[str, Any]:
+    """Computes dynamic, physically accurate wiring anchors and connectors based on H1-H7 and contact zone."""
+    t_obj = str(scene.get("interacting_tool") or "").lower()
+    h_fam = str(scene.get("h_family") or "").upper()
+    dam = scene.get("dynamic_art_manifest") or {}
+    cp = dam.get("contact_point") or {}
+    host_area = cp.get("host_target_area", "document_face")
+    anchor_type = cp.get("anchor_type", "")
+
+    # Determine connector type
+    if "yarn" in t_obj or "pin" in t_obj or "H4" in h_fam:
+        conn = "red_yarn"
+    elif "caliper" in t_obj or "clamp" in t_obj or "H2" in h_fam:
+        conn = "brass_caliper"
+    elif "stamp" in t_obj or "seal" in t_obj or "H1" in h_fam:
+        conn = "turned_wood_seal"
+    elif "loupe" in t_obj or "lens" in t_obj or "H5" in h_fam:
+        conn = "optical_loupe"
+    elif "highlight" in t_obj or "marker" in t_obj or "pencil" in t_obj or "H6" in h_fam:
+        conn = "highlighter_band"
+    elif "odometer" in t_obj or "wheel" in t_obj:
+        conn = "odometer_wheels"
+    elif "padlock" in t_obj or "tape" in t_obj or "H7" in h_fam:
+        conn = "padlock_clasp"
+    elif "scissor" in t_obj or "slice" in t_obj or "seam" in t_obj or "H3" in h_fam:
+        conn = "slice_seam_razor"
+    elif "arrow" in t_obj or "token" in t_obj or "coin" in t_obj:
+        conn = "directional_arrow"
+    elif anchor_type:
+        conn = anchor_type
+    else:
+        conn = "red_yarn"
+
+    # Dynamic Anchor Coordinates based on interaction zone
+    if host_area == "top_right_corner":
+        src = [520, 380]
+        tgt = [1480, 260]
+    elif host_area == "left_margin":
+        src = [360, 480]
+        tgt = [1380, 520]
+    elif host_area == "bottom_seal_zone":
+        src = [500, 560]
+        tgt = [1460, 760]
+    elif host_area == "paragraph_body":
+        if conn in ("optical_loupe", "brass_caliper"):
+            src = [460, 420]
+            tgt = [1420, 440]
+        elif conn == "highlighter_band":
+            src = [420, 460]
+            tgt = [1460, 460]
+        else:
+            src = [480, 450]
+            tgt = [1440, 480]
+    else:  # "document_face" or default
+        if "stamp" in conn:
+            src = [450, 480]
+            tgt = [1450, 580]
+        elif conn == "red_yarn":
+            src = [420, 380]
+            tgt = [1480, 280]
+        else:
+            src = [440, 420]
+            tgt = [1460, 360]
+
+    return {
+        "connector_type": conn,
+        "source_anchor": src,
+        "target_anchor": tgt,
+        "ingress_axis": "X",
+        "ingress_duration_sec": 0.3,
+        "hold_fps": 12,
+        "snappy_physics": True,
+    }
+
+
+def slice_scene_modular_assets(
+    composite_path: Path,
+    scene_id: str,
+    scene: Dict[str, Any],
+    output_dir: Path,
+    force: bool = False,
+) -> Dict[str, Path]:
+    """Crops authentic Hero Cutout, Interacting Tool, and Stage Canvas from composite seed (2560x1440).
+
+    Eliminates generic placeholder rectangles in Card 2 and Card 4 by extracting the genuine
+    subjects directly from each scene's composite seed image.
+    """
+    from PIL import Image, ImageOps
+
+    m_num = re.search(r"(\d+)", str(scene_id))
+    clean_id = f"scene_{int(m_num.group(1)):02d}" if m_num else str(scene_id).lower().replace("composite_", "").replace(".png", "")
+    stage_path = output_dir / f"stage_{clean_id}.png"
+    hero_path = output_dir / f"hero_{clean_id}.png"
+    tool_path = output_dir / f"tool_{clean_id}.png"
+
+    if not force and stage_path.exists() and hero_path.exists() and tool_path.exists():
+        if stage_path.stat().st_size > 1000 and hero_path.stat().st_size > 1000 and tool_path.stat().st_size > 1000:
+            return {"stage": stage_path, "hero": hero_path, "tool": tool_path}
+
+    if not composite_path or not Path(composite_path).exists():
+        return {}
+
+    try:
+        with Image.open(str(composite_path)) as raw_im:
+            img = raw_im.convert("RGB")
+            w, h = img.size
+
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # 1. Stage Canvas (1920x1080 center crop representing diorama desk)
+            sx1 = max(0, (w - 1920) // 2)
+            sy1 = max(0, (h - 1080) // 2)
+            stage_crop = img.crop((sx1, sy1, sx1 + 1920, sy1 + 1080))
+            stage_crop.save(str(stage_path), format="PNG", quality=95)
+
+            # 2. Hero Cutout Object
+            dam = scene.get("dynamic_art_manifest") or {}
+            cp = dam.get("contact_point") or {}
+            host_area = cp.get("host_target_area", "document_face")
+
+            bbox = scene.get("bounding_box")
+            focal = dam.get("focal_point_norm") or scene.get("focal_point_norm")
+
+            if bbox and len(bbox) == 4:
+                if all(0.0 <= float(coord) <= 1.0 for coord in bbox):
+                    hx1 = int(bbox[1] * w)
+                    hy1 = int(bbox[0] * h)
+                    hx2 = int(bbox[3] * w)
+                    hy2 = int(bbox[2] * h)
+                else:
+                    hx1, hy1, hx2, hy2 = [int(coord) for coord in bbox]
+            elif focal and len(focal) == 2:
+                fx, fy = float(focal[0]), float(focal[1])
+                hw, hh = int(0.52 * w), int(0.66 * h)
+                cx, cy = int(fx * w), int(fy * h)
+                hx1 = max(0, cx - hw // 2)
+                hy1 = max(0, cy - hh // 2)
+                hx2 = min(w, hx1 + hw)
+                hy2 = min(h, hy1 + hh)
+            else:
+                if host_area == "left_margin":
+                    hx1, hy1, hx2, hy2 = int(0.20 * w), int(0.15 * h), int(0.75 * w), int(0.85 * h)
+                elif host_area == "top_right_corner":
+                    hx1, hy1, hx2, hy2 = int(0.15 * w), int(0.20 * h), int(0.70 * w), int(0.85 * h)
+                elif host_area == "bottom_seal_zone":
+                    hx1, hy1, hx2, hy2 = int(0.18 * w), int(0.12 * h), int(0.78 * w), int(0.78 * h)
+                else:
+                    hx1, hy1, hx2, hy2 = int(0.18 * w), int(0.15 * h), int(0.74 * w), int(0.85 * h)
+
+            hero_raw = img.crop((hx1, hy1, hx2, hy2))
+            hero_framed = ImageOps.expand(hero_raw, border=8, fill="#FFFFFF")
+            hero_framed.save(str(hero_path), format="PNG", quality=95)
+
+            # 3. Interacting Tool Prop
+            t_name = str(scene.get("interacting_tool") or "").lower()
+            h_fam = str(scene.get("h_family") or "").upper()
+
+            if host_area == "top_right_corner":
+                tx1, ty1, tx2, ty2 = int(0.60 * w), int(0.08 * h), int(0.95 * w), int(0.48 * h)
+            elif host_area == "left_margin":
+                tx1, ty1, tx2, ty2 = int(0.08 * w), int(0.25 * h), int(0.42 * w), int(0.75 * h)
+            elif host_area == "bottom_seal_zone":
+                tx1, ty1, tx2, ty2 = int(0.42 * w), int(0.55 * h), int(0.88 * w), int(0.92 * h)
+            elif "yarn" in t_name or "H4" in h_fam:
+                tx1, ty1, tx2, ty2 = int(0.48 * w), int(0.18 * h), int(0.92 * w), int(0.68 * h)
+            elif "loupe" in t_name or "H5" in h_fam:
+                tx1, ty1, tx2, ty2 = int(0.45 * w), int(0.25 * h), int(0.85 * w), int(0.75 * h)
+            elif "caliper" in t_name or "clamp" in t_name or "H2" in h_fam:
+                tx1, ty1, tx2, ty2 = int(0.45 * w), int(0.20 * h), int(0.88 * w), int(0.72 * h)
+            elif "stamp" in t_name or "seal" in t_name or "H1" in h_fam:
+                tx1, ty1, tx2, ty2 = int(0.48 * w), int(0.35 * h), int(0.90 * w), int(0.85 * h)
+            elif "wheel" in t_name or "odometer" in t_name:
+                tx1, ty1, tx2, ty2 = int(0.50 * w), int(0.35 * h), int(0.92 * w), int(0.82 * h)
+            elif "padlock" in t_name or "caution" in t_name or "H7" in h_fam:
+                tx1, ty1, tx2, ty2 = int(0.48 * w), int(0.30 * h), int(0.92 * w), int(0.80 * h)
+            else:
+                tx1, ty1, tx2, ty2 = int(0.46 * w), int(0.25 * h), int(0.90 * w), int(0.78 * h)
+
+            tool_raw = img.crop((tx1, ty1, tx2, ty2))
+            tool_framed = ImageOps.expand(tool_raw, border=6, fill="#FFFFFF")
+            tool_framed.save(str(tool_path), format="PNG", quality=95)
+
+            # 4. Supporting Document / Record Cutout (bills of lading, invoices, court filings, etc.)
+            supp_path = output_dir / f"supp_{clean_id}.png"
+            if not supp_path.exists() or force:
+                sx1, sy1, sx2, sy2 = int(0.55 * w), int(0.40 * h), int(0.95 * w), int(0.92 * h)
+                supp_raw = img.crop((sx1, sy1, sx2, sy2))
+                supp_framed = ImageOps.expand(supp_raw, border=6, fill="#FFFFFF")
+                supp_framed.save(str(supp_path), format="PNG", quality=95)
+
+            logger.info(f"Sliced modular assets for {clean_id}: stage, hero, tool, supp")
+            return {"stage": stage_path, "hero": hero_path, "tool": tool_path, "supp": supp_path}
+    except Exception as _slice_err:
+        logger.warning(f"Error slicing modular assets from {composite_path}: {_slice_err}")
+        return {}
 
 
 # ==============================================================================
@@ -822,7 +1152,11 @@ def render_scene_contact_sheet_png(
             except Exception as _load_err:
                 logger.debug(f"Could not load image {target_img_path}: {_load_err}")
 
-        stat_hero = extract_stat_hero_from_text(sc.get("narration") or "")
+        stat_hero = (
+            sc.get("stat_hero")
+            or (sc.get("information_spec", {}).get("stat_hero") if isinstance(sc.get("information_spec"), dict) else None)
+            or extract_stat_hero_from_text(sc.get("narration") or "")
+        )
 
         if not img_drawn:
             # Fallback stylized diorama frame
@@ -892,7 +1226,7 @@ def render_scene_master_asset_sheet_png(
     market: str = "EN",
 ) -> Path:
     """Renders the Canonical Vox Master Asset Sheet for a single scene (FT-201 / Direction A+).
-    
+
     Shows the Assembled Result Anchor on the left, the Modular Decomposed Asset Zoo on the right,
     and the Unidirectional Motion Coupling Contract at the bottom.
     """
@@ -927,7 +1261,7 @@ def render_scene_master_asset_sheet_png(
     # =========================================================================
     left_x1, left_y1, left_x2, left_y2 = 40, 95, 880, 780
     draw.rectangle([left_x1, left_y1, left_x2, left_y2], fill=card_bg, outline=border_col, width=2)
-    
+
     # Title bar
     draw.rectangle([left_x1 + 2, left_y1 + 2, left_x2 - 2, left_y1 + 38], fill=ink)
     draw.text((left_x1 + 12, left_y1 + 10), "[STYLE ANCHOR] ASSEMBLED RESULT SCENE (TARGET COMPOSITE)", fill="#FFFFFF", font=fonts["label"])
@@ -939,18 +1273,15 @@ def render_scene_master_asset_sheet_png(
 
     # Check for seed image
     img_loaded = False
-    if image_dir and image_dir.exists():
-        for cand_name in [f"composite_{sc_id.lower()}.png", f"{sc_id.lower()}.png", f"{sc_id}.png"]:
-            cand_p = image_dir / cand_name
-            if cand_p.exists():
-                try:
-                    s_img = Image.open(cand_p).convert("RGB")
-                    s_img = s_img.resize((img_w, img_h), Image.Resampling.LANCZOS)
-                    img.paste(s_img, (img_x1, img_y1))
-                    img_loaded = True
-                    break
-                except Exception as _cand_err:
-                    logger.debug(f"Candidate image read bypass: {_cand_err}")
+    cand_seed_path = resolve_scene_image_path(sc_id, image_dir=image_dir)
+    if cand_seed_path and cand_seed_path.exists():
+        try:
+            s_img = Image.open(cand_seed_path).convert("RGB")
+            s_img = s_img.resize((img_w, img_h), Image.Resampling.LANCZOS)
+            img.paste(s_img, (img_x1, img_y1))
+            img_loaded = True
+        except Exception as _cand_err:
+            logger.debug(f"Candidate image read bypass: {_cand_err}")
 
     if not img_loaded:
         # Draw high-fidelity tactile diorama preview
@@ -976,14 +1307,15 @@ def render_scene_master_asset_sheet_png(
         draw.text(((hx1 + hx2) // 2, (hy1 + hy2) // 2), f"{hero_obj[:22].upper()}", fill="#FFFFFF", font=fonts["label"], anchor="mm")
 
         # Stat Card preview (center-right)
-        stat_hero = extract_stat_hero_from_text(scene.get("narration") or "")
-        if stat_hero:
+        stat_val, stat_label = resolve_scene_stat_and_label(scene)
+        if stat_val:
             cx1, cy1, cx2, cy2 = img_x1 + 420, img_y1 + 100, img_x2 - 50, img_y1 + 320
             draw.rectangle([cx1 + 8, cy1 + 8, cx2 + 8, cy2 + 8], fill=(26, 26, 26, 80))
             draw.rectangle([cx1, cy1, cx2, cy2], fill=bg_color, outline=border_col, width=2)
             draw.rectangle([cx1, cy1, cx2, cy1 + 36], fill=ink)
-            draw.text((cx1 + 12, cy1 + 8), "QUANTITATIVE EVIDENCE", fill="#FFFFFF", font=fonts["caption"])
-            draw.text(((cx1 + cx2) // 2, cy1 + 110), stat_hero, fill=hot_red, font=fonts["stat_hero"], anchor="mm")
+            draw.text((cx1 + 12, cy1 + 8), stat_label.upper()[:28], fill="#FFFFFF", font=fonts["caption"])
+            font_stat_anchor = fonts["stat_hero"] if len(stat_val) <= 8 else (fonts.get("stat_medium") or fonts["body_bold"])
+            draw.text(((cx1 + cx2) // 2, cy1 + 110), stat_val, fill=hot_red, font=font_stat_anchor, anchor="mm")
 
         # Red connecting line / vector
         draw.line([(hx2, (hy1 + hy2) // 2), (img_x1 + 420, img_y1 + 210)], fill=hot_red, width=4)
@@ -1016,7 +1348,7 @@ def render_scene_master_asset_sheet_png(
     # =========================================================================
     right_x1, right_y1, right_x2, right_y2 = 905, 95, 1880, 780
     draw.rectangle([right_x1, right_y1, right_x2, right_y2], fill=bg_color, outline=border_col, width=2)
-    
+
     # Title bar
     draw.rectangle([right_x1 + 2, right_y1 + 2, right_x2 - 2, right_y1 + 38], fill=ink)
     draw.text((right_x1 + 12, right_y1 + 10), "MODULAR ASSET DECOMPOSITION ZOO (REMOTION INPUT LAYERS WITH ALPHA)", fill="#FFFFFF", font=fonts["label"])
@@ -1024,7 +1356,19 @@ def render_scene_master_asset_sheet_png(
     decomp = scene.get("decomposed_prompts") or {}
     tool_name = scene.get("interacting_tool") or "Forensic Brass Caliper / Red Yarn"
     hero_name = scene.get("hero_cutout_object") or "Archival Subject Cutout"
-    stat_val = extract_stat_hero_from_text(narr) or "AUDIT DATA"
+    stat_val, stat_label = resolve_scene_stat_and_label(scene)
+
+    # Auto-slice modular assets if cutouts missing and composite seed image exists
+    if image_dir and image_dir.exists():
+        cand_seed = resolve_scene_image_path(sc_id, image_dir=image_dir)
+        if cand_seed and cand_seed.exists():
+            hero_t = image_dir / f"hero_{sc_id.lower()}.png"
+            tool_t = image_dir / f"tool_{sc_id.lower()}.png"
+            if not hero_t.exists() or not tool_t.exists():
+                try:
+                    slice_scene_modular_assets(cand_seed, sc_id, scene, image_dir)
+                except Exception as _sl_err:
+                    logger.debug(f"Auto-slice notice for {sc_id}: {_sl_err}")
 
     # 4 Grid Cards: 2 cols x 2 rows
     # Col 1: 915 -> 1385, Col 2: 1400 -> 1870
@@ -1039,20 +1383,17 @@ def render_scene_master_asset_sheet_png(
     # Thumbnail
     c1_thumb_box = [c1_x1 + 10, c1_y1 + 36, c1_x1 + cw - 10, c1_y1 + 160]
     c1_loaded = False
-    if image_dir and image_dir.exists():
-        for cand_bg in [f"stage_{sc_id.lower()}.png", f"bg_{sc_id.lower()}.png", f"stage_{sc_id}.png"]:
-            cand_p = image_dir / cand_bg
-            if cand_p.exists():
-                try:
-                    bg_im = Image.open(cand_p).convert("RGB")
-                    bw, bh = cw - 20, 124
-                    bg_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
-                    draw.rectangle(c1_thumb_box, fill="#FFFFFF", outline=gray, width=1)
-                    img.paste(bg_im, (c1_x1 + 10 + (bw - bg_im.width) // 2, c1_y1 + 36 + (bh - bg_im.height) // 2))
-                    c1_loaded = True
-                    break
-                except Exception as _cand_err:
-                    logger.debug(f"Candidate image read bypass: {_cand_err}")
+    cand_bg_p = _find_modular_asset_file(image_dir, ["stage", "bg"], sc_id)
+    if cand_bg_p:
+        try:
+            bg_im = Image.open(cand_bg_p).convert("RGB")
+            bw, bh = cw - 20, 124
+            bg_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+            draw.rectangle(c1_thumb_box, fill="#FFFFFF", outline=gray, width=1)
+            img.paste(bg_im, (c1_x1 + 10 + (bw - bg_im.width) // 2, c1_y1 + 36 + (bh - bg_im.height) // 2))
+            c1_loaded = True
+        except Exception as _cand_err:
+            logger.debug(f"Candidate image read bypass: {_cand_err}")
     if not c1_loaded:
         draw.rectangle(c1_thumb_box, fill=(244, 241, 234), outline=gray, width=1)
         for gx in range(c1_x1 + 10, c1_x1 + cw - 10, 25):
@@ -1072,21 +1413,18 @@ def render_scene_master_asset_sheet_png(
     c2_thumb_box = [c2_x1 + 10, c2_y1 + 36, c2_x1 + cw - 10, c2_y1 + 160]
     draw.rectangle(c2_thumb_box, fill="#FFFFFF", outline=gray, width=1)
     c2_loaded = False
-    if image_dir and image_dir.exists():
-        for cand_hero in [f"hero_{sc_id.lower()}.png", f"cutout_{sc_id.lower()}.png", f"hero_{sc_id}.png"]:
-            cand_p = image_dir / cand_hero
-            if cand_p.exists():
-                try:
-                    h_im = Image.open(cand_p).convert("RGBA")
-                    bw, bh = cw - 20, 124
-                    h_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
-                    paste_x = c2_x1 + 10 + (bw - h_im.width) // 2
-                    paste_y = c2_y1 + 36 + (bh - h_im.height) // 2
-                    img.paste(h_im, (paste_x, paste_y), h_im)
-                    c2_loaded = True
-                    break
-                except Exception as _cand_err:
-                    logger.debug(f"Candidate image read bypass: {_cand_err}")
+    cand_hero_p = _find_modular_asset_file(image_dir, ["hero", "cutout"], sc_id)
+    if cand_hero_p:
+        try:
+            h_im = Image.open(cand_hero_p).convert("RGBA")
+            bw, bh = cw - 20, 124
+            h_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+            paste_x = c2_x1 + 10 + (bw - h_im.width) // 2
+            paste_y = c2_y1 + 36 + (bh - h_im.height) // 2
+            img.paste(h_im, (paste_x, paste_y), h_im)
+            c2_loaded = True
+        except Exception as _cand_err:
+            logger.debug(f"Candidate image read bypass: {_cand_err}")
     if not c2_loaded:
         draw.rectangle([c2_x1 + 180, c2_y1 + 44, c2_x1 + 290, c2_y1 + 152], fill=(214, 46, 31)) # shadow
         draw.rectangle([c2_x1 + 174, c2_y1 + 38, c2_x1 + 284, c2_y1 + 146], fill="#FFFFFF", outline=ink, width=1) # deckle
@@ -1101,14 +1439,21 @@ def render_scene_master_asset_sheet_png(
     c3_x1, c3_y1 = right_x1 + 10, right_y1 + ch + 60
     draw.rectangle([c3_x1, c3_y1, c3_x1 + cw, c3_y1 + ch], fill=card_bg, outline=border_col, width=1)
     draw.rectangle([c3_x1 + 2, c3_y1 + 2, c3_x1 + cw - 2, c3_y1 + 28], fill=border_col)
-    draw.text((c3_x1 + 8, c3_y1 + 6), "3. STAT HERO CARD (DATA CHIP)", fill="#FFFFFF", font=fonts["caption"])
+    draw.text((c3_x1 + 8, c3_y1 + 6), f"3. STAT HERO CARD: {stat_label[:28]}", fill="#FFFFFF", font=fonts["caption"])
     # Thumbnail: Giant red stat on cream card
     draw.rectangle([c3_x1 + 10, c3_y1 + 36, c3_x1 + cw - 10, c3_y1 + 160], fill=bg_color, outline=gray, width=1)
     draw.rectangle([c3_x1 + 10, c3_y1 + 36, c3_x1 + cw - 10, c3_y1 + 60], fill=ink)
-    draw.text((c3_x1 + 20, c3_y1 + 42), "VERIFIED FORENSIC METRIC", fill="#FFFFFF", font=fonts["caption"])
-    draw.text((c3_x1 + cw // 2, c3_y1 + 110), stat_val, fill=hot_red, font=fonts["stat_medium"], anchor="mm")
+    draw.text((c3_x1 + 20, c3_y1 + 42), stat_label.upper()[:36], fill="#FFFFFF", font=fonts["caption"])
+
+    font_stat = fonts["stat_medium"]
+    if len(stat_val) > 12:
+        font_stat = fonts.get("title") or fonts["stat_medium"]
+    if len(stat_val) > 16:
+        font_stat = fonts.get("body_bold") or fonts["stat_medium"]
+
+    draw.text((c3_x1 + cw // 2, c3_y1 + 110), stat_val, fill=hot_red, font=font_stat, anchor="mm")
     # Details
-    draw.text((c3_x1 + 10, c3_y1 + 170), f"METRIC: {stat_val}", fill=hot_red, font=fonts["caption"])
+    draw.text((c3_x1 + 10, c3_y1 + 170), f"METRIC: {stat_val} // {stat_label}", fill=hot_red, font=fonts["caption"])
     draw.text((c3_x1 + 10, c3_y1 + 190), "SPEC: Giant bold condensed font, aged cardstock, red ink", fill=gray, font=fonts["caption"])
     draw.text((c3_x1 + 10, c3_y1 + 210), "ALPHA: Independent floating card layer with drop shadow", fill=gray, font=fonts["caption"])
 
@@ -1121,21 +1466,18 @@ def render_scene_master_asset_sheet_png(
     c4_thumb_box = [c4_x1 + 10, c4_y1 + 36, c4_x1 + cw - 10, c4_y1 + 160]
     draw.rectangle(c4_thumb_box, fill="#FFFFFF", outline=gray, width=1)
     c4_loaded = False
-    if image_dir and image_dir.exists():
-        for cand_tool in [f"tool_{sc_id.lower()}.png", f"prop_{sc_id.lower()}.png", f"tool_{sc_id}.png"]:
-            cand_p = image_dir / cand_tool
-            if cand_p.exists():
-                try:
-                    t_im = Image.open(cand_p).convert("RGBA")
-                    bw, bh = cw - 20, 124
-                    t_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
-                    paste_x = c4_x1 + 10 + (bw - t_im.width) // 2
-                    paste_y = c4_y1 + 36 + (bh - t_im.height) // 2
-                    img.paste(t_im, (paste_x, paste_y), t_im)
-                    c4_loaded = True
-                    break
-                except Exception as _cand_err:
-                    logger.debug(f"Candidate image read bypass: {_cand_err}")
+    cand_tool_p = _find_modular_asset_file(image_dir, ["tool", "prop"], sc_id)
+    if cand_tool_p:
+        try:
+            t_im = Image.open(cand_tool_p).convert("RGBA")
+            bw, bh = cw - 20, 124
+            t_im.thumbnail((bw, bh), Image.Resampling.LANCZOS)
+            paste_x = c4_x1 + 10 + (bw - t_im.width) // 2
+            paste_y = c4_y1 + 36 + (bh - t_im.height) // 2
+            img.paste(t_im, (paste_x, paste_y), t_im)
+            c4_loaded = True
+        except Exception as _cand_err:
+            logger.debug(f"Candidate image read bypass: {_cand_err}")
     if not c4_loaded:
         draw.line([(c4_x1 + 40, c4_y1 + 98), (c4_x1 + cw - 40, c4_y1 + 98)], fill=hot_red, width=4)
         draw.ellipse([c4_x1 + 34, c4_y1 + 92, c4_x1 + 46, c4_y1 + 104], fill=(217, 164, 65))
@@ -1155,7 +1497,7 @@ def render_scene_master_asset_sheet_png(
     draw.text((bot_x1 + 12, bot_y1 + 7), "6-IN-1 MASTER SHEET SPECIFICATION // WIRING COUPLING & TRANSACTION PROMPT (FT-201)", fill="#FFFFFF", font=fonts["label"])
 
     col_w = (bot_x2 - bot_x1 - 50) // 4
-    
+
     # Col 1: Phase 1 (Ingress)
     p1_x = bot_x1 + 16
     draw.text((p1_x, bot_y1 + 38), "1. KINETIC INGRESS (<=0.4s)", fill=hot_red, font=fonts["label"])
@@ -1164,10 +1506,15 @@ def render_scene_master_asset_sheet_png(
     draw.text((p1_x, bot_y1 + 90), "- Settle within 12 frames @ 30fps", fill=gray, font=fonts["caption"])
 
     # Col 2: Relational Wiring Spec
+    dynamic_wiring = compute_dynamic_wiring_spec(scene)
+    conn_type = dynamic_wiring.get("connector_type", "red_yarn").replace("_", " ").title()
+    src_anchor = dynamic_wiring.get("source_anchor", [450, 420])
+    tgt_anchor = dynamic_wiring.get("target_anchor", [1450, 240])
+
     p2_x = p1_x + col_w + 10
     draw.text((p2_x, bot_y1 + 38), "2. WIRING COUPLING SPEC", fill=hot_red, font=fonts["label"])
-    draw.text((p2_x, bot_y1 + 58), f"- Connector: {tool_name[:24]}", fill=ink, font=fonts["caption"])
-    draw.text((p2_x, bot_y1 + 74), "- Anchors: [450, 420] -> [1450, 240]", fill=ink, font=fonts["caption"])
+    draw.text((p2_x, bot_y1 + 58), f"- Connector: {conn_type[:24]}", fill=ink, font=fonts["caption"])
+    draw.text((p2_x, bot_y1 + 74), f"- Anchors: {src_anchor} -> {tgt_anchor}", fill=ink, font=fonts["caption"])
     draw.text((p2_x, bot_y1 + 90), "- Dead-stop spatial lock with 12fps paper hold", fill=gray, font=fonts["caption"])
 
     # Col 3: Engine Roles
@@ -1182,7 +1529,7 @@ def render_scene_master_asset_sheet_png(
     draw.text((p4_x, bot_y1 + 38), "4. INFORMATION SUMMARY", fill=hot_red, font=fonts["label"])
     draw.text((p4_x, bot_y1 + 58), f"• STAT: {stat_val[:18]}", fill=hot_red, font=fonts["caption"])
     draw.text((p4_x, bot_y1 + 74), f"• HERO: {hero_name[:22]}", fill=ink, font=fonts["caption"])
-    draw.text((p4_x, bot_y1 + 90), f"• HEADLINE: {headline[:22]}", fill=gray, font=fonts["caption"])
+    draw.text((p4_x, bot_y1 + 90), f"• LABEL: {stat_label[:22]}", fill=gray, font=fonts["caption"])
 
     # Bottom Row: Transaction Prompt Banner
     tx_p = decomp.get("relational_motion_mechanism") or scene.get("universal_video_prompt") or f"[{hero_name}] + interacts with + [{tool_name}], leaving permanent physical residue on aged desk with 12fps paper vibration."
@@ -1239,6 +1586,21 @@ def render_multiscene_master_asset_sheet_png(
 
     s1 = scenes[0] if len(scenes) > 0 else {}
     s2 = scenes[1] if len(scenes) > 1 else {}
+
+    # Auto-slice modular assets for S1 and S2 if cutouts missing
+    if image_dir and image_dir.exists():
+        for s_obj in [s1, s2]:
+            s_obj_id = s_obj.get("scene_id", "")
+            if s_obj_id:
+                cand_s = resolve_scene_image_path(s_obj_id, image_dir=image_dir)
+                if cand_s and cand_s.exists():
+                    h_tgt = image_dir / f"hero_{s_obj_id.lower()}.png"
+                    t_tgt = image_dir / f"tool_{s_obj_id.lower()}.png"
+                    if not h_tgt.exists() or not t_tgt.exists():
+                        try:
+                            slice_scene_modular_assets(cand_s, s_obj_id, s_obj, image_dir)
+                        except Exception as _ms_slice_err:
+                            logger.debug(f"Slice notice in multiscene: {_ms_slice_err}")
 
     # Scene 1 & 2 Left Thumbnails (Result Scene Anchors)
     for s_idx, (sc, y_offset) in enumerate([(s1, 95), (s2, 575)]):
@@ -1301,14 +1663,15 @@ def render_multiscene_master_asset_sheet_png(
         draw.text((x1, 298), f"Stage {sc_id[-2:]} (#F4F1EA Desk)", fill=ink, font=fonts["caption"])
 
     # Stat Cards S1 & S2 (Stylized Remotion Vector Card)
-    s1_stat = extract_stat_hero_from_text(s1.get("narration") or "") or "AUDIT DATA"
-    s2_stat = extract_stat_hero_from_text(s2.get("narration") or "") or "9 RETAIL"
-    for s_idx, (st_val, x1, x2) in enumerate([(s1_stat, 1430, 1640), (s2_stat, 1660, 1860)]):
+    s1_stat, s1_label = resolve_scene_stat_and_label(s1, 0)
+    s2_stat, s2_label = resolve_scene_stat_and_label(s2, 1)
+    for s_idx, ((st_val, st_lbl), x1, x2) in enumerate([((s1_stat, s1_label), 1430, 1640), ((s2_stat, s2_label), 1660, 1860)]):
         draw.rectangle([x1, 170, x2, 290], fill=(244, 241, 234), outline=border_col, width=2)
         draw.rectangle([x1, 170, x2, 198], fill=ink)
-        draw.text(((x1 + x2)//2, 184), "STAT CHIP // IBM PLEX", fill="#FFFFFF", font=fonts["caption"], anchor="mm")
-        draw.text(((x1 + x2)//2, 244), str(st_val)[:8], fill=hot_red, font=fonts["stat_medium"], anchor="mm")
-        draw.text((x1, 298), f"Stat S{s_idx+1} Metric Card", fill=hot_red, font=fonts["caption"])
+        draw.text(((x1 + x2)//2, 184), st_lbl[:24].upper(), fill="#FFFFFF", font=fonts["caption"], anchor="mm")
+        font_st = fonts["stat_medium"] if len(st_val) <= 8 else (fonts.get("title") or fonts["body_bold"])
+        draw.text(((x1 + x2)//2, 244), str(st_val), fill=hot_red, font=font_st, anchor="mm")
+        draw.text((x1, 298), f"Stat S{s_idx+1}: {st_lbl[:20]}", fill=hot_red, font=fonts["caption"])
 
     # Hero Cutouts S1 & S2 (Real AI Cutout Images with Deckle Edge)
     h1_name = s1.get("hero_cutout_object") or "Subject S1"
@@ -1422,12 +1785,12 @@ def generate_master_scene_dashboard_html(
             or first_shot.get("prompt")
             or ""
         )
-        stat_hero = extract_stat_hero_from_text(narration)
+        stat_val_d, stat_label_d = resolve_scene_stat_and_label(sc, idx)
 
         # Image source logic: check image_paths_map or relative path
         img_src = image_paths_map.get(sc_id) or f"{seeds_dir_rel}/composite_{sc_id.lower()}.png"
 
-        stat_badge_html = f'<div class="stat-hero-badge">{stat_hero}</div>' if stat_hero else ""
+        stat_badge_html = f'<div class="stat-hero-badge">{stat_val_d}</div>' if stat_val_d else ""
 
         cam_dir = sc.get("camera_directive") or mt.get("camera") or "TOP_DOWN_TRACKING"
 
@@ -1473,7 +1836,6 @@ def generate_master_scene_dashboard_html(
         decomp = sc.get("decomposed_prompts") or {}
         ms_p_file = f"master_asset_sheet_{sc_id.lower()}.png"
         tool_label = sc.get("interacting_tool") or "Forensic Instrument / Red Yarn"
-        stat_label = stat_hero or "QUANTITATIVE METRIC"
 
         ms_card = f"""
         <div class="ms-card" id="ms_card_{sc_id.lower()}">
@@ -1498,8 +1860,8 @@ def generate_master_scene_dashboard_html(
                         <pre class="ms-layer-prompt">{decomp.get('hero_cutout_prompt', f'Authentic Vox tactile paper cutout: {hero}')}</pre>
                     </div>
                     <div class="ms-layer-card">
-                        <div class="ms-layer-title">3. STAT CARD HERO: {stat_label}</div>
-                        <div class="ms-layer-spec">Giant bold red numeral on cream cardstock // Floating alpha layer</div>
+                        <div class="ms-layer-title">3. STAT CARD HERO: {stat_val_d} // {stat_label_d}</div>
+                        <div class="ms-layer-spec">Giant bold red numeral on cream cardstock // Floating alpha layer // {stat_label_d}</div>
                     </div>
                     <div class="ms-layer-card">
                         <div class="ms-layer-title">4. INTERACTING TOOL / CONNECTOR: {tool_label}</div>
@@ -2209,9 +2571,13 @@ def generate_master_scene_package(
         if dp_path and Path(dp_path).exists():
             try:
                 plan_data = json.loads(Path(dp_path).read_text(encoding="utf-8"))
-                scenes = plan_data.get("scenes") or plan_data.get("shots") or []
-                if not payload:
-                    payload = plan_data
+                if "payload" in plan_data and isinstance(plan_data["payload"], dict):
+                    payload = plan_data["payload"]
+                    scenes = payload.get("scenes") or payload.get("shots") or []
+                else:
+                    scenes = plan_data.get("scenes") or plan_data.get("shots") or []
+                    if not payload:
+                        payload = plan_data
             except Exception as _e:
                 logger.warning(f"Failed to load director_plan from {dp_path}: {_e}")
                 scenes = []
@@ -2368,12 +2734,31 @@ def generate_master_scene_package(
 
     effective_image_mode = bool(image_mode or (len(scenes) > 0 and len(missing_scenes) == 0))
 
+    # Slicing modular assets for all available composite seeds (FT-201)
+    if effective_image_mode and seeds_dir.exists():
+        for idx_sc, sc in enumerate(scenes):
+            sc_id = sc.get("scene_id") or f"SCENE_{idx_sc + 1:02d}"
+            cand_p = resolve_scene_image_path(scene_id=sc_id, image_dir=seeds_dir, fallback_dirs=search_dirs)
+            if cand_p and cand_p.exists():
+                try:
+                    slice_scene_modular_assets(cand_p, sc_id, sc, seeds_dir)
+                except Exception as _sl_err:
+                    logger.debug(f"Slice notice during package generation for {sc_id}: {_sl_err}")
+
     # Compute Stat Hero manifest coverage
     stat_heroes_summary: Dict[str, Optional[str]] = {}
+    stat_labels_summary: Dict[str, str] = {}
     decomposed_roster: Dict[str, Dict[str, Any]] = {}
     for idx, sc in enumerate(scenes):
         sc_id = sc.get("scene_id", f"SCENE_{idx+1:02d}")
-        stat_heroes_summary[sc_id] = extract_stat_hero_from_text(sc.get("narration") or "")
+        raw_extracted = extract_stat_hero_from_text(sc.get("narration") or "")
+        stat_val, stat_label = resolve_scene_stat_and_label(sc, idx)
+        stat_heroes_summary[sc_id] = (
+            sc.get("stat_hero")
+            or (sc.get("information_spec", {}).get("stat_hero") if isinstance(sc.get("information_spec"), dict) else None)
+            or raw_extracted
+        )
+        stat_labels_summary[sc_id] = stat_label
         decomposed_roster[sc_id] = {
             "hero_cutout_object": sc.get("hero_cutout_object"),
             "interacting_tool": sc.get("interacting_tool"),
@@ -2384,14 +2769,16 @@ def generate_master_scene_package(
     # Build 6-in-1 MasterSheetAssetBundle for every scene (FT-201)
     candidate_dirs = search_dirs
     master_sheet_bundles = {}
-    for sc in scenes:
-        sc_id = sc.get("scene_id", "SCENE_01")
+    for idx, sc in enumerate(scenes):
+        sc_id = sc.get("scene_id", f"SCENE_{idx+1:02d}")
         decomp = sc.get("decomposed_prompts") or {}
         h_obj = sc.get("hero_cutout_object") or "Archival Hero Subject"
         t_obj = sc.get("interacting_tool") or "Forensic Brass Caliper / Red Evidence Yarn"
         narr = sc.get("narration") or ""
-        stat_hero = extract_stat_hero_from_text(narr) or "AUDIT DATA"
+        stat_hero, stat_label = resolve_scene_stat_and_label(sc, idx)
         headline = sc.get("headline") or "FORENSIC FOCUS"
+        dynamic_wiring = compute_dynamic_wiring_spec(sc)
+        dam = sc.get("dynamic_art_manifest")
 
         resolved_anchor = ""
         resolved_hero = ""
@@ -2402,24 +2789,27 @@ def generate_master_scene_package(
             for cdir in candidate_dirs:
                 if not cdir.exists():
                     continue
-                for f_name in [f"composite_{sc_id.lower()}.png", f"{sc_id.lower()}.png"]:
-                    if (cdir / f_name).exists():
-                        resolved_anchor = str((cdir / f_name).resolve())
-                        break
-                for f_name in [f"hero_{sc_id.lower()}.png", f"cutout_{sc_id.lower()}.png"]:
-                    if (cdir / f_name).exists():
-                        resolved_hero = str((cdir / f_name).resolve())
-                        break
-                for f_name in [f"tool_{sc_id.lower()}.png", f"prop_{sc_id.lower()}.png"]:
-                    if (cdir / f_name).exists():
-                        resolved_tool = str((cdir / f_name).resolve())
-                        break
-                for f_name in [f"stage_{sc_id.lower()}.png", f"bg_{sc_id.lower()}.png"]:
-                    if (cdir / f_name).exists():
-                        resolved_stage = str((cdir / f_name).resolve())
-                        break
+                if not resolved_anchor:
+                    cand_anc = resolve_scene_image_path(scene_id=sc_id, image_dir=cdir)
+                    if cand_anc:
+                        resolved_anchor = str(cand_anc.resolve())
+                if not resolved_hero:
+                    cand_h = _find_modular_asset_file(cdir, ["hero", "cutout"], sc_id)
+                    if cand_h:
+                        resolved_hero = str(cand_h.resolve())
+                if not resolved_tool:
+                    cand_t = _find_modular_asset_file(cdir, ["tool", "prop"], sc_id)
+                    if cand_t:
+                        resolved_tool = str(cand_t.resolve())
+                if not resolved_stage:
+                    cand_s = _find_modular_asset_file(cdir, ["stage", "bg"], sc_id)
+                    if cand_s:
+                        resolved_stage = str(cand_s.resolve())
 
         tx_prompt = decomp.get("relational_motion_mechanism") or sc.get("universal_video_prompt") or f"[{h_obj}] + couples with + [{t_obj}], leaving permanent physical residue with 12fps paper vibration."
+
+        w_words = sc.get("whisper_words") or sc.get("words") or sc.get("subtitles")
+        sc_dur = float(sc.get("duration_est_sec") or sc.get("duration_sec") or 6.0)
 
         bundle_dict = generate_master_sheet_bundle(
             scene_id=sc_id,
@@ -2432,20 +2822,15 @@ def generate_master_scene_package(
             information_spec={
                 "headline": headline,
                 "stat_hero": stat_hero,
-                "stat_label": "QUANTITATIVE EVIDENCE",
+                "stat_label": stat_label,
                 "narration": narr
             },
             transaction_prompt=tx_prompt,
-            wiring_spec={
-                "connector_type": "red_yarn" if "yarn" in t_obj.lower() else ("brass_caliper" if "caliper" in t_obj.lower() else "turned_wood_seal"),
-                "source_anchor": [450, 420],
-                "target_anchor": [1450, 240],
-                "ingress_axis": "X",
-                "ingress_duration_sec": 0.3,
-                "hold_fps": 12,
-                "snappy_physics": True
-            },
-            camera_movement="locked"
+            wiring_spec=dynamic_wiring,
+            camera_movement="locked",
+            dynamic_manifest=dam,
+            whisper_words=w_words,
+            duration_sec=sc_dur,
         )
         master_sheet_bundles[sc_id] = bundle_dict
 
@@ -2461,6 +2846,7 @@ def generate_master_scene_package(
         "runtime_seconds": runtime_s,
         "stat_heroes_count": stat_heroes_count,
         "stat_heroes": stat_heroes_summary,
+        "stat_labels": stat_labels_summary,
         "decomposed_roster": decomposed_roster,
         "master_sheet_bundles": master_sheet_bundles,
         "files": {
@@ -2483,7 +2869,115 @@ def generate_master_scene_package(
     return manifest
 
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Layer1BackgroundDesk(BaseModel):
+    """Layer 1: Background Desk (#F4F1EA paper/blueprint/desk texture)."""
+    model_config = ConfigDict(extra="ignore")
+    desk_texture: str = Field(default="paper_kraft", description="Texture style: paper_kraft, blueprint, cream_parchment, vintage_desk")
+    background_color: str = Field(default="#F4F1EA", description="Primary desk background color (#F4F1EA)")
+    aged_border: bool = Field(default=True, description="Archival aged vignette/border (#3A352A)")
+    texture_asset_url: str = Field(default="", description="Path or URL to high-res desk surface texture")
+    environmental_prompt: str = Field(default="", description="Prompt for background table / workspace generation")
+
+
+class CutoutItem(BaseModel):
+    """Cutout item with white deckle border and contact dynamics."""
+    model_config = ConfigDict(extra="ignore")
+    item_id: str
+    name: str
+    asset_url: str = ""
+    cutout_border: str = Field(default="#FFFFFF", description="Cutout white border color (#FFFFFF)")
+    border_width_px: int = Field(default=4, description="White cutout border stroke in px")
+    item_type: str = Field(default="document", description="document, photo, stamp, invoice, bill_of_lading, court_record")
+    anchor_x: float = Field(default=0.5, ge=0.0, le=1.0)
+    anchor_y: float = Field(default=0.5, ge=0.0, le=1.0)
+    scale: float = Field(default=0.5, ge=0.05, le=1.5)
+    rotation_deg: float = Field(default=0.0)
+    depth: float = Field(default=0.5, ge=0.0, le=1.0)
+    enter_at_sec: float = Field(default=0.0, ge=0.0)
+    has_shadow: bool = Field(default=True)
+
+
+class Layer2MidgroundCutout(BaseModel):
+    """Layer 2: Midground Cutout Assets (photos with cutout white borders, court documents, bills of lading, invoices, stamps)."""
+    model_config = ConfigDict(extra="ignore")
+    hero_cutout: CutoutItem
+    supporting_cutouts: List[CutoutItem] = Field(default_factory=list)
+    interacting_tool: Optional[CutoutItem] = None
+
+
+class HighlighterSweep(BaseModel):
+    """Fluorescent highlighter pass sweeping across text/document."""
+    model_config = ConfigDict(extra="ignore")
+    color: str = Field(default="#FFE600", description="Fluorescent yellow #FFE600 or hot red #B62E1F")
+    start_ms: float = Field(default=0.0, ge=0.0)
+    end_ms: float = Field(default=600.0, ge=0.0)
+    target_text: str = ""
+    x_pct: float = Field(default=50.0)
+    y_pct: float = Field(default=50.0)
+    width_pct: float = Field(default=30.0)
+
+
+class SVGArrowCallout(BaseModel):
+    """SVG animated directional arrow or catenary evidence yarn."""
+    model_config = ConfigDict(extra="ignore")
+    arrow_type: str = Field(default="red_yarn", description="red_yarn, curved_arrow, straight_callout, bracket")
+    from_coord: List[int] = Field(default_factory=lambda: [450, 420])
+    to_coord: List[int] = Field(default_factory=lambda: [1450, 240])
+    color: str = Field(default="#B62E1F")
+    animated: bool = True
+    delay_ms: float = Field(default=300.0)
+
+
+class DataCounterCallout(BaseModel):
+    """Data counter / Odometer rollup / Giant red stat hero number."""
+    model_config = ConfigDict(extra="ignore")
+    stat_hero: str = ""
+    stat_label: str = ""
+    start_value: float = 0.0
+    end_value: Optional[float] = None
+    color: str = Field(default="#B62E1F")
+    rollup_duration_sec: float = Field(default=1.2)
+    x_pct: float = Field(default=75.0)
+    y_pct: float = Field(default=45.0)
+
+
+class Layer3ForegroundCallouts(BaseModel):
+    """Layer 3: Foreground Graphic Callouts (highlighter sweeps, SVG animated arrows, data counters)."""
+    model_config = ConfigDict(extra="ignore")
+    headline: str = ""
+    highlighter_sweeps: List[HighlighterSweep] = Field(default_factory=list)
+    svg_arrows: List[SVGArrowCallout] = Field(default_factory=list)
+    data_counters: List[DataCounterCallout] = Field(default_factory=list)
+
+
+class CameraCue(BaseModel):
+    """Camera Cue Sheet entry with exact millisecond timings anchored to Whisper word timestamps."""
+    model_config = ConfigDict(extra="ignore")
+    cue_id: str
+    time_ms: float = Field(ge=0.0, description="Exact timestamp in milliseconds")
+    duration_ms: float = Field(default=400.0, ge=0.0)
+    camera_movement: str = Field(default="slow_push_in", description="Camera movement name")
+    zoom_scale: float = Field(default=1.0, ge=0.5, le=3.0)
+    pan_x_pct: float = Field(default=0.0)
+    pan_y_pct: float = Field(default=0.0)
+    rotation_deg: float = Field(default=0.0)
+    stepped_framing: bool = Field(default=True, description="True for 12fps stop-motion rhythm")
+    whisper_anchor_word: Optional[str] = None
+
+
+class SceneAssetManifest(BaseModel):
+    """Story-specific Asset Manifest for a single scene across all 3 layers and camera cue sheet."""
+    model_config = ConfigDict(extra="ignore")
+    scene_id: str
+    layer_1_background: Layer1BackgroundDesk
+    layer_2_midground: Layer2MidgroundCutout
+    layer_3_foreground: Layer3ForegroundCallouts
+    camera_cue_sheet: List[CameraCue] = Field(default_factory=list)
+    duration_ms: float = 6000.0
+    narration: str = ""
 
 
 class WiringSpec(BaseModel):
@@ -2507,7 +3001,7 @@ class InformationSpec(BaseModel):
 
 class MasterSheetAssetBundle(BaseModel):
     """Khế ước Bộ linh kiện Master Sheet toàn diện 6-trong-1 (FT-201).
-    
+
     Bắt buộc đủ 6 khối:
     1. Assembled Anchor (Image Result mong muốn)
     2. Hero Cutout (Object chủ thể)
@@ -2530,6 +3024,399 @@ class MasterSheetAssetBundle(BaseModel):
     ingress_duration_sec: float = Field(default=0.3, le=0.4, description="Thời gian bứt tốc vào sân khấu (<= 0.4s)")
     camera_movement: str = Field(default="locked", description="Khóa cứng khung máy tính 1920x1080, cấm zoom/pan")
     dynamic_manifest: Optional[Dict[str, Any]] = Field(default=None, description="Bespoke Opus 5.5 Art Director Manifest")
+    layer_1_background: Optional[Layer1BackgroundDesk] = Field(default=None, description="Layer 1: Background Desk")
+    layer_2_midground: Optional[Layer2MidgroundCutout] = Field(default=None, description="Layer 2: Midground Cutouts with #FFFFFF border")
+    layer_3_foreground: Optional[Layer3ForegroundCallouts] = Field(default=None, description="Layer 3: Foreground Graphic Callouts")
+    camera_cue_sheet: List[CameraCue] = Field(default_factory=list, description="Camera Cue Sheet with millisecond timings")
+
+
+def build_dynamic_scene_manifest(
+    scene_id: str,
+    narration: str = "",
+    headline: str = "",
+    stat_hero: str = "",
+    stat_label: str = "",
+    hero_cutout_url: str = "",
+    stage_backdrop_url: str = "",
+    interacting_tool_url: str = "",
+    whisper_words: Optional[List[Any]] = None,
+    dynamic_manifest: Optional[Dict[str, Any]] = None,
+    duration_sec: float = 6.0,
+    wiring_spec: Optional[Dict[str, Any]] = None,
+) -> SceneAssetManifest:
+    """Builds a dynamic, story-specific asset manifest for a single scene across all 3 layers."""
+    narr_lower = narration.lower()
+    head_lower = headline.lower()
+    combined_text = f"{narr_lower} {head_lower}"
+
+    # --- Layer 1: Background Desk ---
+    desk_texture = "paper_kraft"
+    if any(k in combined_text for k in ["court", "legal", "law", "judge", "ruling"]):
+        desk_texture = "vintage_desk"
+    elif any(k in combined_text for k in ["blueprint", "factory", "engineer", "build", "port", "ship"]):
+        desk_texture = "blueprint"
+    elif any(k in combined_text for k in ["archive", "history", "ancient", "ledger", "19", "century"]):
+        desk_texture = "cream_parchment"
+
+    l1 = Layer1BackgroundDesk(
+        desk_texture=desk_texture,
+        background_color="#F4F1EA",
+        aged_border=True,
+        texture_asset_url=stage_backdrop_url or f"composite_seeds/stage_{scene_id.lower()}.png",
+        environmental_prompt=(
+            f"Archival tabletop desk surface ({desk_texture}) in documentary lighting, cream paper tint #F4F1EA, "
+            f"aged vignette border, subtle tactile woodgrain and paper fiber texture."
+        ),
+    )
+
+    # --- Layer 2: Midground Cutouts ---
+    hero_name = headline if headline else f"Primary Evidence {scene_id}"
+    hero_item = CutoutItem(
+        item_id=f"hero_{scene_id.lower()}",
+        name=hero_name,
+        asset_url=hero_cutout_url or f"composite_seeds/hero_{scene_id.lower()}.png",
+        cutout_border="#FFFFFF",
+        border_width_px=4,
+        item_type="photo" if any(k in combined_text for k in ["ceo", "man", "person", "portrait", "investigator"]) else "document",
+        anchor_x=0.38,
+        anchor_y=0.52,
+        scale=0.55,
+        rotation_deg=-1.5,
+        depth=0.5,
+        enter_at_sec=0.0,
+        has_shadow=True,
+    )
+
+    # Supporting cutouts (court documents, bills of lading, invoices, stamps)
+    supporting: List[CutoutItem] = []
+    if any(k in combined_text for k in ["bill", "lading", "cargo", "freight", "customs", "export", "import"]):
+        supporting.append(CutoutItem(
+            item_id=f"supp_bol_{scene_id.lower()}",
+            name="Official Bill of Lading & Shipping Manifest",
+            asset_url=f"composite_seeds/bol_{scene_id.lower()}.png",
+            cutout_border="#FFFFFF",
+            border_width_px=4,
+            item_type="bill_of_lading",
+            anchor_x=0.72,
+            anchor_y=0.60,
+            scale=0.40,
+            rotation_deg=2.5,
+            depth=0.35,
+            enter_at_sec=0.4,
+        ))
+    elif any(k in combined_text for k in ["invoice", "tax", "audit", "account", "ledger", "receipt"]):
+        supporting.append(CutoutItem(
+            item_id=f"supp_inv_{scene_id.lower()}",
+            name="Forensic Audit Invoice & Ledger Slip",
+            asset_url=f"composite_seeds/invoice_{scene_id.lower()}.png",
+            cutout_border="#FFFFFF",
+            border_width_px=4,
+            item_type="invoice",
+            anchor_x=0.74,
+            anchor_y=0.58,
+            scale=0.42,
+            rotation_deg=3.0,
+            depth=0.35,
+            enter_at_sec=0.4,
+        ))
+    elif any(k in combined_text for k in ["court", "verdict", "judge", "subpoena", "ruling"]):
+        supporting.append(CutoutItem(
+            item_id=f"supp_court_{scene_id.lower()}",
+            name="Federal Court Filing & Judicial Order",
+            asset_url=f"composite_seeds/court_record_{scene_id.lower()}.png",
+            cutout_border="#FFFFFF",
+            border_width_px=4,
+            item_type="court_record",
+            anchor_x=0.70,
+            anchor_y=0.62,
+            scale=0.44,
+            rotation_deg=-2.0,
+            depth=0.40,
+            enter_at_sec=0.35,
+        ))
+    else:
+        supporting.append(CutoutItem(
+            item_id=f"supp_doc_{scene_id.lower()}",
+            name="Archival Evidence Memorandum",
+            asset_url=f"composite_seeds/doc_{scene_id.lower()}.png",
+            cutout_border="#FFFFFF",
+            border_width_px=4,
+            item_type="document",
+            anchor_x=0.68,
+            anchor_y=0.55,
+            scale=0.42,
+            rotation_deg=1.8,
+            depth=0.35,
+            enter_at_sec=0.35,
+        ))
+
+    # Interacting Tool
+    tool_item: Optional[CutoutItem] = None
+    if interacting_tool_url or dynamic_manifest:
+        tool_name = "Forensic Interacting Prop"
+        if dynamic_manifest and "contact_point" in dynamic_manifest:
+            tool_name = dynamic_manifest.get("interacting_tool_prompt", tool_name)[:40]
+        tool_item = CutoutItem(
+            item_id=f"tool_{scene_id.lower()}",
+            name=tool_name,
+            asset_url=interacting_tool_url or f"composite_seeds/tool_{scene_id.lower()}.png",
+            cutout_border="#FFFFFF",
+            border_width_px=3,
+            item_type="stamp" if "stamp" in combined_text else "tool",
+            anchor_x=0.55,
+            anchor_y=0.45,
+            scale=0.32,
+            rotation_deg=12.0,
+            depth=0.8,
+            enter_at_sec=0.3,
+            has_shadow=True,
+        )
+
+    l2 = Layer2MidgroundCutout(
+        hero_cutout=hero_item,
+        supporting_cutouts=supporting,
+        interacting_tool=tool_item,
+    )
+
+    # --- Layer 3: Foreground Graphic Callouts ---
+    highlighters: List[HighlighterSweep] = []
+    if any(k in combined_text for k in ["highlight", "audit", "line", "secret", "hidden", "found", "show"]):
+        highlighters.append(HighlighterSweep(
+            color="#FFE600",
+            start_ms=500.0,
+            end_ms=1100.0,
+            target_text=headline or "CRITICAL EVIDENCE",
+            x_pct=42.0,
+            y_pct=52.0,
+            width_pct=36.0,
+        ))
+
+    w_spec = wiring_spec or {}
+    src_pt = w_spec.get("source_anchor") or [450, 420]
+    tgt_pt = w_spec.get("target_anchor") or [1450, 240]
+    conn_type = w_spec.get("connector_type") or "red_yarn"
+
+    arrows = [
+        SVGArrowCallout(
+            arrow_type=conn_type,
+            from_coord=src_pt,
+            to_coord=tgt_pt,
+            color="#B62E1F",
+            animated=True,
+            delay_ms=300.0,
+        )
+    ]
+
+    counters: List[DataCounterCallout] = []
+    if stat_hero:
+        counters.append(DataCounterCallout(
+            stat_hero=stat_hero,
+            stat_label=stat_label or "VERIFIED METRIC",
+            start_value=0.0,
+            color="#B62E1F",
+            rollup_duration_sec=1.2,
+            x_pct=76.0,
+            y_pct=42.0,
+        ))
+
+    l3 = Layer3ForegroundCallouts(
+        headline=headline or "FORENSIC FOCUS",
+        highlighter_sweeps=highlighters,
+        svg_arrows=arrows,
+        data_counters=counters,
+    )
+
+    # --- Camera Cue Sheet ---
+    cues: List[CameraCue] = []
+    dur_ms = max(1000.0, duration_sec * 1000.0)
+
+    # If authentic whisper words exist, anchor cue timings directly to words
+    if whisper_words and len(whisper_words) >= 4:
+        total_w = len(whisper_words)
+        # Cue 1: Wide Establish at word 0
+        w0 = whisper_words[0]
+        t0 = round(float(getattr(w0, "start", 0.0) if hasattr(w0, "start") else w0.get("start", 0.0)) * 1000.0, 1)
+        w0_text = str(getattr(w0, "word", "") if hasattr(w0, "word") else w0.get("word", ""))
+        cues.append(CameraCue(
+            cue_id=f"cue_{scene_id.lower()}_01_establish",
+            time_ms=max(0.0, t0),
+            duration_ms=400.0,
+            camera_movement="slow_push_in",
+            zoom_scale=1.00,
+            pan_x_pct=0.0,
+            pan_y_pct=0.0,
+            stepped_framing=True,
+            whisper_anchor_word=w0_text,
+        ))
+
+        # Cue 2: Tension / Contact Impact around 25-35% through words
+        mid_idx = min(total_w - 2, max(1, total_w // 3))
+        w_mid = whisper_words[mid_idx]
+        t_mid_raw = round(float(getattr(w_mid, "start", 0.0) if hasattr(w_mid, "start") else w_mid.get("start", 0.0)) * 1000.0, 1)
+        t_mid = max(t0 + 250.0, t_mid_raw)
+        w_mid_text = str(getattr(w_mid, "word", "") if hasattr(w_mid, "word") else w_mid.get("word", ""))
+        cues.append(CameraCue(
+            cue_id=f"cue_{scene_id.lower()}_02_tension_ingress",
+            time_ms=t_mid,
+            duration_ms=300.0,
+            camera_movement="rake_30_focus",
+            zoom_scale=1.28,
+            pan_x_pct=5.0,
+            pan_y_pct=-2.0,
+            stepped_framing=True,
+            whisper_anchor_word=w_mid_text,
+        ))
+
+        # Cue 3: Climax Punch-In / Metric reveal around 65-75%
+        climax_idx = min(total_w - 1, max(mid_idx + 1, (total_w * 2) // 3))
+        w_climax = whisper_words[climax_idx]
+        t_climax_raw = round(float(getattr(w_climax, "start", 0.0) if hasattr(w_climax, "start") else w_climax.get("start", 0.0)) * 1000.0, 1)
+        t_climax = max(t_mid + 300.0, t_climax_raw)
+        w_climax_text = str(getattr(w_climax, "word", "") if hasattr(w_climax, "word") else w_climax.get("word", ""))
+        cues.append(CameraCue(
+            cue_id=f"cue_{scene_id.lower()}_03_macro_climax",
+            time_ms=t_climax,
+            duration_ms=400.0,
+            camera_movement="macro_glide",
+            zoom_scale=1.55,
+            pan_x_pct=12.0,
+            pan_y_pct=4.0,
+            stepped_framing=True,
+            whisper_anchor_word=w_climax_text,
+        ))
+
+        # Cue 4: Final Hold before cut
+        w_last = whisper_words[-1]
+        t_last = round(float(getattr(w_last, "start", 0.0) if hasattr(w_last, "start") else w_last.get("start", 0.0)) * 1000.0, 1)
+        cues.append(CameraCue(
+            cue_id=f"cue_{scene_id.lower()}_04_hold",
+            time_ms=max(t_climax + 400.0, min(dur_ms - 200.0, t_last)),
+            duration_ms=300.0,
+            camera_movement="slow_push_in",
+            zoom_scale=1.58,
+            pan_x_pct=12.0,
+            pan_y_pct=4.0,
+            stepped_framing=True,
+            whisper_anchor_word="[DEAD_STOP_HOLD]",
+        ))
+    elif whisper_words and len(whisper_words) > 0:
+        # Sparse voiceover (1 to 3 words): Anchor words safely with monotonic spacing
+        total_w = len(whisper_words)
+        w0 = whisper_words[0]
+        t0 = round(float(getattr(w0, "start", 0.0) if hasattr(w0, "start") else w0.get("start", 0.0)) * 1000.0, 1)
+        w0_text = str(getattr(w0, "word", "") if hasattr(w0, "word") else w0.get("word", ""))
+
+        t_mid = max(t0 + 350.0, round(dur_ms * 0.28, 1))
+        t_climax = max(t_mid + 400.0, round(dur_ms * 0.65, 1))
+        t_hold = max(t_climax + 350.0, round(dur_ms * 0.85, 1))
+
+        mid_w = whisper_words[min(1, total_w - 1)]
+        climax_w = whisper_words[-1]
+
+        cues = [
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_01_establish",
+                time_ms=max(0.0, t0),
+                duration_ms=400.0,
+                camera_movement="slow_push_in",
+                zoom_scale=1.00,
+                pan_x_pct=0.0,
+                pan_y_pct=0.0,
+                stepped_framing=True,
+                whisper_anchor_word=w0_text,
+            ),
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_02_tension_ingress",
+                time_ms=t_mid,
+                duration_ms=300.0,
+                camera_movement="rake_30_focus",
+                zoom_scale=1.28,
+                pan_x_pct=5.0,
+                pan_y_pct=-2.0,
+                stepped_framing=True,
+                whisper_anchor_word=str(getattr(mid_w, "word", "") if hasattr(mid_w, "word") else mid_w.get("word", "")),
+            ),
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_03_macro_climax",
+                time_ms=t_climax,
+                duration_ms=400.0,
+                camera_movement="macro_glide",
+                zoom_scale=1.55,
+                pan_x_pct=12.0,
+                pan_y_pct=4.0,
+                stepped_framing=True,
+                whisper_anchor_word=str(getattr(climax_w, "word", "") if hasattr(climax_w, "word") else climax_w.get("word", "")) or (stat_hero or None),
+            ),
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_04_hold",
+                time_ms=t_hold,
+                duration_ms=300.0,
+                camera_movement="slow_push_in",
+                zoom_scale=1.58,
+                pan_x_pct=12.0,
+                pan_y_pct=4.0,
+                stepped_framing=True,
+                whisper_anchor_word="[DEAD_STOP_HOLD]",
+            ),
+        ]
+    else:
+        # Fallback to standard 4-phase micro-beat timings proportional to scene duration
+        cues = [
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_01_establish",
+                time_ms=0.0,
+                duration_ms=400.0,
+                camera_movement="slow_push_in",
+                zoom_scale=1.00,
+                pan_x_pct=0.0,
+                pan_y_pct=0.0,
+                stepped_framing=True,
+                whisper_anchor_word=None,
+            ),
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_02_tension_ingress",
+                time_ms=round(dur_ms * 0.28, 1),
+                duration_ms=300.0,
+                camera_movement="rake_30_focus",
+                zoom_scale=1.28,
+                pan_x_pct=6.0,
+                pan_y_pct=-3.0,
+                stepped_framing=True,
+                whisper_anchor_word=None,
+            ),
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_03_macro_climax",
+                time_ms=round(dur_ms * 0.65, 1),
+                duration_ms=400.0,
+                camera_movement="macro_glide",
+                zoom_scale=1.55,
+                pan_x_pct=12.0,
+                pan_y_pct=4.0,
+                stepped_framing=True,
+                whisper_anchor_word=stat_hero or None,
+            ),
+            CameraCue(
+                cue_id=f"cue_{scene_id.lower()}_04_hold",
+                time_ms=round(dur_ms * 0.85, 1),
+                duration_ms=300.0,
+                camera_movement="slow_push_in",
+                zoom_scale=1.58,
+                pan_x_pct=12.0,
+                pan_y_pct=4.0,
+                stepped_framing=True,
+                whisper_anchor_word="[DEAD_STOP_HOLD]",
+            ),
+        ]
+
+    return SceneAssetManifest(
+        scene_id=scene_id,
+        layer_1_background=l1,
+        layer_2_midground=l2,
+        layer_3_foreground=l3,
+        camera_cue_sheet=cues,
+        duration_ms=dur_ms,
+        narration=narration,
+    )
 
 
 def generate_master_sheet_bundle(
@@ -2547,15 +3434,14 @@ def generate_master_sheet_bundle(
     ingress_duration_sec: float = 0.3,
     camera_movement: str = "locked",
     dynamic_manifest: Optional[Any] = None,
+    whisper_words: Optional[List[Any]] = None,
+    duration_sec: float = 6.0,
 ) -> Dict[str, Any]:
     """Generates a canonical MasterSheetAssetBundle (FT-201) dict for Remotion/Pipeline consumption.
 
-    Enforces 6-in-1 complete Master Sheet specification (Result, Hero, Tool, Info, Transaction Prompt, Wiring Spec).
-    Supports dynamic manifest injection from Opus 5.5 Art Director (FT-206) to eliminate hardcoding.
-    Invariants (01_CONTRACTS.md):
-    - camera_movement MUST be 'locked' (zero zoom, zero pan).
-    - ingress_duration_sec <= 0.4s (snappy stop-motion).
-    - ingress_direction is unidirectional (default 'screen_right_to_left').
+    Enforces 6-in-1 complete Master Sheet specification (Result, Hero, Tool, Info, Transaction Prompt, Wiring Spec)
+    and full 3-layer scene manifests (Layer 1 Background Desk, Layer 2 Midground Cutouts with #FFFFFF borders,
+    Layer 3 Foreground Graphic Callouts, and Camera Cue Sheet with millisecond timings anchored to Whisper).
     """
     manifest_dict: Optional[Dict[str, Any]] = None
     if dynamic_manifest is not None:
@@ -2590,7 +3476,7 @@ def generate_master_sheet_bundle(
         cp = manifest_dict["contact_point"]
         anchor_type = cp.get("anchor_type", "corner_pin")
         host_area = cp.get("host_target_area", "document_face")
-        
+
         # Calculate dynamic non-hardcoded coordinates based on target zone
         area_coords = {
             "top_right_corner": ([520, 480], [1480, 260]),
@@ -2600,7 +3486,7 @@ def generate_master_sheet_bundle(
             "document_face": ([450, 450], [1450, 450]),
         }
         src_coord, tgt_coord = area_coords.get(host_area, ([480, 450], [1440, 450]))
-        
+
         if "connector_type" not in final_wiring_dict:
             final_wiring_dict["connector_type"] = anchor_type
         if "source_anchor" not in final_wiring_dict:
@@ -2618,6 +3504,22 @@ def generate_master_sheet_bundle(
         "snappy_physics": True
     }))
 
+    # Synthesize dynamic 3-layer story manifests and camera cue sheet
+    manifest_obj = build_dynamic_scene_manifest(
+        scene_id=scene_id,
+        narration=info_obj.narration,
+        headline=info_obj.headline,
+        stat_hero=info_obj.stat_hero,
+        stat_label=info_obj.stat_label,
+        hero_cutout_url=hero_cutout_url,
+        stage_backdrop_url=stage_backdrop_url,
+        interacting_tool_url=interacting_tool_url,
+        whisper_words=whisper_words,
+        dynamic_manifest=manifest_dict,
+        duration_sec=duration_sec,
+        wiring_spec=final_wiring_dict,
+    )
+
     bundle = MasterSheetAssetBundle(
         scene_id=scene_id,
         assembled_anchor_url=assembled_anchor_url or "images/assembled_anchor.png",
@@ -2633,6 +3535,10 @@ def generate_master_sheet_bundle(
         ingress_duration_sec=ingress_duration_sec,
         camera_movement=camera_movement,
         dynamic_manifest=manifest_dict,
+        layer_1_background=manifest_obj.layer_1_background,
+        layer_2_midground=manifest_obj.layer_2_midground,
+        layer_3_foreground=manifest_obj.layer_3_foreground,
+        camera_cue_sheet=manifest_obj.camera_cue_sheet,
     )
 
     return bundle.model_dump() if hasattr(bundle, "model_dump") else bundle.dict()
@@ -2650,6 +3556,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root) if args.repo_root else Path(__file__).resolve().parent.parent.parent
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
     ep_id = args.episode.strip().strip("'\"")
 
     from core.paths import resolve_run_paths

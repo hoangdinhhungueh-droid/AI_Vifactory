@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -235,6 +236,184 @@ def _validate_rendered_clips(ctx: RunContext, clips: list[dict]) -> list[Path]:
     return clip_paths
 
 
+def _find_remotion_cli(repo_root: Optional[Path] = None) -> Optional[list[str]]:
+    """Detects Remotion CLI command if available on VPS or local system."""
+    import shutil
+    remotion_vps = Path("/root/video_factory/remotion/node_modules/.bin/remotion")
+    if remotion_vps.exists() and os.access(str(remotion_vps), os.X_OK):
+        return [str(remotion_vps)]
+    if repo_root:
+        local_cand = repo_root / "remotion" / "node_modules" / ".bin" / "remotion"
+        if local_cand.exists():
+            return [str(local_cand)]
+        local_cmd = repo_root / "remotion" / "node_modules" / ".bin" / "remotion.cmd"
+        if local_cmd.exists():
+            return [str(local_cmd)]
+    if shutil.which("remotion"):
+        return ["remotion"]
+    if shutil.which("npx"):
+        return ["npx", "remotion"]
+    return None
+
+
+def _render_vox_native_scene_clips(
+    ctx: RunContext,
+    scene_props: list[SceneRenderProp],
+    fps: float = 30.0,
+    s5_scenes: Optional[list[dict]] = None,
+) -> list[Path]:
+    """Renders 2.5D CSS parallax scene clips with continuous camera motion and 12fps stop-motion rhythm."""
+    from PIL import Image, ImageDraw
+
+    from app.services.master_scene_sheet import build_dynamic_scene_manifest
+    from vox.compositor import render_master_vox_scene
+
+    rendered_clips: list[Path] = []
+    render_temp_dir = ctx.paths.root / "vox_rendered_clips"
+    render_temp_dir.mkdir(parents=True, exist_ok=True)
+
+    seeds_dir = ctx.paths.composite_seeds_dir if hasattr(ctx.paths, "composite_seeds_dir") else ctx.paths.root / "composite_seeds"
+
+    # Load master sheet bundles if available
+    bundles: dict[str, Any] = {}
+    ms_manifest_file = ctx.paths.root / "master_sheets" / "master_sheet_manifest.json"
+    if ms_manifest_file.exists():
+        try:
+            ms_json = json.loads(ms_manifest_file.read_text(encoding="utf-8"))
+            bundles = ms_json.get("master_sheet_bundles", {})
+        except Exception as _ms_err:
+            logger.debug(f"[s10_render] Notice loading master_sheet_manifest: {_ms_err}")
+
+    s5_map: dict[str, dict] = {}
+    if s5_scenes:
+        for sc in s5_scenes:
+            if isinstance(sc, dict) and sc.get("scene_id"):
+                s5_map[sc["scene_id"]] = sc
+
+    for idx, sc in enumerate(scene_props):
+        clip_out = render_temp_dir / f"vox_clip_{sc.scene_id.lower()}.mp4"
+        dur_sec = max(1.0, sc.duration_in_frames / fps)
+
+        # 1. Resolve Story-Specific Master Scene Manifest
+        sc_manifest = bundles.get(sc.scene_id)
+        sc_raw = s5_map.get(sc.scene_id, {})
+        if not sc_manifest:
+            sc_manifest = sc_raw.get("master_scene_manifest")
+        if not sc_manifest:
+            m_obj = build_dynamic_scene_manifest(
+                scene_id=sc.scene_id,
+                narration=sc.narration or sc_raw.get("narration") or f"Scene {idx+1}",
+                headline=sc.headline or sc_raw.get("headline") or "FORENSIC FOCUS",
+                duration_sec=dur_sec,
+            )
+            sc_manifest = m_obj.model_dump() if hasattr(m_obj, "model_dump") else m_obj.dict()
+
+        # 2. Resolve Background Desk (#F4F1EA)
+        bg_cand = seeds_dir / f"stage_{sc.scene_id.lower()}.png"
+        comp_cand = seeds_dir / f"composite_{sc.scene_id.lower()}.png"
+        bg_path = bg_cand if bg_cand.exists() else (comp_cand if comp_cand.exists() else None)
+
+        if not bg_path or not bg_path.exists():
+            bg_path = render_temp_dir / f"paper_desk_{sc.scene_id.lower()}.png"
+            if not bg_path.exists():
+                canvas = Image.new("RGB", (2400, 1350), (244, 241, 234))  # #F4F1EA
+                draw = ImageDraw.Draw(canvas)
+                draw.rectangle([20, 20, 2380, 1330], outline=(201, 187, 156), width=3)
+                canvas.save(str(bg_path), format="PNG")
+
+        # 3. Resolve Layer 2 Modular Cutouts (Hero + Tool + Supporting Documents)
+        fg_map: dict[str, Path] = {}
+
+        # Hero cutout
+        hero_cand = seeds_dir / f"hero_{sc.scene_id.lower()}.png"
+        if hero_cand.exists():
+            fg_map["hero"] = hero_cand
+            fg_map[f"hero_{sc.scene_id.lower()}"] = hero_cand
+        else:
+            hero_doc = render_temp_dir / f"card_{sc.scene_id.lower()}.png"
+            if not hero_doc.exists():
+                card = Image.new("RGBA", (700, 950), (255, 255, 255, 255))
+                c_draw = ImageDraw.Draw(card)
+                c_draw.rectangle([10, 10, 690, 940], outline=(26, 26, 26), width=3)
+                c_draw.text((40, 50), sc.headline or f"EXHIBIT // {sc.scene_id}", fill=(182, 46, 31))
+                card.save(str(hero_doc), format="PNG")
+            fg_map["hero"] = hero_doc
+            fg_map[f"hero_{sc.scene_id.lower()}"] = hero_doc
+
+        # Tool cutout
+        tool_cand = seeds_dir / f"tool_{sc.scene_id.lower()}.png"
+        if tool_cand.exists():
+            fg_map["tool"] = tool_cand
+            fg_map[f"tool_{sc.scene_id.lower()}"] = tool_cand
+        else:
+            tool_doc = render_temp_dir / f"tool_{sc.scene_id.lower()}.png"
+            if not tool_doc.exists():
+                t_card = Image.new("RGBA", (400, 300), (255, 255, 255, 255))
+                t_draw = ImageDraw.Draw(t_card)
+                t_draw.rectangle([6, 6, 394, 294], outline=(201, 187, 156), width=2)
+                t_draw.text((25, 30), "PROP // TOOL", fill=(26, 26, 26))
+                t_card.save(str(tool_doc), format="PNG")
+            fg_map["tool"] = tool_doc
+            fg_map[f"tool_{sc.scene_id.lower()}"] = tool_doc
+
+        # Supporting cutouts (court records, bills of lading, invoices, stamps)
+        supp_cand = seeds_dir / f"supp_{sc.scene_id.lower()}.png"
+        if supp_cand.exists():
+            fg_map["supp"] = supp_cand
+            fg_map[f"supp_{sc.scene_id.lower()}"] = supp_cand
+        else:
+            supp_doc = render_temp_dir / f"supp_{sc.scene_id.lower()}.png"
+            if not supp_doc.exists():
+                sp_card = Image.new("RGBA", (500, 700), (255, 255, 255, 255))
+                sp_draw = ImageDraw.Draw(sp_card)
+                sp_draw.rectangle([6, 6, 494, 694], outline=(26, 26, 26), width=2)
+                sp_draw.text((25, 30), "DOCUMENT // RECORD", fill=(51, 65, 85))
+                sp_card.save(str(supp_doc), format="PNG")
+            fg_map["supp"] = supp_doc
+            fg_map[f"supp_{sc.scene_id.lower()}"] = supp_doc
+
+        # Support specific supporting cutout IDs from manifest
+        l2_data = sc_manifest.get("layer_2_midground") or {}
+        for s_item in l2_data.get("supporting_cutouts", []):
+            s_id = s_item.get("item_id")
+            if s_id and s_id not in fg_map:
+                fg_map[s_id] = fg_map["supp"]
+
+        # 4. Render Master Vox Scene Clip with 2.5D Parallax, Continuous Camera Motion, and 12fps Stop-Motion Rhythm
+        render_master_vox_scene(
+            scene_manifest=sc_manifest,
+            bg_path=bg_path,
+            fg_map=fg_map,
+            out_clip=clip_out,
+            duration_sec=dur_sec,
+            fps=int(round(fps)),
+        )
+        rendered_clips.append(clip_out)
+
+    return rendered_clips
+
+
+def _call_assemble_final_video(
+    clip_paths: Optional[list[Path]],
+    audio_wav: Path,
+    ass_subtitles: Path,
+    final_output: Path,
+    scene_durations: Optional[list[float]] = None,
+    silent_video: Optional[Path] = None,
+) -> Path:
+    """Invokes assemble_final_video respecting its parameter signature."""
+    import inspect
+    sig = inspect.signature(assemble_final_video)
+    kwargs = {}
+    if "scene_durations" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        if scene_durations is not None:
+            kwargs["scene_durations"] = scene_durations
+    if "silent_video" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        if silent_video is not None:
+            kwargs["silent_video"] = silent_video
+    return assemble_final_video(clip_paths, audio_wav, ass_subtitles, final_output, **kwargs)
+
+
 def _validate_and_assemble_video(
     ctx: RunContext,
     clips: list[dict],
@@ -243,10 +422,10 @@ def _validate_and_assemble_video(
     final_mp4: Path,
     scene_props: Optional[list[SceneRenderProp]] = None,
     fps: float = 30.0,
+    props_file: Optional[Path] = None,
+    s5_scenes: Optional[list[dict]] = None,
 ) -> None:
-    """Validates inputs and calls assemble_final_video."""
-    clip_paths = _validate_rendered_clips(ctx, clips)
-
+    """Validates inputs and calls assemble_final_video using Remotion, Vox Parallax, or declared clips."""
     if not audio_file or not Path(audio_file).exists() or Path(audio_file).stat().st_size < 100:
         raise MissingAudioError(f"Stage S10 requires valid audio narration file from S9, got '{audio_file}'")
 
@@ -259,17 +438,51 @@ def _validate_and_assemble_video(
     if not ass_file.exists() or ass_file.stat().st_size == 0:
         raise MissingSubtitlesError(f"Stage S10 requires valid subtitles file at '{ass_file}'")
 
-    scene_durations = [sc.duration_in_frames / fps for sc in scene_props] if scene_props else None
+    # Check for Remotion CLI first (VPS or environment with Remotion installed)
+    remotion_cmd = _find_remotion_cli(getattr(ctx.paths, "repo_root", None))
+    remotion_silent_mp4 = final_mp4.parent / "remotion_silent_master.mp4"
 
-    # Delegate strictly to canonical vox assembly engine with two-pass loudnorm (Rule 125 & 139)
-    import inspect
-    sig = inspect.signature(assemble_final_video)
-    if "scene_durations" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
-        assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4, scene_durations=scene_durations)
-    else:
-        assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4)
-    if not final_mp4.exists() or final_mp4.stat().st_size < 1000:
-        raise RuntimeError(f"assemble_final_video failed to produce master MP4 at {final_mp4}")
+    if remotion_cmd and props_file and props_file.exists():
+        try:
+            logger.info(f"[s10_render] Executing Remotion master render via {' '.join(remotion_cmd)}...")
+            cmd_r = remotion_cmd + [
+                "render", "src/index.tsx", "TwoLayerEpisode",
+                str(remotion_silent_mp4),
+                f"--props={props_file}",
+                "--log=error",
+                "--concurrency=3",
+            ]
+            remotion_cwd = (getattr(ctx.paths, "repo_root", None) or Path.cwd()) / "remotion"
+            subprocess.run(cmd_r, cwd=str(remotion_cwd), check=True, timeout=600)
+            if remotion_silent_mp4.exists() and remotion_silent_mp4.stat().st_size > 1000:
+                _call_assemble_final_video(
+                    clip_paths=None,
+                    audio_wav=Path(audio_file),
+                    ass_subtitles=ass_file,
+                    final_output=final_mp4,
+                    silent_video=remotion_silent_mp4,
+                )
+                return
+        except Exception as _r_err:
+            logger.warning(f"[s10_render] Notice during Remotion master render ({_r_err}), falling back to Vox motion assembly engine")
+
+    # If declared S8 clips are present (with file paths), validate them fail-closed
+    has_declared_s8_files = any(bool(cl.get("file_path")) for cl in clips)
+    if has_declared_s8_files:
+        clip_paths = _validate_rendered_clips(ctx, clips)
+        scene_durations = [sc.duration_in_frames / fps for sc in scene_props] if scene_props else None
+        _call_assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4, scene_durations=scene_durations)
+        return
+
+    # If clips list is empty or vox_native (true Vox motion graphics mode), render via 2.5D Parallax Compositor!
+    if scene_props:
+        logger.info(f"[s10_render] Rendering {len(scene_props)} scenes via Vox 2.5D Parallax motion engine...")
+        clip_paths = _render_vox_native_scene_clips(ctx, scene_props, fps=fps, s5_scenes=s5_scenes)
+        scene_durations = [sc.duration_in_frames / fps for sc in scene_props]
+        _call_assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4, scene_durations=scene_durations)
+        return
+
+    raise MissingClipsError("Stage S10 requires either declared S8 video clips or valid SceneRenderProps for Vox assembly")
 
 
 def _parse_rational_fps(r_fps_str: str) -> float:
@@ -462,6 +675,7 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
 
     # Extract scene narrations from S5 (or S3 fallback)
     scene_narrations: dict[str, str] = {}
+    s5_scenes: list[dict] = []
     s5_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
     if s5_path.exists():
         try:
@@ -485,6 +699,21 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
             except Exception as _s3_err:
                 logger.debug(f"[s10_render] Notice extracting narrations from s3: {_s3_err}")
 
+    # If S8 clips are not declared, populate from S5 scenes for Vox Native Motion Assembly
+    if not clips and s5_scenes:
+        logger.info(f"[s10_render] Populating {len(s5_scenes)} scene entries for Vox Native motion graphics assembly")
+        clips = [
+            {
+                "scene_id": sc.get("scene_id", f"SCENE_{i+1:02d}"),
+                "duration_sec": float(sc.get("duration_est_sec") or 5.0),
+                "render_mode": "vox_native",
+                "narration": sc.get("narration"),
+                "headline": sc.get("headline"),
+                "file_path": "",
+            }
+            for i, sc in enumerate(s5_scenes)
+        ]
+
     render_props, props_file, scene_props = _build_and_save_remotion_props(
         ctx, clips, audio_file, subtitles, audio_duration_sec=audio_duration_sec, scene_narrations=scene_narrations
     )
@@ -493,7 +722,7 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
     final_mp4 = ctx.paths.final_render_dir / "final.mp4"
 
     if ctx.force or not _probe_existing_final_video(final_mp4):
-        _validate_and_assemble_video(ctx, clips, audio_file, s9_data, final_mp4, scene_props=scene_props, fps=render_props.fps)
+        _validate_and_assemble_video(ctx, clips, audio_file, s9_data, final_mp4, scene_props=scene_props, fps=render_props.fps, props_file=props_file, s5_scenes=s5_scenes)
 
     sz = final_mp4.stat().st_size if final_mp4.exists() else 0
     sha = compute_file_sha256(final_mp4) if final_mp4.exists() else "none"

@@ -1168,13 +1168,31 @@ def run(ctx: RunContext) -> StageArtifact:
         scene.headline_typography = vox_meta["headline_typography"]
         scene.audio_foley_cues = vox_meta["audio_foley_cues"]
 
-        # Opus 5.5 Bespoke Art Director Manifest (FT-206)
+        # Opus 5.5 Bespoke Art Director Manifest (FT-206) with Rich Macro Context
         try:
             from app.services.opus_art_director import generate_dynamic_art_manifest
+            context_payload = {
+                "episode_id": getattr(ctx, "run_id", "EPISODE"),
+                "topic": getattr(ctx, "topic", "") or getattr(ctx, "run_id", ""),
+                "market": market,
+                "scene_index": idx + 1,
+                "total_scenes": total_sc,
+                "core_idea": getattr(scene, "core_idea", "") or "",
+                "visual_metaphor": getattr(scene, "visual_metaphor", "") or "",
+                "hero_cutout_object": getattr(scene, "hero_cutout_object", "") or vox_meta.get("hero_cutout_object", ""),
+                "interacting_tool": getattr(scene, "interacting_tool", "") or vox_meta.get("interacting_tool", ""),
+                "h_family": h_fam,
+                "camera_directive": cam_dir,
+                "previous_scene_headline": getattr(prev_scene, "headline", "") if prev_scene else "",
+                "story_excerpt": story_text[:600] if story_text else "",
+            }
             manifest = generate_dynamic_art_manifest(
                 scene_id=scene.scene_id,
                 narration=getattr(scene, "narration", "") or getattr(scene, "sentence", "") or "",
                 headline=getattr(scene, "headline", "") or "",
+                context=context_payload,
+                preferred_model="claude-opus-5-5",
+                fallback_model="gpt-6-astra",
             )
             manifest_data = manifest.model_dump() if hasattr(manifest, "model_dump") else manifest.dict()
             scene.dynamic_art_manifest = manifest_data
@@ -1333,6 +1351,12 @@ def run(ctx: RunContext) -> StageArtifact:
             "dir": str(ctx.paths.root / "master_sheets"),
             "manifest": master_sheet_manifest,
         }
+        # Wire dynamic story asset manifests back into each scene object (FT-201 / AVF-VOX-001)
+        bundles = master_sheet_manifest.get("master_sheet_bundles", {})
+        for sc_dict in payload.get("scenes", []):
+            sc_id = sc_dict.get("scene_id")
+            if sc_id and sc_id in bundles:
+                sc_dict["master_scene_manifest"] = bundles[sc_id]
 
     artifact = StageArtifact(
         run_id=ctx.run_id,

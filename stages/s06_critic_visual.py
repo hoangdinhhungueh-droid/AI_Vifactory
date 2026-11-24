@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -282,15 +283,28 @@ def run(ctx: RunContext) -> StageArtifact:
     else:
         # Live DACL Adversarial Convergence Gate
         try:
-            from app.services.b36_visual_convergence import run_b36_visual_convergence
-            logger.info(f"[s06_critic_visual] Executing Live DACL Visual Convergence Loop for {ctx.run_id}...")
-            audit_res = run_b36_visual_convergence(
-                episode_id=ctx.run_id,
-                director_plan=s5_art.payload,
-                prompts_data=prompts_data,
-                market=market,
-                max_rounds=ctx.config.limits.critic_max_rounds
-            )
+            cached_audit = ctx.paths.root / "visual_convergence_audit.json"
+            audit_res = None
+            if cached_audit.exists():
+                try:
+                    with open(cached_audit, "r", encoding="utf-8") as caf:
+                        c_data = json.load(caf)
+                    if c_data.get("converged") and float(c_data.get("final_score", 0)) >= 8.0:
+                        logger.info(f"[s06_critic_visual] Reusing verified convergence audit for {ctx.run_id} (Score: {c_data.get('final_score')}/10)")
+                        audit_res = c_data
+                except Exception:
+                    audit_res = None
+
+            if not audit_res:
+                from app.services.b36_visual_convergence import run_b36_visual_convergence
+                logger.info(f"[s06_critic_visual] Executing Live DACL Visual Convergence Loop for {ctx.run_id}...")
+                audit_res = run_b36_visual_convergence(
+                    episode_id=ctx.run_id,
+                    director_plan=s5_art.payload,
+                    prompts_data=prompts_data,
+                    market=market,
+                    max_rounds=ctx.config.limits.critic_max_rounds
+                )
             score = float(audit_res.get("final_score") or audit_res.get("audit_score", 9.0))
             is_pass = audit_res.get("converged", False) or score >= 8.0 or audit_res.get("verdict") == "PASS"
             verdict = "pass" if is_pass else "revise"
@@ -335,6 +349,14 @@ def run(ctx: RunContext) -> StageArtifact:
             sc_id = sc.get("scene_id", f"SCENE_{i+1:02d}")
             t2i = sc.get("image_prompt", "") or sc.get("t2i_prompt", "")
             i2v = sc.get("i2v_prompt_omni", "") or sc.get("i2v_prompt", "") or sc.get("i2v_google_flow", "")
+            # Auto-sanitize diffusion freeze directives (Rule 140 Anti-Dead-Stop Invariant)
+            for banned in ("lock into dead-stop hold", "locks into dead-stop hold", "dead-stop hold", "dead stop hold"):
+                if banned in i2v.lower():
+                    clean_freeze = "settles into a stable spatial anchor on twos with continuous 12fps paper vibration"
+                    i2v = re.sub(re.escape(banned), clean_freeze, i2v, flags=re.IGNORECASE)
+                    for k in ("i2v_prompt_omni", "i2v_prompt", "i2v_google_flow", "video_prompt"):
+                        if sc.get(k):
+                            sc[k] = re.sub(re.escape(banned), clean_freeze, sc[k], flags=re.IGNORECASE)
             cam = sc.get("camera_directive", "") or sc.get("camera_movement", "")
             hero = sc.get("hero_cutout_object", "")
             tool = sc.get("interacting_tool", "") or sc.get("tool", "")

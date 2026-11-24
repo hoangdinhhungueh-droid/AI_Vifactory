@@ -685,6 +685,33 @@ def run(ctx: RunContext) -> StageArtifact:
                         c_dict["claim"] = sanitize_substantive_claim_text(c_dict["claim"], market=market)
                     if not c_dict.get("source") and c_dict.get("source_name"):
                         c_dict["source"] = c_dict["source_name"]
+
+                    # Cross-reference grounding_intel to anchor verified provenance before LLM classification
+                    if g_claims_raw:
+                        topic_words = set(re.findall(r"\w{3,}", (topic or "").lower()))
+                        c_words = set(re.findall(r"\w{4,}", str(c_dict.get("claim", "")).lower()))
+                        substantive_c = c_words - topic_words
+                        best_gc = None
+                        best_overlap = 0
+                        for gc in g_claims_raw:
+                            if gc.get("source_url") and gc.get("source_url") == c_dict.get("source_url"):
+                                best_gc = gc
+                                break
+                            gc_words = set(re.findall(r"\w{4,}", str(gc.get("claim", "")).lower()))
+                            substantive_gc = gc_words - topic_words
+                            overlap = len(substantive_c & substantive_gc)
+                            if overlap > best_overlap:
+                                best_overlap = overlap
+                                best_gc = gc
+
+                        if best_gc and (best_gc.get("source_url") == c_dict.get("source_url") or best_overlap >= 2):
+                            for k in ("source", "source_url", "date", "confidence", "causal_role", "mechanism", "act_target"):
+                                if best_gc.get(k) is not None:
+                                    c_dict[k] = best_gc[k]
+                            if best_gc.get("confidence") in ("verified", "high"):
+                                c_dict.pop("procedural_status", None)
+                                c_dict.pop("verification_status", None)
+
                     prov_c = _classify_llm_claim(c_dict, market=market)
                     # Cross-check against grounding_intel URL provenance if matching source_url is RSS
                     src_url = prov_c.get("source_url") or c.get("source_url") or ""
@@ -727,7 +754,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             prov_c["doc_type"] = "regulatory_notice"
                         prov_c["verification_status"] = "verified_primary"
                         prov_c["evidence_tier"] = "primary"
-                        if prov_c.get("credibility_tier") in ("unconfirmed_claim", None, ""):
+                        if prov_c.get("credibility_tier") in ("unconfirmed_claim", "press_allegation", None, ""):
                             prov_c["credibility_tier"] = "official_regulation"
                         prov_c["confidence"] = "high"
                     elif is_rep_press or (is_off_portal and has_press_lead):
@@ -764,6 +791,31 @@ def run(ctx: RunContext) -> StageArtifact:
                     raw_llm_claim = re.sub(r"[\u0900-\u097F]+", "", raw_llm_claim)
                     raw_llm_claim = re.sub(r"\s+", " ", raw_llm_claim).strip()
 
+                    matched_gc = None
+                    if g_claims_raw:
+                        for gc in g_claims_raw:
+                            if gc.get("source_url") and gc.get("source_url") == src_url:
+                                matched_gc = gc
+                                break
+                            gc_words = set(re.findall(r"\w{4,}", str(gc.get("claim", "")).lower()))
+                            c_words = set(re.findall(r"\w{4,}", str(raw_llm_claim).lower()))
+                            if len(gc_words & c_words) >= 2:
+                                matched_gc = gc
+                                break
+
+                    final_causal_role = prov_c.get("causal_role")
+                    final_mechanism = prov_c.get("mechanism") or c.get("mechanism")
+                    final_act_target = prov_c.get("act_target") or c.get("act_target")
+
+                    if matched_gc:
+                        if matched_gc.get("causal_role") and (not final_causal_role or final_causal_role in ("background_context", "unknown")):
+                            if prov_c.get("verification_status") in ("verified_primary", "corroborated_secondary"):
+                                final_causal_role = matched_gc["causal_role"]
+                        if matched_gc.get("mechanism") and not final_mechanism:
+                            final_mechanism = matched_gc["mechanism"]
+                        if matched_gc.get("act_target") and not final_act_target:
+                            final_act_target = matched_gc["act_target"]
+
                     ledger.append(EvidenceClaim(
                         claim_id=c_id,
                         claim=raw_llm_claim,
@@ -778,10 +830,10 @@ def run(ctx: RunContext) -> StageArtifact:
                         verification_status=prov_c.get("verification_status", "unverified_secondary"),
                         credibility_tier=prov_c.get("credibility_tier", "unconfirmed_claim"),
                         evidence_tier=prov_c.get("evidence_tier", "secondary"),
-                        causal_role=prov_c.get("causal_role", "unknown"),
+                        causal_role=final_causal_role or "background_context",
                         scope=prov_c.get("scope"),
-                        mechanism=prov_c.get("mechanism") or c.get("mechanism"),
-                        act_target=prov_c.get("act_target") or c.get("act_target"),
+                        mechanism=final_mechanism,
+                        act_target=final_act_target,
                         confidence=prov_c.get("confidence", "low"),
                     ))
 

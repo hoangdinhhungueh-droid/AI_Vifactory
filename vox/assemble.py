@@ -20,18 +20,19 @@ logger = logging.getLogger("vox.assemble")
 
 
 def assemble_final_video(
-    scene_clips: list[Path],
-    audio_wav: Path,
-    ass_subtitles: Path,
-    final_output: Path,
+    scene_clips: Optional[list[Path]] = None,
+    audio_wav: Path = None,
+    ass_subtitles: Path = None,
+    final_output: Path = None,
     scene_durations: Optional[list[float]] = None,
+    silent_video: Optional[Path] = None,
 ) -> Path:
-    """Assembles scene video clips, audio, and subtitles into final broadcast MP4."""
+    """Assembles scene video clips or silent master video, audio, and subtitles into final broadcast MP4."""
     final_output = Path(final_output)
     final_output.parent.mkdir(parents=True, exist_ok=True)
 
-    if not scene_clips:
-        raise ValueError("Cannot assemble final video: zero scene clips provided")
+    if not silent_video and not scene_clips:
+        raise ValueError("Cannot assemble final video: zero scene clips provided and no silent_video specified")
 
     from vox.ffmpeg_utils import get_ffmpeg_binary
     ffmpeg_bin = get_ffmpeg_binary()
@@ -109,30 +110,33 @@ def assemble_final_video(
     else:
         clips_to_concat = list(scene_clips)
 
-    # 1. Create ffmpeg concat list file
-    concat_list_file = final_output.parent / "concat_list.txt"
-    temp_files_to_clean.append(concat_list_file)
-    lines = [f"file '{clip.resolve().as_posix()}'" for clip in clips_to_concat]
-    concat_list_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if silent_video and Path(silent_video).exists() and Path(silent_video).stat().st_size > 1000:
+        temp_concat_video = Path(silent_video)
+    else:
+        # 1. Create ffmpeg concat list file
+        concat_list_file = final_output.parent / "concat_list.txt"
+        temp_files_to_clean.append(concat_list_file)
+        lines = [f"file '{clip.resolve().as_posix()}'" for clip in clips_to_concat]
+        concat_list_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    # Temporary concatenated video without audio
-    temp_concat_video = final_output.parent / "temp_concat.mp4"
-    temp_files_to_clean.append(temp_concat_video)
+        # Temporary concatenated video without audio
+        temp_concat_video = final_output.parent / "temp_concat.mp4"
+        temp_files_to_clean.append(temp_concat_video)
 
-    print(f"[assemble] Concatenating {len(clips_to_concat)} clips via stream copy...", flush=True)
-    cmd_concat = [
-        ffmpeg_bin, "-y",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", str(concat_list_file),
-        "-c", "copy",
-        str(temp_concat_video)
-    ]
-    try:
-        subprocess.run(cmd_concat, capture_output=True, check=True)
-    except subprocess.CalledProcessError as _c_err:
-        err_msg = _c_err.stderr.decode("utf-8", errors="replace") if _c_err.stderr else str(_c_err)
-        raise RuntimeError(f"assemble_final_video concat failed: {err_msg}") from _c_err
+        print(f"[assemble] Concatenating {len(clips_to_concat)} clips via stream copy...", flush=True)
+        cmd_concat = [
+            ffmpeg_bin, "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_list_file),
+            "-c", "copy",
+            str(temp_concat_video)
+        ]
+        try:
+            subprocess.run(cmd_concat, capture_output=True, check=True)
+        except subprocess.CalledProcessError as _c_err:
+            err_msg = _c_err.stderr.decode("utf-8", errors="replace") if _c_err.stderr else str(_c_err)
+            raise RuntimeError(f"assemble_final_video concat failed: {err_msg}") from _c_err
 
     # Pass 1: Measure audio loudness statistics
     pass1_cmd = [

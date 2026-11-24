@@ -214,3 +214,126 @@ def test_s10_render_fails_closed_when_subtitles_file_key_missing(tmp_path: Path)
     with pytest.raises(MissingSubtitlesError, match="canonical 'subtitles_file' key in S9 payload contract"):
         run_s10_render(ctx)
 
+
+def test_s10_render_vox_native_parallax_motion_graphics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies that Stage S10 successfully renders 2.5D CSS parallax motion graphics when clips is empty."""
+    run_id = "test_s10_vox_native"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+
+    # Empty clips list in S8 (representing Vox motion graphics mode without fragmented I2V clips)
+    s8_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S8_VIDEO_GEN.value,
+        "status": "ok",
+        "payload": {"clips": []},
+        "provenance": {"generator": "stages.s8_video_gen"},
+    }
+    s8_file = paths.artifact_file(StageID.S8_VIDEO_GEN.value)
+    s8_file.parent.mkdir(parents=True, exist_ok=True)
+    s8_file.write_text(json.dumps(s8_artifact), encoding="utf-8")
+
+    # S5 Director Plan with scene narration
+    s5_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S5_DIRECTOR_PLAN.value,
+        "status": "ok",
+        "payload": {
+            "scenes": [
+                {
+                    "scene_id": "SCENE_01",
+                    "headline": "FORENSIC DISCLOSURE",
+                    "narration": "Archival ledger entries exposed the diversion of funds.",
+                    "duration_est_sec": 3.0,
+                }
+            ]
+        },
+        "provenance": {"generator": "stages.s5_director_plan"},
+    }
+    s5_file = paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
+    s5_file.parent.mkdir(parents=True, exist_ok=True)
+    s5_file.write_text(json.dumps(s5_artifact), encoding="utf-8")
+
+    # Valid narration WAV and ASS subtitles
+    audio_file = tmp_path / "narration.wav"
+    audio_file.write_bytes(b"RIFF" + b"\x00" * 400)
+    sub_file = tmp_path / "subtitles.ass"
+    sub_file.write_text("[Script Info]\nTitle: Test Subtitles\n", encoding="utf-8")
+
+    s9_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S9_VOICE_TTS.value,
+        "status": "ok",
+        "payload": {
+            "audio_file": str(audio_file),
+            "subtitles_file": str(sub_file),
+            "total_duration_sec": 3.0,
+            "subtitles": [
+                {"word": "Archival", "start": 0.0, "end": 0.5},
+                {"word": "ledger", "start": 0.5, "end": 1.0},
+            ]
+        },
+        "provenance": {"generator": "stages.s9_voice_tts"},
+    }
+    s9_file = paths.artifact_file(StageID.S9_VOICE_TTS.value)
+    s9_file.parent.mkdir(parents=True, exist_ok=True)
+    s9_file.write_text(json.dumps(s9_artifact), encoding="utf-8")
+
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+
+    # Monkeypatch render_scene_clip and assemble_final_video to isolate unit test
+    vox_rendered = []
+    captured_manifests = []
+    captured_fg_maps = []
+    def fake_render_scene_clip(scene, bg_path, fg_map, out_clip, **kwargs):
+        Path(out_clip).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_clip).write_bytes(b"fake_vox_mp4" + b"\x00" * 1200)
+        vox_rendered.append(out_clip)
+        if "master_manifest" in kwargs and kwargs["master_manifest"]:
+            captured_manifests.append(kwargs["master_manifest"])
+        captured_fg_maps.append(fg_map)
+        return out_clip
+
+    def fake_assemble(clip_paths, audio_file, ass_file, final_mp4, **kwargs):
+        Path(final_mp4).parent.mkdir(parents=True, exist_ok=True)
+        Path(final_mp4).write_bytes(b"master_video_data" + b"\x00" * 2000)
+        return final_mp4
+
+    monkeypatch.setattr("vox.compositor.render_scene_clip", fake_render_scene_clip)
+    monkeypatch.setattr("stages.s10_render.assemble_final_video", fake_assemble)
+    monkeypatch.setattr("vox.qa.gates.probe_media_file", lambda p: {
+        "streams": [
+            {"codec_type": "video", "r_frame_rate": "30/1", "avg_frame_rate": "30/1", "duration": "3.0", "nb_frames": "90", "nb_read_packets": "90"},
+            {"codec_type": "audio", "duration": "3.0"}
+        ],
+        "format": {"duration": "3.0"}
+    })
+
+    art = run_s10_render(ctx)
+    assert art.status == "ok"
+    assert len(vox_rendered) == 1
+    assert Path(art.payload["final_video_path"]).exists()
+    assert art.payload["total_scenes_rendered"] == 1
+
+    # Verify 3-layer manifests and modular cutouts were resolved and passed to master compositor
+    assert len(captured_manifests) == 1
+    m = captured_manifests[0]
+    assert "layer_1_background" in m
+    assert m["layer_1_background"]["background_color"] == "#F4F1EA"
+    assert "layer_2_midground" in m
+    assert "layer_3_foreground" in m
+    assert "camera_cue_sheet" in m
+    assert "hero" in captured_fg_maps[0]
+    assert "tool" in captured_fg_maps[0]
+    assert "supp" in captured_fg_maps[0]
+
+

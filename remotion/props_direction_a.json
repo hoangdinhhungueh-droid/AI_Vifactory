@@ -1,0 +1,123 @@
+{
+  "scenes": [
+    {
+      "id": "new_mastersheet_scene_02",
+      "scene_id": "SCENE_02",
+      "component": "VoxBuildOnStage",
+      "durationInFrames": 180,
+      "durationSec": 6.0,
+      "headline": "THE DIVISION OF LABOR",
+      "editorialHeadline": "FORENSIC JURISDICTION ANALYSIS // SCENE 02",
+      "statValue": "10X",
+      "statLabel": "CRITICAL ATTACK MULTIPLIER",
+      "sourceTag": "UK FORENSIC EXPERT TESTIMONY // 2026.11",
+      "sourceCredit": "UK FORENSIC EXPERT TESTIMONY // 2026.11",
+      "accentColor": "#D62E1F",
+      "background": "images/new_stage_backdrop.png",
+      "backgroundSrc": "images/new_stage_backdrop.png",
+      "heroSrc": "images/new_hero_cutout.png",
+      "heroLabel": "INVESTIGATOR // EXHIBIT A",
+      "layoutVariant": "paper_collage",
+      "theme": "newsprint-editorial",
+      "cameraMovement": "locked",
+      "steppedPunches": [],
+      "disableDrift": true,
+      "narration": "UK forensic specialists confirm: ransom negotiation efficiency increased tenfold.",
+      "subtitles": [
+        {
+          "word": "UK",
+          "start": 0.0,
+          "end": 0.45,
+          "start_ms": 0.0,
+          "end_ms": 450.0
+        },
+        {
+          "word": "forensic",
+          "start": 0.45,
+          "end": 0.95,
+          "start_ms": 450.0,
+          "end_ms": 950.0
+        },
+        {
+          "word": "specialists",
+          "start": 0.95,
+          "end": 1.55,
+          "start_ms": 950.0,
+          "end_ms": 1550.0
+        },
+        {
+          "word": "confirm:",
+          "start": 1.55,
+          "end": 2.1,
+          "start_ms": 1550.0,
+          "end_ms": 2100.0
+        },
+        {
+          "word": "ransom",
+          "start": 2.1,
+          "end": 2.7,
+          "start_ms": 2100.0,
+          "end_ms": 2700.0
+        },
+        {
+          "word": "negotiation",
+          "start": 2.7,
+          "end": 3.4,
+          "start_ms": 2700.0,
+          "end_ms": 3400.0
+        },
+        {
+          "word": "efficiency",
+          "start": 3.4,
+          "end": 4.1,
+          "start_ms": 3400.0,
+          "end_ms": 4100.0
+        },
+        {
+          "word": "increased",
+          "start": 4.1,
+          "end": 4.8,
+          "start_ms": 4100.0,
+          "end_ms": 4800.0
+        },
+        {
+          "word": "10X.",
+          "start": 4.8,
+          "end": 5.8,
+          "start_ms": 4800.0,
+          "end_ms": 5800.0
+        }
+      ],
+      "supportingCutouts": [
+        {
+          "id": "cutout_stat_card",
+          "label": "STAT HERO // 10X MULTIPLIER",
+          "role": "EXHIBIT // CRIME ARCHIVE",
+          "src": "images/new_stat_card.png",
+          "xPct": 56,
+          "yPct": 35,
+          "widthPct": 34,
+          "rotation": 0.0,
+          "delaySec": 0.4,
+          "entranceType": "slide_in_deal",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "CRITICAL ATTACK MULTIPLIER // 10X"
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 27,
+          "fromY": 48,
+          "toX": 58,
+          "toY": 48,
+          "color": "#D62E1F",
+          "delaySec": 1.2
+        }
+      ],
+      "stampText": "10X LEVERAGE // VERIFIED",
+      "stampColor": "#D62E1F",
+      "hasMarkerHighlight": true
+    }
+  ]
+}

@@ -1,0 +1,1479 @@
+{
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "id": "scene_01",
+      "scene_id": "SCENE_01",
+      "durationInFrames": 223,
+      "durationSec": 7.42,
+      "headline": "ASIC NOTICE",
+      "editorialHeadline": "OFFICIAL ASIC NOTICE // VOLUNTARY ADMINISTRATION",
+      "statValue": "2026",
+      "statLabel": "QUANTITATIVE EVIDENCE",
+      "sourceTag": "ASIC CORPORATE FILING // 2026.11",
+      "sourceCredit": "ASIC CORPORATE FILING // 2026.11",
+      "accentColor": "#D62E1F",
+      "theme": "newsprint-editorial",
+      "layoutVariant": "paper_collage",
+      "cameraMovement": "locked",
+      "disableDrift": true,
+      "steppedPunches": [],
+      "presetId": 0,
+      "heroSrc": "episodes/EN_EP0268_general_pants_collapse/images/hero_scene_01_alpha.png",
+      "heroLabel": "OFFICIAL ASIC NOTICE",
+      "heroPosition": {
+        "xPct": 48,
+        "yPct": 48,
+        "widthPct": 44
+      },
+      "hasMarkerHighlight": true,
+      "supportingCutouts": [
+        {
+          "id": "cutout_tool_01",
+          "src": "episodes/EN_EP0268_general_pants_collapse/images/tool_scene_01_alpha.png",
+          "xPct": 20,
+          "yPct": 24,
+          "widthPct": 28,
+          "rotation": 2.5,
+          "delaySec": 0.8,
+          "entranceType": "delicate_tack",
+          "hasPin": true
+        },
+        {
+          "id": "cutout_excerpt_01",
+          "variant": "excerpt",
+          "badge": "STATUTORY CLAUSE",
+          "label": "CORPORATIONS ACT 2001 // SEC. 436A",
+          "subLabel": "APPOINTMENT OF EXTERNAL ADMINISTRATORS",
+          "xPct": 18,
+          "yPct": 70,
+          "widthPct": 22,
+          "rotation": -3.0,
+          "delaySec": 1.4,
+          "entranceType": "paper_slap",
+          "hasTape": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "SEC. 436A"
+        },
+        {
+          "id": "cutout_sticky_01",
+          "variant": "sticky_note",
+          "badge": "AUDIT NOTE",
+          "label": "GENERAL PANTS CO. PTY LTD",
+          "subLabel": "ENTERED ADMINISTRATION: 11/2026",
+          "xPct": 78,
+          "yPct": 24,
+          "widthPct": 22,
+          "rotation": 3.5,
+          "delaySec": 2.0,
+          "entranceType": "delicate_tack",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "NOVEMBER 2026"
+        },
+        {
+          "id": "cutout_stat_card_01",
+          "variant": "card",
+          "badge": "QUANTITATIVE METRIC",
+          "label": "STAT HERO // FISCAL YEAR",
+          "subLabel": "2026 AUDITED FILING",
+          "xPct": 78,
+          "yPct": 72,
+          "widthPct": 22,
+          "rotation": -1.0,
+          "delaySec": 2.8,
+          "entranceType": "paper_slap",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "2026"
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 22,
+          "fromY": 34,
+          "toX": 35,
+          "toY": 42,
+          "color": "#D62E1F",
+          "delaySec": 1.6,
+          "label": "STATUTORY AUDIT #00789"
+        },
+        {
+          "fromX": 35,
+          "fromY": 54,
+          "toX": 20,
+          "toY": 68,
+          "color": "#D62E1F",
+          "delaySec": 2.2,
+          "label": "SEC 436A MANDATE"
+        },
+        {
+          "fromX": 58,
+          "fromY": 42,
+          "toX": 74,
+          "toY": 26,
+          "color": "#D62E1F",
+          "delaySec": 2.6,
+          "label": "INSOLVENCY DISCLOSURE"
+        },
+        {
+          "fromX": 76,
+          "fromY": 32,
+          "toX": 78,
+          "toY": 66,
+          "color": "#D62E1F",
+          "delaySec": 3.4,
+          "label": "AUDIT TIMELINE // 2026"
+        }
+      ],
+      "dimensionLines": [],
+      "stampText": "ASIC NOTICE // NOV 2026",
+      "stampColor": "#D62E1F",
+      "narration": "An official ASIC notice confirms General Pants Co. entered voluntary administration in November 2026.",
+      "subtitles": [
+        {
+          "word": "An",
+          "start": 0.0,
+          "end": 0.4,
+          "start_ms": 0,
+          "end_ms": 400
+        },
+        {
+          "word": "official",
+          "start": 0.4,
+          "end": 0.72,
+          "start_ms": 400,
+          "end_ms": 720
+        },
+        {
+          "word": "ASIC",
+          "start": 0.72,
+          "end": 1.18,
+          "start_ms": 720,
+          "end_ms": 1180
+        },
+        {
+          "word": "notice",
+          "start": 1.18,
+          "end": 1.5,
+          "start_ms": 1180,
+          "end_ms": 1500
+        },
+        {
+          "word": "confirms",
+          "start": 1.5,
+          "end": 2.0,
+          "start_ms": 1500,
+          "end_ms": 2000
+        },
+        {
+          "word": "general",
+          "start": 2.0,
+          "end": 2.5,
+          "start_ms": 2000,
+          "end_ms": 2500
+        },
+        {
+          "word": "pants",
+          "start": 2.5,
+          "end": 2.9,
+          "start_ms": 2500,
+          "end_ms": 2900
+        },
+        {
+          "word": "company",
+          "start": 2.9,
+          "end": 3.26,
+          "start_ms": 2900,
+          "end_ms": 3260
+        },
+        {
+          "word": "entered",
+          "start": 3.26,
+          "end": 3.62,
+          "start_ms": 3260,
+          "end_ms": 3620
+        },
+        {
+          "word": "voluntary",
+          "start": 3.62,
+          "end": 4.06,
+          "start_ms": 3620,
+          "end_ms": 4060
+        },
+        {
+          "word": "administration",
+          "start": 4.06,
+          "end": 4.74,
+          "start_ms": 4060,
+          "end_ms": 4740
+        },
+        {
+          "word": "in",
+          "start": 4.74,
+          "end": 5.16,
+          "start_ms": 4740,
+          "end_ms": 5160
+        },
+        {
+          "word": "November",
+          "start": 5.16,
+          "end": 5.42,
+          "start_ms": 5160,
+          "end_ms": 5420
+        },
+        {
+          "word": "2026.",
+          "start": 5.42,
+          "end": 6.44,
+          "start_ms": 5420,
+          "end_ms": 6440
+        }
+      ],
+      "words": [
+        {
+          "word": "An",
+          "start": 0.0,
+          "end": 0.4,
+          "start_ms": 0,
+          "end_ms": 400
+        },
+        {
+          "word": "official",
+          "start": 0.4,
+          "end": 0.72,
+          "start_ms": 400,
+          "end_ms": 720
+        },
+        {
+          "word": "ASIC",
+          "start": 0.72,
+          "end": 1.18,
+          "start_ms": 720,
+          "end_ms": 1180
+        },
+        {
+          "word": "notice",
+          "start": 1.18,
+          "end": 1.5,
+          "start_ms": 1180,
+          "end_ms": 1500
+        },
+        {
+          "word": "confirms",
+          "start": 1.5,
+          "end": 2.0,
+          "start_ms": 1500,
+          "end_ms": 2000
+        },
+        {
+          "word": "general",
+          "start": 2.0,
+          "end": 2.5,
+          "start_ms": 2000,
+          "end_ms": 2500
+        },
+        {
+          "word": "pants",
+          "start": 2.5,
+          "end": 2.9,
+          "start_ms": 2500,
+          "end_ms": 2900
+        },
+        {
+          "word": "company",
+          "start": 2.9,
+          "end": 3.26,
+          "start_ms": 2900,
+          "end_ms": 3260
+        },
+        {
+          "word": "entered",
+          "start": 3.26,
+          "end": 3.62,
+          "start_ms": 3260,
+          "end_ms": 3620
+        },
+        {
+          "word": "voluntary",
+          "start": 3.62,
+          "end": 4.06,
+          "start_ms": 3620,
+          "end_ms": 4060
+        },
+        {
+          "word": "administration",
+          "start": 4.06,
+          "end": 4.74,
+          "start_ms": 4060,
+          "end_ms": 4740
+        },
+        {
+          "word": "in",
+          "start": 4.74,
+          "end": 5.16,
+          "start_ms": 4740,
+          "end_ms": 5160
+        },
+        {
+          "word": "November",
+          "start": 5.16,
+          "end": 5.42,
+          "start_ms": 5160,
+          "end_ms": 5420
+        },
+        {
+          "word": "2026.",
+          "start": 5.42,
+          "end": 6.44,
+          "start_ms": 5420,
+          "end_ms": 6440
+        }
+      ]
+    },
+    {
+      "id": "scene_02",
+      "scene_id": "SCENE_02",
+      "durationInFrames": 238,
+      "durationSec": 7.94,
+      "headline": "9 SUBSIDIARIES",
+      "editorialHeadline": "STATUTORY FILINGS // 9 RETAIL SUBSIDIARIES",
+      "statValue": "9 RETAIL",
+      "statLabel": "QUANTITATIVE EVIDENCE",
+      "sourceTag": "STATUTORY LIQUIDATION FILINGS // 2026",
+      "sourceCredit": "STATUTORY LIQUIDATION FILINGS // 2026",
+      "accentColor": "#D62E1F",
+      "theme": "newsprint-editorial",
+      "layoutVariant": "paper_collage",
+      "cameraMovement": "locked",
+      "disableDrift": true,
+      "steppedPunches": [],
+      "presetId": 0,
+      "heroSrc": "episodes/EN_EP0268_general_pants_collapse/images/hero_scene_02_alpha.png",
+      "heroLabel": "PARENT ENTITY // HOLDING ARCHIVE",
+      "heroPosition": {
+        "xPct": 24,
+        "yPct": 46,
+        "widthPct": 34
+      },
+      "hasMarkerHighlight": true,
+      "supportingCutouts": [
+        {
+          "id": "cutout_stat_card_02",
+          "variant": "card",
+          "badge": "QUANTITATIVE METRIC",
+          "label": "STAT HERO // 9 RETAIL",
+          "subLabel": "OPERATING SUBSIDIARIES",
+          "xPct": 78,
+          "yPct": 22,
+          "widthPct": 24,
+          "rotation": -1.5,
+          "delaySec": 1.2,
+          "entranceType": "paper_slap",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "9 RETAIL UNITS"
+        },
+        {
+          "id": "cutout_sticky_02",
+          "variant": "sticky_note",
+          "badge": "CAPITAL FLOW MEMO",
+          "label": "INTERCOMPANY CLAIMS REGISTER",
+          "subLabel": "CROSS-GUARANTEE EXPOSURE: AUDIT VERIFIED",
+          "xPct": 82,
+          "yPct": 50,
+          "widthPct": 22,
+          "rotation": 2.0,
+          "delaySec": 1.8,
+          "entranceType": "delicate_tack",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "CROSS-GUARANTEE"
+        },
+        {
+          "id": "cutout_subsidiaries_register",
+          "variant": "excerpt",
+          "badge": "ASIC SUBSIDIARY REGISTER",
+          "label": "RETAIL ENTITIES UNDER ADMINISTRATION",
+          "subLabel": "9 OPERATING DIVISIONS AUDITED",
+          "xPct": 80,
+          "yPct": 78,
+          "widthPct": 24,
+          "rotation": -2.0,
+          "delaySec": 2.4,
+          "entranceType": "paper_slap",
+          "hasTape": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "9 DIVISIONS"
+        },
+        {
+          "id": "cutout_tool_02",
+          "src": "episodes/EN_EP0268_general_pants_collapse/images/tool_scene_02_alpha.png",
+          "xPct": 52,
+          "yPct": 78,
+          "widthPct": 32,
+          "rotation": 0.5,
+          "delaySec": 3.0,
+          "entranceType": "delicate_tack",
+          "hasPin": true
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 30,
+          "fromY": 40,
+          "toX": 74,
+          "toY": 24,
+          "color": "#D62E1F",
+          "delaySec": 1.4,
+          "label": "100% SUBSIDIARY CONTROL"
+        },
+        {
+          "fromX": 32,
+          "fromY": 48,
+          "toX": 78,
+          "toY": 50,
+          "color": "#D62E1F",
+          "delaySec": 2.0,
+          "label": "CROSS-GUARANTEE EXPOSURE"
+        },
+        {
+          "fromX": 30,
+          "fromY": 56,
+          "toX": 76,
+          "toY": 76,
+          "color": "#D62E1F",
+          "delaySec": 2.6,
+          "label": "RETAIL TRADING ENTITIES"
+        },
+        {
+          "fromX": 32,
+          "fromY": 62,
+          "toX": 48,
+          "toY": 74,
+          "color": "#D62E1F",
+          "delaySec": 3.2,
+          "label": "CAPITAL REGULATION DRAIN"
+        }
+      ],
+      "dimensionLines": [],
+      "stampText": "PARENT ENTITY // AUDIT DATA",
+      "stampColor": "#D62E1F",
+      "narration": "Statutory filings confirm the administration encompasses nine retail operating subsidiaries alongside the parent company.",
+      "subtitles": [
+        {
+          "word": "Statutory",
+          "start": 0.0,
+          "end": 1.04,
+          "start_ms": 0,
+          "end_ms": 1040
+        },
+        {
+          "word": "filings",
+          "start": 1.04,
+          "end": 1.52,
+          "start_ms": 1040,
+          "end_ms": 1520
+        },
+        {
+          "word": "confirmed",
+          "start": 1.52,
+          "end": 1.94,
+          "start_ms": 1520,
+          "end_ms": 1940
+        },
+        {
+          "word": "the",
+          "start": 1.94,
+          "end": 2.22,
+          "start_ms": 1940,
+          "end_ms": 2220
+        },
+        {
+          "word": "administration",
+          "start": 2.22,
+          "end": 2.7,
+          "start_ms": 2220,
+          "end_ms": 2700
+        },
+        {
+          "word": "encompasses",
+          "start": 2.7,
+          "end": 3.44,
+          "start_ms": 2700,
+          "end_ms": 3440
+        },
+        {
+          "word": "nine",
+          "start": 3.44,
+          "end": 3.88,
+          "start_ms": 3440,
+          "end_ms": 3880
+        },
+        {
+          "word": "retail",
+          "start": 3.88,
+          "end": 4.3,
+          "start_ms": 3880,
+          "end_ms": 4300
+        },
+        {
+          "word": "operating",
+          "start": 4.3,
+          "end": 4.76,
+          "start_ms": 4300,
+          "end_ms": 4760
+        },
+        {
+          "word": "subsidiaries",
+          "start": 4.76,
+          "end": 5.6,
+          "start_ms": 4760,
+          "end_ms": 5600
+        },
+        {
+          "word": "alongside",
+          "start": 5.6,
+          "end": 6.1,
+          "start_ms": 5600,
+          "end_ms": 6100
+        },
+        {
+          "word": "the",
+          "start": 6.1,
+          "end": 6.4,
+          "start_ms": 6100,
+          "end_ms": 6400
+        },
+        {
+          "word": "parent",
+          "start": 6.4,
+          "end": 6.66,
+          "start_ms": 6400,
+          "end_ms": 6660
+        },
+        {
+          "word": "company.",
+          "start": 6.66,
+          "end": 7.06,
+          "start_ms": 6660,
+          "end_ms": 7060
+        }
+      ],
+      "words": [
+        {
+          "word": "Statutory",
+          "start": 0.0,
+          "end": 1.04,
+          "start_ms": 0,
+          "end_ms": 1040
+        },
+        {
+          "word": "filings",
+          "start": 1.04,
+          "end": 1.52,
+          "start_ms": 1040,
+          "end_ms": 1520
+        },
+        {
+          "word": "confirmed",
+          "start": 1.52,
+          "end": 1.94,
+          "start_ms": 1520,
+          "end_ms": 1940
+        },
+        {
+          "word": "the",
+          "start": 1.94,
+          "end": 2.22,
+          "start_ms": 1940,
+          "end_ms": 2220
+        },
+        {
+          "word": "administration",
+          "start": 2.22,
+          "end": 2.7,
+          "start_ms": 2220,
+          "end_ms": 2700
+        },
+        {
+          "word": "encompasses",
+          "start": 2.7,
+          "end": 3.44,
+          "start_ms": 2700,
+          "end_ms": 3440
+        },
+        {
+          "word": "nine",
+          "start": 3.44,
+          "end": 3.88,
+          "start_ms": 3440,
+          "end_ms": 3880
+        },
+        {
+          "word": "retail",
+          "start": 3.88,
+          "end": 4.3,
+          "start_ms": 3880,
+          "end_ms": 4300
+        },
+        {
+          "word": "operating",
+          "start": 4.3,
+          "end": 4.76,
+          "start_ms": 4300,
+          "end_ms": 4760
+        },
+        {
+          "word": "subsidiaries",
+          "start": 4.76,
+          "end": 5.6,
+          "start_ms": 4760,
+          "end_ms": 5600
+        },
+        {
+          "word": "alongside",
+          "start": 5.6,
+          "end": 6.1,
+          "start_ms": 5600,
+          "end_ms": 6100
+        },
+        {
+          "word": "the",
+          "start": 6.1,
+          "end": 6.4,
+          "start_ms": 6100,
+          "end_ms": 6400
+        },
+        {
+          "word": "parent",
+          "start": 6.4,
+          "end": 6.66,
+          "start_ms": 6400,
+          "end_ms": 6660
+        },
+        {
+          "word": "company.",
+          "start": 6.66,
+          "end": 7.06,
+          "start_ms": 6660,
+          "end_ms": 7060
+        }
+      ]
+    },
+    {
+      "id": "scene_03",
+      "scene_id": "SCENE_03",
+      "durationInFrames": 226,
+      "durationSec": 7.54,
+      "headline": "RETAIL STORES AT RISK",
+      "editorialHeadline": "EXPOSURE SUMMARY // 500 JOBS & 35 DOORS",
+      "statValue": "500 JOBS",
+      "statLabel": "STATUTORY THREAT",
+      "sourceTag": "ASIC & TRADE UNION DISCLOSURES // 2026",
+      "sourceCredit": "ASIC & TRADE UNION DISCLOSURES // 2026",
+      "accentColor": "#D62E1F",
+      "theme": "newsprint-editorial",
+      "layoutVariant": "paper_collage",
+      "cameraMovement": "locked",
+      "disableDrift": true,
+      "steppedPunches": [],
+      "presetId": 0,
+      "heroSrc": "episodes/EN_EP0268_general_pants_collapse/images/hero_scene_03_alpha.png",
+      "heroLabel": "RETAIL STORES // 35 LOCATIONS AT RISK",
+      "heroPosition": {
+        "xPct": 36,
+        "yPct": 58,
+        "widthPct": 46
+      },
+      "hasMarkerHighlight": true,
+      "supportingCutouts": [
+        {
+          "id": "cutout_stat_card_03",
+          "variant": "card",
+          "badge": "AT-RISK METRIC",
+          "label": "STAT HERO // RETAIL FOOTPRINT",
+          "subLabel": "AUSTRALIA & NEW ZEALAND UNITS",
+          "xPct": 42,
+          "yPct": 18,
+          "widthPct": 26,
+          "rotation": -1.0,
+          "delaySec": 1.0,
+          "entranceType": "drop",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "500 JOBS"
+        },
+        {
+          "id": "cutout_tool_03",
+          "src": "episodes/EN_EP0268_general_pants_collapse/images/tool_scene_03_alpha.png",
+          "xPct": 78,
+          "yPct": 30,
+          "widthPct": 32,
+          "rotation": -2.5,
+          "delaySec": 1.6,
+          "entranceType": "delicate_tack",
+          "hasPin": true
+        },
+        {
+          "id": "cutout_sticky_03",
+          "variant": "sticky_note",
+          "badge": "STORE AUDIT MEMO",
+          "label": "GENERAL PANTS NETWORK",
+          "subLabel": "35 LEASED PREMISES UNDER THREAT",
+          "xPct": 18,
+          "yPct": 32,
+          "widthPct": 22,
+          "rotation": 4.0,
+          "delaySec": 2.2,
+          "entranceType": "delicate_tack",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "35 STORES"
+        },
+        {
+          "id": "cutout_excerpt_03",
+          "variant": "excerpt",
+          "badge": "ASIC LIQUIDATION NOTICE",
+          "label": "UNSECURED CREDITORS CLAIM",
+          "subLabel": "TENANCY LEASES AUDITED: NOV 2026",
+          "xPct": 76,
+          "yPct": 74,
+          "widthPct": 26,
+          "rotation": -2.0,
+          "delaySec": 2.8,
+          "entranceType": "paper_slap",
+          "hasTape": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "CREDITOR CLAIMS"
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 40,
+          "fromY": 24,
+          "toX": 34,
+          "toY": 50,
+          "color": "#D62E1F",
+          "delaySec": 1.4,
+          "label": "500 WORKERS TERMINATED"
+        },
+        {
+          "fromX": 38,
+          "fromY": 24,
+          "toX": 22,
+          "toY": 30,
+          "color": "#D62E1F",
+          "delaySec": 2.2,
+          "label": "35 LEASEHOLD SITES"
+        },
+        {
+          "fromX": 44,
+          "fromY": 64,
+          "toX": 72,
+          "toY": 72,
+          "color": "#D62E1F",
+          "delaySec": 3.0,
+          "label": "UNSECURED LEASE CLAIMS"
+        },
+        {
+          "fromX": 76,
+          "fromY": 68,
+          "toX": 76,
+          "toY": 42,
+          "color": "#D62E1F",
+          "delaySec": 3.6,
+          "label": "LIQUIDATION DEBT AUDIT"
+        }
+      ],
+      "dimensionLines": [
+        {
+          "startX": 18,
+          "endX": 60,
+          "y": 75,
+          "label": "35 RETAIL DOORS UNDER AUDIT",
+          "color": "#DC2626",
+          "delaySec": 2.4,
+          "rotation": 0
+        }
+      ],
+      "stampText": "STORE NETWORK // AUDIT RISK",
+      "stampColor": "#D62E1F",
+      "narration": "Approximately five hundred retail jobs and thirty-five stores across Australia and New Zealand are reportedly at risk.",
+      "subtitles": [
+        {
+          "word": "Approximately",
+          "start": 0.0,
+          "end": 1.0,
+          "start_ms": 0,
+          "end_ms": 1000
+        },
+        {
+          "word": "500",
+          "start": 1.0,
+          "end": 1.44,
+          "start_ms": 1000,
+          "end_ms": 1440
+        },
+        {
+          "word": "retail",
+          "start": 1.44,
+          "end": 2.04,
+          "start_ms": 1440,
+          "end_ms": 2040
+        },
+        {
+          "word": "jobs",
+          "start": 2.04,
+          "end": 2.4,
+          "start_ms": 2040,
+          "end_ms": 2400
+        },
+        {
+          "word": "and",
+          "start": 2.4,
+          "end": 2.68,
+          "start_ms": 2400,
+          "end_ms": 2680
+        },
+        {
+          "word": "35",
+          "start": 2.68,
+          "end": 3.12,
+          "start_ms": 2680,
+          "end_ms": 3120
+        },
+        {
+          "word": "stores",
+          "start": 3.12,
+          "end": 3.56,
+          "start_ms": 3120,
+          "end_ms": 3560
+        },
+        {
+          "word": "across",
+          "start": 3.56,
+          "end": 3.94,
+          "start_ms": 3560,
+          "end_ms": 3940
+        },
+        {
+          "word": "Australia",
+          "start": 3.94,
+          "end": 4.46,
+          "start_ms": 3940,
+          "end_ms": 4460
+        },
+        {
+          "word": "and",
+          "start": 4.46,
+          "end": 4.98,
+          "start_ms": 4460,
+          "end_ms": 4980
+        },
+        {
+          "word": "New",
+          "start": 4.98,
+          "end": 5.1,
+          "start_ms": 4980,
+          "end_ms": 5100
+        },
+        {
+          "word": "Zealand",
+          "start": 5.1,
+          "end": 5.42,
+          "start_ms": 5100,
+          "end_ms": 5420
+        },
+        {
+          "word": "are",
+          "start": 5.42,
+          "end": 5.7,
+          "start_ms": 5420,
+          "end_ms": 5700
+        },
+        {
+          "word": "reportedly",
+          "start": 5.7,
+          "end": 6.06,
+          "start_ms": 5700,
+          "end_ms": 6060
+        },
+        {
+          "word": "at",
+          "start": 6.06,
+          "end": 6.34,
+          "start_ms": 6060,
+          "end_ms": 6340
+        },
+        {
+          "word": "risk.",
+          "start": 6.34,
+          "end": 6.66,
+          "start_ms": 6340,
+          "end_ms": 6660
+        }
+      ],
+      "words": [
+        {
+          "word": "Approximately",
+          "start": 0.0,
+          "end": 1.0,
+          "start_ms": 0,
+          "end_ms": 1000
+        },
+        {
+          "word": "500",
+          "start": 1.0,
+          "end": 1.44,
+          "start_ms": 1000,
+          "end_ms": 1440
+        },
+        {
+          "word": "retail",
+          "start": 1.44,
+          "end": 2.04,
+          "start_ms": 1440,
+          "end_ms": 2040
+        },
+        {
+          "word": "jobs",
+          "start": 2.04,
+          "end": 2.4,
+          "start_ms": 2040,
+          "end_ms": 2400
+        },
+        {
+          "word": "and",
+          "start": 2.4,
+          "end": 2.68,
+          "start_ms": 2400,
+          "end_ms": 2680
+        },
+        {
+          "word": "35",
+          "start": 2.68,
+          "end": 3.12,
+          "start_ms": 2680,
+          "end_ms": 3120
+        },
+        {
+          "word": "stores",
+          "start": 3.12,
+          "end": 3.56,
+          "start_ms": 3120,
+          "end_ms": 3560
+        },
+        {
+          "word": "across",
+          "start": 3.56,
+          "end": 3.94,
+          "start_ms": 3560,
+          "end_ms": 3940
+        },
+        {
+          "word": "Australia",
+          "start": 3.94,
+          "end": 4.46,
+          "start_ms": 3940,
+          "end_ms": 4460
+        },
+        {
+          "word": "and",
+          "start": 4.46,
+          "end": 4.98,
+          "start_ms": 4460,
+          "end_ms": 4980
+        },
+        {
+          "word": "New",
+          "start": 4.98,
+          "end": 5.1,
+          "start_ms": 4980,
+          "end_ms": 5100
+        },
+        {
+          "word": "Zealand",
+          "start": 5.1,
+          "end": 5.42,
+          "start_ms": 5100,
+          "end_ms": 5420
+        },
+        {
+          "word": "are",
+          "start": 5.42,
+          "end": 5.7,
+          "start_ms": 5420,
+          "end_ms": 5700
+        },
+        {
+          "word": "reportedly",
+          "start": 5.7,
+          "end": 6.06,
+          "start_ms": 5700,
+          "end_ms": 6060
+        },
+        {
+          "word": "at",
+          "start": 6.06,
+          "end": 6.34,
+          "start_ms": 6060,
+          "end_ms": 6340
+        },
+        {
+          "word": "risk.",
+          "start": 6.34,
+          "end": 6.66,
+          "start_ms": 6340,
+          "end_ms": 6660
+        }
+      ]
+    },
+    {
+      "id": "scene_04",
+      "scene_id": "SCENE_04",
+      "durationInFrames": 275,
+      "durationSec": 9.17,
+      "headline": "YOUTH FASHION HERITAGE",
+      "editorialHeadline": "FOUNDING ARCHIVE // ESTABLISHED 1972",
+      "statValue": "1972",
+      "statLabel": "HISTORICAL CHRONICLE",
+      "sourceTag": "RAGTRADER ARCHIVE // 1972-2026",
+      "sourceCredit": "RAGTRADER ARCHIVE // 1972-2026",
+      "accentColor": "#D62E1F",
+      "theme": "newsprint-editorial",
+      "layoutVariant": "paper_collage",
+      "cameraMovement": "locked",
+      "disableDrift": true,
+      "steppedPunches": [],
+      "presetId": 0,
+      "heroSrc": "episodes/EN_EP0268_general_pants_collapse/images/hero_scene_04_alpha.png",
+      "heroLabel": "YOUTH FASHION & DENIM // EST. 1972",
+      "heroPosition": {
+        "xPct": 24,
+        "yPct": 44,
+        "widthPct": 34
+      },
+      "hasMarkerHighlight": true,
+      "supportingCutouts": [
+        {
+          "id": "cutout_stat_card_04",
+          "variant": "card",
+          "badge": "HERITAGE RECORD",
+          "label": "STAT HERO // FOUNDING YEAR",
+          "subLabel": "50 YEARS OF AUSTRALIAN RETAIL",
+          "xPct": 52,
+          "yPct": 24,
+          "widthPct": 24,
+          "rotation": -1.0,
+          "delaySec": 1.2,
+          "entranceType": "delicate_tack",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "EST. 1972"
+        },
+        {
+          "id": "cutout_excerpt_04",
+          "variant": "excerpt",
+          "badge": "INDUSTRY DISCLOSURE",
+          "label": "RAGTRADER AUSTRALIA // 1972-2026",
+          "subLabel": "YOUTH APPAREL & DENIM CONCESSIONS",
+          "xPct": 22,
+          "yPct": 78,
+          "widthPct": 24,
+          "rotation": 2.5,
+          "delaySec": 1.8,
+          "entranceType": "paper_slap",
+          "hasTape": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "RAGTRADER 1972"
+        },
+        {
+          "id": "cutout_sticky_04",
+          "variant": "sticky_note",
+          "badge": "ARCHIVE NOTE",
+          "label": "RAGTRADER HISTORICAL FILE",
+          "subLabel": "FLAGSHIP SYDNEY & MELBOURNE DOORS",
+          "xPct": 58,
+          "yPct": 68,
+          "widthPct": 24,
+          "rotation": -2.0,
+          "delaySec": 2.4,
+          "entranceType": "delicate_tack",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "FLAGSHIP DOORS"
+        },
+        {
+          "id": "cutout_tool_04",
+          "src": "episodes/EN_EP0268_general_pants_collapse/images/tool_scene_04_alpha.png",
+          "xPct": 82,
+          "yPct": 62,
+          "widthPct": 28,
+          "rotation": 1.0,
+          "delaySec": 3.0,
+          "entranceType": "stamp_slam",
+          "hasPin": true
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 26,
+          "fromY": 54,
+          "toX": 22,
+          "toY": 72,
+          "color": "#D62E1F",
+          "delaySec": 1.2,
+          "label": "1972 FOUNDING RECORD"
+        },
+        {
+          "fromX": 30,
+          "fromY": 42,
+          "toX": 48,
+          "toY": 26,
+          "color": "#D62E1F",
+          "delaySec": 1.8,
+          "label": "AUSTRALIAN YOUTH ROOTS"
+        },
+        {
+          "fromX": 54,
+          "fromY": 30,
+          "toX": 58,
+          "toY": 62,
+          "color": "#D62E1F",
+          "delaySec": 2.6,
+          "label": "SYDNEY & MELBOURNE DOORS"
+        },
+        {
+          "fromX": 64,
+          "fromY": 68,
+          "toX": 80,
+          "toY": 64,
+          "color": "#D62E1F",
+          "delaySec": 3.4,
+          "label": "OFFICIAL REGISTRY DOCKET"
+        }
+      ],
+      "dimensionLines": [
+        {
+          "startX": 24,
+          "endX": 82,
+          "y": 38,
+          "label": "54-YEAR RETAIL LIFESPAN (1972 - 2026)",
+          "color": "#DC2626",
+          "delaySec": 1.6,
+          "rotation": 0
+        }
+      ],
+      "stampText": "FOUNDING RECORD // RAGTRADER 1972",
+      "stampColor": "#D62E1F",
+      "narration": "According to industry reporting in Ragtrader, General Pants was established in 1972 as an Australian youth fashion and denim retail specialist.",
+      "subtitles": [
+        {
+          "word": "According",
+          "start": 0.0,
+          "end": 0.54,
+          "start_ms": 0,
+          "end_ms": 540
+        },
+        {
+          "word": "to",
+          "start": 0.54,
+          "end": 0.82,
+          "start_ms": 540,
+          "end_ms": 820
+        },
+        {
+          "word": "industry",
+          "start": 0.82,
+          "end": 1.14,
+          "start_ms": 820,
+          "end_ms": 1140
+        },
+        {
+          "word": "reporting",
+          "start": 1.14,
+          "end": 1.6,
+          "start_ms": 1140,
+          "end_ms": 1600
+        },
+        {
+          "word": "in",
+          "start": 1.6,
+          "end": 1.86,
+          "start_ms": 1600,
+          "end_ms": 1860
+        },
+        {
+          "word": "Ragtrader,",
+          "start": 1.86,
+          "end": 2.56,
+          "start_ms": 1860,
+          "end_ms": 2560
+        },
+        {
+          "word": "General",
+          "start": 2.88,
+          "end": 3.08,
+          "start_ms": 2880,
+          "end_ms": 3080
+        },
+        {
+          "word": "Pants",
+          "start": 3.08,
+          "end": 3.46,
+          "start_ms": 3080,
+          "end_ms": 3460
+        },
+        {
+          "word": "was",
+          "start": 3.46,
+          "end": 3.74,
+          "start_ms": 3460,
+          "end_ms": 3740
+        },
+        {
+          "word": "established",
+          "start": 3.74,
+          "end": 4.14,
+          "start_ms": 3740,
+          "end_ms": 4140
+        },
+        {
+          "word": "in",
+          "start": 4.14,
+          "end": 4.52,
+          "start_ms": 4140,
+          "end_ms": 4520
+        },
+        {
+          "word": "1972",
+          "start": 4.52,
+          "end": 5.22,
+          "start_ms": 4520,
+          "end_ms": 5220
+        },
+        {
+          "word": "as",
+          "start": 5.22,
+          "end": 5.7,
+          "start_ms": 5220,
+          "end_ms": 5700
+        },
+        {
+          "word": "an",
+          "start": 5.7,
+          "end": 5.8,
+          "start_ms": 5700,
+          "end_ms": 5800
+        },
+        {
+          "word": "Australian",
+          "start": 5.8,
+          "end": 6.2,
+          "start_ms": 5800,
+          "end_ms": 6200
+        },
+        {
+          "word": "youth",
+          "start": 6.2,
+          "end": 6.56,
+          "start_ms": 6200,
+          "end_ms": 6560
+        },
+        {
+          "word": "fashion",
+          "start": 6.56,
+          "end": 6.98,
+          "start_ms": 6560,
+          "end_ms": 6980
+        },
+        {
+          "word": "and",
+          "start": 6.98,
+          "end": 7.24,
+          "start_ms": 6980,
+          "end_ms": 7240
+        },
+        {
+          "word": "denim",
+          "start": 7.24,
+          "end": 7.52,
+          "start_ms": 7240,
+          "end_ms": 7520
+        },
+        {
+          "word": "retail",
+          "start": 7.52,
+          "end": 7.94,
+          "start_ms": 7520,
+          "end_ms": 7940
+        },
+        {
+          "word": "chain.",
+          "start": 7.94,
+          "end": 8.34,
+          "start_ms": 7940,
+          "end_ms": 8340
+        }
+      ],
+      "words": [
+        {
+          "word": "According",
+          "start": 0.0,
+          "end": 0.54,
+          "start_ms": 0,
+          "end_ms": 540
+        },
+        {
+          "word": "to",
+          "start": 0.54,
+          "end": 0.82,
+          "start_ms": 540,
+          "end_ms": 820
+        },
+        {
+          "word": "industry",
+          "start": 0.82,
+          "end": 1.14,
+          "start_ms": 820,
+          "end_ms": 1140
+        },
+        {
+          "word": "reporting",
+          "start": 1.14,
+          "end": 1.6,
+          "start_ms": 1140,
+          "end_ms": 1600
+        },
+        {
+          "word": "in",
+          "start": 1.6,
+          "end": 1.86,
+          "start_ms": 1600,
+          "end_ms": 1860
+        },
+        {
+          "word": "Ragtrader,",
+          "start": 1.86,
+          "end": 2.56,
+          "start_ms": 1860,
+          "end_ms": 2560
+        },
+        {
+          "word": "General",
+          "start": 2.88,
+          "end": 3.08,
+          "start_ms": 2880,
+          "end_ms": 3080
+        },
+        {
+          "word": "Pants",
+          "start": 3.08,
+          "end": 3.46,
+          "start_ms": 3080,
+          "end_ms": 3460
+        },
+        {
+          "word": "was",
+          "start": 3.46,
+          "end": 3.74,
+          "start_ms": 3460,
+          "end_ms": 3740
+        },
+        {
+          "word": "established",
+          "start": 3.74,
+          "end": 4.14,
+          "start_ms": 3740,
+          "end_ms": 4140
+        },
+        {
+          "word": "in",
+          "start": 4.14,
+          "end": 4.52,
+          "start_ms": 4140,
+          "end_ms": 4520
+        },
+        {
+          "word": "1972",
+          "start": 4.52,
+          "end": 5.22,
+          "start_ms": 4520,
+          "end_ms": 5220
+        },
+        {
+          "word": "as",
+          "start": 5.22,
+          "end": 5.7,
+          "start_ms": 5220,
+          "end_ms": 5700
+        },
+        {
+          "word": "an",
+          "start": 5.7,
+          "end": 5.8,
+          "start_ms": 5700,
+          "end_ms": 5800
+        },
+        {
+          "word": "Australian",
+          "start": 5.8,
+          "end": 6.2,
+          "start_ms": 5800,
+          "end_ms": 6200
+        },
+        {
+          "word": "youth",
+          "start": 6.2,
+          "end": 6.56,
+          "start_ms": 6200,
+          "end_ms": 6560
+        },
+        {
+          "word": "fashion",
+          "start": 6.56,
+          "end": 6.98,
+          "start_ms": 6560,
+          "end_ms": 6980
+        },
+        {
+          "word": "and",
+          "start": 6.98,
+          "end": 7.24,
+          "start_ms": 6980,
+          "end_ms": 7240
+        },
+        {
+          "word": "denim",
+          "start": 7.24,
+          "end": 7.52,
+          "start_ms": 7240,
+          "end_ms": 7520
+        },
+        {
+          "word": "retail",
+          "start": 7.52,
+          "end": 7.94,
+          "start_ms": 7520,
+          "end_ms": 7940
+        },
+        {
+          "word": "chain.",
+          "start": 7.94,
+          "end": 8.34,
+          "start_ms": 7940,
+          "end_ms": 8340
+        }
+      ]
+    }
+  ],
+  "audioTrack": "episodes/EN_EP0268_general_pants_collapse/audio/audio_master_act1.mp3",
+  "theme": "newsprint-editorial",
+  "layoutVariant": "paper_collage",
+  "cameraMovement": "locked",
+  "disableDrift": true,
+  "steppedPunches": []
+}

@@ -4,7 +4,6 @@
 
 import json
 from pathlib import Path
-import pytest
 
 from app.services.master_scene_sheet import (
     VOX_PALETTE,
@@ -422,3 +421,231 @@ def test_stepped_framing_motion_metadata():
     assert shake_values[0] == 3.0, "Landing strike must register full impact amplitude at t=0"
     assert shake_values[1] < 0, "Rebound shockwave must invert direction at t=1"
     assert abs(shake_values[5]) < 0.1, "Shockwave must settle within 5-6 frames"
+
+
+def test_resolve_scene_stat_and_label_hierarchy_and_zero_cross_contamination():
+    """Rule 128 & 132: Verifies hierarchical resolution with zero hardcoded episode bias."""
+    from app.services.master_scene_sheet import resolve_scene_stat_and_label
+
+    # 1. Direct scene properties take precedence
+    sc1 = {"scene_id": "SCENE_01", "stat_hero": "$100M", "stat_label": "VALUATION"}
+    assert resolve_scene_stat_and_label(sc1) == ("$100M", "VALUATION")
+
+    # 2. information_spec fallback
+    sc2 = {
+        "scene_id": "SCENE_02",
+        "information_spec": {"stat_hero": "45%", "stat_label": "MARKET SHARE"},
+    }
+    assert resolve_scene_stat_and_label(sc2) == ("45%", "MARKET SHARE")
+
+    # 3. Narration regex extraction
+    sc3 = {"scene_id": "SCENE_03", "narration": "The company lost $500M in quarter 3."}
+    val3, lbl3 = resolve_scene_stat_and_label(sc3)
+    assert val3 == "$500M"
+    assert lbl3 == "FINANCIAL METRIC"
+
+    sc4 = {"scene_id": "SCENE_04", "narration": "TJX allocated one-third of the funds to bonus pools."}
+    val4, lbl4 = resolve_scene_stat_and_label(sc4)
+    assert val4 == "1/3"
+    assert lbl4 == "RATIO METRIC"
+
+    sc5 = {"scene_id": "SCENE_05", "narration": "Nine corporations engaged in the tariff maneuver."}
+    val5, lbl5 = resolve_scene_stat_and_label(sc5)
+    assert val5 == "9 CORPORATIONS"
+    assert lbl5 == "ENTITY COUNT"
+
+    # 4. Completely unrelated episode without numbers - must NOT leak TJX tariff metrics
+    sc_crypto = {
+        "scene_id": "SCENE_01",
+        "headline": "GENESIS BLOCK",
+        "core_idea": "DECENTRALIZED TIMESTAMPING",
+        "narration": "In an anonymous forum, a pseudonymous developer published a whitepaper.",
+    }
+    val_c, lbl_c = resolve_scene_stat_and_label(sc_crypto, index=0)
+    # Must NOT be 'REFUND CLAIM' or 'U.S. CUSTOMS'
+    assert val_c != "REFUND CLAIM"
+    assert lbl_c != "U.S. CUSTOMS"
+    assert val_c != "AUDIT DATA"
+    assert val_c == "GENESIS BLOCK"
+    assert lbl_c == "DECENTRALIZED TIMESTAMPING"
+
+
+def test_generate_master_scene_package_loads_from_payload_wrapped_json(tmp_path):
+    """Rule 121 & 126: Verifies loading scenes from standard artifact payload wrapping."""
+    from app.services.master_scene_sheet import generate_master_scene_package
+
+    class DummyPaths:
+        def __init__(self, root: Path):
+            self.root = root
+            self.composite_seeds_dir = root / "composite_seeds"
+            self.composite_seeds_dir.mkdir(parents=True, exist_ok=True)
+
+    class DummyContext:
+        def __init__(self, root: Path):
+            self.run_id = "WRAPPED_EP01"
+            self.topic = "Wrapped Artifact Test"
+            self.paths = DummyPaths(root)
+            self.manifest = None
+
+    # Write director_plan.json with top-level 'payload' wrapper
+    dp_data = {
+        "schema_version": "2.0",
+        "status": "ok",
+        "payload": {
+            "scenes": [
+                {
+                    "scene_id": "SCENE_01",
+                    "headline": "CYBERNETIC CORE",
+                    "stat_hero": "0.4MS",
+                    "stat_label": "LATENCY FLOOR",
+                    "narration": "The fiber line cut latency down to 0.4ms.",
+                }
+            ]
+        }
+    }
+    (tmp_path / "director_plan.json").write_text(json.dumps(dp_data), encoding="utf-8")
+
+    ctx = DummyContext(tmp_path)
+    res = generate_master_scene_package(ctx=ctx, scenes=None, image_mode=False)
+    assert res["total_scenes"] == 1
+    assert res["stat_heroes"]["SCENE_01"] == "0.4MS"
+    assert res["stat_labels"]["SCENE_01"] == "LATENCY FLOOR"
+
+
+def test_master_scene_manifest_3_layers_and_camera_cue_sheet():
+    """Architectural Requirement: Dynamic story-specific manifests across Layer 1, 2, 3 and Camera Cue Sheet."""
+    from app.services.master_scene_sheet import (
+        build_dynamic_scene_manifest,
+        generate_master_sheet_bundle,
+        Layer1BackgroundDesk,
+        Layer2MidgroundCutout,
+        Layer3ForegroundCallouts,
+        CameraCue,
+    )
+
+    whisper_words = [
+        {"word": "The", "start": 0.0, "end": 0.15},
+        {"word": "customs", "start": 0.15, "end": 0.45},
+        {"word": "officials", "start": 0.45, "end": 0.85},
+        {"word": "seized", "start": 0.85, "end": 1.20},
+        {"word": "the", "start": 1.20, "end": 1.35},
+        {"word": "bill", "start": 1.35, "end": 1.65},
+        {"word": "of", "start": 1.65, "end": 1.80},
+        {"word": "lading", "start": 1.80, "end": 2.20},
+        {"word": "exposing", "start": 2.20, "end": 2.70},
+        {"word": "$48.6B", "start": 2.70, "end": 3.40},
+        {"word": "in", "start": 3.40, "end": 3.55},
+        {"word": "fraud.", "start": 3.55, "end": 4.10},
+    ]
+
+    manifest = build_dynamic_scene_manifest(
+        scene_id="SCENE_01",
+        narration="The customs officials seized the bill of lading exposing $48.6B in fraud.",
+        headline="BILL OF LADING SEIZED",
+        stat_hero="$48.6B",
+        stat_label="UNREPORTED TARIFF VALUE",
+        whisper_words=whisper_words,
+        duration_sec=4.5,
+    )
+
+    # 1. Layer 1 Background Desk
+    assert isinstance(manifest.layer_1_background, Layer1BackgroundDesk)
+    assert manifest.layer_1_background.background_color == "#F4F1EA"
+    assert manifest.layer_1_background.aged_border is True
+    assert "desk" in manifest.layer_1_background.environmental_prompt.lower() or "table" in manifest.layer_1_background.environmental_prompt.lower()
+
+    # 2. Layer 2 Midground Cutouts
+    assert isinstance(manifest.layer_2_midground, Layer2MidgroundCutout)
+    assert manifest.layer_2_midground.hero_cutout.cutout_border == "#FFFFFF"
+    assert manifest.layer_2_midground.hero_cutout.border_width_px >= 3
+    # Mentions "bill of lading" -> supporting cutout must reflect shipping / bill of lading
+    assert len(manifest.layer_2_midground.supporting_cutouts) > 0
+    supp = manifest.layer_2_midground.supporting_cutouts[0]
+    assert supp.cutout_border == "#FFFFFF"
+    assert supp.item_type in ("bill_of_lading", "invoice", "court_record", "document")
+
+    # 3. Layer 3 Foreground Graphic Callouts
+    assert isinstance(manifest.layer_3_foreground, Layer3ForegroundCallouts)
+    assert manifest.layer_3_foreground.headline == "BILL OF LADING SEIZED"
+    assert len(manifest.layer_3_foreground.data_counters) > 0
+    counter = manifest.layer_3_foreground.data_counters[0]
+    assert counter.stat_hero == "$48.6B"
+    assert counter.color == "#B62E1F"
+    assert len(manifest.layer_3_foreground.svg_arrows) > 0
+
+    # 4. Camera Cue Sheet anchored to Whisper
+    assert len(manifest.camera_cue_sheet) >= 3
+    cues = manifest.camera_cue_sheet
+    assert all(isinstance(c, CameraCue) for c in cues)
+    assert cues[0].time_ms == 0.0
+    assert cues[0].zoom_scale == 1.00
+    assert cues[0].stepped_framing is True
+    # Anchor words must be populated from whisper
+    assert any(c.whisper_anchor_word for c in cues)
+
+    # 5. Full Bundle Serialization
+    bundle = generate_master_sheet_bundle(
+        scene_id="SCENE_01",
+        assembled_anchor_url="composite_seeds/composite_scene_01.png",
+        hero_cutout_url="composite_seeds/hero_scene_01.png",
+        interacting_tool_url="composite_seeds/tool_scene_01.png",
+        information_spec={
+            "headline": "BILL OF LADING SEIZED",
+            "stat_hero": "$48.6B",
+            "stat_label": "UNREPORTED TARIFF VALUE",
+            "narration": "The customs officials seized the bill of lading exposing $48.6B in fraud.",
+        },
+        whisper_words=whisper_words,
+        duration_sec=4.5,
+    )
+
+    assert "layer_1_background" in bundle
+    assert bundle["layer_1_background"]["background_color"] == "#F4F1EA"
+    assert "layer_2_midground" in bundle
+    assert bundle["layer_2_midground"]["hero_cutout"]["cutout_border"] == "#FFFFFF"
+    assert "layer_3_foreground" in bundle
+    assert bundle["layer_3_foreground"]["data_counters"][0]["stat_hero"] == "$48.6B"
+    assert "camera_cue_sheet" in bundle
+    assert len(bundle["camera_cue_sheet"]) >= 3
+
+
+def test_camera_cue_sheet_sparse_whisper_words_monotonicity():
+    """Edge Case Verification: Verifies 0, 1, and 2 whisper words never produce colliding cue times."""
+    from app.services.master_scene_sheet import build_dynamic_scene_manifest
+
+    # Case A: 0 whisper words (pure music / silence)
+    m0 = build_dynamic_scene_manifest("SCENE_01", whisper_words=[], duration_sec=6.0)
+    times0 = [c.time_ms for c in m0.camera_cue_sheet]
+    assert len(times0) == 4
+    assert times0 == sorted(times0)
+    assert len(set(times0)) == len(times0), f"Colliding cue times in 0-word scene: {times0}"
+
+    # Case B: 1 whisper word
+    m1 = build_dynamic_scene_manifest(
+        "SCENE_02",
+        whisper_words=[{"word": "Guilty.", "start": 0.2, "end": 0.6}],
+        duration_sec=5.0,
+    )
+    times1 = [c.time_ms for c in m1.camera_cue_sheet]
+    assert len(times1) == 4
+    assert times1 == sorted(times1)
+    assert len(set(times1)) == len(times1), f"Colliding cue times in 1-word scene: {times1}"
+    assert times1[0] < times1[1] < times1[2] < times1[3]
+
+    # Case C: 2 whisper words
+    m2 = build_dynamic_scene_manifest(
+        "SCENE_03",
+        whisper_words=[
+            {"word": "Case", "start": 0.1, "end": 0.4},
+            {"word": "closed.", "start": 0.5, "end": 0.9},
+        ],
+        duration_sec=4.0,
+    )
+    times2 = [c.time_ms for c in m2.camera_cue_sheet]
+    assert len(times2) == 4
+    assert times2 == sorted(times2)
+    assert len(set(times2)) == len(times2), f"Colliding cue times in 2-word scene: {times2}"
+    assert times2[0] < times2[1] < times2[2] < times2[3]
+
+
+

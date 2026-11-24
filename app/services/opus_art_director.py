@@ -102,7 +102,9 @@ def _generate_contextual_fallback_manifest(
     High-fidelity deterministic fallback if LLM is offline or in dry-run mode.
     Derives unique props, H1-H7 mechanical interactions, and contact points from narration text.
     """
-    text_lower = (narration + " " + headline).lower()
+    ctx_obj = context or {}
+    extra_text = " ".join(str(ctx_obj.get(k, "")) for k in ["core_idea", "visual_metaphor", "hero_cutout_object", "interacting_tool", "h_family"])
+    text_lower = (narration + " " + headline + " " + extra_text).lower()
 
     # Determine mechanical family and bespoke prop based on narrative keywords
     if any(k in text_lower for k in ["stamp", "sign", "liquidat", "court", "ruling", "official", "formal", "seal"]):
@@ -148,9 +150,13 @@ def _generate_contextual_fallback_manifest(
         focal = [0.42, 0.48]
         rationale = "Institutional documentation clamped and archived for investigative presentation (H2_CONSTRAINT)."
 
+    if ctx_obj.get("interacting_tool"):
+        tool_desc = str(ctx_obj["interacting_tool"])
+
     hero_desc = (
-        f"archival evidence document relating to '{headline or 'investigation'}' "
-        "printed on aged textured cream cardstock with subtle deckle edge"
+        str(ctx_obj.get("hero_cutout_object"))
+        if ctx_obj.get("hero_cutout_object")
+        else f"archival evidence document relating to '{headline or 'investigation'}' printed on aged textured cream cardstock with subtle deckle edge"
     )
 
     full_prompt = (

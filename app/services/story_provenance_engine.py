@@ -1028,7 +1028,13 @@ def sanitize_substantive_claim_text(raw_text: str, market: str) -> str:
         s1 = re.split(r"\.\s+", t)[0].strip().rstrip(".")
         s1 = re.sub(r"^(?:Tài liệu được cung cấp|Theo tài liệu cung cấp)\s*", "", s1, flags=re.IGNORECASE)
         return f"{s1}." if s1 else ""
-    t_clean = re.sub(r"\b(Co|Inc|Ltd|Corp|Gov|Dept|Mr|Ms|Mrs|Dr|vs)\.\s+", r"\1@@DOT_SPACE@@", t)
+    t_clean = t
+    # Protect acronyms with dots like U.S., U.K., T.J., e.g., i.e.
+    t_clean = re.sub(r"\b([A-Za-z](?:\.[A-Za-z])+)\.\s+", r"\1@@DOT_SPACE@@", t_clean)
+    # Protect single initials like J. Maxx
+    t_clean = re.sub(r"\b([A-Z])\.\s+", r"\1@@DOT_SPACE@@", t_clean)
+    # Protect standard honorifics / abbreviations
+    t_clean = re.sub(r"\b(Co|Inc|Ltd|Corp|Gov|Dept|Mr|Ms|Mrs|Dr|vs|No|approx|est|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.\s+", r"\1@@DOT_SPACE@@", t_clean, flags=re.IGNORECASE)
     s1 = re.split(r"\.\s+", t_clean)[0].replace("@@DOT_SPACE@@", ". ").strip().rstrip(".")
     s1 = re.sub(r"^(?:The provided document claims that|The provided source states that)\s*", "", s1, flags=re.IGNORECASE)
     return f"{s1}." if s1 else ""
@@ -1633,8 +1639,9 @@ def line_matches_expected_qualifier(
     sp = claim.get("speaker")
     ps = str(claim.get("procedural_status", "unknown")).lower()
     vs = str(claim.get("verification_status", "corroborated_secondary")).lower()
+    cred = str(claim.get("credibility_tier", "") or "").lower()
 
-    bucket = expected_qualifier_bucket(ls, st, dt, sp, ps, vs)
+    bucket = expected_qualifier_bucket(ls, st, dt, sp, ps, vs, cred)
     if bucket == "fact":
         return True, "ok"
 

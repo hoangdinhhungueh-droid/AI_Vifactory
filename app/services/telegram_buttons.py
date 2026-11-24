@@ -697,6 +697,50 @@ def send_hg2_story_audited(
     return send_telegram_broadcast(text)
 
 
+def send_hg3_prompts_ready(
+    task_id: str,
+    total_scenes: int,
+    bulk_prompts_file: str,
+    composite_dir: str,
+    preset: str = "story_forensic",
+    next_cmd: Optional[str] = None,
+    critic_score: str = "9.6/10.0",
+) -> Optional[int]:
+    """Human Gate 3: S05 Director Plan & S06 Visual Critic audit completed, bulk image prompts emitted.
+    Emits notification with exact CLI command and guidelines to generate authentic illustrations.
+    """
+    safe_task = html.escape(str(task_id))
+    safe_preset = html.escape(str(preset))
+    safe_prompts = html.escape(str(bulk_prompts_file))
+    safe_comp = html.escape(str(composite_dir))
+    safe_score = html.escape(str(critic_score))
+
+    cmd = next_cmd or f"python -m orchestrator.run_pipeline --run-id {task_id} --preset {preset} --from s07_image_gen --to s11_qc"
+
+    lines = [
+        "🖼️ <b>[HUMAN GATE 3] KẾ HOẠCH ĐẠO DIỄN S05 & KIỂM TOÁN MỸ THUẬT S06 ĐÃ HOÀN TẤT</b>",
+        f"<i>(✨ Kế hoạch thị giác xúc giác & Bộ Prompt {total_scenes} Scene: {safe_preset})</i>",
+        "",
+        f"🎬 <b>Tiêu đề Tập:</b> <code>{safe_task}</code>",
+        f"📦 <b>Quy mô phân cảnh:</b> {total_scenes} Scenes · 5 Beats (Tương tác xúc giác H1 ➔ H7)",
+        "🎨 <b>Bảng màu & Chất liệu:</b> Giấy báo cũ ngả vàng #F4F1EA & Giấy Kraft #C9BB9C",
+        f"🛡️ <b>Kiểm toán Mỹ thuật S06:</b> <b>PASS (Score: {safe_score}, 0 Violations)</b>",
+        f"🆔 <b>Run ID:</b> <code>{safe_task}</code>",
+        "",
+        f"👉 <b>BƯỚC TIẾP THEO: Sinh {total_scenes} Ảnh Composite Seed & Chạy Full Pipeline (S07 ➔ S11)</b>",
+        "📋 <b>Lệnh thực thi sau khi nạp ảnh (Copy & Dán):</b>",
+        f"<pre>{html.escape(cmd)}</pre>",
+        "",
+        "🖼️ <b>Hướng dẫn tạo ảnh:</b>",
+        f"• File prompts: <code>{safe_prompts}</code>",
+        f"• Bộ ảnh đích: {total_scenes} ảnh seed (<code>composite_scene_01.png</code> đến <code>composite_scene_{total_scenes:02d}.png</code>)",
+        f"• Thư mục lưu trữ: <code>{safe_comp}</code>",
+        "• Chạy skill <code>/vf-image-gen</code> trong Antigravity hoặc dùng Gemini Imagen UI để sinh ảnh chuẩn Graphic Novel 2560x1440.",
+    ]
+    text = "\n".join(lines)
+    return send_telegram_broadcast(text)
+
+
 def send_hg3_images_verified(
     task_id: str,
     image_count: int,

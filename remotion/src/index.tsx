@@ -1098,7 +1098,7 @@ export const TwoLayerScene = (props) => {
 // opacity/zoom animation) -- only the transition itself fades.
 const BACKGROUND_TRANSITION_FRAMES = 15;
 
-export const getSceneDurationFrames = (s: any, defaultFrames = 1): number => {
+export const getSceneDurationFrames = (s: any, defaultFrames = 150): number => {
   if (!s) return defaultFrames;
   const raw = s.durationInFrames ?? s.duration_in_frames ?? (s.durationSec ? s.durationSec * 30 : null);
   return Math.max(1, Math.round(Number(raw) || defaultFrames));
@@ -1361,7 +1361,6 @@ const computeOverlayKey = (s: any, idx: number = 0) => {
 
   const pos = s.foregroundPosition || (idx % 2 === 0 ? "left" : "right");
   return JSON.stringify({
-    idx,
     ovType: ovType || (hasStat ? "stat_card" : hasDim ? "dimension_line" : "stamp_badge"),
     ovTitle: ov?.title || s.statLabel,
     statValue: s.statValue || ov?.statValue,
@@ -2291,7 +2290,7 @@ export const LivingMicroLifeLayer: React.FC<{ frame: number }> = ({ frame }) => 
 };
 
 const totalSceneFrames = (scenes) =>
-  (scenes || []).reduce((sum, s) => sum + getSceneDurationFrames(s), 0);
+  (scenes || []).reduce((sum, s) => sum + getSceneDurationFrames(s, 150), 0);
 
 /**
  * Master TwoLayerEpisode Container Component (Rule 125 Single Truth).

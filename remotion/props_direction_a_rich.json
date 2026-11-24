@@ -1,0 +1,656 @@
+{
+  "includeAudio": true,
+  "audioMaster": "episodes/EN_EP0268_general_pants_collapse/audio/audio_master_2scenes.mp3",
+  "scenes": [
+    {
+      "id": "scene_01",
+      "scene_id": "SCENE_01",
+      "durationInFrames": 223,
+      "durationSec": 7.42,
+      "headline": "ASIC NOTICE",
+      "editorialHeadline": "OFFICIAL ASIC NOTICE // VOLUNTARY ADMINISTRATION",
+      "statValue": "2026",
+      "statLabel": "QUANTITATIVE EVIDENCE",
+      "sourceTag": "ASIC CORPORATE FILING // 2026.11",
+      "sourceCredit": "ASIC CORPORATE FILING // 2026.11",
+      "accentColor": "#D62E1F",
+      "theme": "newsprint-editorial",
+      "layoutVariant": "paper_collage",
+      "cameraMovement": "locked",
+      "disableDrift": true,
+      "steppedPunches": [],
+      "presetId": 0,
+      "heroSrc": "episodes/EN_EP0268_general_pants_collapse/images/hero_scene_01_alpha.png",
+      "heroLabel": "ASIC NOTICE // VOLUNTARY ADMINISTRATION",
+      "heroPosition": {
+        "xPct": 30,
+        "yPct": 50,
+        "widthPct": 38
+      },
+      "hasMarkerHighlight": true,
+      "supportingCutouts": [
+        {
+          "id": "cutout_excerpt_01",
+          "variant": "excerpt",
+          "badge": "STATUTORY CLAUSE",
+          "label": "CORPORATIONS ACT 2001 // SEC. 436A",
+          "subLabel": "APPOINTMENT OF EXTERNAL ADMINISTRATORS",
+          "xPct": 22,
+          "yPct": 80,
+          "widthPct": 24,
+          "rotation": -3.5,
+          "delaySec": 1.4,
+          "entranceType": "slide_in_deal",
+          "hasTape": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "SECTION 436A APPOINTMENT"
+        },
+        {
+          "id": "cutout_sticky_01",
+          "variant": "sticky_note",
+          "badge": "AUDIT NOTE",
+          "label": "GENERAL PANTS CO. PTY LTD",
+          "subLabel": "ENTERED ADMINISTRATION: 11/2026",
+          "xPct": 52,
+          "yPct": 26,
+          "widthPct": 22,
+          "rotation": 4.0,
+          "delaySec": 2.0,
+          "entranceType": "delicate_tack",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "NOVEMBER 2026 FILING"
+        },
+        {
+          "id": "cutout_stat_card_01",
+          "variant": "card",
+          "badge": "QUANTITATIVE METRIC",
+          "label": "STAT HERO // FISCAL YEAR",
+          "subLabel": "2026 AUDITED FILING",
+          "xPct": 78,
+          "yPct": 28,
+          "widthPct": 22,
+          "rotation": -1.5,
+          "delaySec": 2.8,
+          "entranceType": "slide_in_deal",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "2026 INSOLVENCY"
+        },
+        {
+          "id": "cutout_tool_01",
+          "src": "episodes/EN_EP0268_general_pants_collapse/images/tool_scene_01_alpha.png",
+          "xPct": 72,
+          "yPct": 68,
+          "widthPct": 34,
+          "rotation": 2.0,
+          "delaySec": 3.6,
+          "entranceType": "slide_in_deal",
+          "hasPin": true
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 30,
+          "fromY": 60,
+          "toX": 24,
+          "toY": 76,
+          "color": "#D62E1F",
+          "delaySec": 1.2
+        },
+        {
+          "fromX": 38,
+          "fromY": 42,
+          "toX": 50,
+          "toY": 28,
+          "color": "#D62E1F",
+          "delaySec": 2.2
+        },
+        {
+          "fromX": 56,
+          "fromY": 26,
+          "toX": 74,
+          "toY": 28,
+          "color": "#D62E1F",
+          "delaySec": 3.2
+        },
+        {
+          "fromX": 78,
+          "fromY": 34,
+          "toX": 74,
+          "toY": 62,
+          "color": "#D62E1F",
+          "delaySec": 4.0
+        }
+      ],
+      "stampText": "ASIC NOTICE // NOV 2026",
+      "stampColor": "#D62E1F",
+      "narration": "An official ASIC notice confirms General Pants Co. entered voluntary administration in November 2026.",
+      "subtitles": [
+        {
+          "word": "An",
+          "start": 0.0,
+          "end": 0.4,
+          "start_ms": 0,
+          "end_ms": 400
+        },
+        {
+          "word": "official",
+          "start": 0.4,
+          "end": 0.72,
+          "start_ms": 400,
+          "end_ms": 720
+        },
+        {
+          "word": "ASIC",
+          "start": 0.72,
+          "end": 1.18,
+          "start_ms": 720,
+          "end_ms": 1180
+        },
+        {
+          "word": "notice",
+          "start": 1.18,
+          "end": 1.5,
+          "start_ms": 1180,
+          "end_ms": 1500
+        },
+        {
+          "word": "confirms",
+          "start": 1.5,
+          "end": 2.0,
+          "start_ms": 1500,
+          "end_ms": 2000
+        },
+        {
+          "word": "general",
+          "start": 2.0,
+          "end": 2.52,
+          "start_ms": 2000,
+          "end_ms": 2520
+        },
+        {
+          "word": "pants",
+          "start": 2.52,
+          "end": 2.9,
+          "start_ms": 2520,
+          "end_ms": 2900
+        },
+        {
+          "word": "company",
+          "start": 2.9,
+          "end": 3.26,
+          "start_ms": 2900,
+          "end_ms": 3260
+        },
+        {
+          "word": "entered",
+          "start": 3.26,
+          "end": 3.62,
+          "start_ms": 3260,
+          "end_ms": 3620
+        },
+        {
+          "word": "voluntary",
+          "start": 3.62,
+          "end": 4.06,
+          "start_ms": 3620,
+          "end_ms": 4060
+        },
+        {
+          "word": "administration",
+          "start": 4.06,
+          "end": 4.74,
+          "start_ms": 4060,
+          "end_ms": 4740
+        },
+        {
+          "word": "in",
+          "start": 4.74,
+          "end": 5.16,
+          "start_ms": 4740,
+          "end_ms": 5160
+        },
+        {
+          "word": "November",
+          "start": 5.16,
+          "end": 5.42,
+          "start_ms": 5160,
+          "end_ms": 5420
+        },
+        {
+          "word": "2026.",
+          "start": 5.42,
+          "end": 6.44,
+          "start_ms": 5420,
+          "end_ms": 6440
+        }
+      ],
+      "words": [
+        {
+          "word": "An",
+          "start": 0.0,
+          "end": 0.4,
+          "start_ms": 0,
+          "end_ms": 400
+        },
+        {
+          "word": "official",
+          "start": 0.4,
+          "end": 0.72,
+          "start_ms": 400,
+          "end_ms": 720
+        },
+        {
+          "word": "ASIC",
+          "start": 0.72,
+          "end": 1.18,
+          "start_ms": 720,
+          "end_ms": 1180
+        },
+        {
+          "word": "notice",
+          "start": 1.18,
+          "end": 1.5,
+          "start_ms": 1180,
+          "end_ms": 1500
+        },
+        {
+          "word": "confirms",
+          "start": 1.5,
+          "end": 2.0,
+          "start_ms": 1500,
+          "end_ms": 2000
+        },
+        {
+          "word": "general",
+          "start": 2.0,
+          "end": 2.52,
+          "start_ms": 2000,
+          "end_ms": 2520
+        },
+        {
+          "word": "pants",
+          "start": 2.52,
+          "end": 2.9,
+          "start_ms": 2520,
+          "end_ms": 2900
+        },
+        {
+          "word": "company",
+          "start": 2.9,
+          "end": 3.26,
+          "start_ms": 2900,
+          "end_ms": 3260
+        },
+        {
+          "word": "entered",
+          "start": 3.26,
+          "end": 3.62,
+          "start_ms": 3260,
+          "end_ms": 3620
+        },
+        {
+          "word": "voluntary",
+          "start": 3.62,
+          "end": 4.06,
+          "start_ms": 3620,
+          "end_ms": 4060
+        },
+        {
+          "word": "administration",
+          "start": 4.06,
+          "end": 4.74,
+          "start_ms": 4060,
+          "end_ms": 4740
+        },
+        {
+          "word": "in",
+          "start": 4.74,
+          "end": 5.16,
+          "start_ms": 4740,
+          "end_ms": 5160
+        },
+        {
+          "word": "November",
+          "start": 5.16,
+          "end": 5.42,
+          "start_ms": 5160,
+          "end_ms": 5420
+        },
+        {
+          "word": "2026.",
+          "start": 5.42,
+          "end": 6.44,
+          "start_ms": 5420,
+          "end_ms": 6440
+        }
+      ]
+    },
+    {
+      "id": "scene_02",
+      "scene_id": "SCENE_02",
+      "durationInFrames": 238,
+      "durationSec": 7.94,
+      "headline": "9 SUBSIDIARIES",
+      "editorialHeadline": "STATUTORY FILINGS // 9 RETAIL SUBSIDIARIES",
+      "statValue": "9 RETAIL",
+      "statLabel": "QUANTITATIVE EVIDENCE",
+      "sourceTag": "STATUTORY LIQUIDATION FILINGS // 2026",
+      "sourceCredit": "STATUTORY LIQUIDATION FILINGS // 2026",
+      "accentColor": "#D62E1F",
+      "theme": "newsprint-editorial",
+      "layoutVariant": "paper_collage",
+      "cameraMovement": "locked",
+      "disableDrift": true,
+      "steppedPunches": [],
+      "presetId": 0,
+      "heroSrc": "episodes/EN_EP0268_general_pants_collapse/images/hero_scene_02_alpha.png",
+      "heroLabel": "PARENT ENTITY // HOLDING ARCHIVE",
+      "heroPosition": {
+        "xPct": 30,
+        "yPct": 50,
+        "widthPct": 38
+      },
+      "hasMarkerHighlight": true,
+      "supportingCutouts": [
+        {
+          "id": "cutout_subsidiaries_register",
+          "variant": "excerpt",
+          "badge": "ASIC SUBSIDIARY REGISTER",
+          "label": "RETAIL ENTITIES UNDER ADMINISTRATION",
+          "subLabel": "9 OPERATING DIVISIONS AUDITED",
+          "xPct": 22,
+          "yPct": 80,
+          "widthPct": 24,
+          "rotation": -2.5,
+          "delaySec": 1.4,
+          "entranceType": "slide_in_deal",
+          "hasTape": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "9 RETAIL SUBSIDIARIES"
+        },
+        {
+          "id": "cutout_sticky_02",
+          "variant": "sticky_note",
+          "badge": "CAPITAL FLOW MEMO",
+          "label": "INTERCOMPANY CLAIMS REGISTER",
+          "subLabel": "CROSS-GUARANTEE EXPOSURE: AUDIT VERIFIED",
+          "xPct": 52,
+          "yPct": 26,
+          "widthPct": 22,
+          "rotation": 3.0,
+          "delaySec": 2.0,
+          "entranceType": "delicate_tack",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "CROSS-ENTITY LIABILITIES"
+        },
+        {
+          "id": "cutout_stat_card_02",
+          "variant": "card",
+          "badge": "QUANTITATIVE METRIC",
+          "label": "STAT HERO // 9 RETAIL",
+          "subLabel": "OPERATING SUBSIDIARIES",
+          "xPct": 78,
+          "yPct": 28,
+          "widthPct": 22,
+          "rotation": -1.0,
+          "delaySec": 2.8,
+          "entranceType": "slide_in_deal",
+          "hasPin": true,
+          "hasMarkerHighlight": true,
+          "highlightText": "9 RETAIL UNITS"
+        },
+        {
+          "id": "cutout_tool_02",
+          "src": "episodes/EN_EP0268_general_pants_collapse/images/tool_scene_02_alpha.png",
+          "xPct": 72,
+          "yPct": 68,
+          "widthPct": 34,
+          "rotation": 1.5,
+          "delaySec": 3.6,
+          "entranceType": "slide_in_deal",
+          "hasPin": true
+        }
+      ],
+      "yarns": [
+        {
+          "fromX": 30,
+          "fromY": 60,
+          "toX": 24,
+          "toY": 76,
+          "color": "#D62E1F",
+          "delaySec": 1.2
+        },
+        {
+          "fromX": 38,
+          "fromY": 42,
+          "toX": 50,
+          "toY": 28,
+          "color": "#D62E1F",
+          "delaySec": 2.2
+        },
+        {
+          "fromX": 56,
+          "fromY": 26,
+          "toX": 74,
+          "toY": 28,
+          "color": "#D62E1F",
+          "delaySec": 3.2
+        },
+        {
+          "fromX": 78,
+          "fromY": 34,
+          "toX": 74,
+          "toY": 62,
+          "color": "#D62E1F",
+          "delaySec": 4.0
+        }
+      ],
+      "stampText": "PARENT ENTITY // AUDIT DATA",
+      "stampColor": "#D62E1F",
+      "narration": "Statutory filings confirm the administration encompasses nine retail operating subsidiaries alongside the parent company.",
+      "subtitles": [
+        {
+          "word": "Statutory",
+          "start": 0.0,
+          "end": 1.04,
+          "start_ms": 0,
+          "end_ms": 1040
+        },
+        {
+          "word": "filings",
+          "start": 1.04,
+          "end": 1.52,
+          "start_ms": 1040,
+          "end_ms": 1520
+        },
+        {
+          "word": "confirmed",
+          "start": 1.52,
+          "end": 1.94,
+          "start_ms": 1520,
+          "end_ms": 1940
+        },
+        {
+          "word": "the",
+          "start": 1.94,
+          "end": 2.22,
+          "start_ms": 1940,
+          "end_ms": 2220
+        },
+        {
+          "word": "administration",
+          "start": 2.22,
+          "end": 2.7,
+          "start_ms": 2220,
+          "end_ms": 2700
+        },
+        {
+          "word": "encompasses",
+          "start": 2.7,
+          "end": 3.44,
+          "start_ms": 2700,
+          "end_ms": 3440
+        },
+        {
+          "word": "nine",
+          "start": 3.44,
+          "end": 3.88,
+          "start_ms": 3440,
+          "end_ms": 3880
+        },
+        {
+          "word": "retail",
+          "start": 3.88,
+          "end": 4.3,
+          "start_ms": 3880,
+          "end_ms": 4300
+        },
+        {
+          "word": "operating",
+          "start": 4.3,
+          "end": 4.76,
+          "start_ms": 4300,
+          "end_ms": 4760
+        },
+        {
+          "word": "subsidiaries",
+          "start": 4.76,
+          "end": 5.6,
+          "start_ms": 4760,
+          "end_ms": 5600
+        },
+        {
+          "word": "alongside",
+          "start": 5.6,
+          "end": 6.1,
+          "start_ms": 5600,
+          "end_ms": 6100
+        },
+        {
+          "word": "the",
+          "start": 6.1,
+          "end": 6.4,
+          "start_ms": 6100,
+          "end_ms": 6400
+        },
+        {
+          "word": "parent",
+          "start": 6.4,
+          "end": 6.66,
+          "start_ms": 6400,
+          "end_ms": 6660
+        },
+        {
+          "word": "company.",
+          "start": 6.66,
+          "end": 7.06,
+          "start_ms": 6660,
+          "end_ms": 7060
+        }
+      ],
+      "words": [
+        {
+          "word": "Statutory",
+          "start": 0.0,
+          "end": 1.04,
+          "start_ms": 0,
+          "end_ms": 1040
+        },
+        {
+          "word": "filings",
+          "start": 1.04,
+          "end": 1.52,
+          "start_ms": 1040,
+          "end_ms": 1520
+        },
+        {
+          "word": "confirmed",
+          "start": 1.52,
+          "end": 1.94,
+          "start_ms": 1520,
+          "end_ms": 1940
+        },
+        {
+          "word": "the",
+          "start": 1.94,
+          "end": 2.22,
+          "start_ms": 1940,
+          "end_ms": 2220
+        },
+        {
+          "word": "administration",
+          "start": 2.22,
+          "end": 2.7,
+          "start_ms": 2220,
+          "end_ms": 2700
+        },
+        {
+          "word": "encompasses",
+          "start": 2.7,
+          "end": 3.44,
+          "start_ms": 2700,
+          "end_ms": 3440
+        },
+        {
+          "word": "nine",
+          "start": 3.44,
+          "end": 3.88,
+          "start_ms": 3440,
+          "end_ms": 3880
+        },
+        {
+          "word": "retail",
+          "start": 3.88,
+          "end": 4.3,
+          "start_ms": 3880,
+          "end_ms": 4300
+        },
+        {
+          "word": "operating",
+          "start": 4.3,
+          "end": 4.76,
+          "start_ms": 4300,
+          "end_ms": 4760
+        },
+        {
+          "word": "subsidiaries",
+          "start": 4.76,
+          "end": 5.6,
+          "start_ms": 4760,
+          "end_ms": 5600
+        },
+        {
+          "word": "alongside",
+          "start": 5.6,
+          "end": 6.1,
+          "start_ms": 5600,
+          "end_ms": 6100
+        },
+        {
+          "word": "the",
+          "start": 6.1,
+          "end": 6.4,
+          "start_ms": 6100,
+          "end_ms": 6400
+        },
+        {
+          "word": "parent",
+          "start": 6.4,
+          "end": 6.66,
+          "start_ms": 6400,
+          "end_ms": 6660
+        },
+        {
+          "word": "company.",
+          "start": 6.66,
+          "end": 7.06,
+          "start_ms": 6660,
+          "end_ms": 7060
+        }
+      ]
+    }
+  ]
+}
