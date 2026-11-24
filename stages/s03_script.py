@@ -2466,7 +2466,8 @@ def run(ctx: RunContext) -> StageArtifact:
                                 text = _normalize_spoken_korean_numbers(text)
 
                             # Handle editorial pattern interrupts cleanly
-                            if _is_editorial_pattern_interrupt(ln, text, market=market):
+                            is_rhetorical_q = text.strip().endswith("?") and not any(ch.isdigit() for ch in text)
+                            if _is_editorial_pattern_interrupt(ln, text, market=market) or is_rhetorical_q:
                                 from app.services.story_provenance_engine import strip_attribution_prefix
                                 text_clean, _ = strip_attribution_prefix(text, market=market)
                                 text_clean = text_clean.strip()
@@ -3165,9 +3166,18 @@ def run(ctx: RunContext) -> StageArtifact:
                         t = re.sub(r"\bstatutory\s+(?:right|measure|remedy)\b", "reported proposed measure", t, flags=re.IGNORECASE)
                         t = re.sub(r"\bguaranteed\s+by\s+the\s+state\b", "debated as a policy precedent in press reports", t, flags=re.IGNORECASE)
 
-                # Ensure single-hedging: if line has attribution prefix, dehedge the predicate
-                _, pfx = strip_attribution_prefix(t, market=market)
+                # Ensure single-hedging: if line has attribution prefix, deduplicate stacked prefixes and dehedge predicate
+                stripped_t, pfx = strip_attribution_prefix(t, market=market)
                 if pfx:
+                    # If multiple prefixes stacked (e.g. "Pending ... early ... Media ..."), keep only the first clean prefix
+                    first_pfx = pfx.split(",")[0].strip()
+                    if first_pfx and not first_pfx.endswith((",", "—", "、", "에 따르면", "theo")):
+                        if market in ("EN", "VN"):
+                            first_pfx += ","
+                    if stripped_t and market in ("EN", "VN") and first_pfx.endswith(","):
+                        if not stripped_t[0].isupper() and len(stripped_t) > 1 and stripped_t[1].islower():
+                            stripped_t = stripped_t[0].lower() + stripped_t[1:]
+                    t = f"{first_pfx} {stripped_t}".strip() if first_pfx else stripped_t
                     t = dehedge_predicate(t, market=market)
                 ln.text = t
 

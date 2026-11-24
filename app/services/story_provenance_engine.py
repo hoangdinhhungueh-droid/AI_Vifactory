@@ -932,7 +932,9 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "published media accounts", "public reporting", "media reporting", "published reporting",
             "press investigations", "published accounts", "press reports", "press reporting", "press accounts",
             "industry reporting", "industry reports", "reporting indicates", "reports indicate",
-            "reporting reflects", "reports reflect",
+            "reporting reflects", "reports reflect", "published reports describe", "media accounts noted",
+            "press reports describe", "news coverage at the time", "news accounts noted", "published coverage noted",
+            "financial reporting indicated", "financial reporting noted",
         ],
         "settled": [
             "settled without admitting", "consent decree", "agreed to pay without admitting",
@@ -945,6 +947,8 @@ _LEGAL_QUALIFIER_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "pending verification", "initial reporting", "preliminary industry reporting",
             "preliminary industry reports", "industry census", "preliminary reporting",
             "according to preliminary reporting", "unconfirmed press reports", "unconfirmed accounts",
+            "pending independent corroboration", "early unverified coverage", "initial reporting yet to be verified",
+            "unverified coverage",
         ],
         "proposed": ["proposed", "draft", "under consideration", "planned", "pending regulatory", "proposals"],
     },
@@ -1082,17 +1086,19 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
         return t, ""
 
     pat = (
-        r"^[“\"‘']?(?:"
+        r"^[“\"‘'\(]?(?:"
         r"According to\s+[^,:\n]{1,60}[,:;]\s*|"
-        r"As\s+[^,:\n]{1,40}(?:reported|documented|disclosed|revealed)[^,:\n]*[,:;]\s*|"
+        r"As\s+[^,:\n]{1,40}(?:reported|documented|disclosed|revealed|noted)[^,:\n]*[,:;]\s*|"
+        r"Pending\s+[^,:\n]{1,60}[,:;]\s*|"
         r"(?:Internal\s+)?(?:procurement\s+)?(?:audits|audit\s+reports?)\s+(?:uncovered|revealed|identified|showed|documented|found)\s+|"
         r"(?:Prosecutors|Regulators|Auditors|Investigators)\s+(?:alleged|stated|noted|found|charged)(?:\s+in\s+the\s+[^,:\n]{1,40})?\s+that\s+|"
-        r"(?:Charging documents|The indictment|Court records|Audit exhibits)\s+(?:state|states|allege|alleges|show|shows|reflect|reflects)\s+that\s+|"
-        r"(?:Published|Media|Press|Industry)\s+(?:reporting|reports|investigations|accounts)\s+(?:indicate|indicates|reflect|reflects|note|notes|show|shows|documented|document|confirm|confirms)(?:\s+that)?(?:,\s*|\s+)|"
-        r"(?:Regulatory|Official|Statutory)\s+(?:filings|notices|records)\s+(?:establish|confirms|confirm|indicate|indicates|reflect|reflects|show|shows)(?:\s+that)?(?:,\s*|\s+)|"
+        r"(?:Charging documents|The indictment|Court records|Audit exhibits)\s+(?:state|states|stated|allege|alleges|alleged|show|shows|showed|reflect|reflects|reflected)\s+that\s+|"
+        r"(?:Published|Media|Press|Industry|News|Financial)\s+(?:reporting|reports|investigations|accounts|coverage)\s+(?:indicate|indicates|indicated|suggest|suggests|suggested|reflect|reflects|reflected|note|notes|noted|show|shows|showed|documented|document|documents|confirm|confirms|confirmed|describe|describes|described|state|states|stated)(?:\s+that)?(?:,\s*|\s+)|"
+        r"(?:Initial|Early|Preliminary)\s+(?:unverified\s+)?(?:reports|reporting|accounts|coverage)(?:\s+yet\s+to\s+be\s+verified)?(?:\s+suggest|\s+suggests|\s+suggested|\s+indicate|\s+indicates|\s+indicated|\s+state|\s+states|\s+stated|\s+reflect|\s+reflects|\s+reflected|\s+note|\s+notes|\s+noted)?(?:\s+that)?(?:,\s*|\s+)|"
+        r"(?:Regulatory|Official|Statutory)\s+(?:filings|notices|records)\s+(?:establish|establishes|established|confirms|confirm|confirmed|indicate|indicates|indicated|reflect|reflects|reflected|show|shows|showed)(?:\s+that)?(?:,\s*|\s+)|"
         r"(?:An?|The)\s+[\w\s.-]{2,30}?\s+(?:report|investigation|article|disclosure)\s+(?:stated|reported|described|noted|indicated|found|revealed|alleged)(?:\s+that)?(?:,\s*|\s+)|"
-        r"[A-Z][\w\s.-]{1,25}?\s+(?:published a report stating that|reported that|revealed that|disclosed that)(?:,\s*|\s+)"
-        r")[”\"’']?\s*"
+        r"[A-Z][\w\s.-]{1,25}?\s+(?:published a report stating that|reported that|revealed that|disclosed that|noted that)(?:,\s*|\s+)"
+        r")[”\"’'\)\s]?"
     )
     pfx_list = []
     curr_t = t
@@ -1538,7 +1544,7 @@ def route_legal_qualifier(
             "proposed": ["Under the proposed draft framework,", "According to preliminary policy proposals,", "Under the pending regulatory plan,"],
             "alleged_regulator": ["According to regulatory filings,", "According to official regulatory findings,", "As regulators documented in filings,", "According to findings by oversight agencies,", "Regulatory records establish that,"],
             "audit_finding": ["According to the audit report,", "Audit exhibits and findings establish,", "As documented in official audit exhibits,"],
-            "alleged": ["According to press reports,", "Media reporting reflects that,", "According to news coverage at the time,", "Published reporting indicates that,", "Press investigations documented that,", "As reported in published accounts,"],
+            "alleged": ["According to press reports,", "Media reporting reflects that,", "According to news coverage at the time,", "Published reporting indicates that,", "Press accounts indicated that,", "As reported in published accounts,"],
         },
     }
 
