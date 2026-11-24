@@ -185,11 +185,16 @@ def _render_via_vps_runner(
         local_audio = timeline_path.parent / "voice_narration.mp3"
 
     if local_audio.exists():
-        from scripts.upload_vps_asset import upload_file
-        logger.info(f"[papertrails_vps_bridge] Uploading audio ({local_audio.stat().st_size} bytes) to VPS...")
-        up_ok = upload_file(str(local_audio), vps_audio)
-        if not up_ok:
-            raise RuntimeError(f"Failed to upload audio to VPS: {vps_audio}")
+        chk_a = run_vps_cmd(f"stat -c %s '{vps_audio}'")
+        rem_size = int(chk_a.get("stdout", "0").strip()) if chk_a.get("stdout", "").strip().isdigit() else 0
+        if rem_size == local_audio.stat().st_size:
+            logger.info(f"[papertrails_vps_bridge] Audio already uploaded to VPS ({rem_size} bytes, matches local).")
+        else:
+            from scripts.upload_vps_asset import upload_file
+            logger.info(f"[papertrails_vps_bridge] Uploading audio ({local_audio.stat().st_size} bytes) to VPS...")
+            up_ok = upload_file(str(local_audio), vps_audio)
+            if not up_ok:
+                raise RuntimeError(f"Failed to upload audio to VPS: {vps_audio}")
 
     # 2. Trigger render script on VPS in background with log monitoring
     vps_log = f"{vps_run_dir}/render.log"
