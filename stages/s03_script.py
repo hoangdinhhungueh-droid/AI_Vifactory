@@ -2957,15 +2957,17 @@ def run(ctx: RunContext) -> StageArtifact:
                                 if best_cid and best_hits >= 3:
                                     ln.claim_ids = [best_cid]
 
-                    # 8. If short of min words, expand lines with unused claim lines into B3
+                    # 8. If short of min words or min duration, expand lines with unused claim lines into B3
                     cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
                     cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
-                    shortfall = u_min - int(cand_timing_chk["spoken_units"])
-                    if shortfall > 0 and len(cand_beats) >= 4:
+                    min_target_units = max(u_min, int(d_min * 2.15)) if market == "EN" else u_min
+                    shortfall = min_target_units - int(cand_timing_chk["spoken_units"])
+                    dur_shortfall = d_min - float(cand_timing_chk["estimated_duration_sec"])
+                    if (shortfall > 0 or dur_shortfall > 0) and len(cand_beats) >= 4:
                         all_used_cids = {c for _, _, lns in cand_beats for ln in lns for c in (ln.claim_ids or [])}
                         avail_c = [c for c in evidence_raw if c.get("claim_id") not in all_used_cids]
                         af_idx = 0
-                        while shortfall > 0 and af_idx < len(avail_c) and len(cand_beats[2][2]) < 8:
+                        while (shortfall > 0 or dur_shortfall > 0) and af_idx < len(avail_c) and len(cand_beats[2][2]) < 8:
                             extra_c = avail_c[af_idx]
                             af_idx += 1
                             extra_cid = extra_c.get("claim_id")
@@ -2981,7 +2983,8 @@ def run(ctx: RunContext) -> StageArtifact:
                                     ln_r.line_id = f"B3_L{idx_r:02d}"
                                 cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
                                 cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
-                                shortfall = u_min - int(cand_timing_chk["spoken_units"])
+                                shortfall = min_target_units - int(cand_timing_chk["spoken_units"])
+                                dur_shortfall = d_min - float(cand_timing_chk["estimated_duration_sec"])
 
                     return cand_beats
 
