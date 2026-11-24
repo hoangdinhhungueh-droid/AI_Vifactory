@@ -25,7 +25,7 @@ def render_papertrails_on_vps(
     quality: str = "high",
     sfx: bool = True,
     gpu: bool = False,
-    timeout_sec: int = 1800,
+    timeout_sec: int = 7200,
 ) -> Dict[str, Any]:
     """Renders a Papertrails timeline into an MP4 video using Playwright on VPS.
 
