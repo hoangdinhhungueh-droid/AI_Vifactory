@@ -89,16 +89,28 @@ def _run_local_faster_whisper(
     lang: str,
     initial_prompt: str,
 ) -> List[Dict[str, Any]]:
-    """Executes faster-whisper locally if installed in the active Python environment."""
+    """Executes faster-whisper locally via FFmpeg float32 PCM decoding (bypasses PyAV open bug)."""
+    import numpy as np
     from faster_whisper import WhisperModel
+    from vox.ffmpeg_utils import get_ffmpeg_binary
+
+    pcm_cmd = [
+        get_ffmpeg_binary(), "-v", "error",
+        "-i", str(audio_file),
+        "-ac", "1", "-ar", "16000", "-f", "f32le", "-",
+    ]
+    pcm_res = subprocess.run(pcm_cmd, capture_output=True, check=True, timeout=120)
+    audio_np = np.frombuffer(pcm_res.stdout, dtype=np.float32)
+    if audio_np.size == 0:
+        raise RuntimeError(f"Decoded 0 PCM samples from '{audio_file}' for local faster-whisper")
 
     model = WhisperModel(model_name, device="cpu", compute_type="int8")
     raw_segments, _ = model.transcribe(
-        str(audio_file),
+        audio_np,
         language=lang,
         word_timestamps=True,
         vad_filter=True,
-        beam_size=5,
+        beam_size=1,
         initial_prompt=initial_prompt[:400] if initial_prompt else None,
     )
     out: List[Dict[str, Any]] = []
@@ -143,6 +155,9 @@ def _measure_words_with_faster_whisper(
 
     remote_audio = f"/tmp/s09_asr_{run_id}.mp3"
     remote_json = f"/tmp/s09_asr_{run_id}.json"
+    remote_py = f"/tmp/s09_asr_{run_id}.py"
+    remote_log = f"/tmp/s09_asr_{run_id}.log"
+    remote_done = f"/tmp/s09_asr_{run_id}.done"
     local_json = audio_file.with_name(".asr_vps_result.json")
     try:
         from scripts.download_vps_asset import download_file_chunked
@@ -154,20 +169,39 @@ def _measure_words_with_faster_whisper(
             return None
 
         py_code = (
-            "import json; "
-            "from faster_whisper import WhisperModel; "
-            f"m=WhisperModel('{model_name}', device='cpu', compute_type='int8'); "
-            f"segs,_=m.transcribe('{remote_audio}', language='{lang}', word_timestamps=True, vad_filter=True, beam_size=5); "
-            "out=[{'start':round(s.start,3),'end':round(s.end,3),'text':s.text.strip(),"
-            "'words':[{'word':w.word.strip(),'start':round(w.start,3),'end':round(max(w.start+0.01,w.end),3)} "
-            "for w in (s.words or []) if w.word.strip()]} for s in segs if s.text.strip()]; "
-            f"open('{remote_json}','w',encoding='utf-8').write(json.dumps(out,ensure_ascii=False))"
+            "import json\n"
+            "from faster_whisper import WhisperModel\n"
+            f"m = WhisperModel({model_name!r}, device='cpu', compute_type='int8')\n"
+            f"segs, _ = m.transcribe({remote_audio!r}, language={lang!r}, word_timestamps=True, vad_filter=True, beam_size=1)\n"
+            "out = [{'start': round(s.start, 3), 'end': round(s.end, 3), 'text': s.text.strip(), "
+            "'words': [{'word': w.word.strip(), 'start': round(w.start, 3), 'end': round(max(w.start + 0.01, w.end), 3)} "
+            "for w in (s.words or []) if w.word.strip()]} for s in segs if s.text.strip()]\n"
+            f"open({remote_json!r}, 'w', encoding='utf-8').write(json.dumps(out, ensure_ascii=False))\n"
         )
         vps_python = "/root/video_factory/venv/bin/python3"
-        cmd = f"{vps_python} -c {json.dumps(py_code)}"
-        res = run_vps_cmd(cmd, timeout=240)
-        if res.get("exit_code", 1) != 0:
-            logger.warning("[s09_voice_tts] VPS faster-whisper error: %s", res.get("stderr") or res)
+        launch_cmd = (
+            f"rm -f '{remote_done}' '{remote_log}' '{remote_json}'; "
+            f"python3 -c \"open('{remote_py}','w',encoding='utf-8').write(bytes.fromhex('{py_code.encode('utf-8').hex()}').decode('utf-8'))\" && "
+            f"nohup bash -c \"{vps_python} '{remote_py}' > '{remote_log}' 2>&1; echo \\$? > '{remote_done}'\" >/dev/null 2>&1 & echo $!"
+        )
+        launch_res = run_vps_cmd(launch_cmd, timeout=30)
+        if launch_res.get("exit_code", 1) != 0:
+            logger.warning("[s09_voice_tts] VPS faster-whisper launch error: %s", launch_res.get("stderr") or launch_res)
+            return None
+
+        deadline = time.time() + 360.0
+        asr_exit: Optional[str] = None
+        while time.time() < deadline:
+            poll_res = run_vps_cmd(f"if [ -f '{remote_done}' ]; then cat '{remote_done}'; fi", timeout=30)
+            out_txt = (poll_res.get("stdout") or "").strip()
+            if out_txt:
+                asr_exit = out_txt.splitlines()[-1].strip()
+                break
+            time.sleep(5.0)
+
+        if asr_exit != "0":
+            err_tail = run_vps_cmd(f"tail -n 30 '{remote_log}' 2>/dev/null || true", timeout=20).get("stdout", "")
+            logger.warning("[s09_voice_tts] VPS faster-whisper did not finish cleanly (exit=%s): %s", asr_exit, err_tail)
             return None
 
         if not download_file_chunked(remote_json, str(local_json)):
@@ -182,7 +216,10 @@ def _measure_words_with_faster_whisper(
     finally:
         try:
             from scripts.vps_runner import run_vps_cmd
-            run_vps_cmd(f"rm -f '{remote_audio}' '{remote_json}'", timeout=15)
+            run_vps_cmd(
+                f"rm -f '{remote_audio}' '{remote_json}' '{remote_py}' '{remote_log}' '{remote_done}'",
+                timeout=15,
+            )
         except Exception as cleanup_err:
             logger.debug("[s09_voice_tts] VPS tmp cleanup notice: %s", cleanup_err)
         if local_json.exists():
@@ -399,10 +436,10 @@ def run(ctx: RunContext) -> StageArtifact:
 
     # Two-pass EBU R128 broadcast loudness normalization in live prod BEFORE measuring final ASR alignment
     if not is_min_profile and audio_file.exists() and audio_file.stat().st_size > 1000:
-        normalize_audio_ebur128(audio_file, target_i=-16.0, target_tp=-2.5, target_lra=7.0)
+        normalize_audio_ebur128(audio_file, target_i=-15.8, target_tp=-2.5, target_lra=11.0)
         a_info = probe_media_file(audio_file)
         real_audio_dur = float(a_info.get("format", {}).get("duration", "0"))
-        logger.info("[s09_voice_tts] Normalized voice audio to EBU R128 (-16.0 LUFS, -2.5 dBTP)")
+        logger.info("[s09_voice_tts] Normalized voice audio to EBU R128 (-15.8 LUFS, -2.5 dBTP)")
 
     actual_total_dur = real_audio_dur if real_audio_dur > 0.0 else max(len(words) * 0.35, 5.0)
     if edge_boundaries and conformed_factor != 1.0:
