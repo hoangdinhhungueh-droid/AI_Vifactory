@@ -111,7 +111,7 @@ def _run_local_faster_whisper(
         word_timestamps=True,
         vad_filter=True,
         beam_size=1,
-        initial_prompt=initial_prompt[:400] if initial_prompt else None,
+        condition_on_previous_text=False,
     )
     out: List[Dict[str, Any]] = []
     for seg in raw_segments:
@@ -172,7 +172,7 @@ def _measure_words_with_faster_whisper(
             "import json\n"
             "from faster_whisper import WhisperModel\n"
             f"m = WhisperModel({model_name!r}, device='cpu', compute_type='int8')\n"
-            f"segs, _ = m.transcribe({remote_audio!r}, language={lang!r}, word_timestamps=True, vad_filter=True, beam_size=1)\n"
+            f"segs, _ = m.transcribe({remote_audio!r}, language={lang!r}, word_timestamps=True, vad_filter=True, beam_size=1, condition_on_previous_text=False)\n"
             "out = [{'start': round(s.start, 3), 'end': round(s.end, 3), 'text': s.text.strip(), "
             "'words': [{'word': w.word.strip(), 'start': round(w.start, 3), 'end': round(max(w.start + 0.01, w.end), 3)} "
             "for w in (s.words or []) if w.word.strip()]} for s in segs if s.text.strip()]\n"
@@ -436,10 +436,10 @@ def run(ctx: RunContext) -> StageArtifact:
 
     # Two-pass EBU R128 broadcast loudness normalization in live prod BEFORE measuring final ASR alignment
     if not is_min_profile and audio_file.exists() and audio_file.stat().st_size > 1000:
-        normalize_audio_ebur128(audio_file, target_i=-15.8, target_tp=-2.5, target_lra=11.0)
+        normalize_audio_ebur128(audio_file, target_i=-15.5, target_tp=-2.5, target_lra=11.0)
         a_info = probe_media_file(audio_file)
         real_audio_dur = float(a_info.get("format", {}).get("duration", "0"))
-        logger.info("[s09_voice_tts] Normalized voice audio to EBU R128 (-15.8 LUFS, -2.5 dBTP)")
+        logger.info("[s09_voice_tts] Normalized voice audio to EBU R128 (-15.5 LUFS, -2.5 dBTP)")
 
     actual_total_dur = real_audio_dur if real_audio_dur > 0.0 else max(len(words) * 0.35, 5.0)
     if edge_boundaries and conformed_factor != 1.0:
@@ -458,7 +458,17 @@ def run(ctx: RunContext) -> StageArtifact:
             market=market,
             initial_prompt=full_text,
         )
-        if whisper_segments:
+        whisper_ok = bool(whisper_segments)
+        if whisper_segments and edge_boundaries:
+            w_first = float(whisper_segments[0].get("start", 0.0))
+            w_count = sum(len(s.get("words") or []) for s in whisper_segments)
+            if w_first > 2.5 or w_count < int(0.65 * len(edge_boundaries)):
+                logger.warning(
+                    "[s09_voice_tts] faster-whisper incomplete coverage (first=%.2fs, words=%d vs edge=%d); falling back to WordBoundary",
+                    w_first, w_count, len(edge_boundaries),
+                )
+                whisper_ok = False
+        if whisper_ok and whisper_segments:
             segments = _reconcile_script_casing_onto_whisper(whisper_segments, full_text)
             timing_source = "faster-whisper+edge-boundary" if (synthesized_fresh and edge_boundaries) else "faster-whisper-measured"
         elif edge_boundaries:
