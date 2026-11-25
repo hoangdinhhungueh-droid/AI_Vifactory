@@ -36,8 +36,8 @@ def _resolve_local_audio(timeline_path: Path, t_json: Dict[str, Any]) -> Path:
     return local_audio
 
 
-def _sync_timeline_and_audio_to_vps(timeline_path: Path) -> Dict[str, str]:
-    """Uploads Papertrails timeline.json (rewritten to VPS audio path) and voice MP3 to VPS."""
+def _sync_timeline_and_audio_to_vps(timeline_path: Path, include_audio: bool = True) -> Dict[str, str]:
+    """Uploads Papertrails timeline.json (rewritten to VPS audio path) and optional voice MP3 to VPS."""
     from scripts.upload_vps_asset import upload_file
     from scripts.vps_runner import run_vps_cmd
 
@@ -60,7 +60,7 @@ def _sync_timeline_and_audio_to_vps(timeline_path: Path) -> Dict[str, str]:
     finally:
         tmp_tl.unlink(missing_ok=True)
 
-    if local_audio.exists():
+    if include_audio and local_audio.exists():
         chk_a = run_vps_cmd(f"stat -c %s '{vps_audio}' 2>/dev/null || echo 0")
         rem_size = int(chk_a.get("stdout", "0").strip()) if chk_a.get("stdout", "").strip().isdigit() else 0
         if rem_size == local_audio.stat().st_size:
@@ -119,22 +119,40 @@ def render_papertrails_stills_on_vps(
     from scripts.download_vps_asset import download_file_chunked
     from scripts.vps_runner import run_vps_cmd
 
-    synced = _sync_timeline_and_audio_to_vps(timeline_path)
+    synced = _sync_timeline_and_audio_to_vps(timeline_path, include_audio=False)
     vps_run_dir = synced["vps_run_dir"]
     vps_timeline = synced["vps_timeline"]
     vps_prefix = f"{vps_run_dir}/stills_preview.mp4"
+    vps_log = f"{vps_run_dir}/stills.log"
+    vps_done = f"{vps_run_dir}/stills.done"
     gpu_flag = "--gpu" if gpu else ""
 
-    run_vps_cmd(f"rm -f '{vps_prefix}.still-'*.png '{vps_prefix}.stills.json'")
-    cmd = (
+    run_vps_cmd(f"rm -f '{vps_prefix}.still-'*.png '{vps_prefix}.stills.json' '{vps_log}' '{vps_done}'")
+    launch_cmd = (
         f"cd /root/video_factory/vox/papertrails_engine && "
         f"env -u NODE_CHANNEL_FD -u NODE_CHANNEL_SERIALIZATION_MODE -u NODE_APP_INSTANCE "
-        f"node scripts/render.mjs '{vps_timeline}' '{vps_prefix}' --stills '{csv_times}' --stills-only --quality {quality} {gpu_flag}"
+        f"nohup bash -c \"node scripts/render.mjs '{vps_timeline}' '{vps_prefix}' "
+        f"--stills '{csv_times}' --stills-only --quality {quality} {gpu_flag} > '{vps_log}' 2>&1; "
+        f"echo \\$? > '{vps_done}'\" >/dev/null 2>&1 & echo $!"
     )
     logger.info(f"[papertrails_vps_bridge] Rendering {len(still_times)} preview stills on VPS (quality={quality})...")
-    res = run_vps_cmd(cmd, timeout=timeout_sec)
-    if res.get("exit_code", 1) != 0:
-        raise RuntimeError(f"VPS stills render failed:\nSTDOUT: {res.get('stdout')}\nSTDERR: {res.get('stderr')}")
+    launch_res = run_vps_cmd(launch_cmd, timeout=30)
+    if launch_res.get("exit_code", 1) != 0:
+        raise RuntimeError(f"VPS stills launch failed:\nSTDOUT: {launch_res.get('stdout')}\nSTDERR: {launch_res.get('stderr')}")
+
+    deadline = time.time() + timeout_sec
+    exit_code_str = None
+    while time.time() < deadline:
+        poll_res = run_vps_cmd(f"if [ -f '{vps_done}' ]; then cat '{vps_done}'; fi", timeout=30)
+        txt = (poll_res.get("stdout") or "").strip()
+        if txt:
+            exit_code_str = txt.splitlines()[-1].strip()
+            break
+        time.sleep(5.0)
+
+    if exit_code_str != "0":
+        tail_log = (run_vps_cmd(f"tail -n 40 '{vps_log}' 2>/dev/null || true", timeout=20).get("stdout") or "")
+        raise RuntimeError(f"VPS stills render failed (exit={exit_code_str}):\n{tail_log}")
 
     meta_chk = run_vps_cmd(f"cat '{vps_prefix}.stills.json'")
     meta = json.loads(meta_chk.get("stdout") or "{}")
