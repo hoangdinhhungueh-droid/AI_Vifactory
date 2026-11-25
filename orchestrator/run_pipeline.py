@@ -68,6 +68,18 @@ STAGE_MODULES = {
     StageID.S11_QC: "stages.s11_qc",
 }
 
+PAPERTRAILS_VOICE_FIRST_STAGES: List[StageID] = [
+    StageID.S1_IDEATION,
+    StageID.S2_RESEARCH,
+    StageID.S3_SCRIPT,
+    StageID.S4_CRITIC_SCRIPT,
+    StageID.S9_VOICE_TTS,
+    StageID.S5_DIRECTOR_PLAN,
+    StageID.S8_VIDEO_GEN,
+    StageID.S10_RENDER,
+    StageID.S11_QC,
+]
+
 
 def resolve_stage_index(token: Optional[str], stage_list: List[StageID]) -> Optional[int]:
     """Resolves CLI stage identifier (e.g. 's1', 's01', 's01_ideation', 'ideation', '1') to stage_list index."""
@@ -243,6 +255,7 @@ def execute_pipeline(
     upload_youtube: bool = False,
     human_gates: Optional[bool] = None,
     auto: bool = False,
+    stills_only: bool = False,
 ) -> int:
     if profile is not None:
         profile_name = profile
@@ -297,6 +310,7 @@ def execute_pipeline(
         config=config,
         force=force,
         dry_run=dry_run,
+        stills_only=stills_only,
         preset=loaded_preset,
         topic=topic,
         max_veo_shots=max_veo_shots,
@@ -380,7 +394,16 @@ def execute_pipeline(
             logger.warning(f"[HG4] Telegram notification notice: {_tg_err}")
         return 0
 
-    stage_list = list(StageID)
+    legacy_stage_tokens = {
+        StageID.S6_CRITIC_VISUAL.value, StageID.S7_IMAGE_GEN.value,
+        "s06", "s07", "s6", "s7", "critic_visual", "image_gen",
+    }
+    explicit_legacy_target = any(
+        (tok or "").strip().lower() in legacy_stage_tokens
+        for tok in (only_stage, from_stage, effective_to)
+    )
+    use_voice_first = bool(config.name == "prod" and not dry_run and not explicit_legacy_target)
+    stage_list = list(PAPERTRAILS_VOICE_FIRST_STAGES) if use_voice_first else list(StageID)
     start_idx = 0
     if from_stage:
         resolved_from = resolve_stage_index(from_stage, stage_list)
@@ -419,7 +442,9 @@ def execute_pipeline(
         manifest = RunManifest.load_or_create(paths, profile=config.name)
         ctx.manifest = manifest
         if from_stage:
-            manifest.invalidate_downstream(stage_list[start_idx], inclusive=True, paths=paths)
+            manifest.invalidate_downstream(
+                stage_list[start_idx], inclusive=True, paths=paths, stage_order=stage_list
+            )
             manifest.save_atomic(paths)
 
         # 3. Stage Execution Loop
@@ -449,6 +474,7 @@ def execute_pipeline(
                     "market": str(getattr(getattr(ctx, "config", None), "market", "") or ""),
                     "profile": str(config.name),
                     "dry_run": bool(getattr(ctx, "dry_run", False)),
+                    "stills_only": bool(getattr(ctx, "stills_only", False)) if stage == StageID.S8_VIDEO_GEN else False,
                 },
             )
             expected_in_sha, upstream_map = compute_stage_input_provenance(stage, paths, config_sha256=cfg_sha)
@@ -479,7 +505,7 @@ def execute_pipeline(
                 if not force and state and state.status in ("done", "skipped") and art_path.exists():
                     if topic_mismatch_reason:
                         print(f"   🔄 CACHE INVALIDATED for {stage_name} ({topic_mismatch_reason}): clearing stale exports and re-running.")
-                        manifest.invalidate_downstream(stage, inclusive=True, paths=paths)
+                        manifest.invalidate_downstream(stage, inclusive=True, paths=paths, stage_order=stage_list)
                         manifest.save_atomic(paths)
                     else:
                         sha_now = compute_file_sha256(art_path)
@@ -492,7 +518,7 @@ def execute_pipeline(
                             manifest.save_atomic(paths)
                             continue
                         print(f"   🔄 CACHE INVALIDATED for {stage_name} ({cache_reason}): clearing stale exports and re-running.")
-                        manifest.invalidate_downstream(stage, inclusive=True, paths=paths)
+                        manifest.invalidate_downstream(stage, inclusive=True, paths=paths, stage_order=stage_list)
                         manifest.save_atomic(paths)
 
                 manifest.mark(stage, "running")
@@ -502,12 +528,12 @@ def execute_pipeline(
                     _artifact = stage_mod.run(ctx)
                 except GateError:
                     # Preserve diagnostic critic artifact when a stage deliberately rejects via GateError
-                    manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
+                    manifest.invalidate_downstream(stage, inclusive=False, paths=paths, stage_order=stage_list)
                     manifest.save_atomic(paths)
                     raise
                 except BaseException:
                     purge_stage_outputs(stage, paths, include_artifact_file=True)
-                    manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
+                    manifest.invalidate_downstream(stage, inclusive=False, paths=paths, stage_order=stage_list)
                     manifest.save_atomic(paths)
                     raise
                 stamp_artifact_provenance(
@@ -518,11 +544,15 @@ def execute_pipeline(
                     run_nonce=stage_nonce,
                 )
 
-                if isinstance(_artifact.payload, dict) and _artifact.payload.get("verdict") in ("fail", "rejected"):
+                if isinstance(_artifact.payload, dict) and (
+                    _artifact.payload.get("verdict") in ("fail", "rejected")
+                    or str(_artifact.payload.get("qc_verdict") or "").upper() == "FAIL"
+                ):
+                    _rej_verdict = _artifact.payload.get("verdict") or _artifact.payload.get("qc_verdict")
                     raise GateError(
                         stage,
-                        f"Stage '{stage_name}' critic audit rejected artifact with verdict '{_artifact.payload.get('verdict')}'",
-                        details=_artifact.payload.get("violations") or {}
+                        f"Stage '{stage_name}' audit rejected artifact with verdict '{_rej_verdict}'",
+                        details=_artifact.payload.get("violations") or _artifact.payload.get("qc_details") or {}
                     )
 
                 sha_new = compute_file_sha256(art_path) if art_path.exists() else "none"
@@ -534,7 +564,7 @@ def execute_pipeline(
                     st_done.upstream_artifacts = upstream_map
                     st_done.run_nonce = stage_nonce
                 # Upstream stage produced a new artifact -> invalidate downstream stages to prevent split-brain
-                manifest.invalidate_downstream(stage, inclusive=False, paths=paths)
+                manifest.invalidate_downstream(stage, inclusive=False, paths=paths, stage_order=stage_list)
                 manifest.save_atomic(paths)
                 try:
                     print(f"   ✅ PASS (Artifact emitted: {art_path.name})")
@@ -601,13 +631,26 @@ def execute_pipeline(
                         print("🛡️ Script Audit:       PASS (Dual Critic Council Rule 444 & 445)")
                         print(f"📄 Script Artifact:    {s3_art_path}")
                         print("\nStory script validated and locked into master run manifest.")
-                        print("\n👉 NEXT STEP: Generate Director Plan, Visual Critic Audit & Images (S05 -> S07)")
-                        print("Execute CLI Command:")
-                        print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s05_director_plan --to s07_image_gen")
-                        print("\n[Image Generation Instructions]:")
-                        print(f"Bulk prompts saved in: {paths.root / 'bulk_image_prompts.txt'}")
-                        print(f"Generate authentic images and place in: {paths.composite_seeds_dir}")
-                        print("Or execute skill /vf-image-gen in Antigravity UI.")
+                        if use_voice_first:
+                            hg2_next_cmd = (
+                                f"python -m orchestrator.run_pipeline --run-id {effective_run_id} "
+                                f"--preset {preset_name} --from s09_voice_tts --to s08_video_gen --stills-only"
+                            )
+                            print("\n👉 NEXT STEP: Synthesize Voice + Real ASR, Direct 3D Pop-Up World & Preview Stills")
+                            print("Execute CLI Command:")
+                            print(hg2_next_cmd)
+                        else:
+                            hg2_next_cmd = (
+                                f"python -m orchestrator.run_pipeline --run-id {effective_run_id} "
+                                f"--preset {preset_name} --from s05_director_plan --to s07_image_gen"
+                            )
+                            print("\n👉 NEXT STEP: Generate Director Plan, Visual Critic Audit & Images (S05 -> S07)")
+                            print("Execute CLI Command:")
+                            print(hg2_next_cmd)
+                            print("\n[Image Generation Instructions]:")
+                            print(f"Bulk prompts saved in: {paths.root / 'bulk_image_prompts.txt'}")
+                            print(f"Generate authentic images and place in: {paths.composite_seeds_dir}")
+                            print("Or execute skill /vf-image-gen in Antigravity UI.")
                         print("=" * 75 + "\n")
                         try:
                             from app.services.telegram_buttons import send_hg2_story_audited
@@ -620,7 +663,7 @@ def execute_pipeline(
                                 est_duration_s=d_num,
                                 audit_score="PASS",
                                 preset=preset_name,
-                                next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s05_director_plan --to s07_image_gen",
+                                next_cmd=hg2_next_cmd,
                                 bulk_prompts_file=str(paths.root / "bulk_image_prompts.txt"),
                             )
                         except Exception as _tg_err:
@@ -667,6 +710,26 @@ def execute_pipeline(
                         except Exception as _tg_err:
                             logger.warning(f"[HG3] Telegram notification notice: {_tg_err}")
                         return 0
+
+                # ------------------------------------------------------------------
+                # PAPERTRAILS STILLS GATE (HG3): Review representative 3D frames before full render
+                # ------------------------------------------------------------------
+                if stage == StageID.S8_VIDEO_GEN and stills_only:
+                    stills_dir = paths.root / "stills"
+                    dir_md = paths.root / "DIRECTION.md"
+                    next_render_cmd = (
+                        f"python -m orchestrator.run_pipeline --run-id {effective_run_id} "
+                        f"--preset {preset_name} --from s08_video_gen --to s11_qc --auto"
+                    )
+                    print("\n" + "=" * 75)
+                    print("🛑 [HUMAN GATE 3 REACHED: PAPERTRAILS 3D STILLS READY FOR VISUAL REVIEW]")
+                    print("=" * 75)
+                    print(f"🖼️ Stills Directory:   {stills_dir}")
+                    print(f"📋 Shot Direction:     {dir_md}")
+                    print("\n👉 NEXT STEP: Inspect stills/*.png, then launch full parallel 1080p render + QC:")
+                    print(next_render_cmd)
+                    print("=" * 75 + "\n")
+                    return 0
 
                 # ------------------------------------------------------------------
                 # HUMAN GATE 5: Master Video QC Passed -> YouTube Unlisted Upload
@@ -747,6 +810,7 @@ def main():
     parser.add_argument("--preset", default="story_forensic", help="Pipeline track preset (e.g. story_forensic, macro_legacy)")
     parser.add_argument("--max-veo-shots", type=int, default=None, help="Maximum number of Veo shots to generate (quota management)")
     parser.add_argument("--pilot", action="store_true", help="Generate 30-second Beat 1 demo/pilot video and run visual critic evaluation")
+    parser.add_argument("--stills-only", action="store_true", help="Render Papertrails representative still frames for fast visual review before full MP4 render")
     parser.add_argument("--upload-youtube", action="store_true", help="Upload final master video as unlisted to YouTube (Human Gate 5)")
     parser.add_argument("--human-gates", dest="human_gates", action="store_true", default=None, help="Enable explicit Human Approval Gates pausing execution")
     parser.add_argument("--no-human-gates", dest="human_gates", action="store_false", help="Disable Human Approval Gates")
@@ -771,6 +835,7 @@ def main():
         upload_youtube=args.upload_youtube,
         human_gates=args.human_gates,
         auto=args.auto,
+        stills_only=args.stills_only,
     )
     sys.exit(exit_code)
 

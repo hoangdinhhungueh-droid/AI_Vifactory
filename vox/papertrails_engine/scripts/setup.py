@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Install local runtime dependencies, not global agent configuration."""
 import argparse
-from pathlib import Path
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 

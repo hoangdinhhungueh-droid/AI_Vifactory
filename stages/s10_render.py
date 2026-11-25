@@ -455,12 +455,33 @@ def _validate_and_assemble_video(
     if not ass_file.exists() or ass_file.stat().st_size == 0:
         raise MissingSubtitlesError(f"Stage S10 requires valid subtitles file at '{ass_file}'")
 
-    # [FT-303] Check for Papertrails Master 3D Video
+    # [FT-303] Check for Papertrails Master 3D Video -> lossless video copy + two-pass EBU R128 loudnorm
     pt_master = ctx.paths.root / "master_papertrails.mp4"
     if pt_master.exists() and pt_master.stat().st_size > 1000:
-        logger.info(f"[s10_render] Master Papertrails 3D video found ({pt_master.stat().st_size} bytes). Establishing as final.mp4.")
-        import shutil
-        shutil.copy2(str(pt_master), str(final_mp4))
+        from vox.ffmpeg_utils import build_twopass_loudnorm_filter, get_ffmpeg_binary
+
+        final_mp4.parent.mkdir(parents=True, exist_ok=True)
+        ffmpeg_bin = get_ffmpeg_binary()
+        loudnorm_filter = build_twopass_loudnorm_filter(
+            ffmpeg_bin, pt_master, target_i=-16.0, target_tp=-2.5, target_lra=7.0
+        )
+        logger.info(
+            f"[s10_render] Establishing Papertrails 3D master ({pt_master.stat().st_size} bytes) with EBU R128 loudnorm..."
+        )
+        cmd_norm = [
+            ffmpeg_bin, "-y",
+            "-i", str(pt_master),
+            "-map", "0:v:0",
+            "-map", "0:a:0",
+            "-c:v", "copy",
+            "-af", loudnorm_filter,
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-ar", "48000",
+            "-movflags", "+faststart",
+            str(final_mp4),
+        ]
+        subprocess.run(cmd_norm, capture_output=True, check=True, timeout=180)
         return
 
     # Check for Remotion CLI first (VPS or environment with Remotion installed)
@@ -740,8 +761,34 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
             for i, sc in enumerate(s5_scenes)
         ]
 
+    # Populate per-scene props from Papertrails timeline.json when single master 3D video is provided
+    props_clips = clips
+    pt_timeline_path = ctx.paths.root / "timeline.json"
+    if (
+        len(clips) == 1
+        and clips[0].get("render_mode") == "papertrails_3d"
+        and pt_timeline_path.exists()
+    ):
+        try:
+            tl_doc = json.loads(pt_timeline_path.read_text(encoding="utf-8"))
+            tl_scenes = tl_doc.get("scenes") or []
+            if tl_scenes:
+                props_clips = [
+                    {
+                        "scene_id": f"SC_{idx + 1:03d}",
+                        "duration_sec": max(0.1, float(ts["end"]) - float(ts["start"])),
+                        "render_mode": "papertrails_3d",
+                        "narration": ts.get("narration", ""),
+                        "headline": ts.get("title", ""),
+                        "file_path": clips[0].get("file_path", ""),
+                    }
+                    for idx, ts in enumerate(tl_scenes)
+                ]
+        except (OSError, json.JSONDecodeError, KeyError, ValueError) as tl_err:
+            logger.warning(f"[s10_render] Could not expand Papertrails timeline chapters: {tl_err}")
+
     render_props, props_file, scene_props = _build_and_save_remotion_props(
-        ctx, clips, audio_file, subtitles, audio_duration_sec=audio_duration_sec, scene_narrations=scene_narrations
+        ctx, props_clips, audio_file, subtitles, audio_duration_sec=audio_duration_sec, scene_narrations=scene_narrations
     )
 
     # Render target final.mp4
@@ -749,6 +796,21 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
 
     if ctx.force or not _probe_existing_final_video(final_mp4):
         _validate_and_assemble_video(ctx, clips, audio_file, s9_data, final_mp4, scene_props=scene_props, fps=render_props.fps, props_file=props_file, s5_scenes=s5_scenes)
+
+    # Export ground-truth YouTube chapters synchronized from remotion_props/timeline.json (Rule 120 & 135)
+    chapters_file = ctx.paths.final_render_dir / "chapters.txt"
+    try:
+        from app.services.seo_package_forge import sync_exact_chapters_from_remotion
+        ch_lines = sync_exact_chapters_from_remotion(
+            task_id=ctx.run_id,
+            market=getattr(ctx.manifest, "market", "EN") or "EN",
+            title=render_props.title,
+            remotion_props_path=str(props_file),
+        )
+        if ch_lines:
+            chapters_file.write_text("\n".join(ch_lines) + "\n", encoding="utf-8")
+    except Exception as ch_err:
+        logger.debug(f"[s10_render] Ground-truth chapter export notice: {ch_err}")
 
     sz = final_mp4.stat().st_size if final_mp4.exists() else 0
     sha = compute_file_sha256(final_mp4) if final_mp4.exists() else "none"

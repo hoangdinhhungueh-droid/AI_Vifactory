@@ -73,6 +73,7 @@ class RunContext(BaseModel):
     config: PipelineConfig
     force: bool = False
     dry_run: bool = False
+    stills_only: bool = False
     preset: Optional[Any] = None
     topic: Optional[str] = None
     max_veo_shots: Optional[int] = None

@@ -1,4 +1,4 @@
-export const PROPS = ['none', 'village', 'forest', 'bridge', 'mountain', 'sun', 'moon', 'house', 'tree', 'book', 'coin', 'chart', 'factory', 'clock', 'people', 'water', 'globe', 'voice-note', 'edit-board', 'pop-up', 'film', 'bubble', 'mic'];
+export const PROPS = ['none', 'village', 'forest', 'bridge', 'mountain', 'sun', 'moon', 'house', 'tree', 'book', 'coin', 'chart', 'factory', 'clock', 'people', 'water', 'globe', 'voice-note', 'edit-board', 'pop-up', 'film', 'bubble', 'mic', 'courthouse', 'gavel', 'ledger', 'container', 'vault', 'scale', 'contract', 'megaphone', 'briefcase', 'shield'];
 export const ACTIONS = ['walk', 'idle', 'reveal', 'celebrate', 'grow'];
 export const CAMERAS = ['wide', 'close', 'orbit', 'top', 'push', 'low', 'crane'];
 export function frameCount(t) { return Math.ceil(t.duration * t.fps - 1e-9); }

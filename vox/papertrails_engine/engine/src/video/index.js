@@ -32,6 +32,7 @@ window.__papertrails = {
     if(runtime) throw new Error('Already initialized; reload the page to reset deterministic state');
     validateTimeline(timeline);
     const quality=options.quality || 'med';
+    const allowSeek=!!options.allowSeek;
     if(!['low','med','high'].includes(quality))throw new Error('Invalid quality');
     // Optional measured loudness of the ORIGINAL voice, one value (0..1) per output frame; drives waveform props only.
     const envelope=Array.isArray(options.envelope)?options.envelope:null;
@@ -68,15 +69,15 @@ window.__papertrails = {
       focus.copy(origin);focus.y=.9;
       let dist=9,height=.68,angle=side;
       switch(s.camera){
-        case 'close': dist=6.8; break;
-        case 'wide': dist=11; break;
+        case 'close': dist=6.8-0.45*p; angle=side+0.10*p; break;
+        case 'wide': dist=11-0.55*p; angle=side+0.08*Math.sin(p*Math.PI); break;
         case 'orbit': angle=side+.14+sample.local*.17; break;
         case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;                       // slow dolly toward the subject
         case 'low': dist=6.2-.6*p; height=.2; angle=side+.12*p; focus.y=1.25; break;  // hero angle from the paper floor
         case 'crane': dist=8.5; height=.22+.72*p; break;                            // rise up to reveal the set
       }
       const d=dist*k;
-      if(s.camera==='top')camera.position.set(origin.x+.01,13*(portrait?1.2:1),origin.z+2);
+      if(s.camera==='top')camera.position.set(origin.x+.01+Math.sin(p*Math.PI)*.45,(13-0.7*p)*(portrait?1.2:1),origin.z+2);
       else camera.position.set(origin.x+Math.sin(angle)*d, Math.max(1.1,d*height),origin.z+Math.cos(angle)*d);
       camera.lookAt(focus);camera.updateMatrixWorld();
       const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);state.listener.rightX=right.x;state.listener.rightZ=right.z;
@@ -155,6 +156,14 @@ window.__papertrails = {
     runtime={renderFrame(frame){
       if(!Number.isInteger(frame)||frame<0||frame>=frameCount(timeline))throw new Error('Frame index out of range');
       if(frame<lastFrame)throw new Error('Frames must be nondecreasing; reload to rewind');
+      if((lastFrame===-1&&frame>0)||allowSeek){
+        const targetSample=sampleTimeline(timeline,frame/timeline.fps);
+        const sceneStart=Math.max(0,Math.floor(targetSample.scene.start*timeline.fps));
+        if(sceneStart>lastFrame+1){
+          if(active!==targetSample.scene.id)enter(sampleTimeline(timeline,targetSample.scene.start+1e-6));
+          lastFrame=sceneStart-1;
+        }
+      }
       let sample;for(let f=lastFrame+1;f<=frame;f++)sample=simulate(f);
       lastFrame=frame;
       post.setFocus(focus);post.render(1/timeline.fps);

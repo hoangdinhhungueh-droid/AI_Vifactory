@@ -1003,6 +1003,195 @@ def validate_and_sanitize_director_plan(payload: Dict[str, Any]) -> Dict[str, An
     }
 
 
+def _run_papertrails_voice_first_director(
+    ctx: RunContext,
+    s3_artifact: StageArtifact,
+    market: str,
+    start_ts: float,
+) -> StageArtifact:
+    """Voice-First Papertrails LLM Semantic 3D Director path for live prod runs (FT-301)."""
+    from app.services.papertrails_director import direct_papertrails_timeline_with_llm
+
+    s9_path = ctx.paths.artifact_file(StageID.S9_VOICE_TTS.value)
+    if not s9_path.exists():
+        raise FileNotFoundError(
+            f"[s05_director_plan] Voice-First Papertrails mode requires S09 voice & ASR artifact at '{s9_path}'. "
+            f"Execute Stage S09 before S05 (--only s09_voice_tts)."
+        )
+    s9_payload = json.loads(s9_path.read_text(encoding="utf-8")).get("payload", {})
+    audio_path = Path(str(s9_payload.get("audio_file") or (ctx.paths.audio_dir / "voice_narration.mp3")))
+    if not audio_path.exists():
+        raise FileNotFoundError(f"[s05_director_plan] S09 audio file missing at '{audio_path}'")
+
+    audio_dur = float(s9_payload.get("measured_duration_s") or s9_payload.get("total_duration_sec") or 0.0)
+    whisper_segs = s9_payload.get("segments") or []
+    timing_source = str(s9_payload.get("timing_source") or "faster-whisper+edge-boundary")
+    if not whisper_segs:
+        seg_file = ctx.paths.audio_dir / "transcript_segments.json"
+        if seg_file.exists():
+            seg_doc = json.loads(seg_file.read_text(encoding="utf-8"))
+            whisper_segs = seg_doc.get("segments") or []
+            timing_source = str(seg_doc.get("timing_source") or timing_source)
+            audio_dur = audio_dur or float(seg_doc.get("duration") or 0.0)
+    if not whisper_segs or audio_dur <= 0:
+        raise ValueError("[s05_director_plan] S09 missing measured word segments/duration for Voice-First directing.")
+
+    grounding_claims: List[Dict[str, Any]] = []
+    s2_path = ctx.paths.artifact_file(StageID.S2_RESEARCH.value)
+    if s2_path.exists():
+        try:
+            s2_payload = json.loads(s2_path.read_text(encoding="utf-8")).get("payload", {})
+            grounding_claims = list(s2_payload.get("claims") or s2_payload.get("grounding_claims") or [])
+        except (OSError, json.JSONDecodeError) as s2_err:
+            logger.warning(f"[s05_director_plan] Could not read S2 grounding claims: {s2_err}")
+
+    s3_payload = s3_artifact.payload or {}
+    s3_scenes = list(s3_payload.get("scenes") or [])
+    ep_title = str(s3_payload.get("title") or ctx.topic or ctx.run_id).strip()
+    fps = getattr(ctx.config.render, "fps", 30) if ctx.config else 30
+
+    direction_md_path = ctx.paths.root / "DIRECTION.md"
+    timeline_spec = direct_papertrails_timeline_with_llm(
+        transcript_segments=whisper_segs,
+        audio_path=audio_path,
+        audio_duration=audio_dur,
+        grounding_claims=grounding_claims,
+        s3_scenes=s3_scenes,
+        timing_source=timing_source,
+        orientation="landscape",
+        fps=fps,
+        seed=42,
+        direction_md_path=direction_md_path,
+        dry_run=ctx.dry_run,
+    )
+
+    timeline_path = ctx.paths.root / "timeline.json"
+    timeline_path.write_text(json.dumps(timeline_spec, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    cam_pools = {
+        "push": ("slow_push_in", "dolly_zoom"),
+        "orbit": ("macro_orbit", "cinematic_pan"),
+        "crane": ("slow_pull_out", "seamless_whip_pan"),
+        "low": ("macro_tilt", "continuous_drift"),
+    }
+    all_moves = (
+        "slow_push_in",
+        "macro_orbit",
+        "slow_pull_out",
+        "macro_tilt",
+        "dolly_zoom",
+        "cinematic_pan",
+        "seamless_whip_pan",
+        "continuous_drift",
+    )
+    cam_counts: Dict[str, int] = {}
+    prev_cam_move: Optional[str] = None
+    plan_scenes: List[Dict[str, Any]] = []
+    for idx, pt_sc in enumerate(timeline_spec.get("scenes") or []):
+        st = float(pt_sc["start"])
+        en = float(pt_sc["end"])
+        pt_cam = pt_sc["camera"]
+        pool = cam_pools.get(pt_cam, ("slow_push_in", "dolly_zoom"))
+        c_idx = cam_counts.get(pt_cam, 0)
+        cam_move = pool[c_idx % len(pool)]
+        cam_counts[pt_cam] = c_idx + 1
+        if cam_move == prev_cam_move:
+            cam_move = next((m for m in all_moves if m != prev_cam_move), cam_move)
+        prev_cam_move = cam_move
+        sc_id = f"SC_{idx + 1:03d}"
+        plan_scenes.append({
+            "idx": idx,
+            "scene_id": sc_id,
+            "start": st,
+            "end": en,
+            "start_sec": st,
+            "end_sec": en,
+            "duration_est_sec": round(en - st, 3),
+            "narration": pt_sc["narration"],
+            "headline": pt_sc["title"],
+            "market": market,
+            "prop": pt_sc["prop"],
+            "biome": pt_sc["biome"],
+            "action": pt_sc["action"],
+            "papertrails_camera": pt_cam,
+            "camera_movement": cam_move,
+            "bg_prompt": f"Papertrails 3D pop-up {pt_sc['biome']} diorama terrain stage [{sc_id}]",
+            "hero_cutout_object": f"Papertrails 3D folded {pt_sc['prop']} model ({pt_sc['action']}) [{sc_id}]",
+            "image_prompt": f"Papertrails 3D {pt_sc['prop']} in {pt_sc['biome']} [{sc_id}]",
+            "production_route": "PAPERTRAILS_3D",
+            "shots": [
+                {
+                    "shot_id": f"{sc_id}_SH_01",
+                    "visual_prompt": pt_sc["visual"],
+                    "camera_move": cam_move,
+                    "duration_sec": round(en - st, 3),
+                }
+            ],
+        })
+
+    if len(plan_scenes) >= 6:
+        from collections import Counter
+
+        used_moves = {s["camera_movement"] for s in plan_scenes}
+        if len(used_moves) < 6:
+            move_counts = Counter(s["camera_movement"] for s in plan_scenes)
+            unused = [m for m in all_moves if m not in used_moves]
+            for k in range(len(plan_scenes) - 1, -1, -1):
+                if len(used_moves) >= 6 or not unused:
+                    break
+                cur_m = plan_scenes[k]["camera_movement"]
+                if move_counts[cur_m] <= 1:
+                    continue
+                prev_m = plan_scenes[k - 1]["camera_movement"] if k > 0 else None
+                next_m = plan_scenes[k + 1]["camera_movement"] if k + 1 < len(plan_scenes) else None
+                cand = next((m for m in unused if m != prev_m and m != next_m), None)
+                if cand:
+                    plan_scenes[k]["camera_movement"] = cand
+                    plan_scenes[k]["shots"][0]["camera_move"] = cand
+                    move_counts[cur_m] -= 1
+                    move_counts[cand] += 1
+                    used_moves.add(cand)
+                    unused.remove(cand)
+
+    payload: Dict[str, Any] = {
+        "schema_version": "director_plan.papertrails.v1",
+        "project_id": ctx.run_id,
+        "episode_id": ctx.run_id,
+        "task_id": ctx.run_id,
+        "title": ep_title,
+        "format": "PAPERTRAILS_3D_VOICE_FIRST",
+        "runtime_seconds": round(audio_dur, 3),
+        "total_scenes": len(plan_scenes),
+        "timing_source": timing_source,
+        "timeline_file": str(timeline_path),
+        "direction_md_file": str(direction_md_path),
+        "scenes": plan_scenes,
+    }
+
+    import hashlib
+    prompt_spec = ctx.paths.repo_root / "config" / "prompts" / "papertrails_director.md"
+    p_sha = hashlib.sha256(prompt_spec.read_bytes()).hexdigest() if prompt_spec.exists() else ""
+    prov = Provenance(
+        generator="stages.s05_director_plan.papertrails_voice_first",
+        prompt_id=p_sha[:16] if p_sha else None,
+        latency_sec=round(time.time() - start_ts, 2),
+    )
+    artifact = StageArtifact(
+        run_id=ctx.run_id,
+        stage=STAGE,
+        status="ok",
+        payload=payload,
+        provenance=prov,
+    )
+    emit_artifact(artifact, ctx.paths)
+    dp_path = ctx.paths.root / "director_plan.json"
+    dp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    logger.info(
+        f"[s05_director_plan] Voice-First Papertrails directed {len(plan_scenes)} shots -> {timeline_path} & {direction_md_path}"
+    )
+    return artifact
+
+
 @pipeline_stage(
     id="s05_director_plan",
     order=5,
@@ -1016,7 +1205,7 @@ def validate_and_sanitize_director_plan(payload: Dict[str, Any]) -> Dict[str, An
     verify_cmds=["python -m orchestrator.run_pipeline --only s05_director_plan --profile e2e_min"]
 )
 def run(ctx: RunContext) -> StageArtifact:
-    """Executes Stage S5: Director Plan & Prompts Forge with Vox Kinematics."""
+    """Executes Stage S5: Director Plan (Voice-First Papertrails 3D in live prod; hermetic fallback in e2e_min)."""
     start_ts = time.time()
 
     # Read and validate S3 script artifact schema (Rule 121, Rule 139)
@@ -1031,6 +1220,13 @@ def run(ctx: RunContext) -> StageArtifact:
         raise RuntimeError(f"Failed to parse S3 script artifact JSON at {s3_artifact_path}: {parse_err}") from parse_err
 
     s3_artifact = validate_artifact(StageID.S3_SCRIPT, s3_raw)
+
+    # Voice-First Papertrails isolation path (live prod runs bypass legacy 2D/Veo generation)
+    if ctx.config and ctx.config.name == "prod" and not ctx.dry_run:
+        from core.market_resolver import resolve_canonical_market
+        market = resolve_canonical_market(ctx=ctx)
+        return _run_papertrails_voice_first_director(ctx, s3_artifact, market, start_ts)
+
     raw_scenes = s3_artifact.payload.get("scenes", [])
     b2_source_path = s3_artifact.payload.get("b2_source_path", "")
     b2_source_sha256 = s3_artifact.payload.get("b2_source_sha256", "")
@@ -1038,6 +1234,9 @@ def run(ctx: RunContext) -> StageArtifact:
     if not raw_scenes:
         logger.critical("[s05_director_plan] No scenes available in S3 artifact (fail-closed)")
         raise RuntimeError("Stage S05 failed closed: no scenes found in S3 artifact")
+
+    from core.market_resolver import resolve_canonical_market
+    market = resolve_canonical_market(ctx=ctx)
 
     # Load master prompt sha256 for cryptographic provenance
     master_prompt_path = ctx.paths.repo_root / "config" / "prompts" / "vox_b3_director_image_prompt.md"
@@ -1052,8 +1251,6 @@ def run(ctx: RunContext) -> StageArtifact:
     prev_scene: Optional[Scene] = None
 
     # Dynamic Master Prompt 2 Vox Storyboard via Claude Sonnet 5.5 / Fallback GPT-6.1-Sol
-    from core.market_resolver import resolve_canonical_market
-    market = resolve_canonical_market(ctx=ctx)
     sentences = [sc_dict.get("narration", "") for sc_dict in raw_scenes if isinstance(sc_dict, dict) and sc_dict.get("narration")]
     story_text = "\n".join(sentences)
 
@@ -1417,8 +1614,8 @@ def run(ctx: RunContext) -> StageArtifact:
                             whisper_segs = s9_data.get("payload", {}).get("segments")
                             if s9_data.get("payload", {}).get("total_duration_sec"):
                                 audio_dur = float(s9_data["payload"]["total_duration_sec"])
-                        except Exception:
-                            pass
+                        except (OSError, json.JSONDecodeError, ValueError) as s9_err:
+                            logger.debug(f"[s05_director_plan] S9 read notice during timeline sync: {s9_err}")
                     pt_timeline = build_papertrails_timeline(
                         scenes_script=pt_scenes,
                         audio_path=audio_cand,

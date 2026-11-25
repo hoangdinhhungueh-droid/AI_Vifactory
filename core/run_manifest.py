@@ -108,14 +108,15 @@ class RunManifest(BaseModel):
         self,
         from_stage: StageID,
         inclusive: bool = True,
-        paths: Optional[RunPaths] = None
+        paths: Optional[RunPaths] = None,
+        stage_order: Optional[List[StageID]] = None,
     ) -> List[str]:
         """Resets status to 'pending' and clears artifact_sha256 for all stages from from_stage onwards.
         If paths is provided, purges stale artifact files on disk to prevent split-brain reads.
         Returns the ordered list of invalidated stage IDs.
         """
         invalidated: List[str] = []
-        all_stages = list(StageID)
+        all_stages = stage_order if stage_order is not None else list(StageID)
         try:
             start_idx = all_stages.index(from_stage)
         except ValueError:

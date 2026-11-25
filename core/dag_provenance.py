@@ -50,6 +50,7 @@ STAGE_DAG_PARENTS: Dict[StageID, List[StageID]] = {
 
 # Optional cross-stage inputs that invalidate downstream when already consumed
 STAGE_OPTIONAL_PARENTS: Dict[StageID, List[StageID]] = {
+    StageID.S5_DIRECTOR_PLAN: [StageID.S9_VOICE_TTS],
     StageID.S8_VIDEO_GEN: [StageID.S9_VOICE_TTS],
 }
 
@@ -99,7 +100,8 @@ STAGE_EXPORT_SPECS: Dict[StageID, Dict[str, List[str]]] = {
             "prompts.json",
             "prompts_manifest.json",
             "vox_scene_manifest.json",
-            "whisper_segments.json",
+            "timeline.json",
+            "DIRECTION.md",
         ],
         "root_dirs": ["master_sheets"],
         "root_globs": [],
@@ -122,8 +124,9 @@ STAGE_EXPORT_SPECS: Dict[StageID, Dict[str, List[str]]] = {
             "video_manifest.json",
             "pilot_30s.mp4",
             "pilot_manifest.json",
+            "master_papertrails.mp4",
         ],
-        "root_dirs": ["video_clips", "chained_frames", "blocks", "pilot_30s"],
+        "root_dirs": ["video_clips", "chained_frames", "blocks", "pilot_30s", "stills"],
         "root_globs": ["clip_*.mp4"],
     },
     StageID.S9_VOICE_TTS: {

@@ -38,7 +38,6 @@ def assemble_final_video(
     ffmpeg_bin = get_ffmpeg_binary()
 
     # Measure exact audio duration to avoid premature truncation
-    import json
     import wave
     audio_dur = 0.0
     try:
@@ -138,32 +137,8 @@ def assemble_final_video(
             err_msg = _c_err.stderr.decode("utf-8", errors="replace") if _c_err.stderr else str(_c_err)
             raise RuntimeError(f"assemble_final_video concat failed: {err_msg}") from _c_err
 
-    # Pass 1: Measure audio loudness statistics
-    pass1_cmd = [
-        ffmpeg_bin, "-y",
-        "-i", str(audio_wav),
-        "-af", "loudnorm=I=-16:TP=-2.5:LRA=11:print_format=json",
-        "-f", "null", "-"
-    ]
-    p1_res = subprocess.run(pass1_cmd, capture_output=True, text=True, check=False)
-    loudnorm_filter = "loudnorm=I=-16:TP=-2.5:LRA=11"
-    try:
-        err_out = p1_res.stderr
-        json_start = err_out.rfind("{")
-        json_end = err_out.rfind("}")
-        if json_start != -1 and json_end != -1 and json_end > json_start:
-            p1_data = json.loads(err_out[json_start:json_end + 1])
-            m_i = p1_data.get("input_i", "-16.0")
-            m_tp = p1_data.get("input_tp", "-2.5")
-            m_lra = p1_data.get("input_lra", "11.0")
-            m_thresh = p1_data.get("input_thresh", "-26.0")
-            offset = p1_data.get("target_offset", "0.0")
-            loudnorm_filter = (
-                f"loudnorm=I=-16:TP=-2.5:LRA=11:measured_I={m_i}:measured_TP={m_tp}:"
-                f"measured_LRA={m_lra}:measured_thresh={m_thresh}:offset={offset}:linear=true"
-            )
-    except Exception:
-        loudnorm_filter = "loudnorm=I=-16:TP=-2.5:LRA=11"
+    from vox.ffmpeg_utils import build_twopass_loudnorm_filter
+    loudnorm_filter = build_twopass_loudnorm_filter(ffmpeg_bin, Path(audio_wav), target_i=-16.0, target_tp=-2.5, target_lra=11.0)
 
     # Escape path for ffmpeg subtitles filter (replace backslashes with forward slashes)
     ass_escaped = ass_subtitles.resolve().as_posix().replace(":", "\\:")

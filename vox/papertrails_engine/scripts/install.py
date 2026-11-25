@@ -6,9 +6,9 @@ Dry-run by default; --apply is required. Existing installations are never replac
 import argparse
 import json
 import os
-from pathlib import Path
 import shutil
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = 'papertrails-video'

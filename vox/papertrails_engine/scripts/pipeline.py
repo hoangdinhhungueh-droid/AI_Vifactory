@@ -6,17 +6,16 @@ and requires faster-whisper. A timed JSON/SRT bypasses the ASR dependency.
 The starter plan is explicitly rule-based; the calling agent directs the film.
 """
 import argparse
-from array import array
 import hashlib
 import json
 import math
-import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import unicodedata
+from array import array
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 

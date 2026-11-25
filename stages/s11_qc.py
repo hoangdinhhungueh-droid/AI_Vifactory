@@ -42,6 +42,10 @@ CAMERA_ALIAS_MAP: dict[str, CameraMove] = {
     "static_overhead": CameraMove.STATIC_BREATH,
     "slow_horizontal_pan": CameraMove.PAN_RIGHT,
     "subtle_tilt_down": CameraMove.TILT_DOWN,
+    "push": CameraMove.PUSH_IN,
+    "orbit": CameraMove.PARALLAX_LEFT,
+    "crane": CameraMove.PULL_OUT,
+    "low": CameraMove.TILT_DOWN,
 }
 
 _FORBIDDEN_TYPOGRAPHY_TERMS: list[str] = [

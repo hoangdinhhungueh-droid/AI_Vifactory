@@ -144,6 +144,160 @@ def validate_frame_chain_dag(frame_chain: List[Dict[str, Any]]) -> Dict[str, Any
     }
 
 
+def _select_representative_still_times(timeline_data: Dict[str, Any], target_count: int = 12) -> List[float]:
+    """Selects evenly spaced still timestamps across timeline shots (first, midpoints, last)."""
+    scenes = timeline_data.get("scenes") or []
+    dur = float(timeline_data.get("duration") or 0.0)
+    if not scenes or dur <= 0:
+        return [min(1.0, max(0.0, dur * 0.25))] if dur > 0 else [0.5]
+
+    n = len(scenes)
+    if n <= target_count:
+        chosen_indices = list(range(n))
+    else:
+        chosen_indices = sorted({round(i * (n - 1) / (target_count - 1)) for i in range(target_count)})
+
+    times: List[float] = []
+    for idx in chosen_indices:
+        sc = scenes[idx]
+        s_t = float(sc.get("start", 0.0))
+        e_t = float(sc.get("end", s_t + 2.0))
+        mid = s_t + min(1.0, (e_t - s_t) * 0.45) if idx == 0 else (s_t + e_t) * 0.5
+        times.append(round(min(max(0.0, mid), max(0.0, dur - 0.1)), 3))
+    return sorted(set(times))
+
+
+def _verify_master_motion_windows(master_mp4: Path, duration_sec: float) -> None:
+    """Checks temporal motion across start, middle, and end windows of master Papertrails MP4."""
+    import tempfile
+    from vox.ffmpeg_utils import get_ffmpeg_binary
+
+    ff = get_ffmpeg_binary()
+    windows = [
+        max(0.0, min(4.0, duration_sec * 0.1)),
+        max(0.0, duration_sec * 0.5 - 1.5),
+        max(0.0, duration_sec - 4.5),
+    ]
+    with tempfile.TemporaryDirectory() as td:
+        for idx, start_s in enumerate(windows):
+            if duration_sec < 3.0 and idx > 0:
+                break
+            probe_mp4 = Path(td) / f"win_{idx}.mp4"
+            subprocess.run(
+                [ff, "-y", "-ss", f"{start_s:.3f}", "-t", "3.0", "-i", str(master_mp4), "-c", "copy", str(probe_mp4)],
+                capture_output=True, check=True, timeout=30,
+            )
+            validate_video_motion_temporal_delta(probe_mp4, min_delta=0.5)
+
+
+def _run_papertrails_3d_stage(
+    ctx: RunContext,
+    pt_timeline_file: Path,
+    audio_dur: float,
+    start_ts: float,
+) -> StageArtifact:
+    """Voice-First Papertrails 3D execution: fast --stills-only preview or parallel 1080p med render."""
+    from app.services.papertrails_vps_bridge import (
+        render_papertrails_on_vps,
+        render_papertrails_stills_on_vps,
+    )
+    from vox.qa.gates import probe_media_file
+
+    tl_data = json.loads(pt_timeline_file.read_text(encoding="utf-8"))
+    tl_dur = float(tl_data.get("duration") or audio_dur or 0.0)
+    still_times = _select_representative_still_times(tl_data, target_count=12)
+    stills_dir = ctx.paths.root / "stills"
+
+    logger.info(f"[s08_video_gen] Generating {len(still_times)} Papertrails preview stills...")
+    still_paths = render_papertrails_stills_on_vps(
+        timeline_path=pt_timeline_file,
+        stills_dir=stills_dir,
+        still_times=still_times,
+        quality="med",
+        gpu=False,
+    )
+
+    if getattr(ctx, "stills_only", False):
+        payload = {
+            "task_id": ctx.run_id,
+            "stills_only": True,
+            "stills": [str(p) for p in still_paths],
+            "total_clips": 0,
+            "total_veo_shots": 0,
+            "total_vox_native_shots": 0,
+            "video_clips_dir": str(ctx.paths.video_clips_dir),
+            "clips": [],
+            "frame_chain": [],
+            "total_chained_shots": 0,
+        }
+        artifact = StageArtifact(
+            run_id=ctx.run_id,
+            stage=STAGE,
+            status="ok",
+            payload=payload,
+            provenance=Provenance(generator="stages.s08_video_gen.papertrails_stills", latency_sec=round(time.time() - start_ts, 2)),
+        )
+        emit_artifact(artifact, ctx.paths)
+        return artifact
+
+    master_papertrails_mp4 = ctx.paths.root / "master_papertrails.mp4"
+    if not master_papertrails_mp4.exists() or ctx.force:
+        logger.info("[s08_video_gen] Launching parallel Papertrails 3D WebGL render on VPS (1080p quality=med, workers=3)...")
+        render_papertrails_on_vps(
+            timeline_path=pt_timeline_file,
+            output_mp4=master_papertrails_mp4,
+            quality="med",
+            sfx=True,
+            gpu=False,
+            parallel_workers=3,
+            force_rerender=bool(ctx.force),
+        )
+
+    if not master_papertrails_mp4.exists() or master_papertrails_mp4.stat().st_size < 1000:
+        raise RuntimeError(f"[s08_video_gen] Papertrails render did not produce valid master video at {master_papertrails_mp4}")
+
+    p_info = probe_media_file(master_papertrails_mp4)
+    measured_dur = float(p_info.get("format", {}).get("duration") or tl_dur)
+    _verify_master_motion_windows(master_papertrails_mp4, measured_dur)
+
+    sz = master_papertrails_mp4.stat().st_size
+    sha = compute_file_sha256(master_papertrails_mp4)
+    clip_asset = VideoAsset(
+        shot_id="master_001",
+        scene_id="MASTER_PAPERTRAILS",
+        file_path=str(master_papertrails_mp4),
+        account_slot="vps_papertrails_3d",
+        duration_sec=round(measured_dur, 3),
+        size_bytes=sz,
+        sha256=sha,
+        verified=True,
+        render_mode="papertrails_3d",
+    ).model_dump()
+
+    payload = {
+        "task_id": ctx.run_id,
+        "stills_only": False,
+        "stills": [str(p) for p in still_paths],
+        "master_papertrails_mp4": str(master_papertrails_mp4),
+        "total_clips": 1,
+        "total_veo_shots": 0,
+        "total_vox_native_shots": 1,
+        "video_clips_dir": str(ctx.paths.video_clips_dir),
+        "clips": [clip_asset],
+        "frame_chain": [],
+        "total_chained_shots": 0,
+    }
+    artifact = StageArtifact(
+        run_id=ctx.run_id,
+        stage=STAGE,
+        status="ok",
+        payload=payload,
+        provenance=Provenance(generator="stages.s08_video_gen.papertrails_3d", latency_sec=round(time.time() - start_ts, 2)),
+    )
+    emit_artifact(artifact, ctx.paths)
+    return artifact
+
+
 @pipeline_stage(
     id="s08_video_gen",
     order=8,
@@ -214,40 +368,16 @@ def run(ctx: RunContext) -> StageArtifact:
             scene_durations[i] = float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec)
 
     # [FT-302 / Papertrails Revolution]
-    # Build timeline.json if not present and render master 3D pop-up world on VPS
+    # Live prod runs use Papertrails 3D exclusively (--stills-only preview or parallel 1080p med render)
     pt_timeline_file = ctx.paths.root / "timeline.json"
-    if not pt_timeline_file.exists():
-        try:
-            from app.services.papertrails_director import build_papertrails_timeline
-            audio_f = ctx.paths.audio_dir / "voice_narration.mp3"
-            if not audio_f.exists() and (ctx.paths.root / "voice_narration.mp3").exists():
-                audio_f = ctx.paths.root / "voice_narration.mp3"
-            pt_timeline = build_papertrails_timeline(
-                scenes_script=scenes,
-                audio_path=audio_f,
-                audio_duration=audio_dur if audio_dur > 0 else sum(scene_durations.values()),
-                orientation="landscape",
-                fps=ctx.config.render.fps,
+    if not ctx.dry_run and ctx.config.name != "e2e_min":
+        if not pt_timeline_file.exists():
+            raise FileNotFoundError(
+                f"[s08_video_gen] Papertrails mode requires timeline.json at '{pt_timeline_file}'. Run S05 first."
             )
-            pt_timeline_file.write_text(json.dumps(pt_timeline, indent=2, ensure_ascii=False), encoding="utf-8")
-        except Exception as _pt_build_err:
-            logger.warning(f"[s08_video_gen] Notice generating Papertrails timeline: {_pt_build_err}")
+        return _run_papertrails_3d_stage(ctx, pt_timeline_file, audio_dur, start_ts)
 
     master_papertrails_mp4 = ctx.paths.root / "master_papertrails.mp4"
-    if pt_timeline_file.exists() and not ctx.dry_run and ctx.config.name != "e2e_min":
-        if not master_papertrails_mp4.exists() or ctx.force:
-            try:
-                from app.services.papertrails_vps_bridge import render_papertrails_on_vps
-                logger.info("[s08_video_gen] Initiating Papertrails 3D WebGL render on VPS (FT-302)...")
-                render_papertrails_on_vps(
-                    timeline_path=pt_timeline_file,
-                    output_mp4=master_papertrails_mp4,
-                    quality="low",
-                    sfx=True,
-                    gpu=False,
-                )
-            except Exception as _vps_pt_err:
-                logger.warning(f"[s08_video_gen] VPS Papertrails render notice: {_vps_pt_err}")
 
     for idx, sc in enumerate(scenes):
         if not isinstance(sc, dict):
@@ -494,10 +624,10 @@ def run(ctx: RunContext) -> StageArtifact:
                     cmd = [
                         ffmpeg_bin, "-y", "-f", "lavfi",
                         "-i", f"color=c=0xF4F1EA:s=1920x1080:d={actual_dur:.2f}:r={fps},noise=alls=15:allf=t+u",
-                        "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                         str(target_video)
                     ]
-                    subprocess.run(cmd, capture_output=True, check=True, timeout=60)
+                    subprocess.run(cmd, capture_output=True, check=True, timeout=120)
                     validate_video_motion_temporal_delta(target_video)
                     clip_valid = True
                     shot_render_mode = "vox_native"

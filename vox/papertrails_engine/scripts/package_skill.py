@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Package a portable source skill; exclude local dependencies and user media."""
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
 import re
-from pathlib import Path
 import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIP = {'.git', '.github', 'node_modules', '.venv', '.venv-asr', '.cache', '__pycache__', 'qa',

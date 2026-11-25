@@ -172,8 +172,8 @@ def download_file_chunked(
         try:
             w["session"].close()
             w["client"].close()
-        except Exception:
-            pass
+        except OSError as close_err:
+            print(f"[download_vps_asset] session close notice: {close_err}", flush=True)
 
     if os.path.exists(local_path):
         os.replace(tmp_path, local_path)

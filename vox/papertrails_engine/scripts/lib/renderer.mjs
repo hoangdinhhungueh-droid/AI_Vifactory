@@ -41,12 +41,16 @@ export async function startServer() {
 async function deadline(promise,ms,label) {
   let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timeout after ${ms}ms`)),ms);})]);}finally{clearTimeout(timer);}
 }
-export async function renderVideo(filename,output,{quality='med',stills=[],timeoutMs=120000,onProgress,sfx=false,gpu=false}={}) {
+export async function renderVideo(filename,output,{quality='med',stills=[],stillsOnly=false,startFrame=0,endFrame=null,silentOnly=false,timeoutMs=120000,onProgress,sfx=false,gpu=false}={}) {
   if(!['low','med','high'].includes(quality))throw new Error('Quality must be low, med, or high');
   const t=await loadTimeline(filename),frames=frameCount(t);
+  const sF=Math.max(0,Number.isInteger(startFrame)?startFrame:0);
+  const eF=endFrame==null?frames:Math.min(frames,Number(endFrame));
+  if(!stillsOnly&&(!Number.isInteger(eF)||eF<=sF))throw new Error(`Invalid frame range [${sF}, ${eF})`);
+  if(stillsOnly&&!stills.length)throw new Error('--stills-only requires non-empty --stills');
   if(stills.some(n=>!Number.isFinite(n)||n<0||n>=t.duration))throw new Error('Still times must be >= 0 and < duration');
   output=path.resolve(output);
-  if(path.extname(output).toLowerCase()!=='.mp4')throw new Error('Output must be .mp4');
+  if(!stillsOnly&&path.extname(output).toLowerCase()!=='.mp4')throw new Error('Output must be .mp4');
   if(output===t.audio||output===path.resolve(filename))throw new Error('Output cannot overwrite input');
   await mkdir(path.dirname(output),{recursive:true});
   const token=randomUUID(),partial=`${output}.${token}.partial.mp4`,metaPartial=`${output}.${token}.partial.json`;
@@ -67,23 +71,45 @@ export async function renderVideo(filename,output,{quality='med',stills=[],timeo
     await page.goto(`${service.url}/video.html`,{waitUntil:'networkidle',timeout:timeoutMs});
     await page.waitForFunction(()=>window.__papertrails?.ready);
     const envelope=await voiceEnvelope(t.audio,t.fps,frames);
-    const ready=await deadline(page.evaluate(({t,quality,envelope})=>window.__papertrails.init(t,{quality,envelope}),{t,quality,envelope}),timeoutMs,'Scene initialization');
+    const ready=await deadline(page.evaluate(({t,quality,envelope,allowSeek})=>window.__papertrails.init(t,{quality,envelope,allowSeek}),{t,quality,envelope,allowSeek:stillsOnly}),timeoutMs,'Scene initialization');
     if(errors.length)throw new Error(errors.join('\n'));
+    const stillFrames=new Set(stills.map(s=>Math.min(frames-1,Math.round(s*t.fps))));
+    if(stillsOnly){
+      const result={version:1,frames,duration:t.duration,fps:t.fps,width:t.width,height:t.height,seed:t.seed,quality,stillsOnly:true,assetSource:ready.assetSource,stills:[]};
+      const sorted=[...stillFrames].sort((a,b)=>a-b);
+      for(let idx=0;idx<sorted.length;idx++){
+        const frame=sorted[idx];
+        const sample=await deadline(page.evaluate(f=>window.__papertrails.renderFrame(f),frame),timeoutMs,`Still frame ${frame}`);
+        if(errors.length)throw new Error(errors.join('\n'));
+        const image=await page.screenshot({type:'png',animations:'disabled',timeout:timeoutMs});
+        const target=`${output}.still-${String(frame).padStart(6,'0')}.png`,tmp=`${target}.${token}.partial`;
+        await writeFile(tmp,image);temporary.push({tmp,target});
+        result.stills.push({path:target,frame,time:frame/t.fps,scene:sample.scene,caption:sample.caption,sha256:hash(image)});
+        onProgress?.({frame:idx+1,frames:sorted.length,scene:sample.scene});
+      }
+      for(const f of temporary)await rename(f.tmp,f.target);
+      await writeFile(metaPartial,JSON.stringify(result,null,2));
+      await rename(metaPartial,`${output}.stills.json`);
+      return result;
+    }
+    const renderFrames=eF-sF;
     // Optional paper-flip at each cut, synthesized here and mixed UNDER the untouched voice (opt-in: --sfx).
     const cuts=t.scenes.slice(1).map(s=>s.start);
-    const audioArgs=sfx&&cuts.length?['-f','lavfi','-i','anoisesrc=d=0.34:c=pink:r=48000:a=0.5','-filter_complex',
-      `[2:a]highpass=f=900,lowpass=f=7000,afade=t=in:d=0.02,afade=t=out:st=0.05:d=0.27,volume=0.22,asplit=${cuts.length}${cuts.map((_,i)=>`[n${i}]`).join('')};`+
-      cuts.map((c,i)=>`[n${i}]adelay=${Math.max(0,Math.round((c-.14)*1000))}:all=1[d${i}]`).join(';')+';'+
-      `[1:a]aresample=48000[v];[v]${cuts.map((_,i)=>`[d${i}]`).join('')}amix=inputs=${cuts.length+1}:normalize=0:duration=first[aout]`,'-map','0:v:0','-map','[aout]']
-      :['-map','0:v:0','-map','1:a:0'];
-    const args=['-hide_banner','-loglevel','error','-y','-f','image2pipe','-vcodec','png','-framerate',String(t.fps),'-i','pipe:0','-i',t.audio,...audioArgs,'-c:v','libx264','-preset',quality==='high'?'medium':'veryfast','-crf',quality==='low'?'25':quality==='high'?'18':'21','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-t',String(frames/t.fps),'-movflags','+faststart',partial];
+    const audioArgs=silentOnly?['-map','0:v:0','-an']:
+      (sfx&&cuts.length?['-f','lavfi','-i','anoisesrc=d=0.34:c=pink:r=48000:a=0.5','-filter_complex',
+        `[2:a]highpass=f=900,lowpass=f=7000,afade=t=in:d=0.02,afade=t=out:st=0.05:d=0.27,volume=0.22,asplit=${cuts.length}${cuts.map((_,i)=>`[n${i}]`).join('')};`+
+        cuts.map((c,i)=>`[n${i}]adelay=${Math.max(0,Math.round((c-.14)*1000))}:all=1[d${i}]`).join(';')+';'+
+        `[1:a]aresample=48000[v];[v]${cuts.map((_,i)=>`[d${i}]`).join('')}amix=inputs=${cuts.length+1}:normalize=0:duration=first[aout]`,'-map','0:v:0','-map','[aout]']
+        :['-map','0:v:0','-map','1:a:0']);
+    const inputs=silentOnly?['-f','image2pipe','-vcodec','png','-framerate',String(t.fps),'-i','pipe:0']:['-f','image2pipe','-vcodec','png','-framerate',String(t.fps),'-i','pipe:0','-i',t.audio];
+    const audioCodecArgs=silentOnly?[]:['-c:a','aac','-b:a','192k'];
+    const args=['-hide_banner','-loglevel','error','-y',...inputs,...audioArgs,'-c:v','libx264','-preset',quality==='high'?'medium':'veryfast','-crf',quality==='low'?'25':quality==='high'?'18':'21','-pix_fmt','yuv420p',...audioCodecArgs,'-frames:v',String(renderFrames),'-movflags','+faststart',partial];
     encoder=spawn('ffmpeg',args,{stdio:['pipe','ignore','pipe'],windowsHide:true});
     encoder.on('error',e=>{encoderError=e;});encoder.stdin.on('error',e=>{encoderError=e;});
     encoder.stderr.on('data',d=>{stderr=(stderr+d.toString()).slice(-16000);});
     encoderDone=new Promise(resolve=>{encoder.once('close',code=>resolve(code));encoder.once('error',()=>resolve(-1));});
-    const result={version:1,frames,duration:t.duration,fps:t.fps,width:t.width,height:t.height,seed:t.seed,quality,sfx:!!(sfx&&cuts.length),gpu:!!gpu,audio:t.audio,assetSource:ready.assetSource,repeatFrameStable:false,stills:[],shots:t.scenes.map(s=>({id:s.id,start:s.start,end:s.end,prop:s.prop,action:s.action,camera:s.camera,visual:s.visual}))};
-    const stillFrames=new Set(stills.map(s=>Math.min(frames-1,Math.round(s*t.fps))));
-    for(let frame=0;frame<frames;frame++) {
+    const result={version:1,frames:renderFrames,totalTimelineFrames:frames,startFrame:sF,endFrame:eF,duration:renderFrames/t.fps,fps:t.fps,width:t.width,height:t.height,seed:t.seed,quality,sfx:!!(!silentOnly&&sfx&&cuts.length),gpu:!!gpu,audio:silentOnly?null:t.audio,assetSource:ready.assetSource,repeatFrameStable:false,stills:[],shots:t.scenes.map(s=>({id:s.id,start:s.start,end:s.end,prop:s.prop,action:s.action,camera:s.camera,visual:s.visual}))};
+    for(let frame=sF;frame<eF;frame++) {
       if(signalController.signal.aborted)throw new Error('Render interrupted');
       const sample=await deadline(page.evaluate(f=>window.__papertrails.renderFrame(f),frame),timeoutMs,`Frame ${frame}`);
       if(errors.length)throw new Error(errors.join('\n'));
@@ -96,14 +122,15 @@ export async function renderVideo(filename,output,{quality='med',stills=[],timeo
       if(encoderError)throw encoderError;
       if(encoder.exitCode!==null)throw new Error(`ffmpeg exited early: ${stderr}`);
       if(!encoder.stdin.write(image))await deadline(Promise.race([once(encoder.stdin,'drain'),encoderDone.then(()=>{throw new Error(`ffmpeg closed: ${stderr}`);})]),timeoutMs,'ffmpeg pipe');
-      onProgress?.({frame:frame+1,frames,scene:sample.scene});
+      onProgress?.({frame:frame-sF+1,frames:renderFrames,globalFrame:frame+1,totalFrames:frames,scene:sample.scene});
     }
     encoder.stdin.end();
     const code=await deadline(encoderDone,timeoutMs,'ffmpeg finalization');
     if(code!==0||encoderError)throw new Error(`ffmpeg failed (${code}): ${encoderError?.message||stderr}`);
     const {stdout}=await run('ffprobe',['-v','error','-show_streams','-show_format','-of','json',partial],{timeout:30000,maxBuffer:2e6});
     const probe=JSON.parse(stdout),video=probe.streams.find(s=>s.codec_type==='video');
-    if(!video||video.width!==t.width||video.height!==t.height||Number(video.nb_frames)!==frames||!probe.streams.some(s=>s.codec_type==='audio'))throw new Error(`Encoded output failed verification: video ${video?.width}x${video?.height}, ${video?.nb_frames} frames (expected ${t.width}x${t.height}, ${frames}), audio ${probe.streams.some(s=>s.codec_type==='audio')}`);
+    const hasAudio=probe.streams.some(s=>s.codec_type==='audio');
+    if(!video||video.width!==t.width||video.height!==t.height||Number(video.nb_frames)!==renderFrames||(!silentOnly&&!hasAudio))throw new Error(`Encoded output failed verification: video ${video?.width}x${video?.height}, ${video?.nb_frames} frames (expected ${t.width}x${t.height}, ${renderFrames}), audio ${hasAudio}`);
     result.output=output;result.encodedDuration=Number(probe.format.duration);result.bytes=(await stat(partial)).size;
     await writeFile(metaPartial,JSON.stringify(result,null,2));
     for(const f of temporary)await rename(f.tmp,f.target);
