@@ -1010,7 +1010,10 @@ def _run_papertrails_voice_first_director(
     start_ts: float,
 ) -> StageArtifact:
     """Voice-First Papertrails LLM Semantic 3D Director path for live prod runs (FT-301)."""
-    from app.services.papertrails_director import direct_papertrails_timeline_with_llm
+    from app.services.papertrails_director import (
+        audit_papertrails_timeline_antipatterns,
+        direct_papertrails_timeline_with_llm,
+    )
 
     s9_path = ctx.paths.artifact_file(StageID.S9_VOICE_TTS.value)
     if not s9_path.exists():
@@ -1064,6 +1067,13 @@ def _run_papertrails_voice_first_director(
         direction_md_path=direction_md_path,
         dry_run=ctx.dry_run,
     )
+
+    anti_audit = audit_papertrails_timeline_antipatterns(timeline_spec)
+    if not anti_audit["passed"]:
+        raise RuntimeError(
+            "Stage S05 failed closed at Animation Anti-Pattern Audit Gate: "
+            + "; ".join(anti_audit["violations"])
+        )
 
     timeline_path = ctx.paths.root / "timeline.json"
     timeline_path.write_text(json.dumps(timeline_spec, indent=2, ensure_ascii=False), encoding="utf-8")

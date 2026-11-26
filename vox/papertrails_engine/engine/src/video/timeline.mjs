@@ -1,4 +1,4 @@
-export const PROPS = ['none', 'village', 'forest', 'bridge', 'mountain', 'sun', 'moon', 'house', 'tree', 'book', 'coin', 'chart', 'factory', 'clock', 'people', 'water', 'globe', 'voice-note', 'edit-board', 'pop-up', 'film', 'bubble', 'mic', 'courthouse', 'gavel', 'ledger', 'container', 'vault', 'scale', 'contract', 'megaphone', 'briefcase', 'shield'];
+export const PROPS = ['none', 'village', 'forest', 'bridge', 'mountain', 'sun', 'moon', 'house', 'tree', 'book', 'coin', 'chart', 'factory', 'clock', 'people', 'water', 'globe', 'voice-note', 'edit-board', 'pop-up', 'film', 'bubble', 'mic', 'courthouse', 'gavel', 'ledger', 'container', 'vault', 'scale', 'contract', 'megaphone', 'briefcase', 'shield', 'hanko-stamp', 'brass-caliper', 'forensic-loupe'];
 export const ACTIONS = ['walk', 'idle', 'reveal', 'celebrate', 'grow'];
 export const CAMERAS = ['wide', 'close', 'orbit', 'top', 'push', 'low', 'crane'];
 export function frameCount(t) { return Math.ceil(t.duration * t.fps - 1e-9); }
@@ -48,8 +48,19 @@ export function validateTimeline(t) {
         check(c.hl === undefined || (Array.isArray(c.hl) && c.hl.length === 4 && c.hl.every(Number.isFinite)), 'card.hl must be [x,y,w,h] in 0..1 image units');
       }
     }
+    if (s.timing !== undefined) {
+      const tm = s.timing;
+      check(tm && typeof tm === 'object', `scene ${s.id} timing must be object`);
+      if (tm.contactSec !== undefined) check(Number.isFinite(tm.contactSec) && tm.contactSec >= 0 && tm.contactSec <= (s.end - s.start) + 1e-6, `scene ${s.id} timing.contactSec must be within scene duration`);
+    }
   }
   check(Math.abs(end - t.duration) < 1e-6, 'scenes must cover duration');
+  if (t.foley_cues !== undefined) {
+    check(Array.isArray(t.foley_cues), 'foley_cues must be array');
+    for (const fc of t.foley_cues) {
+      check(fc && Number.isFinite(fc.time_sec) && fc.time_sec >= 0 && fc.time_sec <= t.duration + 1e-6, 'foley cue time_sec within duration');
+    }
+  }
   check(Array.isArray(t.captions), 'captions array required'); let prev = 0;
   for (const c of t.captions) {
     check(c && Number.isFinite(c.start) && Number.isFinite(c.end) && c.start >= prev && c.end > c.start && c.end <= t.duration + 1e-6 && typeof c.text === 'string', 'captions must be ordered, non-overlapping, and within duration'); prev = c.end;

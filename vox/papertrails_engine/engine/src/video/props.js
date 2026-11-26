@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { clamp01, smooth, easeInOutCubic, easeOutBack, squashPreserveVolume, overlap, impactPulse, bezierArc } from './motion.js';
 
 // Extension point: add a named builder here and the same name to timeline.mjs PROPS.
 // Each builder returns real layered paper geometry, never a generic title slide.
@@ -156,12 +157,15 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
     rect(.52,.14,crimson,-1.25,-.28,.06,arm);
     const shock=new THREE.Mesh(new THREE.RingGeometry(.45,.58,32),paper(crimson));
     shock.rotation.x=-Math.PI/2;shock.position.set(-.35,.32,0);root.add(shock);
-    anim.push(t=>{
-      const cyc=(t*1.1)%1;
-      const strike=cyc<.2?Math.sin(cyc/.2*Math.PI):0;
-      arm.rotation.z=.52*(1-strike);
-      const wave=cyc>.15&&cyc<.65?(cyc-.15)/.5:0;
-      shock.visible=wave>0;shock.scale.setScalar(.8+wave*1.3);
+    anim.push((t,p,ctx)=>{
+      const cSec=ctx?.scene?.timing?.contactSec??0.42;
+      const pulse=impactPulse(t,cSec,0.14,0.14,0.30);
+      const breathe=pulse.struck?Math.sin((t-cSec)*3.0)*0.015:0;
+      arm.rotation.z=0.38+0.32*pulse.lift-0.38*pulse.impact+breathe;
+      const sq=squashPreserveVolume(pulse.squashY);
+      arm.scale.set(sq.sx,sq.sy,sq.sz);
+      const wave=pulse.struck?clamp01((t-cSec-0.12)/0.45):0;
+      shock.visible=wave>0&&wave<1;shock.scale.setScalar(0.7+wave*1.45);
     });
   } else if (kind==='ledger') {
     const crimson='#c83e2b';
@@ -227,12 +231,19 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
     for(let i=0;i<5;i++)rect(1.22-(i%2)*.25,.045,'#9d8e74',-.05,1.35-i*.18,.06);
     const seal=disc(.26,crimson,.45,.45,.12);
     const ribbon=rect(.18,.32,crimson,.45,.24,.09);
-    anim.push((t,p)=>{
-      doc.scale.y=.3+.7*Math.min(1,p*1.6);
-      const slam=Math.min(1,Math.max(0,(p-.25)*3));
-      seal.scale.setScalar(1.4-.4*slam);
-      ribbon.visible=slam>.4;
-      ribbon.rotation.z=Math.sin(t*2.5)*.06;
+    anim.push((t,p,ctx)=>{
+      const cSec=ctx?.scene?.timing?.contactSec??0.48;
+      const openDoc=easeOutBack(clamp01(t/Math.max(0.18,cSec*0.72)));
+      doc.scale.y=0.28+0.72*openDoc;
+      const pulse=impactPulse(t,cSec,0.13,0.15,0.28);
+      const sq=squashPreserveVolume(pulse.squashY);
+      seal.visible=pulse.lift>0||pulse.impact>0;
+      seal.position.z=0.12+0.28*pulse.lift;
+      seal.scale.set(sq.sx*(0.9+0.1*pulse.settle),sq.sy*(0.9+0.1*pulse.settle),sq.sz);
+      const ov=overlap(t,cSec,0.06,0.24);
+      ribbon.visible=ov>0.02;
+      ribbon.scale.y=Math.max(0.01,easeOutBack(ov));
+      ribbon.rotation.z=Math.sin(t*2.5)*0.06*ov;
     });
   } else if (kind==='megaphone') {
     const crimson='#c83e2b';
@@ -277,13 +288,96 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
       const s=1+Math.sin(t*2.8)*.08;
       band.scale.setScalar(s);core.scale.setScalar(1.08-Math.sin(t*2.8)*.08);
     });
+  } else if (kind==='hanko-stamp') {
+    const crimson='#c83e2b', lacquer='#6e1e19';
+    rect(2.1,1.72,cream,0,.98,0);
+    rect(1.38,.09,ink,-.12,1.6,.04);
+    for(let i=0;i<4;i++)rect(1.22-(i%2)*.26,.045,'#9d8e74',-.18,1.35-i*.18,.04);
+    rect(.66,.38,ink,-.58,.42,.03);
+    rect(.54,.28,crimson,-.58,.44,.06);
+    const imprint=new THREE.Group();imprint.position.set(.42,.66,.055);root.add(imprint);
+    const sealRing=new THREE.Mesh(new THREE.RingGeometry(.21,.28,32),paper(crimson));
+    imprint.add(sealRing);
+    rect(.05,.24,crimson,0,0,.01,imprint);
+    rect(.2,.04,crimson,0,.05,.01,imprint);
+    rect(.2,.04,crimson,0,-.06,.01,imprint);
+    const stamper=new THREE.Group();stamper.position.set(.42,.66,.12);root.add(stamper);
+    rect(.46,.46,gold,0,0,0,stamper);
+    rect(.36,.36,crimson,0,0,.04,stamper);
+    const grip=mesh(new THREE.CylinderGeometry(.16,.2,.72,24).rotateX(Math.PI/2),lacquer,0,0,.38,stamper);
+    disc(.22,gold,0,0,.74,stamper);
+    anim.push((t,p,ctx)=>{
+      const cSec=ctx?.scene?.timing?.contactSec??0.44;
+      const pulse=impactPulse(t,cSec,0.14,0.14,0.28);
+      const sq=squashPreserveVolume(pulse.squashY);
+      stamper.position.z=0.12+0.52*pulse.lift+(1-pulse.impact)*0.34;
+      stamper.rotation.x=-0.22*pulse.lift;
+      grip.scale.set(sq.sx,sq.sy,sq.sz);
+      const rev=overlap(t,cSec,0.02,0.18);
+      imprint.visible=rev>0.01;
+      imprint.scale.setScalar(Math.max(0.01,easeOutBack(rev)));
+    });
+  } else if (kind==='brass-caliper') {
+    const crimson='#c83e2b';
+    rect(2.25,1.76,cream,0,.98,-.03);
+    for(let i=0;i<5;i++)rect(.75,.04,'#a8987d',-.55,1.52-i*.24,.02);
+    const targetBar=rect(.78,.42,crimson,.18,.94,.04);
+    const rail=rect(1.92,.14,gold,0,1.42,.11);
+    for(let i=0;i<9;i++)rect(.025,.07,ink,-.78+i*.19,1.42,.15,rail);
+    const leftJaw=new THREE.Group();leftJaw.position.set(-.26,1.06,.12);root.add(leftJaw);
+    rect(.14,.86,gold,0,0,0,leftJaw);
+    rect(.26,.16,gold,.12,-.36,.02,leftJaw);
+    const rightJaw=new THREE.Group();rightJaw.position.set(.62,1.06,.12);root.add(rightJaw);
+    rect(.14,.86,gold,0,0,0,rightJaw);
+    rect(.26,.16,gold,-.12,-.36,.02,rightJaw);
+    const lockPin=disc(.09,crimson,0,.38,.05,rightJaw);
+    anim.push((t,p,ctx)=>{
+      const cSec=ctx?.scene?.timing?.contactSec??0.46;
+      const pulse=impactPulse(t,cSec,0.14,0.15,0.28);
+      const spread=0.38*pulse.lift+0.32*(1-pulse.impact);
+      rightJaw.position.x=0.60+spread;
+      const sq=squashPreserveVolume(pulse.squashY);
+      targetBar.scale.set(1-0.08*(1-sq.sy),sq.sy,1);
+      const pin=overlap(t,cSec,0.05,0.16);
+      lockPin.scale.setScalar(0.75+0.35*easeOutBack(pin));
+    });
+  } else if (kind==='forensic-loupe') {
+    const crimson='#c83e2b', paleGlass='#e6f0ee';
+    rect(2.05,1.88,cream,0,1.0,-.03);
+    for(let i=0;i<6;i++)rect(1.45-(i%3)*.18,.045,'#9e8f75',0,1.62-i*.22,.02);
+    const clause=rect(.74,.14,gold,.26,.76,.05);
+    const reticle=new THREE.Mesh(new THREE.RingGeometry(.24,.30,32),paper(crimson));
+    reticle.position.set(.26,.76,.065);root.add(reticle);
+    const loupe=new THREE.Group();loupe.position.set(-.65,1.45,.26);root.add(loupe);
+    const bezel=new THREE.Mesh(new THREE.RingGeometry(.38,.48,36),paper(gold));
+    loupe.add(bezel);
+    const lens=disc(.37,paleGlass,0,0,-.02,loupe);
+    lens.material.transparent=true;lens.material.opacity=0.36;
+    const handle=rect(.11,.72,ink,.42,-.42,0,loupe);
+    handle.rotation.z=Math.PI/4;
+    anim.push((t,p,ctx)=>{
+      const cSec=ctx?.scene?.timing?.contactSec??0.46;
+      const moveU=easeInOutCubic(clamp01(t/Math.max(0.18,cSec)));
+      const pos=bezierArc({x:-.68,y:1.45,z:.28},{x:.26,y:.76,z:.19},0.36,moveU);
+      loupe.position.set(pos.x,pos.y,pos.z);
+      const pulse=impactPulse(t,cSec,0.12,0.14,0.28);
+      const sq=squashPreserveVolume(pulse.squashY);
+      loupe.scale.set(sq.sx,sq.sy,sq.sz);
+      const lock=overlap(t,cSec,0.04,0.22);
+      reticle.scale.setScalar(0.85+0.25*easeOutBack(lock));
+      clause.scale.x=1+0.12*smooth(lock);
+    });
   }
   return { group:root, update(time, progress, action, ctx={}) {
     const tileGrow=!!root.userData.grow&&(action==='grow'||action==='reveal');
-    const open=action==='reveal'&&!tileGrow?THREE.MathUtils.smoothstep(progress,0,.42):1;
+    const open=action==='reveal'&&!tileGrow?easeOutBack(clamp01(progress/.42)):1;
     root.rotation.x=-(1-open)*Math.PI/2;
     if(root.userData.grow)root.userData.grow(tileGrow?Math.min(1,progress*1.6):1);
-    if(action==='grow'&&!root.userData.grow)root.scale.setScalar(Math.max(.001,THREE.MathUtils.smoothstep(progress,0,.35)));else root.scale.setScalar(1);
+    if(action==='grow'&&!root.userData.grow){
+      const gu=easeOutBack(clamp01(progress/.36));
+      const sq=squashPreserveVolume(1+.12*Math.sin(Math.min(1,progress/.36)*Math.PI)*(1-clamp01(progress/.36)));
+      root.scale.set(Math.max(.001,gu)*sq.sx,Math.max(.001,gu)*sq.sy,Math.max(.001,gu)*sq.sz);
+    } else root.scale.setScalar(1);
     root.position.y=action==='celebrate'?Math.abs(Math.sin(time*4))*.2:0;
     for(const fn of anim)fn(time,Math.min(1,progress*2),ctx);
   }};

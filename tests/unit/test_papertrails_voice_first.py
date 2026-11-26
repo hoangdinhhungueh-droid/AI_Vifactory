@@ -10,18 +10,22 @@ from app.services.papertrails_director import (
     VALID_PROPS,
     _normalize_llm_shots_to_words,
     _sanitize_viewer_title,
+    audit_papertrails_timeline_antipatterns,
     build_papertrails_timeline,
     direct_papertrails_timeline_with_llm,
 )
 from core.contracts.stages import StageID
+from vox.ffmpeg_utils import build_procedural_foley_inputs_and_filter
 
 
 def test_custom_investigative_props_registered():
     expected = {
         "courthouse", "gavel", "ledger", "container", "vault",
         "scale", "contract", "megaphone", "briefcase", "shield",
+        "hanko-stamp", "brass-caliper", "forensic-loupe",
     }
     assert expected.issubset(VALID_PROPS)
+    assert len(VALID_PROPS) == 36
 
 
 def test_sanitize_viewer_title_strips_internal_ids():
@@ -114,3 +118,70 @@ def test_build_timeline_and_voice_first_stage_order():
         < PAPERTRAILS_VOICE_FIRST_STAGES.index(StageID.S10_RENDER)
         < PAPERTRAILS_VOICE_FIRST_STAGES.index(StageID.S11_QC)
     )
+
+
+def test_timing_sheet_and_antipattern_audit():
+    segments = [
+        {
+            "start": 0.0,
+            "end": 4.2,
+            "text": "Auditors stamped the secret footnote with a 42 percent spread.",
+            "words": [
+                {"word": w, "start": i * 0.35, "end": (i + 1) * 0.35}
+                for i, w in enumerate(
+                    ["Auditors", "stamped", "the", "secret", "footnote", "with", "a", "42", "percent", "spread."]
+                )
+            ],
+        },
+        {
+            "start": 4.2,
+            "end": 8.0,
+            "text": "The federal ruling locked the treasury vault.",
+            "words": [
+                {"word": w, "start": 4.2 + i * 0.5, "end": min(8.0, 4.2 + (i + 1) * 0.5)}
+                for i, w in enumerate(["The", "federal", "ruling", "locked", "the", "treasury", "vault."])
+            ],
+        },
+    ]
+    tl = direct_papertrails_timeline_with_llm(
+        transcript_segments=segments,
+        audio_path=Path("voice.mp3"),
+        audio_duration=8.0,
+        timing_source="faster-whisper+edge-boundary",
+        dry_run=True,
+    )
+    assert len(tl["foley_cues"]) == len(tl["scenes"])
+    for sc in tl["scenes"]:
+        dur = sc["end"] - sc["start"]
+        assert 0.0 <= sc["timing"]["contactSec"] <= dur
+        assert sc["timing"]["sfxKind"]
+
+    clean_audit = audit_papertrails_timeline_antipatterns(tl)
+    assert clean_audit["passed"], clean_audit
+
+    bad_cam = {**tl, "scenes": [{**tl["scenes"][0], "camera": "wide"}, *tl["scenes"][1:]]}
+    cam_audit = audit_papertrails_timeline_antipatterns(bad_cam)
+    assert not cam_audit["passed"]
+    assert any("non-kinetic camera" in v for v in cam_audit["violations"])
+
+    if len(tl["scenes"]) >= 2:
+        s0 = tl["scenes"][0]
+        s1_dup = {**tl["scenes"][1], "biome": s0["biome"], "prop": s0["prop"]}
+        dup_audit = audit_papertrails_timeline_antipatterns({**tl, "scenes": [s0, s1_dup, *tl["scenes"][2:]]})
+        assert not dup_audit["passed"]
+        assert any("consecutive duplicate staging" in v for v in dup_audit["violations"])
+
+
+def test_procedural_foley_filter_graph_builder():
+    cues = [
+        {"scene_id": "shot-001", "cue_idx": 0, "prop": "hanko-stamp", "sfx_kind": "stamp_thud", "time_sec": 0.4},
+        {"scene_id": "shot-002", "cue_idx": 1, "prop": "brass-caliper", "sfx_kind": "caliper_click", "time_sec": 2.1},
+        {"scene_id": "shot-003", "cue_idx": 2, "prop": "forensic-loupe", "sfx_kind": "loupe_whoosh", "time_sec": 4.8},
+    ]
+    inputs_a, graph_a = build_procedural_foley_inputs_and_filter(cues, duration_sec=8.0, seed=42)
+    inputs_b, _ = build_procedural_foley_inputs_and_filter(cues, duration_sec=8.0, seed=99)
+    assert inputs_a.count("lavfi") == 3
+    assert "adelay=400:all=1" in graph_a
+    assert "adelay=2100:all=1" in graph_a
+    assert "amix=inputs=4:normalize=0:duration=first[aout]" in graph_a
+    assert inputs_a != inputs_b

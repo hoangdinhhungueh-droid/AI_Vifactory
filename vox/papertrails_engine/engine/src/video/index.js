@@ -13,9 +13,7 @@ import { createWorld } from '../world/world.js';
 import { createTraveller } from '../player/traveller.js';
 import { createProp } from './props.js';
 import { validateTimeline, sampleTimeline, seededRandom, frameCount } from './timeline.mjs';
-
-const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
-const backOut = (x) => { x = Math.min(1, Math.max(0, x)); const c = 1.7; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2; };
+import { smooth, easeInOutCubic, easeOutBack } from './motion.js';
 
 // Torn paper edge for the caption strip, deterministic per caption (seeded by its start time).
 function tornClip(seed) {
@@ -33,7 +31,7 @@ window.__papertrails = {
     validateTimeline(timeline);
     const quality=options.quality || 'med';
     const allowSeek=!!options.allowSeek;
-    if(!['low','med','high'].includes(quality))throw new Error('Invalid quality');
+    if(!['low','vox','med','high'].includes(quality))throw new Error('Invalid quality');
     // Optional measured loudness of the ORIGINAL voice, one value (0..1) per output frame; drives waveform props only.
     const envelope=Array.isArray(options.envelope)?options.envelope:null;
     const levelAt=time=>{if(!envelope||!envelope.length)return null;const i=Math.min(envelope.length-1,Math.max(0,Math.round(time*timeline.fps)));return envelope[i];};
@@ -64,17 +62,17 @@ window.__papertrails = {
     let active=null,lastFrame=-1;
     const focus=new THREE.Vector3();
     function updateCamera(sample) {
-      const s=sample.scene,origin=origins.get(s.id),side=sides.get(s.id)??.36,p=smooth(sample.progress);
+      const s=sample.scene,origin=origins.get(s.id),side=sides.get(s.id)??.36,p=easeInOutCubic(sample.progress);
       const portrait=timeline.height>timeline.width,k=portrait?1.27:1;
       focus.copy(origin);focus.y=.9;
       let dist=9,height=.68,angle=side;
       switch(s.camera){
         case 'close': dist=6.8-0.45*p; angle=side+0.10*p; break;
         case 'wide': dist=11-0.55*p; angle=side+0.08*Math.sin(p*Math.PI); break;
-        case 'orbit': angle=side+.14+sample.local*.17; break;
-        case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;                       // slow dolly toward the subject
-        case 'low': dist=6.2-.6*p; height=.2; angle=side+.12*p; focus.y=1.25; break;  // hero angle from the paper floor
-        case 'crane': dist=8.5; height=.22+.72*p; break;                            // rise up to reveal the set
+        case 'orbit': angle=side+.14+p*.45; break;                                   // non-linear S-curve orbit arc
+        case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;                       // eased dolly toward subject
+        case 'low': dist=6.2-.6*p; height=.2; angle=side+.12*p; focus.y=1.25; break;  // hero angle from paper floor
+        case 'crane': dist=8.5; height=.22+.72*p; break;                            // eased crane reveal
       }
       const d=dist*k;
       if(s.camera==='top')camera.position.set(origin.x+.01+Math.sin(p*Math.PI)*.45,(13-0.7*p)*(portrait?1.2:1),origin.z+2);
@@ -108,14 +106,14 @@ window.__papertrails = {
         else{const h=c.hl;elCard.innerHTML=`<div class="photo"><div class="ph"><img src="${c.img}">${h?`<svg viewBox="0 0 100 ${100*(c.aspect||0.5625)}" preserveAspectRatio="none"><ellipse cx="${(h[0]+h[2]/2)*100}" cy="${(h[1]+h[3]/2)*100*(c.aspect||0.5625)}" rx="${h[2]*62}" ry="${h[3]*62*(c.aspect||0.5625)}" fill="none" stroke="#d2321f" stroke-width="0.9" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg>`:''}</div>${c.caption?`<div class="cap">${esc(c.caption)}</div>`:''}${c.badge?`<div class="stamp">${esc(c.badge)}</div>`:''}</div>`;}
       }
       const t=sample.local,dur=sample.scene.end-sample.scene.start,box=elCard.firstElementChild;
-      const k=backOut(t/.5);box.style.transform=`translateY(${((1-smooth(t/.35))*12).toFixed(2)}vh) rotate(${(Math.sin(sample.scene.start*2.3)*1.6).toFixed(2)}deg) scale(${(.88+.12*k).toFixed(3)})`;box.style.opacity=String(smooth(t/.25));
+      const k=easeOutBack(t/.5);box.style.transform=`translateY(${((1-smooth(t/.35))*12).toFixed(2)}vh) rotate(${(Math.sin(sample.scene.start*2.3)*1.6).toFixed(2)}deg) scale(${(.88+.12*k).toFixed(3)})`;box.style.opacity=String(smooth(t/.25));
       if(c.kind==='note')elCard.querySelectorAll('.ln').forEach(el=>{const i=+el.dataset.i,n=(c.lines||[]).length,at=c.lineAt?.[i]??(.35+i*Math.min(1.1,(dur*.65)/Math.max(1,n)));const v=smooth((t-at)/.3);el.style.opacity=String(v);el.style.transform=`translateX(${((1-v)*1.2).toFixed(2)}em)`;});
       else{const e=elCard.querySelector('ellipse'),st=elCard.querySelector('.stamp'),hat=c.hlAt??.9;if(e)e.setAttribute('stroke-dashoffset',String(100*(1-smooth((t-hat)/.6))));if(st){const v=smooth((t-(c.badgeAt??hat+.5))/.18);st.style.opacity=String(v);st.style.transform=`rotate(8deg) scale(${(1.6-.6*v).toFixed(3)})`;}}
     }
     function overlays(sample,time){
       const s=sample.scene;cardOverlay(sample);
       if(elTitle.textContent!==s.title)elTitle.textContent=s.title;
-      const tk=backOut(sample.local/.45);
+      const tk=easeOutBack(sample.local/.45);
       elTitle.style.transform=`translateY(${(1-smooth(sample.local/.3))*-1.2}em) rotate(${(-2+1.2*Math.sin(s.start*3.1)).toFixed(2)}deg) scale(${(.85+.15*tk).toFixed(3)})`;
       elTitle.style.opacity=String(smooth(sample.local/.25));
       const text=sample.caption||'';
@@ -146,7 +144,7 @@ window.__papertrails = {
       // Celebration is an explicit subject action, not continuous navigation.
       if(sample.scene.action==='celebrate')traveller.group.position.y+=Math.abs(Math.sin(sample.local*5))*.12;
       world.update(dt,p,traveller.moveDir);daynight.update(dt);materials.update(dt);updateCamera(sample);lights.update(dt,traveller,camera);
-      const prop=subjects.get(sample.scene.id);prop.update(sample.local,sample.progress,sample.scene.action,{level:levelAt(time),levelAt,time});prop.group.position.x=origins.get(sample.scene.id).x;prop.group.position.z=origins.get(sample.scene.id).z;
+      const prop=subjects.get(sample.scene.id);prop.update(sample.local,sample.progress,sample.scene.action,{level:levelAt(time),levelAt,time,scene:sample.scene});prop.group.position.x=origins.get(sample.scene.id).x;prop.group.position.z=origins.get(sample.scene.id).z;
       // Show the paper face toward the camera but retain physical 3D folds and thickness.
       prop.group.rotation.y=Math.atan2(camera.position.x-prop.group.position.x,camera.position.z-prop.group.position.z);
       overlays(sample,time);

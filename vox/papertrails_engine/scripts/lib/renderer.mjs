@@ -41,8 +41,9 @@ export async function startServer() {
 async function deadline(promise,ms,label) {
   let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timeout after ${ms}ms`)),ms);})]);}finally{clearTimeout(timer);}
 }
-export async function renderVideo(filename,output,{quality='med',stills=[],stillsOnly=false,startFrame=0,endFrame=null,silentOnly=false,timeoutMs=120000,onProgress,sfx=false,gpu=false}={}) {
-  if(!['low','med','high'].includes(quality))throw new Error('Quality must be low, med, or high');
+export async function renderVideo(filename,output,{quality='med',stills=[],stillsOnly=false,startFrame=0,endFrame=null,silentOnly=false,timeoutMs=120000,onProgress,sfx=false,gpu=false,renderFps=null,frameFormat='png'}={}) {
+  if(!['low','vox','med','high'].includes(quality))throw new Error('Quality must be low, vox, med, or high');
+  if(!['png','jpeg'].includes(frameFormat))throw new Error('frameFormat must be png or jpeg');
   const t=await loadTimeline(filename),frames=frameCount(t);
   const sF=Math.max(0,Number.isInteger(startFrame)?startFrame:0);
   const eF=endFrame==null?frames:Math.min(frames,Number(endFrame));
@@ -93,6 +94,9 @@ export async function renderVideo(filename,output,{quality='med',stills=[],still
       return result;
     }
     const renderFrames=eF-sF;
+    const frameStride=renderFps&&renderFps>0?Math.max(1,Math.round(t.fps/renderFps)):1;
+    const pipeFps=frameStride>1?(t.fps/frameStride):t.fps;
+    const pipeCodec=frameFormat==='jpeg'?'mjpeg':'png';
     // Optional paper-flip at each cut, synthesized here and mixed UNDER the untouched voice (opt-in: --sfx).
     const cuts=t.scenes.slice(1).map(s=>s.start);
     const audioArgs=silentOnly?['-map','0:v:0','-an']:
@@ -101,28 +105,32 @@ export async function renderVideo(filename,output,{quality='med',stills=[],still
         cuts.map((c,i)=>`[n${i}]adelay=${Math.max(0,Math.round((c-.14)*1000))}:all=1[d${i}]`).join(';')+';'+
         `[1:a]aresample=48000[v];[v]${cuts.map((_,i)=>`[d${i}]`).join('')}amix=inputs=${cuts.length+1}:normalize=0:duration=first[aout]`,'-map','0:v:0','-map','[aout]']
         :['-map','0:v:0','-map','1:a:0']);
-    const inputs=silentOnly?['-f','image2pipe','-vcodec','png','-framerate',String(t.fps),'-i','pipe:0']:['-f','image2pipe','-vcodec','png','-framerate',String(t.fps),'-i','pipe:0','-i',t.audio];
+    const inputs=silentOnly?['-f','image2pipe','-vcodec',pipeCodec,'-framerate',String(pipeFps),'-i','pipe:0']:['-f','image2pipe','-vcodec',pipeCodec,'-framerate',String(pipeFps),'-i','pipe:0','-i',t.audio];
+    const vfArgs=frameStride>1?['-vf',`fps=${t.fps}`,'-r',String(t.fps)]:[];
     const audioCodecArgs=silentOnly?[]:['-c:a','aac','-b:a','192k'];
-    const args=['-hide_banner','-loglevel','error','-y',...inputs,...audioArgs,'-c:v','libx264','-preset',quality==='high'?'medium':'veryfast','-crf',quality==='low'?'25':quality==='high'?'18':'21','-pix_fmt','yuv420p',...audioCodecArgs,'-frames:v',String(renderFrames),'-movflags','+faststart',partial];
+    const args=['-hide_banner','-loglevel','error','-y',...inputs,...audioArgs,...vfArgs,'-c:v','libx264','-preset',quality==='high'?'medium':'veryfast','-crf',quality==='low'?'25':quality==='high'?'18':'21','-pix_fmt','yuv420p',...audioCodecArgs,'-frames:v',String(renderFrames),'-movflags','+faststart',partial];
     encoder=spawn('ffmpeg',args,{stdio:['pipe','ignore','pipe'],windowsHide:true});
     encoder.on('error',e=>{encoderError=e;});encoder.stdin.on('error',e=>{encoderError=e;});
     encoder.stderr.on('data',d=>{stderr=(stderr+d.toString()).slice(-16000);});
     encoderDone=new Promise(resolve=>{encoder.once('close',code=>resolve(code));encoder.once('error',()=>resolve(-1));});
-    const result={version:1,frames:renderFrames,totalTimelineFrames:frames,startFrame:sF,endFrame:eF,duration:renderFrames/t.fps,fps:t.fps,width:t.width,height:t.height,seed:t.seed,quality,sfx:!!(!silentOnly&&sfx&&cuts.length),gpu:!!gpu,audio:silentOnly?null:t.audio,assetSource:ready.assetSource,repeatFrameStable:false,stills:[],shots:t.scenes.map(s=>({id:s.id,start:s.start,end:s.end,prop:s.prop,action:s.action,camera:s.camera,visual:s.visual}))};
-    for(let frame=sF;frame<eF;frame++) {
+    const result={version:1,frames:renderFrames,totalTimelineFrames:frames,startFrame:sF,endFrame:eF,duration:renderFrames/t.fps,fps:t.fps,renderFps:pipeFps,frameFormat,quality,width:t.width,height:t.height,seed:t.seed,sfx:!!(!silentOnly&&sfx&&cuts.length),gpu:!!gpu,audio:silentOnly?null:t.audio,assetSource:ready.assetSource,repeatFrameStable:false,stills:[],shots:t.scenes.map(s=>({id:s.id,start:s.start,end:s.end,prop:s.prop,action:s.action,camera:s.camera,visual:s.visual}))};
+    const shotOpts=frameFormat==='jpeg'?{type:'jpeg',quality:92,animations:'disabled',timeout:timeoutMs}:{type:'png',animations:'disabled',timeout:timeoutMs};
+    for(let frame=sF;frame<eF;frame+=frameStride) {
       if(signalController.signal.aborted)throw new Error('Render interrupted');
       const sample=await deadline(page.evaluate(f=>window.__papertrails.renderFrame(f),frame),timeoutMs,`Frame ${frame}`);
       if(errors.length)throw new Error(errors.join('\n'));
-      const image=await page.screenshot({type:'png',animations:'disabled',timeout:timeoutMs});
-      if(frame===0){await page.evaluate(f=>window.__papertrails.renderFrame(f),frame);const repeat=await page.screenshot({type:'png',animations:'disabled'});result.repeatFrameStable=hash(image)===hash(repeat);if(!result.repeatFrameStable)throw new Error('Repeated exact frame differs');}
+      const image=await page.screenshot(shotOpts);
+      if(frame===0){await page.evaluate(f=>window.__papertrails.renderFrame(f),frame);const repeat=await page.screenshot(shotOpts);result.repeatFrameStable=hash(image)===hash(repeat);if(!result.repeatFrameStable)throw new Error('Repeated exact frame differs');}
       if(stillFrames.has(frame)) {
+        const stillImg=frameFormat==='png'?image:await page.screenshot({type:'png',animations:'disabled',timeout:timeoutMs});
         const target=`${output}.still-${String(frame).padStart(6,'0')}.png`,tmp=`${target}.${token}.partial`;
-        await writeFile(tmp,image);temporary.push({tmp,target});result.stills.push({path:target,frame,time:frame/t.fps,scene:sample.scene,caption:sample.caption,sha256:hash(image)});
+        await writeFile(tmp,stillImg);temporary.push({tmp,target});result.stills.push({path:target,frame,time:frame/t.fps,scene:sample.scene,caption:sample.caption,sha256:hash(stillImg)});
       }
       if(encoderError)throw encoderError;
       if(encoder.exitCode!==null)throw new Error(`ffmpeg exited early: ${stderr}`);
       if(!encoder.stdin.write(image))await deadline(Promise.race([once(encoder.stdin,'drain'),encoderDone.then(()=>{throw new Error(`ffmpeg closed: ${stderr}`);})]),timeoutMs,'ffmpeg pipe');
-      onProgress?.({frame:frame-sF+1,frames:renderFrames,globalFrame:frame+1,totalFrames:frames,scene:sample.scene});
+      const doneOut=Math.min(renderFrames,frame-sF+frameStride);
+      onProgress?.({frame:doneOut,frames:renderFrames,globalFrame:Math.min(eF,frame+frameStride),totalFrames:frames,scene:sample.scene});
     }
     encoder.stdin.end();
     const code=await deadline(encoderDone,timeoutMs,'ffmpeg finalization');

@@ -151,6 +151,7 @@ export const post = {
  */
 export const QUALITY = {
   low: { maxDpr: 1, shadowMapSize: 1024, shadows: true, dof: 'cheap', dofTaps: 14, postScale: 0.5, grain: true, anisotropy: 2, msaa: 0, aoTaps: 0, bloom: false, shadowTaps: [6, 8], chroma: false, fill: false },
+  vox: { maxDpr: 1, shadowMapSize: 1536, shadows: true, dof: 'cheap', dofTaps: 14, postScale: 0.5, grain: true, anisotropy: 2, msaa: 0, aoTaps: 0, bloom: true, shadowTaps: [6, 8], chroma: false, fill: false, sharpen: true },
   med: { maxDpr: 1.25, shadowMapSize: 2048, shadows: true, dof: 'full', dofTaps: 22, postScale: 0.5, grain: true, anisotropy: 4, msaa: 2, aoTaps: 6, bloom: true, shadowTaps: [8, 12], chroma: true, fill: true, sharpen: true },
   high: { maxDpr: 2, shadowMapSize: 4096, shadows: true, dof: 'full', dofTaps: 36, postScale: 0.5, grain: true, anisotropy: 8, msaa: 4, aoTaps: 10, bloom: true, shadowTaps: [12, 20], chroma: true, fill: true, sharpen: true },
 };

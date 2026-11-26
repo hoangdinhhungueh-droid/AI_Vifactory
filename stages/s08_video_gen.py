@@ -219,7 +219,7 @@ def _run_papertrails_3d_stage(
             timeline_path=pt_timeline_file,
             stills_dir=stills_dir,
             still_times=still_times,
-            quality="med",
+            quality="vox",
             gpu=False,
         )
     else:
@@ -251,14 +251,19 @@ def _run_papertrails_3d_stage(
 
     master_papertrails_mp4 = ctx.paths.root / "master_papertrails.mp4"
     if not master_papertrails_mp4.exists() or ctx.force:
-        logger.info("[s08_video_gen] Launching parallel Papertrails 3D WebGL render on VPS (1080p quality=med, workers=3)...")
+        logger.info(
+            "[s08_video_gen] Launching parallel Papertrails 3D WebGL render on VPS "
+            "(1080p quality=vox, render_fps=15->30 CFR, format=jpeg, workers=2)..."
+        )
         render_papertrails_on_vps(
             timeline_path=pt_timeline_file,
             output_mp4=master_papertrails_mp4,
-            quality="med",
-            sfx=True,
+            quality="vox",
+            sfx=False,
             gpu=False,
-            parallel_workers=3,
+            parallel_workers=2,
+            render_fps=15,
+            frame_format="jpeg",
             force_rerender=bool(ctx.force),
         )
 

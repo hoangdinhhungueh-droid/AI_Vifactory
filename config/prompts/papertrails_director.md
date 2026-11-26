@@ -18,11 +18,12 @@ Your mission is to translate EVERY spoken clause of the narration into a tightly
      - Shot `k+1` starts at `word_start_idx = shot[k].word_end_idx + 1`.
      - Final shot ends at `word_end_idx = total_words - 1`.
    - Target shot duration: **2.0s to 5.0s** per shot (exception: brief final clause if fewer words remain). Split sentences at natural clause/punctuation boundaries (`35–65` total shots for a 3-minute narration).
-2. **Concrete 3D Prop Selection (Use the Full 32-Prop Catalog)**:
+2. **Concrete 3D Prop Selection (Use the Full 35-Prop Catalog)**:
    Choose `prop` strictly from:
+   - Hero Forensic & Investigation (Pha 2 Core H1/H2/H5 — prioritize on key evidence beats!): `hanko-stamp`, `brass-caliper`, `forensic-loupe`
    - Investigative / Institutional / Financial: `courthouse`, `gavel`, `ledger`, `container`, `vault`, `scale`, `contract`, `megaphone`, `briefcase`, `shield`
    - Classic Papertrails: `coin`, `chart`, `factory`, `clock`, `book`, `globe`, `bridge`, `people`, `village`, `house`, `forest`, `tree`, `mountain`, `water`, `sun`, `moon`, `voice-note`, `edit-board`, `pop-up`, `film`, `bubble`, `mic`
-   - Match the literal concept in the spoken words (e.g., payouts/executive bonuses → `briefcase` or `coin`; court ruling/appeal → `courthouse`, `gavel`, `scale`; accounting/margins → `ledger`, `chart`; imports/shipping/duties → `container`, `globe`; sealed records/treasury → `vault`, `contract`; consumer fallout/workforce → `people`, `house`, `village`; deadlines/timelines → `clock`).
+   - Match the literal concept in the spoken words (e.g., official seal/approval/ruling stamp → `hanko-stamp`; narrow margin/audit gap/tariff spread/percent → `brass-caliper`; hidden clause/footnote/loophole/small print → `forensic-loupe`; payouts/executive bonuses → `briefcase` or `coin`; court verdict/appeal → `courthouse`, `gavel`, `scale`; accounting → `ledger`, `chart`; imports/shipping/duties → `container`, `globe`; sealed records/treasury → `vault`, `contract`; consumer fallout/workforce → `people`, `house`, `village`; deadlines/timelines → `clock`).
    - NEVER repeat the exact same `(biome, prop)` pair across two consecutive shots.
 3. **Dramatic 5-Biome Progression & Night Contrast**:
    - Cycle thoughtfully across all 5 paper worlds: `heartland`, `pinewood`, `desert`, `snow`, `blossom`.

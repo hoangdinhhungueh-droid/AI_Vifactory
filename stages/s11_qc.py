@@ -503,6 +503,21 @@ def run(ctx: RunContext) -> StageArtifact:
 
     # Hard Gate Checks (Boss Item 3.4 & T10: legal S4 flag, resolution, duration)
     hard_failures = []
+    pt_timeline_path = ctx.paths.root / "timeline.json"
+    if pt_timeline_path.exists():
+        try:
+            from app.services.papertrails_director import audit_papertrails_timeline_antipatterns
+
+            tl_data = json.loads(pt_timeline_path.read_text(encoding="utf-8"))
+            anti_audit = audit_papertrails_timeline_antipatterns(tl_data)
+            qc_details["papertrails_antipattern_audit"] = anti_audit
+            if not anti_audit["passed"]:
+                hard_failures.append(
+                    "Papertrails Anti-Pattern Audit failed: " + "; ".join(anti_audit["violations"])
+                )
+        except Exception as _tl_err:
+            hard_failures.append(f"Failed to audit timeline.json: {_tl_err}")
+
     s4_path = ctx.paths.artifact_file(StageID.S4_CRITIC_SCRIPT.value)
     if s4_path.exists():
         try:

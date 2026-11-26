@@ -16,8 +16,8 @@ stateDiagram-v2
     S04_CRITIC_SCRIPT --> S09_VOICE_TTS : Edge-TTS WordBoundary + EBU R128 + faster-whisper ASR
     S09_VOICE_TTS --> S05_DIRECTOR_PLAN : LLM Semantic 3D Director -> timeline.json + DIRECTION.md (FT-301)
     S05_DIRECTOR_PLAN --> S08_STILLS_GATE : --stills-only Representative Frames Check [HG3]
-    S08_STILLS_GATE --> S08_VIDEO_GEN : Parallel 3-Worker 1080p med Render (FT-302)
-    S08_VIDEO_GEN --> S10_RENDER : Lossless Video + EBU R128 Master + chapters.txt (FT-303)
+    S08_STILLS_GATE --> S08_VIDEO_GEN : Parallel 2-Worker 1080p vox Render (15->30 CFR, jpeg, FT-302)
+    S08_VIDEO_GEN --> S10_RENDER : Lossless -c:v copy + Seeded Foley SFX + EBU R128 + chapters.txt (FT-303)
     S10_RENDER --> S11_QC : Full Forensic QC Audit (FT-205)
     S11_QC --> [*]
 ```
@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
 # ==============================================================================
-# [FT-301] PAPERTRAILS 3D TIMELINE SCHEMA (CANONICAL V1 - 32 PROPS - SSOT)
+# [FT-301] PAPERTRAILS 3D TIMELINE SCHEMA (CANONICAL V1 - 35+1 PROPS - SSOT)
 # ==============================================================================
 class PapertrailsCaptionWord(BaseModel):
     """Mốc từ vựng đo thực tế từ faster-whisper / WordBoundary (0ms drift)."""
@@ -81,12 +81,14 @@ class PapertrailsScene(BaseModel):
         pattern=(
             r"^(none|village|forest|bridge|mountain|sun|moon|house|tree|book|coin|chart|"
             r"factory|clock|people|water|globe|voice-note|edit-board|pop-up|film|bubble|mic|"
-            r"courthouse|gavel|ledger|container|vault|scale|contract|megaphone|briefcase|shield)$"
+            r"courthouse|gavel|ledger|container|vault|scale|contract|megaphone|briefcase|shield|"
+            r"hanko-stamp|brass-caliper|forensic-loupe)$"
         ),
     )
     camera: str = Field(default="push", pattern=r"^(push|orbit|crane|low|wide|close|top)$")
     color: str = Field(default="#d79a45", pattern=r"^#[0-9a-fA-F]{6}$")
     visual: str = Field(..., description="Ghi chú đạo diễn: subject -> action -> consequence")
+    timing: Optional[Dict[str, Any]] = Field(default=None, description="Contact-Frame Timing Sheet (±2f)")
     card: Optional[PapertrailsSceneCard] = Field(default=None)
 
 

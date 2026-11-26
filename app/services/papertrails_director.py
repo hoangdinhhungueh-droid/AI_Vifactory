@@ -34,6 +34,27 @@ VALID_PROPS = {
     "globe", "voice-note", "edit-board", "pop-up", "film", "bubble", "mic",
     "courthouse", "gavel", "ledger", "container", "vault", "scale", "contract",
     "megaphone", "briefcase", "shield",
+    "hanko-stamp", "brass-caliper", "forensic-loupe",
+}
+
+PROP_TO_FOLEY_KIND: Dict[str, str] = {
+    "hanko-stamp": "stamp_thud",
+    "contract": "stamp_thud",
+    "brass-caliper": "caliper_click",
+    "ledger": "caliper_click",
+    "chart": "caliper_click",
+    "scale": "caliper_click",
+    "forensic-loupe": "loupe_whoosh",
+    "book": "loupe_whoosh",
+    "edit-board": "loupe_whoosh",
+    "film": "loupe_whoosh",
+    "gavel": "gavel_strike",
+    "courthouse": "gavel_strike",
+    "shield": "gavel_strike",
+    "vault": "vault_clunk",
+    "container": "vault_clunk",
+    "factory": "vault_clunk",
+    "briefcase": "vault_clunk",
 }
 
 KINETIC_CAMERAS = ["push", "orbit", "crane", "low"]
@@ -45,6 +66,9 @@ PALETTE_COLORS = ["#d79a45", "#c4532f", "#3a5a40", "#2b4c7e", "#7b2cbf"]
 # Bilingual semantic domain rule table for deterministic non-LLM fallback / tests.
 # Zero episode-specific entity leaks (Rule 128).
 SUBJECT_RULES: List[Tuple[str, str, List[str]]] = [
+    ("hanko-stamp", "pinewood", ["stamp", "seal", "chop", "approved", "ratified", "endorse", "dong dau", "phe duyet"]),
+    ("brass-caliper", "heartland", ["gap", "spread", "margin", "ratio", "discrepancy", "calculate", "measurement", "chenh lech", "bien do"]),
+    ("forensic-loupe", "snow", ["footnote", "loophole", "fine print", "hidden", "inspect", "trace", "ke ho", "soi xet"]),
     ("courthouse", "snow", ["court", "supreme", "judge", "tribunal", "judicial", "toa an", "tham phan"]),
     ("gavel", "pinewood", ["ruling", "verdict", "lawsuit", "sue", "sued", "indictment", "phan quyet", "kien"]),
     ("scale", "heartland", ["justice", "legal", "appeal", "unlawful", "statute", "constitution", "phap ly"]),
@@ -301,6 +325,133 @@ def _sanitize_card(card: Any, side_idx: int) -> Optional[Dict[str, Any]]:
     }
 
 
+def _attach_timing_sheet_and_foley(
+    timeline_scenes: List[Dict[str, Any]],
+    captions: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Attaches +-2f contact-frame timing sheets to scenes and returns seeded foley cues."""
+    all_words: List[Dict[str, Any]] = []
+    for cap in captions:
+        for w in cap.get("words") or []:
+            if "start" in w and "word" in w:
+                all_words.append(w)
+
+    foley_cues: List[Dict[str, Any]] = []
+    for idx, sc in enumerate(timeline_scenes):
+        st = float(sc["start"])
+        en = float(sc["end"])
+        dur = max(0.05, en - st)
+        in_scene = [w for w in all_words if st - 0.05 <= float(w["start"]) < en - 0.08]
+        focus_rel = dur * 0.32
+        for w in in_scene:
+            tok = str(w.get("word") or "").strip(".,!?;:\"'()[]{}")
+            if any(ch.isdigit() for ch in tok) or "%" in tok or "$" in tok or len(tok) >= 7:
+                rel = float(w["start"]) - st
+                if 0.16 <= rel <= dur - 0.18:
+                    focus_rel = rel
+                    break
+        if dur <= 0.45:
+            contact_sec = round(dur * 0.45, 3)
+        else:
+            max_cap = min(dur - 0.22, 1.35 if dur > 1.8 else dur * 0.65)
+            contact_sec = round(max(0.22, min(max_cap, focus_rel)), 3)
+        sfx_kind = PROP_TO_FOLEY_KIND.get(str(sc.get("prop") or ""), "paper_fold")
+        pre_whoosh = round(max(0.0, contact_sec - 0.10), 3)
+        sc["timing"] = {
+            "anticipationSec": round(max(0.0, contact_sec - 0.14), 3),
+            "contactSec": contact_sec,
+            "settleSec": round(min(dur, contact_sec + 0.28), 3),
+            "preWhooshSec": pre_whoosh,
+            "sfxKind": sfx_kind,
+        }
+        foley_cues.append({
+            "scene_id": sc["id"],
+            "cue_idx": idx,
+            "prop": sc["prop"],
+            "sfx_kind": sfx_kind,
+            "time_sec": round(st + contact_sec, 3),
+            "whoosh_sec": round(st + pre_whoosh, 3),
+        })
+    return foley_cues
+
+
+def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[str, Any]:
+    """Fail-closed gate detecting static cameras, duplicate staging, or timing drift."""
+    scenes = list(timeline.get("scenes") or [])
+    duration = float(timeline.get("duration") or 0.0)
+    violations: List[str] = []
+
+    if not scenes:
+        violations.append("Timeline has zero scenes")
+        return {"passed": False, "violations": violations, "stats": {"scenes": 0}}
+
+    if abs(float(scenes[0].get("start", -1.0))) > 1e-3:
+        violations.append(f"First scene does not start at 0.0 ({scenes[0].get('start')})")
+    if abs(float(scenes[-1].get("end", 0.0)) - duration) > 0.05:
+        violations.append(f"Last scene end {scenes[-1].get('end')} != duration {duration}")
+
+    prev_pair = None
+    prev_cam = None
+    props_used = set()
+    biomes_used = set()
+    night_count = 0
+
+    for idx, sc in enumerate(scenes):
+        sid = sc.get("id") or f"shot-{idx + 1:03d}"
+        st = float(sc.get("start", 0.0))
+        en = float(sc.get("end", 0.0))
+        dur = en - st
+        if dur <= 0:
+            violations.append(f"{sid}: non-positive duration {dur:.3f}s")
+        if idx > 0 and abs(st - float(scenes[idx - 1].get("end", 0.0))) > 1e-3:
+            violations.append(f"{sid}: gap/overlap with previous scene ({scenes[idx - 1].get('end')} vs {st})")
+
+        cam = str(sc.get("camera") or "")
+        if cam not in KINETIC_CAMERAS:
+            violations.append(f"{sid}: disallowed non-kinetic camera '{cam}'")
+        if cam == prev_cam:
+            violations.append(f"{sid}: consecutive duplicate camera '{cam}'")
+
+        prop = str(sc.get("prop") or "")
+        biome = str(sc.get("biome") or "")
+        if prop not in VALID_PROPS:
+            violations.append(f"{sid}: unknown prop '{prop}'")
+        if biome not in VALID_BIOMES:
+            violations.append(f"{sid}: unknown biome '{biome}'")
+        if prev_pair == (biome, prop):
+            violations.append(f"{sid}: consecutive duplicate staging ({biome}, {prop})")
+
+        tm = sc.get("timing")
+        if isinstance(tm, dict) and "contactSec" in tm:
+            c_sec = float(tm["contactSec"])
+            if c_sec < -1e-6 or c_sec > dur + 1e-6:
+                violations.append(f"{sid}: timing.contactSec {c_sec} outside [0, {dur:.3f}]")
+
+        if sc.get("night"):
+            night_count += 1
+        props_used.add(prop)
+        biomes_used.add(biome)
+        prev_pair = (biome, prop)
+        prev_cam = cam
+
+    if len(scenes) >= 12:
+        if len(props_used) < 6:
+            violations.append(f"Low prop diversity: {len(props_used)} < 6 across {len(scenes)} shots")
+        if len(biomes_used) < 4:
+            violations.append(f"Low biome diversity: {len(biomes_used)} < 4 across {len(scenes)} shots")
+    if len(scenes) >= 6 and (night_count / len(scenes)) > 0.45:
+        violations.append(f"Night scenes ratio too high: {night_count}/{len(scenes)} (>45%)")
+
+    stats = {
+        "scenes": len(scenes),
+        "unique_props": len(props_used),
+        "unique_biomes": len(biomes_used),
+        "night_count": night_count,
+        "foley_cues": len(timeline.get("foley_cues") or []),
+    }
+    return {"passed": len(violations) == 0, "violations": violations, "stats": stats}
+
+
 def _write_direction_markdown(
     direction_md_path: Path,
     timeline_scenes: List[Dict[str, Any]],
@@ -310,20 +461,22 @@ def _write_direction_markdown(
     lines = [
         "# Papertrails 3D Shot Direction",
         "",
-        f"- **Direction Status**: `agent-reviewed`",
+        "- **Direction Status**: `agent-reviewed`",
         f"- **Timing Authority**: `{timing_source}`",
         f"- **Total Shots**: {len(timeline_scenes)}",
         "",
-        "| Shot | Measured Time | Spoken Idea | Implemented Prop / Action | Biome | Camera | Card |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        "| Shot | Measured Time | Spoken Idea | Implemented Prop / Action | Biome | Camera | Contact / SFX | Card |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
     for sc in timeline_scenes:
         t_rng = f"{sc['start']:.2f}s–{sc['end']:.2f}s"
         narr = sc["narration"].replace("|", "/")[:80]
         p_act = f"`{sc['prop']}` / `{sc['action']}`"
         b_str = f"`{sc['biome']}`" + (" (night)" if sc.get("night") else "")
+        tm = sc.get("timing") or {}
+        sfx_str = f"{tm.get('contactSec', 0.0):.2f}s `{tm.get('sfxKind', 'paper_fold')}`" if tm else "—"
         c_str = "`note`" if sc.get("card") else "—"
-        lines.append(f"| {sc['id']} | {t_rng} | {narr} | {p_act} | {b_str} | `{sc['camera']}` | {c_str} |")
+        lines.append(f"| {sc['id']} | {t_rng} | {narr} | {p_act} | {b_str} | `{sc['camera']}` | {sfx_str} | {c_str} |")
     direction_md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -584,6 +737,7 @@ def direct_papertrails_timeline_with_llm(
         prev_pair = (biome, prop)
         prev_cam = cam
 
+    foley_cues = _attach_timing_sheet_and_foley(timeline_scenes, captions)
     timeline_spec: Dict[str, Any] = {
         "version": 1,
         "width": width,
@@ -594,6 +748,7 @@ def direct_papertrails_timeline_with_llm(
         "audio": str(audio_path),
         "captions": captions,
         "scenes": timeline_scenes,
+        "foley_cues": foley_cues,
         "timing": {
             "mode": "word",
             "source": timing_source,
@@ -714,6 +869,7 @@ def build_papertrails_timeline(
             timeline_scenes[idx]["end"] = timeline_scenes[idx + 1]["start"]
         timeline_scenes[-1]["end"] = round(float(audio_duration), 3)
 
+    foley_cues = _attach_timing_sheet_and_foley(timeline_scenes, captions)
     return {
         "version": 1,
         "width": width,
@@ -724,6 +880,7 @@ def build_papertrails_timeline(
         "audio": str(audio_path),
         "captions": captions,
         "scenes": timeline_scenes,
+        "foley_cues": foley_cues,
         "timing": {
             "mode": "word" if any(c.get("words") for c in captions) else "segment",
             "source": "measured-segments" if transcript_segments else "deterministic-fixture",

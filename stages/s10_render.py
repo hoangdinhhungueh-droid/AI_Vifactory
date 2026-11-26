@@ -455,13 +455,59 @@ def _validate_and_assemble_video(
     if not ass_file.exists() or ass_file.stat().st_size == 0:
         raise MissingSubtitlesError(f"Stage S10 requires valid subtitles file at '{ass_file}'")
 
-    # [FT-303] Check for Papertrails Master 3D Video -> lossless video copy + two-pass EBU R128 loudnorm
+    # [FT-303] Check for Papertrails Master 3D Video -> lossless video copy + procedural Foley SFX + two-pass EBU R128
     pt_master = ctx.paths.root / "master_papertrails.mp4"
     if pt_master.exists() and pt_master.stat().st_size > 1000:
-        from vox.ffmpeg_utils import build_twopass_loudnorm_filter, get_ffmpeg_binary
+        from vox.ffmpeg_utils import (
+            build_twopass_loudnorm_filter,
+            get_ffmpeg_binary,
+            mix_papertrails_foley_sfx,
+        )
 
         final_mp4.parent.mkdir(parents=True, exist_ok=True)
         ffmpeg_bin = get_ffmpeg_binary()
+        tl_path = ctx.paths.root / "timeline.json"
+        foley_cues: list[dict] = []
+        tl_seed = 42
+        tl_dur = 0.0
+        if tl_path.exists():
+            try:
+                tl_json = json.loads(tl_path.read_text(encoding="utf-8"))
+                foley_cues = list(tl_json.get("foley_cues") or [])
+                tl_seed = int(tl_json.get("seed", 42))
+                tl_dur = float(tl_json.get("duration") or 0.0)
+            except (OSError, json.JSONDecodeError, ValueError) as _tl_err:
+                logger.warning(f"[s10_render] Could not load timeline.json foley_cues: {_tl_err}")
+
+        voice_src = Path(audio_file)
+        if foley_cues and voice_src.exists() and tl_dur > 0:
+            mixed_audio = ctx.paths.root / "audio" / "papertrails_foley_mix.m4a"
+            logger.info(
+                f"[s10_render] Mixing {len(foley_cues)} procedural Foley SFX cues + EBU R128 (-15.5 LUFS)..."
+            )
+            mix_papertrails_foley_sfx(
+                voice_path=voice_src,
+                output_audio=mixed_audio,
+                foley_cues=foley_cues,
+                duration_sec=tl_dur,
+                target_i=-15.5,
+                target_tp=-2.5,
+                seed=tl_seed,
+            )
+            cmd_mux = [
+                ffmpeg_bin, "-y",
+                "-i", str(pt_master),
+                "-i", str(mixed_audio),
+                "-map", "0:v:0",
+                "-map", "1:a:0",
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-movflags", "+faststart",
+                str(final_mp4),
+            ]
+            subprocess.run(cmd_mux, capture_output=True, check=True, timeout=180)
+            return
+
         loudnorm_filter = build_twopass_loudnorm_filter(
             ffmpeg_bin, pt_master, target_i=-16.0, target_tp=-2.5, target_lra=7.0
         )

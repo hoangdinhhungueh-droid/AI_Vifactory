@@ -12,28 +12,29 @@ const run = promisify(execFile);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const engineRoot = path.resolve(scriptDir, '..');
 
-const usage = 'Usage: node scripts/render_parallel.mjs timeline.json out.mp4 [--quality low|med|high] [--sfx] [--gpu] [--workers 3]';
+const usage = 'Usage: node scripts/render_parallel.mjs timeline.json out.mp4 [--quality low|vox|med|high] [--render-fps 15] [--frame-format png|jpeg] [--sfx] [--gpu] [--workers 2]';
 
-function computeSceneAlignedChunks(t, frames, numWorkers) {
+function computeSceneAlignedChunks(t, frames, numWorkers, frameStride = 1) {
   const W = Math.max(1, Math.min(4, numWorkers, t.scenes.length || 1));
   if (W === 1) return [{ index: 0, startFrame: 0, endFrame: frames }];
 
+  const snap = f => (frameStride > 1 ? Math.round(f / frameStride) * frameStride : f);
   const candidates = t.scenes
     .slice(1)
-    .map(s => Math.round(s.start * t.fps))
+    .map(s => snap(Math.round(s.start * t.fps)))
     .filter(f => f > 0 && f < frames);
 
   const boundaries = [0];
   for (let w = 1; w < W; w++) {
-    const target = Math.round((w * frames) / W);
+    const target = snap(Math.round((w * frames) / W));
     const prev = boundaries[boundaries.length - 1];
-    const remainingNeeded = W - w;
+    const remainingNeeded = (W - w) * Math.max(1, frameStride);
     const valid = candidates.filter(f => f > prev && f < frames - remainingNeeded);
     let chosen;
     if (valid.length) {
       chosen = valid.reduce((best, cur) => Math.abs(cur - target) < Math.abs(best - target) ? cur : best, valid[0]);
     } else {
-      chosen = Math.min(frames - remainingNeeded, Math.max(prev + 1, target));
+      chosen = Math.min(frames - remainingNeeded, Math.max(prev + Math.max(1, frameStride), target));
     }
     boundaries.push(chosen);
   }
@@ -56,6 +57,16 @@ function cleanNodeEnv() {
   return env;
 }
 
+const activeChildren = new Set();
+function abortAllWorkers() {
+  for (const child of activeChildren) {
+    try {
+      if (child.exitCode === null) child.kill('SIGKILL');
+    } catch {}
+  }
+  activeChildren.clear();
+}
+
 function spawnSegmentWorker(timelinePath, segOut, chunk, options, progressMap, totalFrames, onTick) {
   return new Promise((resolve, reject) => {
     const args = [
@@ -67,6 +78,8 @@ function spawnSegmentWorker(timelinePath, segOut, chunk, options, progressMap, t
       '--end-frame', String(chunk.endFrame),
       '--silent-only',
     ];
+    if (options.renderFps && options.renderFps > 0) args.push('--render-fps', String(options.renderFps));
+    if (options.frameFormat) args.push('--frame-format', String(options.frameFormat));
     if (options.gpu) args.push('--gpu');
 
     const child = spawn(process.execPath, args, {
@@ -75,6 +88,7 @@ function spawnSegmentWorker(timelinePath, segOut, chunk, options, progressMap, t
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });
+    activeChildren.add(child);
 
     let stderrBuf = '';
     child.stderr.on('data', d => {
@@ -87,9 +101,15 @@ function spawnSegmentWorker(timelinePath, segOut, chunk, options, progressMap, t
       }
     });
 
-    child.on('error', err => reject(err));
+    child.on('error', err => {
+      activeChildren.delete(child);
+      abortAllWorkers();
+      reject(err);
+    });
     child.on('close', code => {
+      activeChildren.delete(child);
       if (code !== 0) {
+        abortAllWorkers();
         reject(new Error(`Worker ${chunk.index} [${chunk.startFrame}..${chunk.endFrame}) exited with ${code}:\n${stderrBuf}`));
       } else {
         progressMap.set(chunk.index, chunk.endFrame - chunk.startFrame);
@@ -106,17 +126,24 @@ async function main() {
     return;
   }
 
-  const options = { quality: 'med', sfx: false, gpu: false, workers: 3 };
+  const options = { quality: 'vox', renderFps: 15, frameFormat: 'jpeg', sfx: false, gpu: false, workers: 2 };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--quality' && args[i + 1]) options.quality = args[++i];
+    else if (args[i] === '--render-fps' && args[i + 1]) options.renderFps = Number(args[++i]);
+    else if (args[i] === '--frame-format' && args[i + 1]) options.frameFormat = args[++i];
     else if (args[i] === '--sfx') options.sfx = true;
     else if (args[i] === '--gpu') options.gpu = true;
     else if (args[i] === '--workers' && args[i + 1]) options.workers = Number(args[++i]);
     else throw new Error(`Unknown/missing option: ${args[i]}\n${usage}`);
   }
 
+  const onSig = () => { abortAllWorkers(); process.exit(1); };
+  process.once('SIGINT', onSig);
+  process.once('SIGTERM', onSig);
+
   const t = await loadTimeline(timelineArg);
   const frames = frameCount(t);
+  const frameStride = options.renderFps && options.renderFps > 0 ? Math.max(1, Math.round(t.fps / options.renderFps)) : 1;
   const output = path.resolve(outputArg);
   await mkdir(path.dirname(output), { recursive: true });
 
@@ -128,8 +155,8 @@ async function main() {
   const concatFile = path.join(workDir, 'concat.txt');
 
   try {
-    const chunks = computeSceneAlignedChunks(t, frames, options.workers);
-    process.stderr.write(`[parallel] Launching ${chunks.length} workers across ${frames} frames (${t.width}x${t.height} quality=${options.quality})...\n`);
+    const chunks = computeSceneAlignedChunks(t, frames, options.workers, frameStride);
+    process.stderr.write(`[parallel] Launching ${chunks.length} workers across ${frames} frames (${t.width}x${t.height} quality=${options.quality} renderFps=${t.fps / frameStride} format=${options.frameFormat})...\n`);
 
     const progressMap = new Map(chunks.map(c => [c.index, 0]));
     let lastReported = -1;
@@ -191,6 +218,8 @@ async function main() {
       frames,
       duration: t.duration,
       fps: t.fps,
+      renderFps: t.fps / frameStride,
+      frameFormat: options.frameFormat,
       width: t.width,
       height: t.height,
       seed: t.seed,
@@ -211,6 +240,9 @@ async function main() {
     await rename(metaPartial, `${output}.json`);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } finally {
+    process.removeListener('SIGINT', onSig);
+    process.removeListener('SIGTERM', onSig);
+    abortAllWorkers();
     await rm(partial, { force: true }).catch(() => {});
     await rm(metaPartial, { force: true }).catch(() => {});
     await rm(workDir, { recursive: true, force: true }).catch(() => {});

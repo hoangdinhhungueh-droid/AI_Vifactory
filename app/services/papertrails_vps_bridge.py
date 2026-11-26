@@ -170,10 +170,12 @@ def render_papertrails_stills_on_vps(
 def render_papertrails_on_vps(
     timeline_path: Path,
     output_mp4: Path,
-    quality: str = "med",
-    sfx: bool = True,
+    quality: str = "vox",
+    sfx: bool = False,
     gpu: bool = False,
-    parallel_workers: int = 3,
+    parallel_workers: int = 2,
+    render_fps: int = 15,
+    frame_format: str = "jpeg",
     force_rerender: bool = False,
     timeout_sec: int = 18000,
 ) -> Dict[str, Any]:
@@ -194,6 +196,8 @@ def render_papertrails_on_vps(
             sfx=sfx,
             gpu=gpu,
             parallel_workers=parallel_workers,
+            render_fps=render_fps,
+            frame_format=frame_format,
             timeout_sec=timeout_sec,
         )
     return _render_via_vps_runner(
@@ -203,6 +207,8 @@ def render_papertrails_on_vps(
         sfx=sfx,
         gpu=gpu,
         parallel_workers=parallel_workers,
+        render_fps=render_fps,
+        frame_format=frame_format,
         force_rerender=force_rerender,
         timeout_sec=timeout_sec,
     )
@@ -215,6 +221,8 @@ def _render_local_vps(
     sfx: bool,
     gpu: bool,
     parallel_workers: int,
+    render_fps: int,
+    frame_format: str,
     timeout_sec: int,
 ) -> Dict[str, Any]:
     """Executes render directly on Linux VPS environment."""
@@ -228,6 +236,10 @@ def _render_local_vps(
         raise FileNotFoundError(f"render script not found at: {render_script}")
 
     cmd = ["node", str(render_script), str(timeline_path), str(output_mp4), "--quality", quality]
+    if render_fps and render_fps > 0:
+        cmd.extend(["--render-fps", str(render_fps)])
+    if frame_format:
+        cmd.extend(["--frame-format", frame_format])
     if sfx:
         cmd.append("--sfx")
     if gpu:
@@ -266,6 +278,8 @@ def _render_via_vps_runner(
     sfx: bool,
     gpu: bool,
     parallel_workers: int,
+    render_fps: int,
+    frame_format: str,
     force_rerender: bool,
     timeout_sec: int,
 ) -> Dict[str, Any]:
@@ -301,12 +315,14 @@ def _render_via_vps_runner(
             run_vps_cmd(f"rm -f '{vps_log}'")
             sfx_flag = "--sfx" if sfx else ""
             gpu_flag = "--gpu" if gpu else ""
+            fps_flag = f"--render-fps {render_fps}" if render_fps and render_fps > 0 else ""
+            fmt_flag = f"--frame-format {frame_format}" if frame_format else ""
             entry = "scripts/render_parallel.mjs" if parallel_workers > 1 else "scripts/render.mjs"
             worker_flag = f"--workers {parallel_workers}" if parallel_workers > 1 else ""
             bg_cmd = (
                 f"cd /root/video_factory/vox/papertrails_engine && "
                 f"env -u NODE_CHANNEL_FD -u NODE_CHANNEL_SERIALIZATION_MODE -u NODE_APP_INSTANCE "
-                f"nohup node {entry} '{vps_timeline}' '{vps_output}' --quality {quality} {sfx_flag} {gpu_flag} {worker_flag} > '{vps_log}' 2>&1 & echo $!"
+                f"nohup node {entry} '{vps_timeline}' '{vps_output}' --quality {quality} {fps_flag} {fmt_flag} {sfx_flag} {gpu_flag} {worker_flag} > '{vps_log}' 2>&1 & echo $!"
             )
             logger.info(f"[papertrails_vps_bridge] Dispatching VPS render: {bg_cmd}")
             res = run_vps_cmd(bg_cmd, timeout=30)
