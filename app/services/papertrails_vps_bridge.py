@@ -282,7 +282,8 @@ def _render_via_vps_runner(
 
     if force_rerender:
         logger.info(f"[papertrails_vps_bridge] force_rerender=True: clearing stale remote render outputs for {ep_id}")
-        run_vps_cmd(f"pkill -f 'node scripts/render.*{ep_id}' || true; rm -f '{vps_output}' '{vps_output}.json' '{vps_log}'")
+        run_vps_cmd(f"rm -f '{vps_output}' '{vps_output}.json' '{vps_log}' '{vps_run_dir}/render.done'")
+        run_vps_cmd(f"for p in $(pgrep -f '[n]ode scripts/render.*{ep_id}'); do kill -9 $p 2>/dev/null || true; done")
 
     stat_out = run_vps_cmd(f"stat -c %s '{vps_output}' 2>/dev/null || echo 0")
     out_size = int(stat_out.get("stdout", "0").strip()) if stat_out.get("stdout", "").strip().isdigit() else 0
@@ -291,7 +292,7 @@ def _render_via_vps_runner(
     if out_size > 1_000_000:
         logger.info(f"[papertrails_vps_bridge] Final video already exists on VPS ({out_size} bytes). Skipping dispatch.")
     else:
-        ps_chk = run_vps_cmd(f"pgrep -f 'node scripts/render(_parallel)?\\.mjs.*{ep_id}'")
+        ps_chk = run_vps_cmd(f"pgrep -f '[n]ode scripts/render(_parallel)?\\.mjs.*{ep_id}'")
         pids = [p.strip() for p in (ps_chk.get("stdout") or "").splitlines() if p.strip().isdigit()]
         if pids:
             pid = pids[0]

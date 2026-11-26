@@ -207,15 +207,24 @@ def _run_papertrails_3d_stage(
     tl_dur = float(tl_data.get("duration") or audio_dur or 0.0)
     still_times = _select_representative_still_times(tl_data, target_count=12)
     stills_dir = ctx.paths.root / "stills"
-
-    logger.info(f"[s08_video_gen] Generating {len(still_times)} Papertrails preview stills...")
-    still_paths = render_papertrails_stills_on_vps(
-        timeline_path=pt_timeline_file,
-        stills_dir=stills_dir,
-        still_times=still_times,
-        quality="med",
-        gpu=False,
+    existing_stills = sorted(stills_dir.glob("*.png")) if stills_dir.exists() else []
+    tl_mtime = pt_timeline_file.stat().st_mtime
+    stills_fresh = (
+        len(existing_stills) >= len(still_times)
+        and all(p.stat().st_mtime >= tl_mtime and p.stat().st_size > 1000 for p in existing_stills)
     )
+    if getattr(ctx, "stills_only", False) or not stills_fresh:
+        logger.info(f"[s08_video_gen] Generating {len(still_times)} Papertrails preview stills...")
+        still_paths = render_papertrails_stills_on_vps(
+            timeline_path=pt_timeline_file,
+            stills_dir=stills_dir,
+            still_times=still_times,
+            quality="med",
+            gpu=False,
+        )
+    else:
+        logger.info(f"[s08_video_gen] Reusing {len(existing_stills)} verified preview stills newer than timeline.json")
+        still_paths = existing_stills
 
     if getattr(ctx, "stills_only", False):
         payload = {
