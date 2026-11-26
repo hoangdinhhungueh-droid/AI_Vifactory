@@ -29,7 +29,7 @@
 - **Logic cốt lõi**:
   1. Bổ sung `motion.js` (*Anticipation, Volume-Preserving Squash & Stretch, Overlap, Bezier Arc, easeOutBack*), vá tuyến tính `orbit`, và bổ sung 3 đạo cụ hero điều tra **H1/H2/H5** (`hanko-stamp`, `brass-caliper`, `forensic-loupe`) đồng bộ `contactSec` từ `timeline.json`.
   2. Chạy `--stills-only` kết xuất nhanh ~12 ảnh PNG lossless đại diện (`quality=vox`) qua scene-seeking (`allowSeek`), tải qua `download_vps_asset.py` để kiểm tra thị giác trước khi render full.
-  3. Chạy `render_parallel.mjs --workers 2 --quality vox --render-fps 15 --frame-format jpeg` (`msaa:0, aoTaps:0, shadowMapSize:1536, bloom:true, sharpen:true`, xuất đúng `30fps CFR` `renderFrames`), bảo vệ treo tiến trình bằng `abortAllWorkers()`, ghép lossless `-c:v copy` và kiểm chứng 3 cửa sổ chuyển động (`t=start/mid/end`).
+  3. Chạy `render_parallel.mjs --workers 2 --quality vox --render-fps 15 --frame-format jpeg` (`msaa:0, aoTaps:0, bloom:false, shadowMapSize:1024, dof:'cheap', dofTaps:10, shadowTaps:[4,6]`, xuất đúng `30fps CFR` `renderFrames`), bảo vệ treo tiến trình bằng `abortAllWorkers()`, ghép lossless `-c:v copy` và kiểm chứng 3 cửa sổ chuyển động (`t=start/mid/end`).
 
 ---
 

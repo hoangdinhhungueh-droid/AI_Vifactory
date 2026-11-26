@@ -41,7 +41,7 @@ export async function startServer() {
 async function deadline(promise,ms,label) {
   let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timeout after ${ms}ms`)),ms);})]);}finally{clearTimeout(timer);}
 }
-export async function renderVideo(filename,output,{quality='med',stills=[],stillsOnly=false,startFrame=0,endFrame=null,silentOnly=false,timeoutMs=120000,onProgress,sfx=false,gpu=false,renderFps=null,frameFormat='png'}={}) {
+export async function renderVideo(filename,output,{quality='med',stills=[],stillsOnly=false,startFrame=0,endFrame=null,silentOnly=false,timeoutMs=180000,onProgress,sfx=false,gpu=false,renderFps=null,frameFormat='png'}={}) {
   if(!['low','vox','med','high'].includes(quality))throw new Error('Quality must be low, vox, med, or high');
   if(!['png','jpeg'].includes(frameFormat))throw new Error('frameFormat must be png or jpeg');
   const t=await loadTimeline(filename),frames=frameCount(t);
