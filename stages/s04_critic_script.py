@@ -590,10 +590,11 @@ def run(ctx: RunContext) -> StageArtifact:
             })
 
         # ------------------------------------------------------------------
-        # Gate 9: Anti-Double-Hedging Gate (Rule 128 / Rule 131 single-hedging invariant)
+        # Gate 9: Anti-Double-Hedging & KR Broadcast Register Gate (Rule 128 / 131)
         # ------------------------------------------------------------------
         from app.services.story_provenance_engine import (
             check_currency_sanity,
+            check_kr_broadcast_register,
             check_script_double_hedging,
             strip_attribution_prefix,
         )
@@ -604,6 +605,16 @@ def run(ctx: RunContext) -> StageArtifact:
                 violations.append({
                     "line_id": None,
                     "gate": "anti_double_hedging_gate",
+                    "detail": issue,
+                })
+
+        kr_reg_ok, kr_reg_issues = check_kr_broadcast_register(all_lines, market=market)
+        if not kr_reg_ok:
+            language_ok = False
+            for issue in kr_reg_issues:
+                violations.append({
+                    "line_id": None,
+                    "gate": "target_market_language_compliance",
                     "detail": issue,
                 })
 

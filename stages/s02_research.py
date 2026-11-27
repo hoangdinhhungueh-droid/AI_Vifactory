@@ -22,6 +22,102 @@ logger = logging.getLogger(__name__)
 
 STAGE: StageID = StageID.S2_RESEARCH
 
+_GENERIC_ANCHOR_STOPWORDS: set[str] = {
+    "손실", "위기", "시장", "정부", "문제", "투자", "가능성", "부담", "핵심", "확인",
+    "보도", "주가", "증시", "개인투자자", "사태", "대책", "방안", "검토", "관련", "규모",
+    "논란", "의혹", "결과", "발표", "기관", "금융", "회사", "기업", "한국", "국내", "아직",
+    "확인되지", "않은", "loss", "crisis", "market", "government", "risk", "report",
+    "issue", "fund", "price", "stock", "investors", "policy", "review", "confirmed",
+    "losses", "stocks", "company", "market", "public", "report", "news",
+    "市場", "政府", "問題", "投資", "損失", "確認", "報道",
+    "thị", "trường", "chính", "phủ", "rủi", "ro", "báo", "cáo", "đầu", "tư",
+}
+
+
+def _extract_topical_anchors(
+    topic: str,
+    central_question: str = "",
+    scheme_summary: str = "",
+    antagonist_name: str = "",
+) -> Tuple[set[str], set[str]]:
+    """Extract distinctive topic anchors (specific subjects/acronyms/numbers) vs generic context words."""
+    primary_text = f"{topic} {antagonist_name}"
+    secondary_text = f"{central_question} {scheme_summary}"
+
+    def _tokens(txt: str) -> set[str]:
+        raw = re.findall(r"[가-힣A-Za-z0-9\u3040-\u30ff\u4e00-\u9fff]{2,}", txt.lower())
+        cleaned: set[str] = set()
+        for tok in raw:
+            stripped = re.sub(r"(?:은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만|까지|부터)$", "", tok)
+            cand = stripped if len(stripped) >= 2 else tok
+            if cand in _GENERIC_ANCHOR_STOPWORDS or cand.isdigit():
+                continue
+            cleaned.add(cand)
+        return cleaned
+
+    primary_anchors = _tokens(primary_text)
+    secondary_anchors = _tokens(secondary_text)
+    return primary_anchors, (primary_anchors | secondary_anchors)
+
+
+def _filter_topically_relevant_claims(
+    claims: List[Any],
+    topic: str,
+    central_question: str = "",
+    scheme_summary: str = "",
+    antagonist_name: str = "",
+    market: str = "EN",
+) -> List[Any]:
+    """Filter out off-topic keyword-collision claims while preserving valid domain coverage."""
+    _ = market
+    if not claims or len(claims) <= 6:
+        return claims
+
+    primary_anchors, combined_anchors = _extract_topical_anchors(
+        topic=topic,
+        central_question=central_question,
+        scheme_summary=scheme_summary,
+        antagonist_name=antagonist_name,
+    )
+    if not primary_anchors and not combined_anchors:
+        return claims
+
+    # Algorithmic compound-stem decomposition for 4+ char CJK/Hangul anchors (Rule 128 pure)
+    _generic_stems = {
+        "펀드", "기금", "시장", "회사", "기업", "금융", "투자", "손실", "위기", "은행", "정부",
+        "문제", "사태", "대책", "보도", "언론", "자료", "기록", "제도", "구조",
+    }
+    domain_substrings = {a for a in primary_anchors if len(a) >= 2}
+    for tok in primary_anchors:
+        if len(tok) >= 4 and re.fullmatch(r"[가-힣\u3040-\u30ff\u4e00-\u9fff]+", tok):
+            mid = len(tok) // 2
+            for part in (tok[:2], tok[:mid], tok[mid:], tok[-2:]):
+                if len(part) >= 2 and part not in _generic_stems and part not in _GENERIC_ANCHOR_STOPWORDS:
+                    domain_substrings.add(part)
+
+    kept: List[Any] = []
+    dropped_titles: List[str] = []
+    for item in claims:
+        c_txt = (
+            item.get("claim", "") if isinstance(item, dict) else getattr(item, "claim", "")
+        )
+        c_low = str(c_txt).lower()
+        primary_hits = sum(1 for a in primary_anchors if a in c_low)
+        sub_hits = sum(1 for s in domain_substrings if s in c_low)
+        sec_hits = sum(1 for a in combined_anchors if a in c_low)
+        if primary_hits >= 1 or sub_hits >= 1 or sec_hits >= 2:
+            kept.append(item)
+        else:
+            dropped_titles.append(str(c_txt)[:80])
+
+    if len(kept) >= 6 and dropped_titles:
+        logger.info(
+            f"[S02_RESEARCH] Dropped {len(dropped_titles)} off-topic keyword-collision claim(s): "
+            f"{dropped_titles}"
+        )
+        return kept
+    return claims
+
 
 @pipeline_stage(
     id="s02_research",
@@ -619,7 +715,20 @@ def run(ctx: RunContext) -> StageArtifact:
                 if grounding_intel and grounding_intel.get("claims"):
                     from app.services.story_provenance_engine import classify_claim_provenance as _classify_g_claim
 
-                    tagged_claims = [_classify_g_claim(gc, market=market) for gc in grounding_intel["claims"]]
+                    epoch_context = " ".join(
+                        f"{ep.get('event_summary', '')} {ep.get('verified_claim', '')}"
+                        for ep in grounding_intel.get("causal_epochs", [])
+                        if isinstance(ep, dict)
+                    )
+                    rel_g_claims = _filter_topically_relevant_claims(
+                        grounding_intel["claims"],
+                        topic=topic,
+                        central_question=c_quest,
+                        scheme_summary=f"{s_summary} {epoch_context}".strip(),
+                        antagonist_name=antag_name,
+                        market=market,
+                    )
+                    tagged_claims = [_classify_g_claim(gc, market=market) for gc in rel_g_claims]
                     user_prompt += (
                         f"GROUNDING INTEL CLAIMS WITH VERIFIED PROVENANCE METADATA ({len(tagged_claims)} claims):\n"
                         f"{json.dumps(tagged_claims, indent=2, ensure_ascii=False)}\n\n"
@@ -627,7 +736,8 @@ def run(ctx: RunContext) -> StageArtifact:
                         f"{json.dumps(grounding_intel.get('causal_epochs', []), indent=2, ensure_ascii=False)}\n\n"
                         f"MANDATE: Preserve verification_status, doc_type, speaker, procedural_status, and scope for every claim in market '{market}'. "
                         f"NEVER convert 'unverified_secondary' / RSS claims into settled 'fact' or 'verified_primary'. "
-                        "Forbid out-of-market agencies not present in the dossier.\n\n"
+                        "Forbid out-of-market agencies not present in the dossier. "
+                        "Exclude any claim whose core subject belongs to an unrelated asset class, foreign market, or side story that merely shares a generic keyword without addressing the episode topic.\n\n"
                     )
                 if market == "KR":
                     user_prompt += "MANDATE: Output all claim text and event descriptions in 100% natural Korean (Hangul).\n\n"
@@ -763,7 +873,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             prov_c["doc_type"] = "news_article"
                         prov_c["verification_status"] = "corroborated_secondary"
                         prov_c["evidence_tier"] = "secondary"
-                        prov_c["credibility_tier"] = "press_allegation" if prov_c.get("legal_status") == "alleged" else "corroborated_secondary_report"
+                        prov_c["credibility_tier"] = "press_allegation"
                         if has_press_lead:
                             prov_c["legal_status"] = "alleged"
                     elif is_rss_hit:
@@ -927,6 +1037,12 @@ def run(ctx: RunContext) -> StageArtifact:
             else:
                 ledger, timeline = _build_generic_evidence_ledger(topic, s1_art.payload)
 
+        # Build dynamic factsheet anchors from S1 payload early so topical relevance filter can use them
+        s1_scheme = s1_art.payload.get("scheme_mechanism_summary") or f"Systemic mechanisms and operational dependencies underlying {topic}."
+        central_q = s1_art.payload.get("central_question") or f"Core investigative paradox regarding {topic}."
+        antagonist_data = s1_art.payload.get("antagonist") or {}
+        antagonist_name = (antagonist_data.get("name") if isinstance(antagonist_data, dict) else getattr(antagonist_data, "name", None)) or (topic.split()[0] if topic else "Corporate Target")
+
         if ledger:
             from app.services.story_provenance_engine import (
                 corroborate_evidence_ledger,
@@ -944,6 +1060,15 @@ def run(ctx: RunContext) -> StageArtifact:
                 if c_dict.get("doc_type") and c_dict.get("doc_type") != "unknown":
                     ledger[idx_c].doc_type = c_dict.get("doc_type")
 
+            ledger = _filter_topically_relevant_claims(
+                ledger,
+                topic=topic,
+                central_question=central_q,
+                scheme_summary=s1_scheme,
+                antagonist_name=antagonist_name,
+                market=market,
+            )
+
             ledger.sort(
                 key=lambda x: (
                     credibility_tier_rank(getattr(x, "credibility_tier", "unconfirmed_claim")),
@@ -952,11 +1077,15 @@ def run(ctx: RunContext) -> StageArtifact:
                 )
             )
 
-        # Build dynamic factsheet and competitor vacuums anchored in S1 payload
-        s1_scheme = s1_art.payload.get("scheme_mechanism_summary") or f"Systemic mechanisms and operational dependencies underlying {topic}."
-        central_q = s1_art.payload.get("central_question") or f"Core investigative paradox regarding {topic}."
-        antagonist_data = s1_art.payload.get("antagonist") or {}
-        antagonist_name = (antagonist_data.get("name") if isinstance(antagonist_data, dict) else getattr(antagonist_data, "name", None)) or (topic.split()[0] if topic else "Corporate Target")
+            kept_cids = {c.claim_id for c in ledger}
+            if timeline and kept_cids:
+                cleaned_tl: List[TimelineEvent] = []
+                for te in timeline:
+                    valid_te_cids = [cid for cid in (te.claim_ids or []) if cid in kept_cids]
+                    if valid_te_cids:
+                        te.claim_ids = valid_te_cids
+                        cleaned_tl.append(te)
+                timeline = cleaned_tl
 
         # Extract dynamic key entities from claims, grounding intel, and antagonist
         extracted_entities = [antagonist_name] if antagonist_name else []

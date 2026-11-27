@@ -536,6 +536,103 @@ def test_kr_unverified_prefix_upgrade_survives_dehedging():
     assert ok_single, hedge_issues
 
 
+def test_reputable_press_tier_and_expanded_ideation_contracts():
+    """Verify EvidenceClaim maps corroborated press cleanly and StoryIdeationPayload allows policy/market niches."""
+    from app.schemas.story_contracts import Antagonist, EvidenceClaim, StoryIdeationPayload
+
+    c = EvidenceClaim(
+        claim_id="C001",
+        claim="Financial press reported institutional reserve reviews.",
+        source_url="https://news.google.com/rss/articles/sample123",
+        source_name="이데일리 (Edaily)",
+        source_type="press",
+        doc_type="news_article",
+        speaker="reporter",
+        legal_status="alleged",
+        procedural_status="reported_event",
+        verification_status="corroborated_secondary",
+        credibility_tier="corroborated_secondary_report",
+    )
+    assert c.credibility_tier == "press_allegation"
+
+    idea = StoryIdeationPayload(
+        niche="financial_policy",
+        title_working="Policy Stabilization Review",
+        central_question="Who bears realized losses?",
+        antagonist=Antagonist(name="Public Liquidity Pool", type="institution"),
+    )
+    assert idea.niche == "financial_policy"
+    assert idea.antagonist.type == "institution"
+
+
+def test_topical_relevance_filter_removes_keyword_collision():
+    """Verify _filter_topically_relevant_claims keeps domain claims and drops unrelated asset-class collisions."""
+    from stages.s02_research import _filter_topically_relevant_claims
+
+    claims = [
+        {"claim_id": "C001", "claim": "정책금융기구가 은행지주 대상 안정기금 추가 출자를 검토했다."},
+        {"claim_id": "C002", "claim": "시중은행 다섯 곳이 기존 안정기금 약정 분담 구조에 참여했다."},
+        {"claim_id": "C003", "claim": "당국이 안정기금 운용지침 개정 절차를 진행하고 있다."},
+        {"claim_id": "C004", "claim": "금융위원회가 은행지주 회장과 시장안정 긴급회의를 소집했다."},
+        {"claim_id": "C005", "claim": "안정기금 재가동 논의 과정에서 은행지주의 손실 부담 우려가 제기됐다."},
+        {"claim_id": "C006", "claim": "과거 안정기금 집행 사례 다섯 건의 효과가 재검토됐다."},
+        {"claim_id": "C007", "claim": "해외 반도체 레버리지 상장지수펀드 투자자들이 큰 손실을 입었다."},
+    ]
+    filtered = _filter_topically_relevant_claims(
+        claims,
+        topic="안정기금 손실, 은행지주 부담",
+        central_question="안정기금 손실 발생 시 은행지주가 부담을 떠안는가?",
+        scheme_summary="은행지주가 참여한 안정기금의 손실 배분 구조 점검",
+        antagonist_name="안정기금 분담 구조",
+        market="KR",
+    )
+    kept_ids = [c["claim_id"] for c in filtered]
+    assert "C001" in kept_ids
+    assert "C005" in kept_ids
+    assert "C007" not in kept_ids
+
+
+def test_kr_number_normalization_double_hedging_and_broadcast_register():
+    """Verify KR currency numeral normalization, quoted double-hedge detection/cleanup, and broadcast register gate."""
+    from app.services.story_provenance_engine import (
+        check_kr_broadcast_register,
+        check_script_double_hedging,
+        dehedge_predicate,
+        strip_attribution_prefix,
+    )
+    from stages.s03_script import _normalize_spoken_korean_numbers
+
+    normed = _normalize_spoken_korean_numbers(
+        "십조 칠천억 원 규모의 기금과 백조 원 확대 제안 및 당국 조사를 다뤘다."
+    )
+    assert "10조 7,000억 원" in normed
+    assert "100조 원" in normed
+    assert "조사" in normed
+
+    sample = "테스트일보에 따르면 금융당국이 자금 점검을 시작했다고 전해졌습니다."
+    body, pfx = strip_attribution_prefix(sample, market="KR")
+    assert pfx == "테스트일보에 따르면"
+    assert "금융당국이" in body
+    ok_hdg, issues_hdg = check_script_double_hedging([{"line_id": "B3_L04", "text": sample}], market="KR")
+    assert ok_hdg is False and issues_hdg
+    cleaned = dehedge_predicate(sample, market="KR")
+    assert cleaned.endswith("시작했습니다.")
+    ok_clean, _ = check_script_double_hedging([{"line_id": "B3_L04", "text": cleaned}], market="KR")
+    assert ok_clean is True
+
+    ok_reg, issues_reg = check_kr_broadcast_register(
+        [{"line_id": "B5_L02", "text": "후속 보도에 따르면, 관련 기사를 실었다."}],
+        market="KR",
+    )
+    assert ok_reg is False and issues_reg
+    ok_reg_pass, _ = check_kr_broadcast_register(
+        [{"line_id": "B5_L02", "text": "보도에 따르면, 관련 기사를 실었습니다."}],
+        market="KR",
+    )
+    assert ok_reg_pass is True
+
+
+
 
 
 

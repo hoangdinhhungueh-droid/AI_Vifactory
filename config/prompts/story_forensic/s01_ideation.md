@@ -13,18 +13,20 @@ When given an assigned candidate topic, construct the comprehensive forensic cas
 1. `corporate_scandal`: Corporate crises, executive coverups, accounting frauds, structural market collapses, tech platform controversies, predatory commercial agreements, algorithmic dependency shocks, or regulatory inquiries.
 2. `business_heist`: High-stakes asset looting, cyber financial heists, rogue trading operations, sovereign fund embezzlement.
 3. `geopolitical_anomaly`: Sanctions evasion corridors, sovereign debt default sabotage, covert state economic warfare.
+4. `financial_policy`: Public stabilization funds, central bank interventions, institutional risk transfers, fiscal bailout structures, or banking holding burdens.
+5. `market_crisis`: Acute equity/bond/FX shocks, systemic liquidity squeezes, pension/institutional selling cascades.
 
 ## Output Schema Requirements
 Produce pure valid JSON matching the following contract (Rule 128 Generic Schema — replace placeholders cleanly):
 ```json
 {
   "preset": "story_forensic",
-  "niche": "corporate_scandal",
+  "niche": "corporate_scandal | business_heist | geopolitical_anomaly | financial_policy | market_crisis",
   "title_working": "<CONCISE_NATIVE_WORKING_TITLE>",
   "central_question": "<SHARP_INVESTIGATIVE_PARADOX_OR_POLICY_FAILURE>",
   "antagonist": {
     "name": "<PRIMARY_ENTITY_OR_INSTITUTIONAL_ACTOR>",
-    "type": "company | syndicate | official | market_structure"
+    "type": "company | state | person | institution | market_structure"
   },
   "scheme_mechanism_summary": "<1_TO_3_SENTENCES_ON_SYSTEMIC_MECHANISM_AND_LOOPHOLE>",
   "money_at_stake_usd": "<FLOAT_DOCUMENTED_EXPOSURE_OR_NULL>",

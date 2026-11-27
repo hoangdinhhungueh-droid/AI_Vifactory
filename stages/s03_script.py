@@ -186,6 +186,38 @@ def _normalize_spoken_korean_numbers(text: str) -> str:
         return match.group(0)
 
     out = re.sub(r"([일이삼사오육칠팔구십]+)분의\s*([일이삼사오육칠팔구십]+)", _frac_repl, out)
+
+    # 5. Spelled-out Sino-Korean currency/scale figures (십조 칠천억 -> 10조 7,000억, 백조 -> 100조)
+    _num_digits = "일이삼사오육칠팔구십백천"
+
+    def _jo_eok_repl(match: re.Match[str]) -> str:
+        prefix_chk = out[max(0, match.start() - 1):match.start()]
+        if prefix_chk == "제":
+            return match.group(0)
+        jo_tok = match.group(1)
+        eok_tok = match.group(2)
+        jo_val = _hangul_to_int(jo_tok)
+        if jo_val is None or jo_val <= 0:
+            return match.group(0)
+        if eok_tok:
+            eok_val = _hangul_to_int(eok_tok)
+            if eok_val is not None and eok_val > 0:
+                return f"{jo_val:,}조 {eok_val:,}억"
+        return f"{jo_val:,}조"
+
+    out = re.sub(
+        rf"(?<![가-힣])([{_num_digits}]+)조(?:\s*([{_num_digits}]+)억)?(?=\s*원|\s*규모|\s*달러)",
+        _jo_eok_repl,
+        out,
+    )
+
+    def _eok_repl(match: re.Match[str]) -> str:
+        eok_val = _hangul_to_int(match.group(1))
+        if eok_val is None or eok_val <= 0:
+            return match.group(0)
+        return f"{eok_val:,}억"
+
+    out = re.sub(rf"(?<![가-힣])([{_num_digits}]+)억(?=\s*원|\s*규모|\s*달러)", _eok_repl, out)
     return out
 
 
@@ -2554,6 +2586,9 @@ def run(ctx: RunContext) -> StageArtifact:
                             af_idx += 1
                             rep_cid = rep_c.get("claim_id")
                             rep_text = str(rep_c.get("claim", "")).strip().rstrip(".。")
+                            if market == "KR":
+                                rep_text = _normalize_spoken_korean_numbers(rep_text)
+                                rep_text = _to_kr_honorific(rep_text).rstrip(".")
                             ln.claim_ids = [rep_cid]
                             if market == "KR":
                                 ln.text = f"후속 보도에 따르면, {rep_text}."
@@ -2817,6 +2852,9 @@ def run(ctx: RunContext) -> StageArtifact:
                     af_idx += 1
                     extra_cid = extra_c.get("claim_id")
                     extra_text = str(extra_c.get("claim", "")).strip().rstrip(".。")
+                    if market == "KR":
+                        extra_text = _normalize_spoken_korean_numbers(extra_text)
+                        extra_text = _to_kr_honorific(extra_text).rstrip(".")
                     extra_src = str(extra_c.get("source_name") or "Press").strip()
                     extra_bkt = _exp_bkt(
                         legal_status=str(extra_c.get("legal_status", "alleged")),
@@ -3676,6 +3714,13 @@ def run(ctx: RunContext) -> StageArtifact:
                                         t_candidate = f"{fb_pfx} {dehedge_predicate(stripped_t, market=market)}".strip()
                                         pfx = fb_pfx
                     t = t_candidate
+                if market == "KR":
+                    t = _normalize_spoken_korean_numbers(t)
+                    if re.search(
+                        r"(?:했다|됐다|였다|었다|았다|실었다|물었다|밝혔다|전했다|보도했다|지목했다|제안했다|소개했다|추진했다)\.$",
+                        t.strip(),
+                    ):
+                        t = _to_kr_honorific(t.strip())
                 ln.text = t
 
         # 2. Ensure Beat 5 contains a Living Warning / pattern interrupt reflecting on systemic risks

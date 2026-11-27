@@ -166,7 +166,9 @@ def is_reputable_press_domain(url: str, source_name: str = "") -> bool:
         "npr", "pbs", "propublica", "economist", "politico", "time", "fortune", "forbes",
         "nikkei", "nhk", "kyodo", "asahi", "yomiuri", "mainichi", "jiji", "日本経済新聞", "朝日新聞", "読売新聞", "毎日新聞", "共同通信", "時事通信",
         "yonhap", "연합뉴스", "kbs", "mbc", "sbs", "ytn", "jtbc", "경향신문", "한겨레", "조선비즈", "동아일보",
-        "한국경제", "매일경제", "조선일보", "중앙일보", "서울경제", "머니투데이", "이데일리", "뉴스1", "뉴시스", "한국일보", "세계일보", "국민일보",
+        "한국경제", "매일경제", "조선일보", "중앙일보", "서울경제", "머니투데이", "이데일리", "edaily",
+        "헤럴드경제", "herald business", "heraldcorp", "인베스트조선", "invest chosun", "investchosun",
+        "뉴스1", "뉴시스", "한국일보", "세계일보", "국민일보",
         "chosun", "chosunbiz", "donga", "joongang", "hankyoreh", "kyunghyang", "hankook", "maeil", "seoul economic",
         "vnexpress", "tuổi trẻ", "tuoi tre", "thanh niên", "thanh nien", "ttxvn", "vietnamplus", "vtv", "vov", "lao động", "nhân dân", "tiền phong", "tien phong", "dân trí", "dan tri",
         "australian financial review", "afr", "alvarez & marsal", "alvarez and marsal",
@@ -1060,6 +1062,7 @@ def strip_attribution_prefix(text: str, market: str) -> Tuple[str, str]:
             r"(?:[가-힣A-Za-z0-9·\s]{1,30}?(?:보도|취재|발표|조사|감사|공시|문건|자료|기록|판결|공소장|소장|보고서|기사|언론|당국|정부|법원|검찰|경찰|수사|내용)"
             r"(?:에\s*따르면|에\s*의하면|을\s*보면|를\s*보면|에\s*나타난|에서\s*밝힌))[”\"’']?[,:]?\s*"
             r"|[가-힣A-Za-z0-9·\s]{1,25}?(?:보고서|공소장|판결문|판결|소장|발표|조사|감사|공시|문건)(?:를\s*통해|로\s*보면|에\s*따르면|에\s*의하면)[”\"’']?[,:]?\s*"
+            r"|[가-힣A-Za-z0-9·\s]{2,25}?(?:에\s*따르면|에\s*의하면)[”\"’']?[,:]?\s*"
             r")[”\"’']?[,:]?\s*"
         )
         match = re.match(pat, t)
@@ -1208,6 +1211,17 @@ def dehedge_predicate(text: str, market: str = "EN") -> str:
                 lambda m: f"{m.group(1) or ''}이었습니다",
                 t_clean,
             )
+            # 3. Quoted '-다고/-라고 전해졌습니다/보도됐습니다' single-hedge cleanup
+            t_clean = re.sub(
+                r"([았었였했됐졌왔뒀썼렀쳤났맞])다고\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                r"\1습니다",
+                t_clean,
+            )
+            t_clean = re.sub(
+                r"(?:다|라)고\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)$",
+                lambda m: f"{'다' if m.group(0).startswith('다') else '라'}고 합니다",
+                t_clean,
+            )
 
         return f"{t_clean}." if has_period or not t_clean.endswith((".", "!", "?")) else t_clean
 
@@ -1247,7 +1261,7 @@ def check_script_double_hedging(
             continue
 
         if m == "KR":
-            if re.search(r"(?:것으로|바가|점이)\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?$", txt):
+            if re.search(r"(?:것으로|바가|점이|[다라]고)\s*(?:보도됐습니다|전해졌습니다|알려졌습니다)\.?$", txt):
                 issues.append(
                     f"Line {ln_id} has redundant double hedging: lead prefix '{pfx}' combined with reported predicate ending."
                 )
@@ -1272,6 +1286,32 @@ def check_script_double_hedging(
                     f"Line {ln_id} has redundant double hedging: lead prefix '{pfx}' combined with redundant reporting qualifier."
                 )
 
+    return len(issues) == 0, issues
+
+
+def check_kr_broadcast_register(
+    lines: List[Dict[str, Any]],
+    market: str = "KR",
+) -> Tuple[bool, List[str]]:
+    """Verify Korean narration maintains consistent spoken broadcast register (-습니다/-까요?)
+    and rejects leaked plain-form written diary/article endings (-했다./-실었다.).
+    """
+    m = normalize_market_code(market)
+    if m != "KR":
+        return True, []
+    issues: List[str] = []
+    plain_pat = re.compile(
+        r"(?:했다|됐다|였다|었다|았다|실었다|물었다|밝혔다|전했다|보도했다|지목했다|제안했다|소개했다|추진했다)\.$"
+    )
+    for ln in lines:
+        ln_id = str(ln.get("line_id", "LINE"))
+        txt = str(ln.get("text", "")).strip()
+        if not txt:
+            continue
+        if plain_pat.search(txt):
+            issues.append(
+                f"Line {ln_id} breaks KR broadcast register with written plain-form ending: '{txt[-18:]}'"
+            )
     return len(issues) == 0, issues
 
 

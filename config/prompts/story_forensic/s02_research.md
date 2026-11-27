@@ -16,7 +16,8 @@ Given the approved ideation topic, compile an exhaustive, timestamped `evidence_
    - `corroborated_secondary` (`secondary`): Credible direct institutional press or multi-source confirmation.
    - `unverified_secondary` (`secondary`/`tertiary`): Single press snippet or aggregator feed not yet corroborated by primary records.
 4. `causal_role` (Rule 130): Explicitly tag `primary_catalyst` (Level 1 objective trigger event) vs `transmission_mechanism` (Level 2 systemic feedback/policy loophole) vs `background_context`, plus `scope` (geographic/institutional scope of the claim).
-5. Every timeline entry must link to valid `claim_ids`.
+5. **Topical Relevance Mandate**: Exclude raw RSS/search snippets whose core subject is an unrelated market, asset class, or side story that merely shares a generic keyword (e.g., "loss", "crisis", "fund") without directly addressing the episode's `topic`, `central_question`, or `scheme_mechanism_summary`.
+6. Every timeline entry must link to valid `claim_ids`.
 
 ## Output Schema Requirements
 Produce pure valid JSON matching the following contract (Rule 128 Generic Schema):

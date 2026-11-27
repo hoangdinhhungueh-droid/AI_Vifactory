@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class Antagonist(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str
-    type: Literal["person", "company", "state"] = "company"
+    type: Literal["person", "company", "state", "institution", "market_structure"] = "company"
 
 
 class SourceSeed(BaseModel):
@@ -41,7 +41,7 @@ class StoryIdeationPayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     preset: str = "story_forensic"
-    niche: Literal["business_heist", "corporate_scandal", "geopolitical_anomaly"] = "corporate_scandal"
+    niche: Literal["business_heist", "corporate_scandal", "geopolitical_anomaly", "financial_policy", "market_crisis"] = "corporate_scandal"
     title_working: str = ""
     central_question: str = ""
     antagonist: Optional[Antagonist] = None
@@ -250,7 +250,7 @@ class EvidenceClaim(BaseModel):
                 out["credibility_tier"] = "official_regulation"
             else:
                 out["credibility_tier"] = "press_allegation"
-        elif supplied_tier == "press_allegation":
+        elif supplied_tier == "press_allegation" or supplied_tier == "corroborated_secondary_report":
             out["credibility_tier"] = "press_allegation"
         elif not supplied_tier:
             if (
@@ -268,12 +268,21 @@ class EvidenceClaim(BaseModel):
                 src_type in ("press", "court", "regulator", "gov")
                 or doc_type in ("news_article", "indictment", "criminal_complaint")
                 or legal_status in ("charged", "alleged")
-            ) and ver_stat in ("corroborated_secondary", "verified_primary") and not is_rss:
+            ) and ver_stat in ("corroborated_secondary", "verified_primary") and (not is_rss or is_rep):
                 out["credibility_tier"] = "press_allegation"
             else:
                 out["credibility_tier"] = "unconfirmed_claim"
         else:
             out["credibility_tier"] = "unconfirmed_claim"
+
+        if (
+            out.get("credibility_tier") == "unconfirmed_claim"
+            and ver_stat == "corroborated_secondary"
+            and is_rep
+            and proc_status not in ("bill_proposed", "speculation")
+            and doc_type not in ("proposed_bill", "rss_snippet")
+        ):
+            out["credibility_tier"] = "press_allegation"
 
         # Structural Invariant: unconfirmed claims cannot be primary catalyst
         if out.get("credibility_tier") == "unconfirmed_claim" and out.get("causal_role") == "primary_catalyst":
