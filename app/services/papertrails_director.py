@@ -813,7 +813,7 @@ def direct_papertrails_timeline_with_llm(
         }
 
         import httpx
-        from app.services.model_gateway import get_global_gateway
+        from app.services.model_gateway import AllProvidersFailed, ModelGatewayError, get_global_gateway
 
         prompt_json = json.dumps(user_payload, ensure_ascii=False, indent=2)
         gw = get_global_gateway()
@@ -838,7 +838,7 @@ def direct_papertrails_timeline_with_llm(
                     fallback="claude-sonnet-5-5",
                 )
                 raw_shots = _extract_shots_from_llm_reply(raw_reply)
-        except (httpx.HTTPError, OSError) as direct_err:
+        except (httpx.HTTPError, OSError, ModelGatewayError, AllProvidersFailed) as direct_err:
             # Local corporate SWG firewall blocks hhtechapi.com -> relay cleanly via Hetzner VPS
             logger.warning("[papertrails_director] Direct gateway blocked (%s); relaying LLM call via VPS...", direct_err)
             raw_reply = _call_director_llm_via_vps(prompt_json=prompt_json, system_prompt=system_prompt)
