@@ -3482,10 +3482,10 @@ def run(ctx: RunContext) -> StageArtifact:
                     prompt=user_prompt,
                     model="claude-sonnet-5-5",
                     system_prompt=system_prompt,
-                    max_tokens=8192,
+                    max_tokens=4096,
                     temperature=0.3,
                     timeout=120.0,
-                    fallback="claude-v4.1-flash",
+                    fallback="gpt-6.1-sol",
                 )
                 try:
                     llm_beats = _parse_and_build_llm_beats(raw_response)
@@ -3567,7 +3567,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         prompt=repair_prompt,
                         model=retry_model,
                         system_prompt=system_prompt,
-                        max_tokens=8192,
+                        max_tokens=4096,
                         temperature=0.35 if (not units_ok or not dur_ok) else 0.2,
                         timeout=120.0,
                         fallback=retry_fallback,
