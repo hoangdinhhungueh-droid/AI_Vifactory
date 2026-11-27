@@ -3484,8 +3484,12 @@ def run(ctx: RunContext) -> StageArtifact:
                     timeout=120.0,
                     fallback="claude-v4.1-flash",
                 )
-                llm_beats = _parse_and_build_llm_beats(raw_response)
-                llm_beats = _auto_repair_beats(llm_beats)
+                try:
+                    llm_beats = _parse_and_build_llm_beats(raw_response)
+                    llm_beats = _auto_repair_beats(llm_beats)
+                except ValueError as _parse_err1:
+                    logger.warning(f"[S03_SCRIPT] Attempt 1 JSON parsing issue: {_parse_err1}")
+                    llm_beats = []
                 passed_pre, cand_timing, cand_dur, b1_dur, b1_dur_ok, units_ok, lang_ok, lang_issues, ent_ok, ent_issues, qual_issues, b1_ok, dur_ok, align_res, has_filler, has_b1_b5_redundancy = _eval_llm_beats(llm_beats)
 
                 if not passed_pre and (
@@ -3554,17 +3558,23 @@ def run(ctx: RunContext) -> StageArtifact:
                         + "\n- ".join(repair_notes)
                         + "\nReturn ONLY corrected valid JSON starting with { and ending with }."
                     )
+                    retry_model = "gpt-6.1-sol" if len(llm_beats) == 0 else "claude-sonnet-5-5"
+                    retry_fallback = "claude-sonnet-5-5" if retry_model == "gpt-6.1-sol" else "claude-v4.1-flash"
                     raw_retry = gateway.call_llm(
                         prompt=repair_prompt,
-                        model="claude-sonnet-5-5",
+                        model=retry_model,
                         system_prompt=system_prompt,
                         max_tokens=8192,
                         temperature=0.35 if not units_ok else 0.2,
                         timeout=120.0,
-                        fallback="claude-v4.1-flash",
+                        fallback=retry_fallback,
                     )
-                    llm_beats_retry = _parse_and_build_llm_beats(raw_retry)
-                    llm_beats_retry = _auto_repair_beats(llm_beats_retry)
+                    try:
+                        llm_beats_retry = _parse_and_build_llm_beats(raw_retry)
+                        llm_beats_retry = _auto_repair_beats(llm_beats_retry)
+                    except ValueError as _parse_err2:
+                        logger.warning(f"[S03_SCRIPT] Attempt 2 JSON parsing issue ({retry_model}): {_parse_err2}")
+                        llm_beats_retry = []
                     passed_retry, cand_timing_r, cand_dur_r, b1_dur_r, b1_dur_ok_r, units_ok_r, lang_ok_r, lang_issues_r, ent_ok_r, ent_issues_r, qual_issues_r, b1_ok_r, dur_ok_r, align_res_r, has_filler_r, has_b1_b5_redundancy_r = _eval_llm_beats(llm_beats_retry)
                     if passed_retry or (
                         len(llm_beats_retry) == 5

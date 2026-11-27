@@ -28,7 +28,11 @@ _GENERIC_ANCHOR_STOPWORDS: set[str] = {
     "논란", "의혹", "결과", "발표", "기관", "금융", "회사", "기업", "한국", "국내", "아직",
     "확인되지", "않은", "loss", "crisis", "market", "government", "risk", "report",
     "issue", "fund", "price", "stock", "investors", "policy", "review", "confirmed",
-    "losses", "stocks", "company", "market", "public", "report", "news",
+    "losses", "stocks", "company", "public", "news", "korean", "korea", "trillion",
+    "billion", "million", "won", "yen", "usd", "krw", "jpy", "vnd", "retail",
+    "reported", "headline", "snippet", "financial", "institutions", "companies",
+    "authorities", "recent", "about", "while", "their", "which", "other", "second",
+    "half", "year",
     "市場", "政府", "問題", "投資", "損失", "確認", "報道",
     "thị", "trường", "chính", "phủ", "rủi", "ro", "báo", "cáo", "đầu", "tư",
 }
@@ -45,7 +49,7 @@ def _extract_topical_anchors(
     secondary_text = f"{central_question} {scheme_summary}"
 
     def _tokens(txt: str) -> set[str]:
-        raw = re.findall(r"[가-힣A-Za-z0-9\u3040-\u30ff\u4e00-\u9fff]{2,}", txt.lower())
+        raw = re.findall(r"[가-힣\u3040-\u30ff\u4e00-\u9fff]{2,}|[a-z0-9]{4,}", txt.lower())
         cleaned: set[str] = set()
         for tok in raw:
             stripped = re.sub(r"(?:은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만|까지|부터)$", "", tok)
@@ -712,6 +716,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     f"Documented Outcome: {doc_outcome}\n"
                     f"Source Seeds: {json.dumps(s1_art.payload.get('source_seeds', []), ensure_ascii=False)}\n\n"
                 )
+                tagged_claims = []
                 if grounding_intel and grounding_intel.get("claims"):
                     from app.services.story_provenance_engine import classify_claim_provenance as _classify_g_claim
 
@@ -745,12 +750,17 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += "MANDATE: Output all claim text and event descriptions in 100% natural Japanese.\n\n"
                 elif market == "VN":
                     user_prompt += "MANDATE: Output all claim text and event descriptions in 100% natural Vietnamese.\n\n"
+                target_claim_str = (
+                    f"target {min(14, max(8, len(tagged_claims)))} distinct topically relevant claims"
+                    if tagged_claims
+                    else "minimum 6-8 claims"
+                )
                 user_prompt += (
                     "CRITICAL MANDATE FOR CLAIM TEXT:\n"
                     "- The 'claim' field must contain ONLY the direct, substantive factual statement itself (e.g. '<ENTITY> officially announced the implementation of <POLICY/MEASURE>').\n"
                     "- DO NOT write meta-commentary, audit caveats, or verification evaluations inside the 'claim' field (NEVER write 'The provided document claims that...' or 'However, ... was not confirmed').\n"
                     "- All evidentiary reservations and caveats belong EXCLUSIVELY in the metadata fields ('legal_status', 'verification_status', 'doc_type', 'confidence').\n\n"
-                    "Extract and compile an exhaustive, timestamped evidence_ledger (minimum 6-8 claims: C001, C002, ...) and chronological timeline strictly adhering to the schema.\n"
+                    f"Extract and compile an exhaustive, timestamped evidence_ledger ({target_claim_str}: C001, C002, ...) and chronological timeline strictly adhering to the schema.\n"
                     "Ensure every claim has a valid legal_status ('convicted' | 'charged' | 'alleged' | 'settled' | 'fact') and confidence ('high' | 'medium').\n"
                     "Start response immediately with { and end with }. Output ONLY valid JSON with NO conversational preamble."
                 )
@@ -947,7 +957,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         confidence=prov_c.get("confidence", "low"),
                     ))
 
-                if doc_outcome and len(ledger) < 8:
+                if ctx.dry_run and doc_outcome and len(ledger) < 4:
                     outcome_covered = any(
                         len(set(c.claim.lower().split()) & set(doc_outcome.lower().split())) >= 4
                         for c in ledger
@@ -1185,6 +1195,10 @@ def run(ctx: RunContext) -> StageArtifact:
         payload=payload,
         provenance=prov
     )
+
+    stale_feedback = ctx.paths.root / "s04_critic_feedback.json"
+    if stale_feedback.is_file():
+        stale_feedback.unlink(missing_ok=True)
 
     emit_artifact(artifact, ctx.paths)
     return artifact
