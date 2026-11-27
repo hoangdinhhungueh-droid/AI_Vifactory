@@ -56,8 +56,8 @@ window.__papertrails = {
           position: new THREE.Vector3(),
           moveDir: new THREE.Vector3(0, 0, 1),
           speed: 0,
-          group: { position: new THREE.Vector3() },
-          teleport(x, z) { this.position.set(x, 0, z); },
+          group: new THREE.Group(),
+          teleport(x, z) { this.position.set(x, 0, z); this.group.position.set(x, 0, z); },
           update() {},
         }
       : createTraveller({scene,assets,world,materials});
