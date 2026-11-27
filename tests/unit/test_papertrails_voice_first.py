@@ -171,6 +171,54 @@ def test_timing_sheet_and_antipattern_audit():
         assert not dup_audit["passed"]
         assert any("consecutive duplicate staging" in v for v in dup_audit["violations"])
 
+        s1_same_prop = {
+            **tl["scenes"][1],
+            "biome": "desert" if s0["biome"] != "desert" else "snow",
+            "prop": s0["prop"],
+        }
+        prop_audit = audit_papertrails_timeline_antipatterns({**tl, "scenes": [s0, s1_same_prop, *tl["scenes"][2:]]})
+        assert not prop_audit["passed"]
+        assert any("consecutive duplicate prop" in v for v in prop_audit["violations"])
+
+
+def test_attach_grounded_evidence_cards_native_language_kr():
+    """Ensure 12+ shot Korean timeline auto-populates native Hangul note cards and avoids adjacent cards."""
+    segments = [
+        {
+            "start": i * 3.0,
+            "end": (i + 1) * 3.0,
+            "text": f"제 {i + 1} 구간의 약 {10 + i}조 원 규모 점검 결과입니다.",
+            "words": [
+                {"word": w, "start": i * 3.0 + j * 0.45, "end": i * 3.0 + (j + 1) * 0.45}
+                for j, w in enumerate(["제", f"{i + 1}번", f"{10 + i}조", "원", "규모", "검증", "보고."])
+            ],
+        }
+        for i in range(12)
+    ]
+    claims = [
+        {"claim_id": "C001", "quantified_value": "10조 원", "statement": "기관 출자 약정 규모가 10조 원으로 집계됐습니다.", "source": "경제신문"},
+        {"claim_id": "C002", "quantified_value": "25곳", "statement": "금융회사 25곳의 참여 여부를 점검 중입니다.", "source": "금융보도"},
+    ]
+    tl = direct_papertrails_timeline_with_llm(
+        transcript_segments=segments,
+        audio_path=Path("voice.mp3"),
+        audio_duration=36.0,
+        grounding_claims=claims,
+        market="KR",
+        timing_source="faster-whisper+edge-boundary",
+        dry_run=True,
+    )
+    audit = audit_papertrails_timeline_antipatterns(tl)
+    assert audit["passed"], audit
+    cards = [sc for sc in tl["scenes"] if sc.get("card")]
+    assert len(cards) >= 3
+    for sc in cards:
+        assert "핵심 근거" in sc["card"]["head"]
+        assert any("`" in ln for ln in sc["card"]["lines"])
+    for a, b in zip(tl["scenes"], tl["scenes"][1:]):
+        assert a["prop"] != b["prop"]
+        assert not (a.get("card") and b.get("card"))
+
 
 def test_procedural_foley_filter_graph_builder():
     cues = [

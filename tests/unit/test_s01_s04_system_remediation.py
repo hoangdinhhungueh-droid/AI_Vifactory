@@ -670,6 +670,40 @@ def test_s09_norm_tok_preserves_unicode_hangul_and_digits():
     assert _norm_tok("한국산업은행은,") == "한국산업은행은"
 
 
+def test_s09_reconcile_script_many_to_one_fixes_kr_proper_nouns():
+    """Ensure Whisper split/misheard KR proper nouns align to verified S03 script without losing monotonicity."""
+    from stages.s09_voice_tts import _reconcile_script_casing_onto_whisper
+
+    whisper_segments = [
+        {
+            "start": 0.0,
+            "end": 5.0,
+            "text": "매일 경제는 미래의 세 박현주 회장이 증한 펀드를 제안했다고",
+            "words": [
+                {"word": "매일", "start": 0.10, "end": 0.50},
+                {"word": "경제는", "start": 0.50, "end": 1.00},
+                {"word": "미래의", "start": 1.05, "end": 1.45},
+                {"word": "세", "start": 1.45, "end": 1.80},
+                {"word": "박현주", "start": 1.85, "end": 2.40},
+                {"word": "회장이", "start": 2.45, "end": 3.00},
+                {"word": "증한", "start": 3.05, "end": 3.45},
+                {"word": "펀드를", "start": 3.45, "end": 4.00},
+                {"word": "제안했다고", "start": 4.05, "end": 4.85},
+            ],
+        }
+    ]
+    verified_script = "매일경제는 미래에셋 박현주 회장이 증안펀드를 제안했다고"
+    rebuilt = _reconcile_script_casing_onto_whisper(whisper_segments, verified_script)
+    words_out = [w["word"] for seg in rebuilt for w in seg["words"]]
+    assert words_out == ["매일경제는", "미래에셋", "박현주", "회장이", "증안펀드를", "제안했다고"]
+    flat_out = [w for seg in rebuilt for w in seg["words"]]
+    assert 0.95 <= flat_out[1]["start"] <= 1.15 and flat_out[1]["end"] == 1.80
+    assert flat_out[4]["start"] == 3.05 and flat_out[4]["end"] == 4.00
+    for a, b in zip(flat_out, flat_out[1:]):
+        assert a["start"] < a["end"] <= b["start"]
+
+
+
 
 
 

@@ -24,7 +24,8 @@ Your mission is to translate EVERY spoken clause of the narration into a tightly
    - Investigative / Institutional / Financial: `courthouse`, `gavel`, `ledger`, `container`, `vault`, `scale`, `contract`, `megaphone`, `briefcase`, `shield`
    - Classic Papertrails: `coin`, `chart`, `factory`, `clock`, `book`, `globe`, `bridge`, `people`, `village`, `house`, `forest`, `tree`, `mountain`, `water`, `sun`, `moon`, `voice-note`, `edit-board`, `pop-up`, `film`, `bubble`, `mic`
    - Match the literal concept in the spoken words (e.g., official seal/approval/ruling stamp → `hanko-stamp`; narrow margin/audit gap/tariff spread/percent → `brass-caliper`; hidden clause/footnote/loophole/small print → `forensic-loupe`; payouts/executive bonuses → `briefcase` or `coin`; court verdict/appeal → `courthouse`, `gavel`, `scale`; accounting → `ledger`, `chart`; imports/shipping/duties → `container`, `globe`; sealed records/treasury → `vault`, `contract`; consumer fallout/workforce → `people`, `house`, `village`; deadlines/timelines → `clock`).
-   - NEVER repeat the exact same `(biome, prop)` pair across two consecutive shots.
+   - For institutional, banking, or financial policy investigations, prioritize `hanko-stamp`, `brass-caliper`, `forensic-loupe`, `ledger`, `vault`, `contract`, `scale`, `chart`, `courthouse`, `gavel`, `briefcase`, `shield`, `clock`, `megaphone`. Avoid `edit-board`, `factory`, or `container` unless the spoken clause literally concerns video editing, physical factories, or shipping containers.
+   - NEVER repeat the exact same `prop` or `(biome, prop)` pair across two consecutive shots.
 3. **Dramatic 5-Biome Progression & Night Contrast**:
    - Cycle thoughtfully across all 5 paper worlds: `heartland`, `pinewood`, `desert`, `snow`, `blossom`.
    - Set `"night": true` selectively for clandestine schemes, crackdowns, or tense turning points (avoid night > 35% of shots).
@@ -37,12 +38,12 @@ Your mission is to translate EVERY spoken clause of the narration into a tightly
    - Keep `title` short (**2 to 5 words**), viewer-facing, matching the format `<CLEAN TOPIC PHASE>` (no internal tags).
    - **Native Market Language Mandate**: `title`, `card.head`, and `card.lines` MUST be written strictly in the native language matching `market` and the spoken narration (`KR` → Korean Hangul, `JA` → Japanese, `VN` → Vietnamese, `EN` → English). Zero stray English headers or labels on non-EN episodes.
    - NEVER output underscores, beat IDs, scene codes, or regex tokens (`<BEAT_ID>`, `<LINE_ID>`, `SC_01`).
-6. **Grounded Forensic Evidence Notes (`card`)**:
+6. **Grounded Forensic Evidence Notes (`card`) — MANDATORY**:
    - On shots presenting hard figures, legal filings, or key entity contrasts from the **S02 Grounding Table**, attach a taped paper `"card"` (`kind: "note"`):
      - `head`: crisp uppercase evidence header in the native market language (`KR` Hangul / `JA` / `VN` / `EN`) matching `<EVIDENCE TYPE // SOURCE>`, <= 32 chars.
      - `lines`: 2 to 3 short bullet strings in the native market language (<= 44 chars each; wrap exact verified figures/dates in backticks like `` `<VERIFIED_METRIC>` ``). Every figure MUST trace strictly to the spoken narration or S02 Grounding claims provided — ZERO invented numbers.
      - `side`: alternate `"left"` / `"right"`.
-   - Attach cards on ~25%–40% of shots (do not clutter every shot).
+   - You MUST attach cards on **30%–40% of shots** (e.g. `12–16` cards across a 40-shot episode, never two consecutive shots with cards). Missing cards will fail the Director Gate.
 7. **Output Format**:
    Return ONLY valid JSON matching:
    ```json

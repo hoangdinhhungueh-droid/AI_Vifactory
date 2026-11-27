@@ -8,11 +8,11 @@
 ### [TEST-301] Kiểm thử Voice-First Papertrails Director & Contracts (Mã FT-301)
 - **Mã Feature**: `FT-301`
 - **Test File**: `tests/unit/test_papertrails_voice_first.py`
-- **Lệnh chạy kiểm thử (CLI)**: `pytest -v tests/unit/test_papertrails_voice_first.py`
+- **Lệnh chạy kiểm thử (CLI)**: `pytest -v tests/unit/test_papertrails_voice_first.py tests/unit/test_s01_s04_system_remediation.py`
 - **Tiêu chuẩn Gherkin (Acceptance Criteria)**:
-  - `Given`: Tập từ vựng đo thực tế (`segments` kèm `words`), bảng 36 `VALID_PROPS`, tiêu đề chứa mã rò rỉ.
-  - `When`: Gọi `_sanitize_viewer_title()`, `_normalize_llm_shots_to_words()`, `build_papertrails_timeline()`, `audit_papertrails_timeline_antipatterns()`.
-  - `Then`: Tiêu đề sạch 100% không còn mã nội bộ (`Rule 136`); các shot phủ kín `0..duration` không lặp `(biome, prop)` hoặc `camera` tĩnh; 13 prop điều tra mới (`hanko-stamp`, `brass-caliper`, `forensic-loupe` + 10 props) thuộc `VALID_PROPS`; Timing Sheet + `foley_cues` nằm gọn trong biên cảnh.
+  - `Given`: Tập từ vựng đo thực tế (`segments` kèm `words`), bảng 36 `VALID_PROPS`, tiêu đề chứa mã rò rỉ, hoặc cụm từ ASR tách sai tên riêng (`many-to-one`).
+  - `When`: Gọi `_sanitize_viewer_title()`, `_normalize_llm_shots_to_words()`, `build_papertrails_timeline()`, `direct_papertrails_timeline_with_llm()`, `audit_papertrails_timeline_antipatterns()`, và `_reconcile_script_casing_onto_whisper()`.
+  - `Then`: Tiêu đề sạch 100% không còn mã nội bộ (`Rule 136`); các shot phủ kín `0..duration` không lặp `prop` hoặc `(biome, prop)` hoặc `camera` tĩnh liền kề; shot `>= 12` đạt tối thiểu `20%` `note` cards bằng ngôn ngữ bản địa; `_reconcile_script_casing_onto_whisper` khôi phục 100% tên riêng đã duyệt không làm lệch mốc thời gian; Timing Sheet + `foley_cues` nằm gọn trong biên cảnh.
 - **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
 
 ---
@@ -30,13 +30,27 @@
 
 ---
 
-### [TEST-303] Kiểm thử CI Toàn Hệ Thống & Chống Hồi Quy (Rules 125, 127, 128, 139)
-- **Lệnh chạy kiểm thử (CLI)**:
+### [TEST-205] Kiểm thử Master QC Gate & Timeline Integrity (Mã FT-205)
+- **Mã Feature**: `FT-205`
+- **Test File**: `tests/unit/test_s11_qc_gate.py`
+- **Lệnh chạy kiểm thử (CLI)**: `pytest -v tests/unit/test_s11_qc_gate.py`
+- **Tiêu chuẩn Gherkin**:
+  - `Given`: Master video `final.mp4`, EBU R128 bounds, và `director_plan.json` / `remotion_props.json`.
+  - `When`: Chạy `stages/s11_qc.py:run()` và `verify_final_video_gates()`.
+  - `Then`: Kiểm toán H.264/AAC, 0 black frames, độ trôi thời lượng trong biên, loudness đạt `[-17.0, -15.0] LUFS` & `<= -2.0 dBTP`.
+- **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
+
+---
+
+### [TEST-303] Kiểm thử Voice-First ASR Alignment, Foley Mixer & CI Toàn Hệ Thống (Mã FT-303)
+- **Mã Feature**: `FT-303`
+- **Test File**: `tests/unit/test_s01_s04_system_remediation.py`, `tests/unit/test_s10_render.py`
+- **Lệnh chạy kiểm thử (CLI)**: `pytest -v tests/unit/test_s01_s04_system_remediation.py tests/unit/test_s10_render.py tests/unit/test_papertrails_voice_first.py tests/test_zero_semantic_bias.py`
+- **Lệnh kiểm định mở rộng (CLI)**:
   - `ruff check --select F821,F811 app/ scripts/ stages/ vox/ core/ tools/`
   - `python tools/ghost_scan.py`
   - `python scripts/forensics/probe_ast_rule139.py`
   - `python scripts/forensics/probe_zero_mock.py`
-  - `pytest -v tests/test_zero_semantic_bias.py tests/test_contracts.py tests/test_human_gates.py tests/unit/test_s05_director_plan.py tests/unit/test_s10_render.py tests/unit/test_papertrails_voice_first.py`
   - `python scripts/e2e_pipeline_smoketest.py`
 - **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
 

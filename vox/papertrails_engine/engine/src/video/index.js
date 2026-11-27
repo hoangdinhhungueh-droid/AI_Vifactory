@@ -71,7 +71,7 @@ window.__papertrails = {
         case 'wide': dist=11-0.55*p; angle=side+0.08*Math.sin(p*Math.PI); break;
         case 'orbit': angle=side+.14+p*.45; break;                                   // non-linear S-curve orbit arc
         case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;                       // eased dolly toward subject
-        case 'low': dist=6.2-.6*p; height=.2; angle=side+.12*p; focus.y=1.25; break;  // hero angle from paper floor
+        case 'low': dist=5.4-.5*p; height=.42; angle=side+.12*p; focus.y=1.18; break;  // hero angle clearing foreground foliage
         case 'crane': dist=8.5; height=.22+.72*p; break;                            // eased crane reveal
       }
       const d=dist*k;

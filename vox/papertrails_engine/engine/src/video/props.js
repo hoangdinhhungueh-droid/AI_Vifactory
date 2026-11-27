@@ -323,7 +323,7 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
     for(let i=0;i<5;i++)rect(.75,.04,'#a8987d',-.55,1.52-i*.24,.02);
     const targetBar=rect(.78,.42,crimson,.18,.94,.04);
     const rail=rect(1.92,.14,gold,0,1.42,.11);
-    for(let i=0;i<9;i++)rect(.025,.07,ink,-.78+i*.19,1.42,.15,rail);
+    for(let i=0;i<9;i++)rect(.025,.07,ink,-.78+i*.19,0,.04,rail);
     const leftJaw=new THREE.Group();leftJaw.position.set(-.26,1.06,.12);root.add(leftJaw);
     rect(.14,.86,gold,0,0,0,leftJaw);
     rect(.26,.16,gold,.12,-.36,.02,leftJaw);

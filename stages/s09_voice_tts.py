@@ -105,6 +105,7 @@ def _run_local_faster_whisper(
         raise RuntimeError(f"Decoded 0 PCM samples from '{audio_file}' for local faster-whisper")
 
     model = WhisperModel(model_name, device="cpu", compute_type="int8")
+    prompt_hint = (initial_prompt or "").strip()[:400] or None
     raw_segments, _ = model.transcribe(
         audio_np,
         language=lang,
@@ -112,6 +113,7 @@ def _run_local_faster_whisper(
         vad_filter=True,
         beam_size=1,
         condition_on_previous_text=False,
+        initial_prompt=prompt_hint,
     )
     out: List[Dict[str, Any]] = []
     for seg in raw_segments:
@@ -168,11 +170,12 @@ def _measure_words_with_faster_whisper(
             logger.warning("[s09_voice_tts] Failed uploading audio to VPS for Whisper alignment")
             return None
 
+        prompt_hint = (initial_prompt or "").strip()[:400] or None
         py_code = (
             "import json\n"
             "from faster_whisper import WhisperModel\n"
             f"m = WhisperModel({model_name!r}, device='cpu', compute_type='int8')\n"
-            f"segs, _ = m.transcribe({remote_audio!r}, language={lang!r}, word_timestamps=True, vad_filter=True, beam_size=1, condition_on_previous_text=False)\n"
+            f"segs, _ = m.transcribe({remote_audio!r}, language={lang!r}, word_timestamps=True, vad_filter=True, beam_size=1, condition_on_previous_text=False, initial_prompt={prompt_hint!r})\n"
             "out = [{'start': round(s.start, 3), 'end': round(s.end, 3), 'text': s.text.strip(), "
             "'words': [{'word': w.word.strip(), 'start': round(w.start, 3), 'end': round(max(w.start + 0.01, w.end), 3)} "
             "for w in (s.words or []) if w.word.strip()]} for s in segs if s.text.strip()]\n"
@@ -288,15 +291,32 @@ def _group_word_boundaries_into_segments(
     return segments
 
 
+def _merge_delete_insert_opcodes(opcodes: List[tuple]) -> List[tuple]:
+    """Merges adjacent delete+insert opcodes from SequenceMatcher into clean replace spans."""
+    merged: List[tuple] = []
+    for tag, i1, i2, j1, j2 in opcodes:
+        if merged and {merged[-1][0], tag} == {"delete", "insert"}:
+            _, pi1, pi2, pj1, pj2 = merged[-1]
+            merged[-1] = ("replace", min(pi1, i1), max(pi2, i2), min(pj1, j1), max(pj2, j2))
+        else:
+            merged.append((tag, i1, i2, j1, j2))
+    return merged
+
+
 def _reconcile_script_casing_onto_whisper(
     whisper_segments: List[Dict[str, Any]],
     script_text: str,
 ) -> List[Dict[str, Any]]:
-    """Preserves exact script spelling/punctuation on 1:1 matched tokens without changing acoustic timestamps."""
+    """Aligns verified script spelling/proper nouns onto Whisper acoustic timings (1:1 & many-to-one)."""
     script_tokens = [t for t in script_text.split() if t.strip()]
     flat_whisper: List[Dict[str, Any]] = []
+    seg_bounds: List[tuple] = []
     for seg in whisper_segments:
-        for w in seg.get("words") or []:
+        seg_words = seg.get("words") or []
+        if not seg_words:
+            continue
+        seg_bounds.append((float(seg.get("start", seg_words[0]["start"])), float(seg.get("end", seg_words[-1]["end"]))))
+        for w in seg_words:
             flat_whisper.append(w)
     if not script_tokens or not flat_whisper:
         return whisper_segments
@@ -304,15 +324,71 @@ def _reconcile_script_casing_onto_whisper(
     w_norm = [_norm_tok(w["word"]) for w in flat_whisper]
     s_norm = [_norm_tok(t) for t in script_tokens]
     matcher = difflib.SequenceMatcher(None, w_norm, s_norm, autojunk=False)
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+
+    reconciled: List[Dict[str, Any]] = []
+    for tag, i1, i2, j1, j2 in _merge_delete_insert_opcodes(matcher.get_opcodes()):
         if tag in ("equal", "replace") and (i2 - i1) == (j2 - j1):
             for offset in range(i2 - i1):
-                # Keep Whisper timing untouched; update only display spelling when 1:1 aligned
-                flat_whisper[i1 + offset]["word"] = script_tokens[j1 + offset]
+                w_item = dict(flat_whisper[i1 + offset])
+                w_item["word"] = script_tokens[j1 + offset]
+                reconciled.append(w_item)
+        elif tag == "replace":
+            span_s = float(flat_whisper[i1]["start"])
+            span_e = max(span_s + 0.02 * (j2 - j1), float(flat_whisper[i2 - 1]["end"]))
+            sub_toks = script_tokens[j1:j2]
+            weights = [max(1, len(_norm_tok(tok)) or len(tok)) for tok in sub_toks]
+            tot_w = float(sum(weights))
+            span_dur = span_e - span_s
+            cur_t = span_s
+            for idx_s, stok in enumerate(sub_toks):
+                nxt_t = span_e if idx_s == len(sub_toks) - 1 else round(cur_t + span_dur * (weights[idx_s] / tot_w), 3)
+                nxt_t = max(round(cur_t + 0.01, 3), nxt_t)
+                reconciled.append({
+                    "word": stok,
+                    "start": round(cur_t, 3),
+                    "end": round(nxt_t, 3),
+                })
+                cur_t = nxt_t
+        elif tag == "insert":
+            prev_e = float(reconciled[-1]["end"]) if reconciled else 0.0
+            next_s = float(flat_whisper[i1]["start"]) if i1 < len(flat_whisper) else (prev_e + 0.04 * (j2 - j1))
+            avail = max(0.02 * (j2 - j1), next_s - prev_e)
+            step = round(avail / max(1, (j2 - j1)), 3)
+            cur_t = prev_e
+            for offset in range(j2 - j1):
+                nxt_t = round(cur_t + max(0.02, step), 3)
+                reconciled.append({
+                    "word": script_tokens[j1 + offset],
+                    "start": round(cur_t, 3),
+                    "end": nxt_t,
+                })
+                cur_t = nxt_t
+        # "delete" drops spurious phantom ASR tokens not present in verified script
+
+    if not reconciled:
+        return whisper_segments
+
+    # Enforce strict monotonic timestamps after boundary insertions
+    prev_end = 0.0
+    for w_item in reconciled:
+        w_item["start"] = round(max(prev_end, float(w_item["start"])), 3)
+        w_item["end"] = round(max(w_item["start"] + 0.01, float(w_item["end"])), 3)
+        prev_end = w_item["end"]
+
+    # Map reconciled words back into original acoustic segment windows
+    buckets: List[List[Dict[str, Any]]] = [[] for _ in seg_bounds]
+    for w_item in reconciled:
+        mid = 0.5 * (float(w_item["start"]) + float(w_item["end"]))
+        best_idx = min(
+            range(len(seg_bounds)),
+            key=lambda idx: 0.0 if seg_bounds[idx][0] <= mid <= seg_bounds[idx][1] else min(
+                abs(mid - seg_bounds[idx][0]), abs(mid - seg_bounds[idx][1])
+            ),
+        )
+        buckets[best_idx].append(w_item)
 
     rebuilt: List[Dict[str, Any]] = []
-    for seg in whisper_segments:
-        words = seg.get("words") or []
+    for words in buckets:
         if not words:
             continue
         rebuilt.append({
@@ -321,7 +397,7 @@ def _reconcile_script_casing_onto_whisper(
             "text": " ".join(w["word"] for w in words).strip(),
             "words": words,
         })
-    return rebuilt
+    return rebuilt or whisper_segments
 
 
 @pipeline_stage(

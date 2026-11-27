@@ -61,7 +61,21 @@ KINETIC_CAMERAS = ["push", "orbit", "crane", "low"]
 VALID_CAMERAS = ["wide", "close", "orbit", "push", "low", "crane", "top"]
 KINETIC_ACTIONS = ["reveal", "grow", "walk", "celebrate"]
 VALID_ACTIONS = ["reveal", "idle", "walk", "celebrate", "grow"]
-PALETTE_COLORS = ["#d79a45", "#c4532f", "#3a5a40", "#2b4c7e", "#7b2cbf"]
+PALETTE_COLORS = ["#d79a45", "#c4532f", "#3a5a40", "#2b4c7e", "#7d342b"]
+INVESTIGATIVE_FALLBACK_PROPS: Tuple[str, ...] = (
+    "hanko-stamp", "brass-caliper", "forensic-loupe", "ledger", "vault",
+    "contract", "scale", "chart", "courthouse", "gavel",
+    "briefcase", "shield", "clock", "megaphone",
+)
+_MARKET_EVIDENCE_HEADERS: Dict[str, str] = {
+    "KR": "핵심 근거 // 공시·보도",
+    "KO": "핵심 근거 // 공시·보도",
+    "JA": "主要根拠 // 検証記録",
+    "JP": "主要根拠 // 検証記録",
+    "VN": "CHỨNG CỨ // ĐỐI CHIẾU",
+    "VI": "CHỨNG CỨ // ĐỐI CHIẾU",
+    "EN": "KEY EVIDENCE // RECORD",
+}
 
 # Bilingual semantic domain rule table for deterministic non-LLM fallback / tests.
 # Zero episode-specific entity leaks (Rule 128).
@@ -266,19 +280,26 @@ def _normalize_llm_shots_to_words(
         else:
             spans.append({"word_start_idx": 0, "word_end_idx": total_w - 1})
 
-    # Split any overly long shot (>5.8s and >=10 words) cleanly so visual pacing remains brisk
-    balanced: List[Dict[str, Any]] = []
-    for sh in spans:
-        s_i, e_i = sh["word_start_idx"], sh["word_end_idx"]
-        dur = float(flat_words[e_i]["end"]) - float(flat_words[s_i]["start"])
-        if dur > 5.8 and (e_i - s_i + 1) >= 10:
-            mid_i = (s_i + e_i) // 2
-            left = dict(sh, word_start_idx=s_i, word_end_idx=mid_i)
-            right = dict(sh, word_start_idx=mid_i + 1, word_end_idx=e_i)
-            right.pop("card", None)
-            balanced.extend([left, right])
-        else:
-            balanced.append(sh)
+    # Split any overly long shot (>5.5s and >=8 words) cleanly up to 2 passes so pacing stays brisk
+    balanced = list(spans)
+    for _pass in range(2):
+        next_balanced: List[Dict[str, Any]] = []
+        changed = False
+        for sh in balanced:
+            s_i, e_i = sh["word_start_idx"], sh["word_end_idx"]
+            dur = float(flat_words[e_i]["end"]) - float(flat_words[s_i]["start"])
+            if dur > 5.5 and (e_i - s_i + 1) >= 8:
+                mid_i = (s_i + e_i) // 2
+                left = dict(sh, word_start_idx=s_i, word_end_idx=mid_i)
+                right = dict(sh, word_start_idx=mid_i + 1, word_end_idx=e_i, _split_half=True)
+                right.pop("card", None)
+                next_balanced.extend([left, right])
+                changed = True
+            else:
+                next_balanced.append(sh)
+        balanced = next_balanced
+        if not changed:
+            break
 
     # Convert word spans into contiguous [start, end] time ranges covering 0.0 .. audio_duration
     out: List[Dict[str, Any]] = []
@@ -391,10 +412,12 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
         violations.append(f"Last scene end {scenes[-1].get('end')} != duration {duration}")
 
     prev_pair = None
+    prev_prop = None
     prev_cam = None
     props_used = set()
     biomes_used = set()
     night_count = 0
+    card_count = 0
 
     for idx, sc in enumerate(scenes):
         sid = sc.get("id") or f"shot-{idx + 1:03d}"
@@ -420,6 +443,8 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
             violations.append(f"{sid}: unknown biome '{biome}'")
         if prev_pair == (biome, prop):
             violations.append(f"{sid}: consecutive duplicate staging ({biome}, {prop})")
+        elif prop == prev_prop:
+            violations.append(f"{sid}: consecutive duplicate prop '{prop}'")
 
         tm = sc.get("timing")
         if isinstance(tm, dict) and "contactSec" in tm:
@@ -429,9 +454,12 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
 
         if sc.get("night"):
             night_count += 1
+        if sc.get("card"):
+            card_count += 1
         props_used.add(prop)
         biomes_used.add(biome)
         prev_pair = (biome, prop)
+        prev_prop = prop
         prev_cam = cam
 
     if len(scenes) >= 12:
@@ -439,6 +467,9 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
             violations.append(f"Low prop diversity: {len(props_used)} < 6 across {len(scenes)} shots")
         if len(biomes_used) < 4:
             violations.append(f"Low biome diversity: {len(biomes_used)} < 4 across {len(scenes)} shots")
+        min_cards = max(3, int(len(scenes) * 0.20))
+        if card_count < min_cards:
+            violations.append(f"Insufficient grounded evidence cards: {card_count} < {min_cards} across {len(scenes)} shots")
     if len(scenes) >= 6 and (night_count / len(scenes)) > 0.45:
         violations.append(f"Night scenes ratio too high: {night_count}/{len(scenes)} (>45%)")
 
@@ -447,6 +478,7 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
         "unique_props": len(props_used),
         "unique_biomes": len(biomes_used),
         "night_count": night_count,
+        "card_count": card_count,
         "foley_cues": len(timeline.get("foley_cues") or []),
     }
     return {"passed": len(violations) == 0, "violations": violations, "stats": stats}
@@ -601,6 +633,118 @@ def _call_director_llm_via_vps(
         out_local.unlink(missing_ok=True)
 
 
+def _extract_numeric_metric(text: str) -> str:
+    """Extracts primary quantitative figure/unit token from narration or claim text."""
+    m = re.search(
+        r"\d[\d,\.]*(?:\s*(?:조|억|만|%|곳|건|차례|년|개월|배|원|billion|million|trillion|percent|cases|years|months|dollars))?",
+        str(text or ""),
+        flags=re.IGNORECASE,
+    )
+    return m.group(0).strip() if m else ""
+
+
+def _best_matching_claim(narration: str, claims: Optional[List[Dict[str, Any]]], used_ids: set) -> Optional[Dict[str, Any]]:
+    """Selects highest-overlap S02 grounding claim matching a shot's spoken clause."""
+    if not claims:
+        return None
+    narr_nums = set(re.findall(r"\d[\d,\.]*", narration))
+    narr_tokens = set(re.findall(r"[\w가-힣ぁ-んァ-ヶ一-龥]{2,}", narration.lower()))
+    best_claim = None
+    best_score = -1
+    for c in claims:
+        if not isinstance(c, dict):
+            continue
+        cid = str(c.get("claim_id") or "")
+        c_txt = str(c.get("claim_text") or c.get("statement") or c.get("claim") or "")
+        metric = str(c.get("metric") or c.get("quantified_value") or "")
+        combined = f"{metric} {c_txt}"
+        c_nums = set(re.findall(r"\d[\d,\.]*", combined))
+        c_tokens = set(re.findall(r"[\w가-힣ぁ-んァ-ヶ一-龥]{2,}", combined.lower()))
+        score = (6 * len(narr_nums & c_nums)) + len(narr_tokens & c_tokens) + (0 if cid in used_ids else 2)
+        if score > best_score:
+            best_score = score
+            best_claim = c
+    return best_claim if best_score > 0 else None
+
+
+def _attach_grounded_evidence_cards(
+    timeline_scenes: List[Dict[str, Any]],
+    grounding_claims: Optional[List[Dict[str, Any]]],
+    market: str = "EN",
+) -> None:
+    """Ensures 12+ shot timelines have >=30% spaced native-language forensic Note Cards."""
+    n = len(timeline_scenes)
+    if n < 12:
+        return
+
+    for idx in range(1, n):
+        if timeline_scenes[idx].get("card") and timeline_scenes[idx - 1].get("card"):
+            timeline_scenes[idx].pop("card", None)
+
+    target_count = max(3, round(n * 0.30))
+    existing = sum(1 for sc in timeline_scenes if sc.get("card"))
+    if existing >= target_count:
+        return
+
+    base_head = _MARKET_EVIDENCE_HEADERS.get(str(market or "EN").strip().upper(), "KEY EVIDENCE // RECORD")
+    hero_props = {"hanko-stamp", "brass-caliper", "forensic-loupe", "ledger", "vault", "contract", "scale", "chart"}
+    used_claim_ids: set = set()
+    side_idx = existing
+
+    def _score_idx(idx: int) -> Tuple[int, int]:
+        sc = timeline_scenes[idx]
+        narr = str(sc.get("narration") or "")
+        s = 5 if re.search(r"\d", narr) else 0
+        if sc.get("prop") in hero_props:
+            s += 2
+        if len(narr) >= 16:
+            s += 1
+        return (s, -idx)
+
+    for idx in sorted(range(n), key=_score_idx, reverse=True):
+        if existing >= target_count:
+            break
+        sc = timeline_scenes[idx]
+        if sc.get("card"):
+            continue
+        prev_has = idx > 0 and bool(timeline_scenes[idx - 1].get("card"))
+        next_has = (idx + 1) < n and bool(timeline_scenes[idx + 1].get("card"))
+        if prev_has or next_has:
+            continue
+
+        narr = str(sc.get("narration") or "").strip()
+        claim = _best_matching_claim(narr, grounding_claims, used_claim_ids)
+        if claim and claim.get("claim_id"):
+            used_claim_ids.add(str(claim["claim_id"]))
+
+        metric = (
+            str(claim.get("quantified_value") or claim.get("metric") or "").strip()
+            if claim else ""
+        ) or _extract_numeric_metric(narr)
+        src = str(claim.get("source_title") or claim.get("source") or "").strip() if claim else ""
+        if src and "//" in base_head:
+            head = f"{base_head.split('//')[0].strip()} // {src[:16]}"
+        else:
+            head = base_head
+
+        fact_txt = str(sc.get("title") or narr[:36]).strip()
+        clean_narr = re.sub(r"\s+", " ", narr).strip()
+        if len(clean_narr) > 40:
+            clean_narr = clean_narr[:39].rstrip() + "…"
+        lines_raw: List[str] = [f"`{metric}` — {fact_txt}"[:44] if metric else fact_txt[:44]]
+        if clean_narr and clean_narr != fact_txt:
+            lines_raw.append(clean_narr)
+
+        sanitized = _sanitize_card(
+            {"kind": "note", "head": head, "lines": lines_raw, "side": "right" if side_idx % 2 == 0 else "left"},
+            side_idx,
+        )
+        if sanitized:
+            sc["card"] = sanitized
+            existing += 1
+            side_idx += 1
+
+
 def direct_papertrails_timeline_with_llm(
     transcript_segments: List[Dict[str, Any]],
     audio_path: Path,
@@ -712,6 +856,8 @@ def direct_papertrails_timeline_with_llm(
             if span_dur >= 4.2 or at_punct or idx == len(flat_words) - 1:
                 clause_txt = " ".join(x["word"] for x in flat_words[grp_start:idx + 1])
                 prop, biome = detect_subject_and_biome(clause_txt)
+                if raw_shots and biome in {s.get("biome") for s in raw_shots[-3:]}:
+                    biome = VALID_BIOMES[len(raw_shots) % len(VALID_BIOMES)]
                 raw_shots.append({
                     "word_start_idx": grp_start,
                     "word_end_idx": idx,
@@ -732,6 +878,8 @@ def direct_papertrails_timeline_with_llm(
 
     timeline_scenes: List[Dict[str, Any]] = []
     prev_pair: Optional[Tuple[str, str]] = None
+    prev_prop: Optional[str] = None
+    prev_title: Optional[str] = None
     prev_cam: Optional[str] = None
     card_counter = 0
 
@@ -744,6 +892,15 @@ def direct_papertrails_timeline_with_llm(
                 prop = d_prop
             if biome not in VALID_BIOMES:
                 biome = d_biome
+
+        # Guarantee zero consecutive identical props (including split long shots)
+        if prev_prop == prop or (sh.get("_split_half") and prev_prop == prop):
+            alt_prop, _ = detect_subject_and_biome(sh["narration"])
+            if alt_prop in VALID_PROPS and alt_prop != prev_prop:
+                prop = alt_prop
+            else:
+                prop_pool = [p for p in INVESTIGATIVE_FALLBACK_PROPS if p != prev_prop]
+                prop = prop_pool[i % len(prop_pool)]
 
         # Guarantee zero adjacent identical (biome, prop) staging
         if prev_pair == (biome, prop):
@@ -760,6 +917,10 @@ def direct_papertrails_timeline_with_llm(
 
         night = bool(sh.get("night", False)) or prop == "moon"
         title = _sanitize_viewer_title(sh.get("title"), sh["narration"], i)
+        if prev_title == title:
+            alt_title = _sanitize_viewer_title("", sh["narration"], i)
+            if alt_title and alt_title != prev_title:
+                title = alt_title
         card = _sanitize_card(sh.get("card"), card_counter)
         if card:
             card_counter += 1
@@ -780,8 +941,11 @@ def direct_papertrails_timeline_with_llm(
             **({"card": card} if card else {}),
         })
         prev_pair = (biome, prop)
+        prev_prop = prop
+        prev_title = title
         prev_cam = cam
 
+    _attach_grounded_evidence_cards(timeline_scenes, grounding_claims, market=market)
     foley_cues = _attach_timing_sheet_and_foley(timeline_scenes, captions)
     timeline_spec: Dict[str, Any] = {
         "version": 1,
