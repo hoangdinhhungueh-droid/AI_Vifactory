@@ -412,7 +412,7 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     t = re.sub(r"보도된\s*것으로\s*보도됐습니다\.$", "보도된 것으로 전해졌습니다.", t)
     t = re.sub(r"전해진\s*것으로\s*전해졌습니다\.$", "전해진 것으로 보도됐습니다.", t)
 
-    if t.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "설명합니다.", "제시했습니다.")):
+    if t.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "설명합니다.", "제시했습니다.", "보도했습니다.", "전했습니다.", "보도합니다.", "전합니다.")):
         return t
     h_bodo = "한 것으로 보도됐습니다." if slot_idx % 2 == 0 else "한 것으로 전해졌습니다."
     d_bodo = "된 것으로 전해졌습니다." if slot_idx % 2 == 0 else "된 것으로 보도됐습니다."
@@ -2397,9 +2397,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     for ln in cand_beats[0][2]:
                         if market == "EN":
                             ln.text = _compact_en_hook_line(ln.text, target_words=16)
-                        elif market == "KR":
-                            ln.text = _compact_kr_hook_line(ln.text, max_chars=40)
-                        else:
+                        elif market != "KR":
                             words = ln.text.split()
                             if len(words) > 16:
                                 ln.text = " ".join(words[:15]).rstrip(",:;") + "."
@@ -2954,15 +2952,12 @@ def run(ctx: RunContext) -> StageArtifact:
                     ln.text = re.sub(r"\.{2,}$", ".", ln.text)
 
             # Final Beat 1 duration guard after qualifier additions
-            if cand_beats and len(cand_beats[0][2]) >= 3:
+            if cand_beats and len(cand_beats[0][2]) >= 3 and market == "EN":
                 b1_lines_post = [ln.text for ln in cand_beats[0][2]]
                 b1_timing_post = estimate_script_speech_duration(b1_lines_post, market=market, docudrama_tempo=True)
                 if float(b1_timing_post["estimated_duration_sec"]) > 22.0:
                     for ln in cand_beats[0][2]:
-                        if market == "EN":
-                            ln.text = _compact_en_hook_line(ln.text, target_words=16)
-                        elif market == "KR":
-                            ln.text = _compact_kr_hook_line(ln.text, max_chars=40)
+                        ln.text = _compact_en_hook_line(ln.text, target_words=16)
 
             return cand_beats
 
