@@ -2405,6 +2405,7 @@ def run(ctx: RunContext) -> StageArtifact:
         )
         from core.llm_json import parse_llm_json
         from core.pacing_budgeter import (
+            DOCUDRAMA_SPEECH_RATES,
             count_speech_units,
             estimate_script_speech_duration,
             get_market_unit_bounds,
@@ -2444,6 +2445,8 @@ def run(ctx: RunContext) -> StageArtifact:
                 d_max = float(getattr(dw, "max", 300.0) or 300.0)
                 target_run_s = float(getattr(dw, "target", 240.0) or 240.0)
         u_min, u_max = get_market_unit_bounds(market, preset_obj=preset_obj)
+        rate_eff = float(DOCUDRAMA_SPEECH_RATES.get(market, 2.0833))
+        prompt_u_min = max(u_min, int(d_min * rate_eff * 1.04))
 
         def _auto_repair_beats(cand_beats: List[Tuple[str, float, List[StorySceneLine]]]) -> List[Tuple[str, float, List[StorySceneLine]]]:
             from app.services.story_provenance_engine import (
@@ -2840,7 +2843,7 @@ def run(ctx: RunContext) -> StageArtifact:
             # 8. If short of min words or min duration, expand lines with unused claim lines into B3
             cand_lines_chk = [ln.text for _, _, lns in cand_beats for ln in lns]
             cand_timing_chk = estimate_script_speech_duration(cand_lines_chk, market=market, docudrama_tempo=True)
-            min_target_units = max(u_min, int(d_min * 2.15)) if market == "EN" else u_min
+            min_target_units = max(u_min, int(d_min * rate_eff * 1.03))
             shortfall = min_target_units - int(cand_timing_chk["spoken_units"])
             dur_shortfall = d_min - float(cand_timing_chk["estimated_duration_sec"])
             if (shortfall > 0 or dur_shortfall > 0) and len(cand_beats) >= 4:
@@ -3069,7 +3072,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE & PROVENANCE MANDATE FOR KOREAN (KR) MARKET:\n"
                         "1. Write 100% natural, authoritative investigative Korean narration (Hangul). English/foreign prose is STRICTLY FORBIDDEN.\n"
-                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} spoken Hangul+numeral syllables across 19-24 lines). Beat 1 (B1_hook) MUST have ONLY 3 concise lines totaling <= 95 syllables (~15-20s) and cite ONLY verified_primary, official_regulation, or corroborated_secondary claim_ids (NEVER put unverified_secondary / unconfirmed_claim inside B1_hook!).\n"
+                        f"2. STRICT LENGTH & PACING: Total 180-300s ({prompt_u_min}-{u_max} spoken Hangul+numeral syllables across 19-24 lines; target >= {prompt_u_min} syllables so duration exceeds 185s). Beat 1 (B1_hook) MUST have ONLY 3 concise lines totaling <= 95 syllables (~15-20s) and cite ONLY verified_primary, official_regulation, or corroborated_secondary claim_ids (NEVER put unverified_secondary / unconfirmed_claim inside B1_hook!).\n"
                         "3. STRICT ATTRIBUTION SPECIFICITY (Gate 3):\n"
                         "   - For claims with credibility_tier='unconfirmed_claim' (RSS snippets/unverified reports): Attribute ONLY as preliminary/unconfirmed reporting ('초기 보도에 따르면', '확인되지 않은 보도에 따르면', '일부 보도에 따르면', '전해진 바에 따르면'). NEVER claim them as '언론사 취재 결과', '취재 결과', or '감독 당국의 조사'!\n"
                         "     DO NOT frame unverified secondary reports as established statutory authority ('개정 법률에 따른') or binding state guarantees ('국가가 보장하는')! Qualify them strictly as reported proposals or media speculation ('보도에 제시된 방안에 따르면', '언론 일각에서는 정책적 선례라는 해석이 제기됐습니다').\n"
@@ -3091,7 +3094,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR JAPANESE (JA) MARKET:\n"
                         "1. Write 100% natural, authoritative Japanese investigative narration. No Hangul or foreign sentences.\n"
-                        f"2. STRICT LENGTH & PACING: Write 23-28 substantive lines of 50-65 Japanese characters each so total spoken narration is STRICTLY 1,100-1,600 Japanese characters (NEVER < 950 chars! Within {u_min}-{u_max} chars / 180-300s). Beat 1 (B1_hook) MUST have 3 short lines totaling <= 115 chars (~15-19s) citing ONLY verified_primary/corroborated_secondary claim_ids.\n"
+                        f"2. STRICT LENGTH & PACING: Write 23-28 substantive lines of 50-65 Japanese characters each so total spoken narration is STRICTLY 1,100-1,600 Japanese characters (NEVER < 950 chars! Within {prompt_u_min}-{u_max} chars / 180-300s). Beat 1 (B1_hook) MUST have 3 short lines totaling <= 115 chars (~15-19s) citing ONLY verified_primary/corroborated_secondary claim_ids.\n"
                         "3. Distinguish judgment (判決によれば) vs indictment (起訴状によれば) vs complaint (訴状によれば) vs named institution report (日銀公表/報告書によれば) vs unverified press reports (未確認の報道によれば).\n"
                         "4. Never attribute unverified claims to official investigatory results (e.g. avoid '調査報道' or '当局調査' for unverified snippets).\n"
                         "5. Include short 5-10 char pattern interrupt lines in B2, B3, B4 without repetitive reporting templates.\n\n"
@@ -3100,14 +3103,14 @@ def run(ctx: RunContext) -> StageArtifact:
                     user_prompt += (
                         "CRITICAL LANGUAGE MANDATE FOR VIETNAMESE (VN) MARKET:\n"
                         "1. Write 100% natural, authoritative Vietnamese narration with full Vietnamese diacritics. No English/CJK prose.\n"
-                        f"2. STRICT LENGTH & PACING: Total 180-300s ({u_min}-{u_max} Vietnamese words across 19-24 lines). Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 75 words (<= 21s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
+                        f"2. STRICT LENGTH & PACING: Total 180-300s ({prompt_u_min}-{u_max} Vietnamese words across 19-24 lines). Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 75 words (<= 21s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
                         "3. Distinguish judgment (Theo phán quyết của tòa án) vs indictment (Theo cáo trạng) vs complaint (Theo đơn kiện) vs unverified press reports (Theo thông tin bước đầu chưa kiểm chứng).\n"
                         "4. CẤM gán thông tin chưa kiểm chứng thành kết quả điều tra chính thức. Thêm câu ngắt nhịp kịch tính ngắn (2-6 từ) ở Beat 2, Beat 3, Beat 4.\n\n"
                     )
                 else:
                     user_prompt += (
                         "CRITICAL PROVENANCE & STRICT PACING MANDATE FOR ENGLISH (EN) MARKET:\n"
-                        f"1. STRICT WORD COUNT & DURATION: Write 100% crisp investigative English narration totaling {u_min}-{u_max} words across 21-24 lines (target 390-440 words, 190-230s docudrama speech timing). Scripts under 370 words will be rejected! Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 48 words (<= 23.5s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
+                        f"1. STRICT WORD COUNT & DURATION: Write 100% crisp investigative English narration totaling {prompt_u_min}-{u_max} words across 21-24 lines (target 390-440 words, 190-230s docudrama speech timing). Scripts under 370 words will be rejected! Beat 1 (B1_hook) MUST have 3 concise lines totaling <= 48 words (<= 23.5s) citing ONLY verified_primary or corroborated_secondary claim_ids.\n"
                         "2. STRICT NON-REDUNDANT CLAIM GROUNDING & BEAT PARTITION:\n"
                         "   - Ground every substantive factual sentence in a DISTINCT claim from the evidence ledger.\n"
                         "   - DO NOT repeat the same claim or numbers across multiple beats or lines (e.g. introduce C006 only in B1 or B2, never both; introduce C008 only in B4, never repeat in B1).\n"
@@ -3511,23 +3514,23 @@ def run(ctx: RunContext) -> StageArtifact:
                     if has_b1_b5_redundancy:
                         repair_notes.append("Do NOT repeat Beat 1 claims in Beat 5. Beat 5 must focus on ongoing reform, systemic consequences, and living warning.")
                     if not dur_ok or not units_ok:
-                        if cand_timing["spoken_units"] < u_min:
-                            shortfall = u_min - int(cand_timing["spoken_units"])
-                            mid_target = int((u_min + u_max) // 2)
+                        if cand_timing["spoken_units"] < prompt_u_min or cand_dur < d_min:
+                            shortfall = max(1, prompt_u_min - int(cand_timing["spoken_units"]))
+                            mid_target = int((prompt_u_min + u_max) // 2)
                             repair_notes.append(
-                                f"TOO SHORT by {shortfall} {cand_timing['unit_type']}: current is ONLY {cand_timing['spoken_units']} "
-                                f"({cand_dur:.1f}s), MUST reach {u_min}-{u_max} {cand_timing['unit_type']} (target ~{mid_target}) and {d_min:.0f}-{d_max:.0f}s. "
-                                f"ADD 4-6 new substantive lines across B2_setup, B3_scheme, and B4_crack detailing the evidence ledger claims cleanly (do NOT lengthen B1_hook)."
+                                f"TOO SHORT ({cand_dur:.1f}s / {cand_timing['spoken_units']} {cand_timing['unit_type']}, shortfall ~{shortfall} {cand_timing['unit_type']}): "
+                                f"MUST reach >= {prompt_u_min}-{u_max} {cand_timing['unit_type']} (target ~{mid_target}) and {d_min:.0f}-{d_max:.0f}s. "
+                                f"ADD 3-5 new substantive lines across B2_setup, B3_scheme, and B4_crack detailing distinct claims from the ledger cleanly (do NOT lengthen B1_hook)."
                             )
                         elif cand_timing["spoken_units"] > u_max:
                             excess = int(cand_timing["spoken_units"]) - u_max
                             repair_notes.append(
-                                f"TOO LONG by {excess} {cand_timing['unit_type']}: trim redundant wording across B2-B5 to strictly {u_min}-{u_max} {cand_timing['unit_type']} ({d_min:.0f}-{d_max:.0f}s)."
+                                f"TOO LONG by {excess} {cand_timing['unit_type']}: trim redundant wording across B2-B5 to strictly {prompt_u_min}-{u_max} {cand_timing['unit_type']} ({d_min:.0f}-{d_max:.0f}s)."
                             )
                         else:
                             repair_notes.append(
                                 f"Duration {cand_dur:.1f}s ({cand_timing['spoken_units']} {cand_timing['unit_type']}) is OUT OF BOUNDS: "
-                                f"MUST be strictly {d_min:.0f}-{d_max:.0f}s AND {u_min}-{u_max} {cand_timing['unit_type']}."
+                                f"MUST be strictly {d_min:.0f}-{d_max:.0f}s AND {prompt_u_min}-{u_max} {cand_timing['unit_type']}."
                             )
                     if not b1_dur_ok:
                         repair_notes.append(
@@ -3565,7 +3568,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         model=retry_model,
                         system_prompt=system_prompt,
                         max_tokens=8192,
-                        temperature=0.35 if not units_ok else 0.2,
+                        temperature=0.35 if (not units_ok or not dur_ok) else 0.2,
                         timeout=120.0,
                         fallback=retry_fallback,
                     )
