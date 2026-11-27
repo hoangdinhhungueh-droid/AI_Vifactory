@@ -480,7 +480,29 @@ def _write_direction_markdown(
     direction_md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _call_director_llm_via_vps(prompt_json: str, system_prompt: str) -> str:
+def _extract_shots_from_llm_reply(raw_reply: str) -> List[Dict[str, Any]]:
+    """Extracts shot dicts from raw LLM output; returns empty list on non-JSON prose."""
+    from core.llm_json import parse_llm_json
+
+    if not (raw_reply or "").strip():
+        return []
+    try:
+        parsed = parse_llm_json(raw_reply)
+    except (ValueError, json.JSONDecodeError) as _parse_err:
+        logger.warning("[papertrails_director] Director LLM reply was not valid JSON (%s); head=%r", _parse_err, raw_reply[:160])
+        return []
+    if isinstance(parsed, dict) and isinstance(parsed.get("shots"), list):
+        return [s for s in parsed["shots"] if isinstance(s, dict)]
+    if isinstance(parsed, list):
+        return [s for s in parsed if isinstance(s, dict)]
+    return []
+
+
+def _call_director_llm_via_vps(
+    prompt_json: str,
+    system_prompt: str,
+    model: Optional[str] = None,
+) -> str:
     """Relays Semantic Director LLM call through Hetzner VPS when local firewall blocks HHTech."""
     from scripts.download_vps_asset import download_file_chunked
     from scripts.upload_vps_asset import upload_file
@@ -504,6 +526,7 @@ def _call_director_llm_via_vps(prompt_json: str, system_prompt: str) -> str:
             json.dumps({
                 "prompt": prompt_json,
                 "system_prompt": system_prompt,
+                "model": model,
                 "max_tokens": 6000,
                 "temperature": 0.35,
             }, ensure_ascii=False),
@@ -516,23 +539,25 @@ def _call_director_llm_via_vps(prompt_json: str, system_prompt: str) -> str:
             "import json, sys\n"
             "sys.path.insert(0, '/root/video_factory')\n"
             "from app.services.model_gateway import get_global_gateway\n"
+            "from app.services.papertrails_director import _extract_shots_from_llm_reply\n"
             f"req = json.loads(open({remote_req!r}, encoding='utf-8').read())\n"
             "gw = get_global_gateway()\n"
             "res = gw.call_llm(\n"
             "    prompt=req['prompt'],\n"
+            "    model=req.get('model'),\n"
             "    system_prompt=req['system_prompt'],\n"
             "    max_tokens=req['max_tokens'],\n"
             "    temperature=req['temperature'],\n"
             "    timeout=180.0,\n"
             "    fallback='gpt-6.1-sol',\n"
             ")\n"
-            "if not (res or '').strip():\n"
+            "if not _extract_shots_from_llm_reply(res or ''):\n"
             "    res = gw.call_llm(\n"
             "        prompt=req['prompt'],\n"
             "        model='gpt-6.1-sol',\n"
             "        system_prompt=req['system_prompt'],\n"
             "        max_tokens=req['max_tokens'],\n"
-            "        temperature=req['temperature'],\n"
+            "        temperature=0.2,\n"
             "        timeout=180.0,\n"
             "    )\n"
             f"open({remote_out!r}, 'w', encoding='utf-8').write(res or '')\n"
@@ -644,7 +669,6 @@ def direct_papertrails_timeline_with_llm(
 
         import httpx
         from app.services.model_gateway import get_global_gateway
-        from core.llm_json import parse_llm_json
 
         prompt_json = json.dumps(user_payload, ensure_ascii=False, indent=2)
         gw = get_global_gateway()
@@ -657,24 +681,23 @@ def direct_papertrails_timeline_with_llm(
                 timeout=120.0,
                 fallback="gpt-6.1-sol",
             )
-            if not (raw_reply or "").strip():
+            raw_shots = _extract_shots_from_llm_reply(raw_reply)
+            if not raw_shots:
                 raw_reply = gw.call_llm(
                     prompt=prompt_json,
                     model="gpt-6.1-sol",
                     system_prompt=system_prompt,
                     max_tokens=6000,
-                    temperature=0.35,
+                    temperature=0.2,
                     timeout=120.0,
+                    fallback="claude-sonnet-5-5",
                 )
+                raw_shots = _extract_shots_from_llm_reply(raw_reply)
         except (httpx.HTTPError, OSError) as direct_err:
             # Local corporate SWG firewall blocks hhtechapi.com -> relay cleanly via Hetzner VPS
             logger.warning("[papertrails_director] Direct gateway blocked (%s); relaying LLM call via VPS...", direct_err)
             raw_reply = _call_director_llm_via_vps(prompt_json=prompt_json, system_prompt=system_prompt)
-        parsed = parse_llm_json(raw_reply)
-        if isinstance(parsed, dict) and isinstance(parsed.get("shots"), list):
-            raw_shots = parsed["shots"]
-        elif isinstance(parsed, list):
-            raw_shots = parsed
+            raw_shots = _extract_shots_from_llm_reply(raw_reply)
         if not raw_shots:
             raise RuntimeError(
                 f"[papertrails_director] LLM Semantic Director returned 0 valid shots (reply head: {raw_reply[:200]!r})"
