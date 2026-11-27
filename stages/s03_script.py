@@ -497,10 +497,19 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
         (r"왔습니다\.$", "왔던 것으로 전해졌습니다."),
         (r"갔습니다\.$", "갔던 것으로 전해졌습니다."),
         (r"났습니다\.$", "났던 것으로 전해졌습니다."),
-        (r"습니다\.$", "는 것으로 전해졌습니다."),
-        (r"ㅂ니다\.$", "는 것으로 전해졌습니다."),
     ]
     for pat, rep in repls:
+        if re.search(pat, t):
+            return re.sub(pat, rep, t)
+    # Algorithmic Hangul jongseong 'ㅆ' guard: all remaining past-tense verbs (-ㅆ습니다) become -던 것으로, never ungrammatical -ㅆ는 것으로
+    if t.endswith("습니다.") and len(t) >= 5:
+        prev_ch = t[-5]
+        if "\uac00" <= prev_ch <= "\ud7a3" and ((ord(prev_ch) - 0xAC00) % 28) == 20:
+            return f"{t[:-4]}던 것으로 전해졌습니다."
+    for pat, rep in [
+        (r"습니다\.$", "는 것으로 전해졌습니다."),
+        (r"ㅂ니다\.$", "는 것으로 전해졌습니다."),
+    ]:
         if re.search(pat, t):
             return re.sub(pat, rep, t)
     return t

@@ -632,6 +632,16 @@ def test_kr_number_normalization_double_hedging_and_broadcast_register():
     assert ok_reg_pass is True
 
 
+def test_kr_past_tense_softening_avoids_ungrammatical_ss_neun():
+    """Verify _soften_kr_reported_predicate handles arbitrary past-tense ㅆ syllables without -ㅆ는 것으로."""
+    from stages.s03_script import _soften_kr_reported_predicate
+
+    out = _soften_kr_reported_predicate("출자자로 이름을 올렸습니다.")
+    assert out == "출자자로 이름을 올렸던 것으로 전해졌습니다."
+    assert "올렸는" not in out
+
+
+
 
 
 

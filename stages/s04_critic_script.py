@@ -767,11 +767,28 @@ def run(ctx: RunContext) -> StageArtifact:
                         max_tokens=2500,
                         temperature=0.2,
                         timeout=120.0,
-                        fallback="claude-v4.1-flash",
+                        fallback="gpt-6.1-sol",
                     )
-                    parsed_critic = parse_llm_json(raw_resp)
+                    try:
+                        parsed_critic = parse_llm_json(raw_resp)
+                    except ValueError as _parse_err1:
+                        logger.warning(f"[S04_CRITIC] Primary LLM JSON parse failed ({_parse_err1}); retrying with gpt-6.1-sol.")
+                        parsed_critic = {}
                     if isinstance(parsed_critic, list):
                         parsed_critic = parsed_critic[0] if parsed_critic and isinstance(parsed_critic[0], dict) else {}
+                    if not isinstance(parsed_critic, dict) or "verdict" not in parsed_critic:
+                        raw_resp_retry = gateway.call_llm(
+                            prompt=user_prompt,
+                            model="gpt-6.1-sol",
+                            system_prompt=system_prompt,
+                            max_tokens=2500,
+                            temperature=0.1,
+                            timeout=120.0,
+                            fallback="claude-sonnet-5-5",
+                        )
+                        parsed_critic = parse_llm_json(raw_resp_retry)
+                        if isinstance(parsed_critic, list):
+                            parsed_critic = parsed_critic[0] if parsed_critic and isinstance(parsed_critic[0], dict) else {}
                     if not isinstance(parsed_critic, dict):
                         parsed_critic = {}
 
