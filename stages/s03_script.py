@@ -535,13 +535,13 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
         tail = rep_m.group(0).rstrip(".") + "."
         head = cand[:rep_m.start()].strip()
 
-        # Check if head contains coordinate clause (e.g. 평가됐고, ...)
-        clauses = [c.strip() for c in re.split(r"[;—]|,\s*", head) if c.strip()]
+        # Check if head contains coordinate clause (e.g. 평가됐고, ...) without splitting numeric thousands commas (e.g. 7,600)
+        clauses = [c.strip() for c in re.split(r"[;—]|,(?!\d)\s*", head) if c.strip()]
         if len(clauses) > 1:
             c0 = clauses[0]
             c0 = re.sub(r"\b(?:매우|상당히|주요|초기|향후|당시|기존|추가적|잠재적|사적|공적|실제|실질적인)\s*", "", c0)
             c0_h = _to_kr_honorific(c0)
-            if not c0_h.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
+            if not pfx and not c0_h.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
                 c0_h = _soften_kr_reported_predicate(c0_h, slot_idx=0)
             if len(c0_h) <= max_chars + 12:
                 cand_fin = f"{pfx}{c0_h}".strip()
@@ -592,7 +592,7 @@ def _compact_kr_hook_line(text: str, max_chars: int = 35) -> str:
 
     cand = re.sub(r"\s+", " ", cand).strip()
     cand = _to_kr_honorific(cand)
-    if rep_m and not cand.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
+    if not pfx and rep_m and not cand.endswith(("전해졌습니다.", "보도됐습니다.", "알려졌습니다.", "의혹입니다.", "분석입니다.")):
         cand = _soften_kr_reported_predicate(cand, slot_idx=0)
 
     cand_fin = f"{pfx}{cand}".strip()
