@@ -180,6 +180,15 @@ def test_timing_sheet_and_antipattern_audit():
         assert not prop_audit["passed"]
         assert any("consecutive duplicate prop" in v for v in prop_audit["violations"])
 
+    # Verify coarse 5-shot 240s timelines are rejected fail-closed
+    coarse_scenes = [
+        {**tl["scenes"][0], "id": f"shot-{k + 1:03d}", "start": k * 48.0, "end": (k + 1) * 48.0, "prop": ["chart", "ledger", "contract", "scale", "vault"][k]}
+        for k in range(5)
+    ]
+    coarse_audit = audit_papertrails_timeline_antipatterns({**tl, "duration": 240.0, "scenes": coarse_scenes})
+    assert not coarse_audit["passed"]
+    assert any("Insufficient shot density" in v for v in coarse_audit["violations"])
+
 
 def test_attach_grounded_evidence_cards_native_language_kr():
     """Ensure 12+ shot Korean timeline auto-populates native Hangul note cards and avoids adjacent cards."""

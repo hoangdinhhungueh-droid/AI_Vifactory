@@ -280,9 +280,9 @@ def _normalize_llm_shots_to_words(
         else:
             spans.append({"word_start_idx": 0, "word_end_idx": total_w - 1})
 
-    # Split any overly long shot (>5.5s and >=8 words) cleanly up to 2 passes so pacing stays brisk
+    # Split any overly long shot (>5.5s and >=6 words) cleanly up to 4 passes so pacing stays brisk
     balanced = list(spans)
-    for _pass in range(2):
+    for _pass in range(4):
         next_balanced: List[Dict[str, Any]] = []
         changed = False
         for sh in balanced:
@@ -470,6 +470,9 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
         min_cards = max(3, int(len(scenes) * 0.20))
         if card_count < min_cards:
             violations.append(f"Insufficient grounded evidence cards: {card_count} < {min_cards} across {len(scenes)} shots")
+    min_req = _min_required_shots(duration)
+    if duration >= 45.0 and len(scenes) < min_req:
+        violations.append(f"Insufficient shot density: {len(scenes)} < {min_req} for {duration:.1f}s video")
     if len(scenes) >= 6 and (night_count / len(scenes)) > 0.45:
         violations.append(f"Night scenes ratio too high: {night_count}/{len(scenes)} (>45%)")
 
@@ -482,6 +485,11 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
         "foley_cues": len(timeline.get("foley_cues") or []),
     }
     return {"passed": len(violations) == 0, "violations": violations, "stats": stats}
+
+
+def _min_required_shots(audio_duration: float) -> int:
+    """Enforces dynamic granular pacing floor (~1 shot per <=9s) for full-length videos."""
+    return max(12, int(float(audio_duration) / 9.0)) if float(audio_duration) >= 45.0 else 1
 
 
 def _write_direction_markdown(
@@ -534,6 +542,7 @@ def _call_director_llm_via_vps(
     prompt_json: str,
     system_prompt: str,
     model: Optional[str] = None,
+    min_shots: int = 1,
 ) -> str:
     """Relays Semantic Director LLM call through Hetzner VPS when local firewall blocks HHTech."""
     from scripts.download_vps_asset import download_file_chunked
@@ -559,6 +568,7 @@ def _call_director_llm_via_vps(
                 "prompt": prompt_json,
                 "system_prompt": system_prompt,
                 "model": model,
+                "min_shots": int(min_shots),
                 "max_tokens": 6000,
                 "temperature": 0.35,
             }, ensure_ascii=False),
@@ -583,8 +593,9 @@ def _call_director_llm_via_vps(
             "    timeout=180.0,\n"
             "    fallback='gpt-6.1-sol',\n"
             ")\n"
-            "if not _extract_shots_from_llm_reply(res or ''):\n"
-            "    res = gw.call_llm(\n"
+            "shots = _extract_shots_from_llm_reply(res or '')\n"
+            "if len(shots) < int(req.get('min_shots', 1)):\n"
+            "    res2 = gw.call_llm(\n"
             "        prompt=req['prompt'],\n"
             "        model='gpt-6.1-sol',\n"
             "        system_prompt=req['system_prompt'],\n"
@@ -592,6 +603,8 @@ def _call_director_llm_via_vps(
             "        temperature=0.2,\n"
             "        timeout=180.0,\n"
             "    )\n"
+            "    if len(_extract_shots_from_llm_reply(res2 or '')) > len(shots):\n"
+            "        res = res2\n"
             f"open({remote_out!r}, 'w', encoding='utf-8').write(res or '')\n"
         )
         vps_python = "/root/video_factory/venv/bin/python3"
@@ -817,6 +830,7 @@ def direct_papertrails_timeline_with_llm(
 
         prompt_json = json.dumps(user_payload, ensure_ascii=False, indent=2)
         gw = get_global_gateway()
+        min_shots = _min_required_shots(audio_duration)
         try:
             raw_reply = gw.call_llm(
                 prompt=prompt_json,
@@ -827,8 +841,12 @@ def direct_papertrails_timeline_with_llm(
                 fallback="gpt-6.1-sol",
             )
             raw_shots = _extract_shots_from_llm_reply(raw_reply)
-            if not raw_shots:
-                raw_reply = gw.call_llm(
+            if len(raw_shots) < min_shots:
+                logger.warning(
+                    "[papertrails_director] Primary returned %d/%d shots; retrying gpt-6.1-sol.",
+                    len(raw_shots), min_shots,
+                )
+                raw_reply2 = gw.call_llm(
                     prompt=prompt_json,
                     model="gpt-6.1-sol",
                     system_prompt=system_prompt,
@@ -837,11 +855,18 @@ def direct_papertrails_timeline_with_llm(
                     timeout=120.0,
                     fallback="claude-sonnet-5-5",
                 )
-                raw_shots = _extract_shots_from_llm_reply(raw_reply)
+                cand_shots = _extract_shots_from_llm_reply(raw_reply2)
+                if len(cand_shots) > len(raw_shots):
+                    raw_shots = cand_shots
+                    raw_reply = raw_reply2
         except (httpx.HTTPError, OSError, ModelGatewayError, AllProvidersFailed) as direct_err:
             # Local corporate SWG firewall blocks hhtechapi.com -> relay cleanly via Hetzner VPS
             logger.warning("[papertrails_director] Direct gateway blocked (%s); relaying LLM call via VPS...", direct_err)
-            raw_reply = _call_director_llm_via_vps(prompt_json=prompt_json, system_prompt=system_prompt)
+            raw_reply = _call_director_llm_via_vps(
+                prompt_json=prompt_json,
+                system_prompt=system_prompt,
+                min_shots=min_shots,
+            )
             raw_shots = _extract_shots_from_llm_reply(raw_reply)
         if not raw_shots:
             raise RuntimeError(
