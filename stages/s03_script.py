@@ -2464,7 +2464,7 @@ def run(ctx: RunContext) -> StageArtifact:
             # 4. Clean filler adverbs and trim words if units > target
             cand_lines = [ln.text for _, _, lns in cand_beats for ln in lns]
             cand_timing = estimate_script_speech_duration(cand_lines, market=market, docudrama_tempo=True)
-            target_units = min(u_max - 20, 515) if u_max else 515
+            target_units = (min(u_max - 20, 515) if market == "EN" else max(u_min + 20, u_max - 40)) if u_max else 515
             excess = int(cand_timing["spoken_units"]) - target_units
             if excess > 0:
                 for b_id, _, lns in cand_beats:
@@ -2510,21 +2510,34 @@ def run(ctx: RunContext) -> StageArtifact:
                             rep_c = avail_aftermath[af_idx]
                             af_idx += 1
                             rep_cid = rep_c.get("claim_id")
-                            rep_text = rep_c.get("claim", "")
+                            rep_text = str(rep_c.get("claim", "")).strip().rstrip(".。")
                             ln.claim_ids = [rep_cid]
-                            ln.text = f"Subsequent reporting reflected that {rep_text}."
+                            if market == "KR":
+                                ln.text = f"후속 보도에 따르면, {rep_text}."
+                            elif market == "JA":
+                                ln.text = f"続報によれば、{rep_text}。"
+                            elif market == "VN":
+                                ln.text = f"Các bản tin tiếp theo cho biết {rep_text}."
+                            else:
+                                ln.text = f"Subsequent reporting reflected that {rep_text}."
                         else:
                             ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
 
                 # Dedup duplicate claims within B5 itself
                 seen_b5_cids = set()
+                _living_warning_by_market = {
+                    "EN": "Until the underlying rules change, the structural accountability gap remains open.",
+                    "KR": "핵심 책임 기준이 명확히 공개되기 전까지 이 구조적 공백은 그대로 남아 있습니다.",
+                    "JA": "制度上の責任基準が明確化されない限り、この構造的な空白は残されたままです。",
+                    "VN": "Chừng nào quy định nền tảng chưa thay đổi, khoảng trống trách nhiệm này vẫn còn nguyên.",
+                }
                 for ln in cand_beats[-1][2]:
                     if ln.claim_ids:
                         dup = any(c in seen_b5_cids for c in ln.claim_ids)
                         if dup:
                             ln.claim_ids = []
                             ln.visual_hook = "living_warning"
-                            ln.text = "Until federal trade rules change, the tariff refund trap remains set." if market == "EN" else "무역 규정이 개정되기 전까지는 환급의 함정이 계속될 것입니다."
+                            ln.text = _living_warning_by_market.get(market, _living_warning_by_market["EN"])
                         else:
                             for c in ln.claim_ids:
                                 seen_b5_cids.add(c)
@@ -2548,12 +2561,20 @@ def run(ctx: RunContext) -> StageArtifact:
             for v_mech in verified_mechanisms:
                 m_cid = v_mech.get("claim_id")
                 if m_cid and m_cid not in used_cids_all:
-                    m_txt = str(v_mech.get("claim", "")).strip().rstrip(". ")
+                    m_txt = str(v_mech.get("claim", "")).strip().rstrip(".。")
                     m_src = str(v_mech.get("source_name") or "Press").strip()
                     if len(cand_beats) >= 3:
+                        if market == "KR":
+                            _mech_line = f"보도에 따르면, {m_txt}."
+                        elif market == "JA":
+                            _mech_line = f"報道によれば、{m_txt}。"
+                        elif market == "VN":
+                            _mech_line = f"Theo các bản tin đã công bố, {m_txt}."
+                        else:
+                            _mech_line = f"Published reporting by {m_src} indicates that {m_txt}."
                         cand_beats[2][2].append(StorySceneLine(
                             line_id="B3_L_mech",
-                            text=f"Published reporting by {m_src} indicates that {m_txt}.",
+                            text=_mech_line,
                             claim_ids=[m_cid],
                             visual_hook="red_thread",
                         ))
@@ -2561,104 +2582,99 @@ def run(ctx: RunContext) -> StageArtifact:
                             ln_renum.line_id = f"B3_L{idx_renum:02d}"
                         used_cids_all.add(m_cid)
 
-            # If B2 contains transition line that cites C006 without discussing customs, detach C006
-            if len(cand_beats) >= 2:
-                for ln in cand_beats[1][2]:
-                    if "C006" in (ln.claim_ids or []) and ("customs" not in ln.text.lower() and "duty" not in ln.text.lower() and "importer" not in ln.text.lower()):
-                        ln.claim_ids = [c for c in ln.claim_ids if c != "C006"]
-                        if not ln.claim_ids:
-                            ln.visual_hook = "pattern_interrupt"
-                            ln.text = "The refund went to the company. The open question is where that money went next."
-
-            # 6. Vary repetitive unconfirmed/press openings across beats with dynamic source enrichment
-            unconfirmed_templates = [
-                "According to preliminary reporting by {src}, ",
-                "According to initial unverified reporting in {src}, ",
-                "Pending independent corroboration, reporting by {src} noted that ",
-                "Early unverified reports in {src} noted that ",
-                "Preliminary reporting by {src} indicated that ",
-                "Unconfirmed press reports in {src} indicated that ",
-                "Early unconfirmed reporting from {src} reflected that ",
-                "According to early reporting yet to be verified in {src}, ",
-            ]
-            unconfirmed_generic = [
-                "According to preliminary reporting by industry analysts, ",
-                "According to initial reports yet to be verified by reporters, ",
-                "Early unverified news reports indicated that ",
-                "Pending independent corroboration, financial reporting noted that ",
-                "Preliminary accounts at the time noted that ",
-            ]
-            alleged_templates = [
-                "According to {src} reporting, ",
-                "Published reporting by {src} indicates that ",
-                "Media reporting in {src} reflects that ",
-                "Press accounts in {src} reported that ",
-            ]
-            alleged_generic = [
-                "Press reports indicate that ",
-                "According to press reports, ",
-                "Published reporting notes that ",
-                "Media accounts describe that ",
-            ]
-            u_alt_idx = 0
-            p_alt_idx = 0
-            for b_id, _, lns in cand_beats:
+            # Sanitize doubled terminal punctuation across all markets
+            for _, _, lns in cand_beats:
                 for ln in lns:
-                    # Sanitize any doubled terminal punctuation
                     ln.text = re.sub(r"\?\s*\.+$", "?", ln.text)
                     ln.text = re.sub(r"\.{2,}$", ".", ln.text)
 
-                    # Hook Beat 1 cleanups: ensure B1_L03 is purely rhetorical paradox question without claims, and B1_L02 has no fragment
-                    if "B1" in b_id:
-                        if ln.line_id == "B1_L03" or ("who really paid" in ln.text.lower() or "shoppers paid" in ln.text.lower() or ln.text.strip().endswith("?")):
+            # 6. Vary repetitive unconfirmed/press openings across beats with dynamic source enrichment (EN only)
+            if market == "EN":
+                if len(cand_beats) >= 2:
+                    for ln in cand_beats[1][2]:
+                        if "C006" in (ln.claim_ids or []) and ("customs" not in ln.text.lower() and "duty" not in ln.text.lower() and "importer" not in ln.text.lower()):
+                            ln.claim_ids = [c for c in ln.claim_ids if c != "C006"]
+                            if not ln.claim_ids:
+                                ln.visual_hook = "pattern_interrupt"
+                                ln.text = "The refund went to the company. The open question is where that money went next."
+
+                unconfirmed_templates = [
+                    "According to preliminary reporting by {src}, ",
+                    "According to initial unverified reporting in {src}, ",
+                    "Pending independent corroboration, reporting by {src} noted that ",
+                    "Early unverified reports in {src} noted that ",
+                    "Preliminary reporting by {src} indicated that ",
+                    "Unconfirmed press reports in {src} indicated that ",
+                    "Early unconfirmed reporting from {src} reflected that ",
+                    "According to early reporting yet to be verified in {src}, ",
+                ]
+                unconfirmed_generic = [
+                    "According to preliminary reporting by industry analysts, ",
+                    "According to initial reports yet to be verified by reporters, ",
+                    "Early unverified news reports indicated that ",
+                    "Pending independent corroboration, financial reporting noted that ",
+                    "Preliminary accounts at the time noted that ",
+                ]
+                alleged_templates = [
+                    "According to {src} reporting, ",
+                    "Published reporting by {src} indicates that ",
+                    "Media reporting in {src} reflects that ",
+                    "Press accounts in {src} reported that ",
+                ]
+                alleged_generic = [
+                    "Press reports indicate that ",
+                    "According to press reports, ",
+                    "Published reporting notes that ",
+                    "Media accounts describe that ",
+                ]
+                u_alt_idx = 0
+                p_alt_idx = 0
+                for b_id, _, lns in cand_beats:
+                    for ln in lns:
+                        if "B1" in b_id and (ln.line_id == "B1_L03" or ln.text.strip().endswith("?")):
                             ln.claim_ids = []
                             ln.visual_hook = "ruler_measure"
-                            ln.text = "So who really paid the tariff, and who gets the money back?"
                             continue
 
-                    # Align B4 pricing + refund routing line with C006
-                    if "register" in ln.text.lower() and "refund" in ln.text.lower() and "C006" in evidence_map:
-                        if "C006" not in ln.claim_ids:
-                            ln.claim_ids.append("C006")
+                        if "register" in ln.text.lower() and "refund" in ln.text.lower() and "C006" in evidence_map:
+                            if "C006" not in ln.claim_ids:
+                                ln.claim_ids.append("C006")
 
-                    # Align B5 C014 line without out-of-scope editorial conclusion
-                    if "B5" in b_id and "C014" in ln.claim_ids and re.search(r",\s*so\s+the\s+question\s+of\s+who", ln.text, re.IGNORECASE):
-                        ln.text = re.sub(r",\s*so\s+the\s+question\s+of\s+who\s+keeps\s+the\s+money\s+remains\s+unresolved\.?", ".", ln.text, flags=re.IGNORECASE)
+                        if "B5" in b_id and "C014" in ln.claim_ids and re.search(r",\s*so\s+the\s+question\s+of\s+who", ln.text, re.IGNORECASE):
+                            ln.text = re.sub(r",\s*so\s+the\s+question\s+of\s+who\s+keeps\s+the\s+money\s+remains\s+unresolved\.?", ".", ln.text, flags=re.IGNORECASE)
 
-                    if not ln.claim_ids:
-                        continue
+                        if not ln.claim_ids:
+                            continue
 
-                    # Select primary claim for provenance bucket & source
-                    c_dict = None
-                    for cid in ln.claim_ids:
-                        c_obj = evidence_map.get(cid)
-                        if c_obj:
-                            c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
-                            break
-                    if not c_dict:
-                        continue
+                        c_dict = None
+                        for cid in ln.claim_ids:
+                            c_obj = evidence_map.get(cid)
+                            if c_obj:
+                                c_dict = c_obj.model_dump() if hasattr(c_obj, "model_dump") else dict(c_obj)
+                                break
+                        if not c_dict:
+                            continue
 
-                    bkt = _exp_bkt(
-                        legal_status=str(c_dict.get("legal_status", "alleged")),
-                        source_type=str(c_dict.get("source_type", "press")),
-                        doc_type=str(c_dict.get("doc_type", "unknown")),
-                        speaker=c_dict.get("speaker"),
-                        procedural_status=str(c_dict.get("procedural_status", "unknown")),
-                        verification_status=str(c_dict.get("verification_status", "corroborated_secondary")),
-                        credibility_tier=str(c_dict.get("credibility_tier", "") or ""),
-                    )
-                    if bkt == "fact":
-                        continue
+                        bkt = _exp_bkt(
+                            legal_status=str(c_dict.get("legal_status", "alleged")),
+                            source_type=str(c_dict.get("source_type", "press")),
+                            doc_type=str(c_dict.get("doc_type", "unknown")),
+                            speaker=c_dict.get("speaker"),
+                            procedural_status=str(c_dict.get("procedural_status", "unknown")),
+                            verification_status=str(c_dict.get("verification_status", "corroborated_secondary")),
+                            credibility_tier=str(c_dict.get("credibility_tier", "") or ""),
+                        )
+                        if bkt == "fact":
+                            continue
 
-                    src = str(c_dict.get("source_name") or "").strip()
-                    clean_txt = ln.text.strip()
-                    while True:
-                        stripped, pfx_found = _strip_pfx(clean_txt, market=market)
-                        if pfx_found and stripped != clean_txt:
-                            clean_txt = stripped.strip()
-                        else:
-                            break
-                    if market == "EN":
+                        src = str(c_dict.get("source_name") or "").strip()
+                        clean_txt = ln.text.strip()
+                        while True:
+                            stripped, pfx_found = _strip_pfx(clean_txt, market=market)
+                            if pfx_found and stripped != clean_txt:
+                                clean_txt = stripped.strip()
+                            else:
+                                break
                         clean_txt = clean_txt.lstrip(",:; ").strip()
                         clean_txt = re.sub(r"^(?:(?:Unconfirmed|Published|Media|Press|Financial)\s+reports\s+(?:indicated|reported|described|stated)(?:\s+that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"^(?:(?:Industry|Financial|Market)\s+analysts\s+(?:were\s+reported\s+to\s+say|reported|stated|said|noted)\s+(?:that)?)\s*", "", clean_txt, flags=re.IGNORECASE).strip()
@@ -2686,36 +2702,35 @@ def run(ctx: RunContext) -> StageArtifact:
                         clean_txt = re.sub(r"\bprompted\s+consumer\s+advocates\s+criticized\b", "prompted consumer-advocate criticism of", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r"\badvocates\s+criticized\s+governance\s+rules\b", "advocate criticism of governance rules", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r",?\s*and\s+the\s+choice\s+rests\s+entirely\s+with\s+them\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
-                        clean_txt = re.sub(r",?\s*and\s+the\s+choice\s+rests\s+with\s+them\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r",?\s*before\s+products\s+ever\s+reached\s+shelves\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = re.sub(r",?\s*before\s+goods\s+ever\s+reached\s+shelves\.?", ".", clean_txt, flags=re.IGNORECASE).strip()
                         clean_txt = clean_txt.lstrip(",:; ").strip()
 
-                    if bkt == "unverified":
-                        if src:
-                            pfx = unconfirmed_templates[u_alt_idx % len(unconfirmed_templates)].format(src=src)
+                        if bkt == "unverified":
+                            if src:
+                                pfx = unconfirmed_templates[u_alt_idx % len(unconfirmed_templates)].format(src=src)
+                            else:
+                                pfx = unconfirmed_generic[u_alt_idx % len(unconfirmed_generic)]
+                            u_alt_idx += 1
+                        elif bkt in ("alleged", "corroborated_secondary"):
+                            if src:
+                                pfx = alleged_templates[p_alt_idx % len(alleged_templates)].format(src=src)
+                            else:
+                                pfx = alleged_generic[p_alt_idx % len(alleged_generic)]
+                            p_alt_idx += 1
+                        elif bkt == "alleged_regulator":
+                            pfx = f"According to regulatory filings by {src}, " if src else "According to regulatory filings, "
                         else:
-                            pfx = unconfirmed_generic[u_alt_idx % len(unconfirmed_generic)]
-                        u_alt_idx += 1
-                    elif bkt in ("alleged", "corroborated_secondary"):
-                        if src:
-                            pfx = alleged_templates[p_alt_idx % len(alleged_templates)].format(src=src)
-                        else:
-                            pfx = alleged_generic[p_alt_idx % len(alleged_generic)]
-                        p_alt_idx += 1
-                    elif bkt == "alleged_regulator":
-                        pfx = f"According to regulatory filings by {src}, " if src else "According to regulatory filings, "
-                    else:
-                        pfx = "According to official records, "
+                            pfx = "According to official records, "
 
-                    if len(clean_txt.split()) >= 4:
-                        if clean_txt and clean_txt[0].isupper():
-                            fw = clean_txt.split()[0]
-                            if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial", "major"):
-                                clean_txt = fw.lower() + clean_txt[len(fw):]
+                        if len(clean_txt.split()) >= 4:
+                            if clean_txt and clean_txt[0].isupper():
+                                fw = clean_txt.split()[0]
+                                if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "early", "initial", "major"):
+                                    clean_txt = fw.lower() + clean_txt[len(fw):]
 
-                    ln.text = f"{pfx}{clean_txt}"
-                    ln.text = re.sub(r"\.{2,}$", ".", ln.text)
+                        ln.text = f"{pfx}{clean_txt}"
+                        ln.text = re.sub(r"\.{2,}$", ".", ln.text)
 
             # 7. Ensure factual lines without claim IDs find their matching claim from evidence ledger
             for b_id, _, lns in cand_beats:
@@ -2748,7 +2763,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     extra_c = avail_c[af_idx]
                     af_idx += 1
                     extra_cid = extra_c.get("claim_id")
-                    extra_text = str(extra_c.get("claim", "")).strip().rstrip(". ")
+                    extra_text = str(extra_c.get("claim", "")).strip().rstrip(".。")
                     extra_src = str(extra_c.get("source_name") or "Press").strip()
                     extra_bkt = _exp_bkt(
                         legal_status=str(extra_c.get("legal_status", "alleged")),
@@ -2759,22 +2774,53 @@ def run(ctx: RunContext) -> StageArtifact:
                         verification_status=str(extra_c.get("verification_status", "corroborated_secondary")),
                         credibility_tier=str(extra_c.get("credibility_tier", "") or ""),
                     )
-                    if extra_bkt == "unverified":
-                        pfx_extra = f"According to preliminary reporting by {extra_src}, " if extra_src else "According to preliminary reporting, "
-                    elif extra_bkt in ("alleged", "corroborated_secondary"):
-                        pfx_extra = f"According to {extra_src} reporting, " if extra_src else "According to press reports, "
-                    elif extra_bkt == "alleged_regulator":
-                        pfx_extra = f"According to regulatory filings by {extra_src}, " if extra_src else "According to regulatory filings, "
+                    if market == "KR":
+                        if extra_bkt == "unverified":
+                            pfx_extra = "초기 미확인 보도에 따르면, "
+                        elif extra_bkt in ("alleged", "corroborated_secondary"):
+                            pfx_extra = "보도에 따르면, "
+                        elif extra_bkt == "alleged_regulator":
+                            pfx_extra = "당국 발표에 따르면, "
+                        elif extra_bkt == "bill_proposed":
+                            pfx_extra = "추진 중인 계획 보도에 따르면, "
+                        else:
+                            pfx_extra = "공식 기록에 따르면, "
+                    elif market == "JA":
+                        if extra_bkt == "unverified":
+                            pfx_extra = "未確認の初期報道によれば、"
+                        elif extra_bkt in ("alleged", "corroborated_secondary"):
+                            pfx_extra = "報道によれば、"
+                        elif extra_bkt == "alleged_regulator":
+                            pfx_extra = "当局発表によれば、"
+                        else:
+                            pfx_extra = "公式記録によれば、"
+                    elif market == "VN":
+                        if extra_bkt == "unverified":
+                            pfx_extra = "Theo thông tin sơ bộ chưa kiểm chứng, "
+                        elif extra_bkt in ("alleged", "corroborated_secondary"):
+                            pfx_extra = "Theo các bản tin báo chí, "
+                        elif extra_bkt == "alleged_regulator":
+                            pfx_extra = "Theo công bố của cơ quan quản lý, "
+                        else:
+                            pfx_extra = "Theo hồ sơ chính thức, "
                     else:
-                        pfx_extra = "Public records establish that "
-                    if extra_text and extra_text[0].isupper():
-                        fw = extra_text.split()[0]
-                        if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "major"):
-                            extra_text = fw.lower() + extra_text[len(fw):]
+                        if extra_bkt == "unverified":
+                            pfx_extra = f"According to preliminary reporting by {extra_src}, " if extra_src else "According to preliminary reporting, "
+                        elif extra_bkt in ("alleged", "corroborated_secondary"):
+                            pfx_extra = f"According to {extra_src} reporting, " if extra_src else "According to press reports, "
+                        elif extra_bkt == "alleged_regulator":
+                            pfx_extra = f"According to regulatory filings by {extra_src}, " if extra_src else "According to regulatory filings, "
+                        else:
+                            pfx_extra = "Public records establish that "
+                        if extra_text and extra_text[0].isupper():
+                            fw = extra_text.split()[0]
+                            if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "major"):
+                                extra_text = fw.lower() + extra_text[len(fw):]
                     if extra_text:
+                        end_punct = "。" if market == "JA" else "."
                         cand_beats[2][2].append(StorySceneLine(
                             line_id="B3_L_extra",
-                            text=f"{pfx_extra}{extra_text}.",
+                            text=f"{pfx_extra}{extra_text}{end_punct}",
                             claim_ids=[extra_cid],
                             visual_hook="stat_hero",
                         ))
@@ -2860,14 +2906,53 @@ def run(ctx: RunContext) -> StageArtifact:
                                         ]
                                     else:
                                         pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
-                                    pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)] if market == "EN" else ("당국 발표에 따르면, " if bkt == "alleged_regulator" else ("보도에 따르면, " if bkt == "alleged" else ("초기 미확인 보도에 따르면, " if bkt == "unverified" else "공식 기록에 따르면, ")))
-                                    if len(clean_txt.split()) >= 4:
+                                    if market == "KR":
+                                        _kr_map = {
+                                            "alleged_regulator": "당국 발표에 따르면, ",
+                                            "alleged": "보도에 따르면, ",
+                                            "corroborated_secondary": "보도에 따르면, ",
+                                            "unverified": "초기 미확인 보도에 따르면, ",
+                                            "bill_proposed": "추진 중인 계획 보도에 따르면, ",
+                                        }
+                                        pfx = _kr_map.get(bkt, "공식 기록에 따르면, ")
+                                    elif market == "JA":
+                                        _ja_map = {
+                                            "alleged_regulator": "当局発表によれば、",
+                                            "alleged": "報道によれば、",
+                                            "corroborated_secondary": "報道によれば、",
+                                            "unverified": "未確認の初期報道によれば、",
+                                            "bill_proposed": "検討段階の計画報道によれば、",
+                                        }
+                                        pfx = _ja_map.get(bkt, "公式記録によれば、")
+                                    elif market == "VN":
+                                        _vn_map = {
+                                            "alleged_regulator": "Theo công bố của cơ quan quản lý, ",
+                                            "alleged": "Theo các bản tin báo chí, ",
+                                            "corroborated_secondary": "Theo các bản tin báo chí, ",
+                                            "unverified": "Theo thông tin sơ bộ chưa kiểm chứng, ",
+                                            "bill_proposed": "Theo kế hoạch đang được xem xét, ",
+                                        }
+                                        pfx = _vn_map.get(bkt, "Theo hồ sơ chính thức, ")
+                                    else:
+                                        pfx = pfx_opts[hash(ln.line_id) % len(pfx_opts)]
+                                    if market == "EN" and len(clean_txt.split()) >= 4:
                                         if clean_txt and clean_txt[0].isupper():
                                             fw = clean_txt.split()[0]
                                             if fw.lower() in ("the", "a", "an", "this", "these", "some", "retail", "corporate", "federal", "several", "major"):
                                                 clean_txt = fw.lower() + clean_txt[len(fw):]
                                     ln.text = f"{pfx}{clean_txt}"
                     ln.text = re.sub(r"\.{2,}$", ".", ln.text)
+
+            # Final Beat 1 duration guard after qualifier additions
+            if cand_beats and len(cand_beats[0][2]) >= 3:
+                b1_lines_post = [ln.text for ln in cand_beats[0][2]]
+                b1_timing_post = estimate_script_speech_duration(b1_lines_post, market=market, docudrama_tempo=True)
+                if float(b1_timing_post["estimated_duration_sec"]) > 22.0:
+                    for ln in cand_beats[0][2]:
+                        if market == "EN":
+                            ln.text = _compact_en_hook_line(ln.text, target_words=16)
+                        elif market == "KR":
+                            ln.text = _compact_kr_hook_line(ln.text, max_chars=40)
 
             return cand_beats
 
