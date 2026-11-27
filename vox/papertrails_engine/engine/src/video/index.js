@@ -11,6 +11,7 @@ import { createPost } from '../render/post.js';
 import { createWFC } from '../world/wfc.js';
 import { createWorld } from '../world/world.js';
 import { createTraveller } from '../player/traveller.js';
+import { createForensicDesk } from './forensic_desk.js';
 import { createProp } from './props.js';
 import { validateTimeline, sampleTimeline, seededRandom, frameCount } from './timeline.mjs';
 import { smooth, easeInOutCubic, easeOutBack } from './motion.js';
@@ -29,6 +30,7 @@ window.__papertrails = {
   async init(timeline, options = {}) {
     if(runtime) throw new Error('Already initialized; reload the page to reset deterministic state');
     validateTimeline(timeline);
+    const isDeskMode = timeline.stageMode === 'forensic_desk';
     const quality=options.quality || 'med';
     const allowSeek=!!options.allowSeek;
     if(!['low','vox','med','high'].includes(quality))throw new Error('Invalid quality');
@@ -41,18 +43,32 @@ window.__papertrails = {
     const { renderer, setSize }=createRenderer({canvas:document.querySelector('#atlas'),quality});
     setSize(timeline.width,timeline.height);
     const materials=createMaterials({quality});
-    const assets=await loadAssets({materials,renderer,quality});materials.setTextures(assets.textures);
-    if(assets.source!=='gltf')throw new Error(`Required upstream glTF assets missing: ${assets.source}`);
-    const wfc=createWFC({seed:timeline.seed});
-    const world=createWorld({scene,assets,wfc,materials,quality});
-    const traveller=createTraveller({scene,assets,world,materials});
+    const assets = isDeskMode
+      ? { source: 'forensic_desk_3d', textures: null }
+      : await loadAssets({materials,renderer,quality});
+    if(assets.textures) materials.setTextures(assets.textures);
+    if(!isDeskMode && assets.source!=='gltf')throw new Error(`Required upstream glTF assets missing: ${assets.source}`);
+    const desk = isDeskMode ? createForensicDesk({ scene, materials, seed: timeline.seed, scenes: timeline.scenes }) : null;
+    const wfc = isDeskMode ? null : createWFC({seed:timeline.seed});
+    const world = isDeskMode ? desk : createWorld({scene,assets,wfc,materials,quality});
+    const traveller = isDeskMode
+      ? {
+          position: new THREE.Vector3(),
+          moveDir: new THREE.Vector3(0, 0, 1),
+          speed: 0,
+          group: { position: new THREE.Vector3() },
+          teleport(x, z) { this.position.set(x, 0, z); },
+          update() {},
+        }
+      : createTraveller({scene,assets,world,materials});
     const camera=new THREE.PerspectiveCamera(37,timeline.width/timeline.height,.05,250);
     const lights=createLights({scene,quality});const daynight=createDayNight({scene});
     const post=createPost({renderer,scene,camera,quality});post.setSize(timeline.width,timeline.height);
     const subjects=new Map();
-    for(const s of timeline.scenes){const prop=createProp(s.prop,{materials,assets,color:s.color});prop.group.visible=false;scene.add(prop.group);subjects.set(s.id,prop);}
+    for(const s of timeline.scenes){const prop=createProp(s.prop,{materials,assets,color:s.color,sceneData:s});prop.group.visible=false;scene.add(prop.group);subjects.set(s.id,prop);}
     const originFor = biome => {
       const preferred={heartland:[0,0],desert:[22,0],snow:[-22,0],blossom:[0,22],pinewood:[0,-22]}[biome];
+      if (isDeskMode) return new THREE.Vector3(...preferred);
       for(let r=0;r<=14;r+=2)for(let i=0;i<16;i++){const x=preferred[0]+Math.cos(i*Math.PI/8)*r,z=preferred[1]+Math.sin(i*Math.PI/8)*r;if(biomeAt(timeline.seed,x/2,z/2)===biome&&world.isWalkable(x-1.2,z+1.3))return new THREE.Vector3(x,0,z);}
       return new THREE.Vector3(...[preferred[0],0,preferred[1]]);
     };
@@ -64,19 +80,38 @@ window.__papertrails = {
     function updateCamera(sample) {
       const s=sample.scene,origin=origins.get(s.id),side=sides.get(s.id)??.36,p=easeInOutCubic(sample.progress);
       const portrait=timeline.height>timeline.width,k=portrait?1.27:1;
-      focus.copy(origin);focus.y=.9;
+      focus.copy(origin);focus.y=isDeskMode?.95:.9;
       let dist=9,height=.68,angle=side;
-      switch(s.camera){
-        case 'close': dist=6.8-0.45*p; angle=side+0.10*p; break;
-        case 'wide': dist=11-0.55*p; angle=side+0.08*Math.sin(p*Math.PI); break;
-        case 'orbit': angle=side+.14+p*.45; break;                                   // non-linear S-curve orbit arc
-        case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;                       // eased dolly toward subject
-        case 'low': dist=5.4-.5*p; height=.42; angle=side+.12*p; focus.y=1.18; break;  // hero angle clearing foreground foliage
-        case 'crane': dist=8.5; height=.22+.72*p; break;                            // eased crane reveal
+      if (isDeskMode) {
+        switch(s.camera){
+          case 'close': dist=5.4-0.4*p; height=.48; angle=side+0.08*p; break;
+          case 'wide': dist=8.2-0.45*p; height=.56; angle=side+0.08*Math.sin(p*Math.PI); break;
+          case 'orbit': dist=6.8; height=.50; angle=side+.12+p*.42; break;
+          case 'push': dist=7.6-2.4*p; height=.56-.10*p; break;
+          case 'low': dist=5.0-.45*p; height=.30; angle=side+.12*p; focus.y=1.05; break;
+          case 'crane': dist=7.2; height=.34+.52*p; break;
+        }
+      } else {
+        switch(s.camera){
+          case 'close': dist=6.8-0.45*p; angle=side+0.10*p; break;
+          case 'wide': dist=11-0.55*p; angle=side+0.08*Math.sin(p*Math.PI); break;
+          case 'orbit': angle=side+.14+p*.45; break;                                   // non-linear S-curve orbit arc
+          case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;                       // eased dolly toward subject
+          case 'low': dist=5.4-.5*p; height=.42; angle=side+.12*p; focus.y=1.18; break;  // hero angle clearing foreground foliage
+          case 'crane': dist=8.5; height=.22+.72*p; break;                            // eased crane reveal
+        }
       }
       const d=dist*k;
       if(s.camera==='top')camera.position.set(origin.x+.01+Math.sin(p*Math.PI)*.45,(13-0.7*p)*(portrait?1.2:1),origin.z+2);
       else camera.position.set(origin.x+Math.sin(angle)*d, Math.max(1.1,d*height),origin.z+Math.cos(angle)*d);
+      if (isDeskMode && !portrait && s.card && (s.card.side === 'left' || s.card.side === 'right')) {
+        const rightX = Math.cos(angle), rightZ = -Math.sin(angle);
+        const shift = s.card.side === 'left' ? -0.78 : 0.78;
+        focus.x += rightX * shift;
+        focus.z += rightZ * shift;
+        camera.position.x += rightX * shift * 0.35;
+        camera.position.z += rightZ * shift * 0.35;
+      }
       camera.lookAt(focus);camera.updateMatrixWorld();
       const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);state.listener.rightX=right.x;state.listener.rightZ=right.z;
     }
@@ -84,11 +119,13 @@ window.__papertrails = {
       const s=sample.scene,origin=origins.get(s.id);
       if(active)subjects.get(active).group.visible=false;active=s.id;
       const prop=subjects.get(s.id);prop.group.visible=true;prop.group.position.copy(origin);
-      traveller.teleport(origin.x-1.4,origin.z+1.5,1,-.2);
+      traveller.teleport(isDeskMode ? origin.x : origin.x-1.4, isDeskMode ? origin.z : origin.z+1.5, 1, -.2);
       daynight.grade.force(s.biome);daynight.set(s.night,true);
       updateCamera(sample);
-      // Fixed, scene-local preroll folds the genuine upstream page up before the cut.
-      for(let i=0;i<90;i++){state.time=-3+i/30;world.update(1/30,traveller.position,traveller.moveDir);}
+      if (!isDeskMode) {
+        // Fixed, scene-local preroll folds the genuine upstream page up before the cut.
+        for(let i=0;i<90;i++){state.time=-3+i/30;world.update(1/30,traveller.position,traveller.moveDir);}
+      }
     }
     // ----- 2D paper overlays (title tag, caption strip, page wipe); all driven by timeline time, never CSS clocks.
     const elTitle=document.querySelector('#title'),elCap=document.querySelector('#caption'),elWrap=document.querySelector('#capwrap'),elWipe=document.querySelector('#wipe');
@@ -143,7 +180,7 @@ window.__papertrails = {
       const p=traveller.position;Object.assign(state.traveller,{x:p.x,y:p.y,z:p.z,dirX:traveller.moveDir.x,dirZ:traveller.moveDir.z,speed:traveller.speed});
       // Celebration is an explicit subject action, not continuous navigation.
       if(sample.scene.action==='celebrate')traveller.group.position.y+=Math.abs(Math.sin(sample.local*5))*.12;
-      world.update(dt,p,traveller.moveDir);daynight.update(dt);materials.update(dt);updateCamera(sample);lights.update(dt,traveller,camera);
+      world.update(dt,p,isDeskMode?time:traveller.moveDir);daynight.update(dt);materials.update(dt);updateCamera(sample);lights.update(dt,traveller,camera);
       const prop=subjects.get(sample.scene.id);prop.update(sample.local,sample.progress,sample.scene.action,{level:levelAt(time),levelAt,time,scene:sample.scene});prop.group.position.x=origins.get(sample.scene.id).x;prop.group.position.z=origins.get(sample.scene.id).z;
       // Show the paper face toward the camera but retain physical 3D folds and thickness.
       prop.group.rotation.y=Math.atan2(camera.position.x-prop.group.position.x,camera.position.z-prop.group.position.z);

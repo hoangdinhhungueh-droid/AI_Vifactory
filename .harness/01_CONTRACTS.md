@@ -95,6 +95,7 @@ class PapertrailsScene(BaseModel):
 class PapertrailsTimelineSpec(BaseModel):
     """Khế ước Single Source of Truth giữa S05, S08, S10 và S11."""
     version: int = Field(default=1)
+    stageMode: str = Field(default="forensic_desk", pattern=r"^(forensic_desk|storybook)$")
     width: int = Field(default=1920)
     height: int = Field(default=1080)
     fps: int = Field(default=30)

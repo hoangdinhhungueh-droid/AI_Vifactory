@@ -12,7 +12,7 @@
 - **Tiêu chuẩn Gherkin (Acceptance Criteria)**:
   - `Given`: Tập từ vựng đo thực tế (`segments` kèm `words`), bảng 36 `VALID_PROPS`, tiêu đề chứa mã rò rỉ, hoặc cụm từ ASR tách sai tên riêng (`many-to-one`).
   - `When`: Gọi `_sanitize_viewer_title()`, `_normalize_llm_shots_to_words()`, `build_papertrails_timeline()`, `direct_papertrails_timeline_with_llm()`, `audit_papertrails_timeline_antipatterns()`, và `_reconcile_script_casing_onto_whisper()`.
-  - `Then`: Tiêu đề sạch 100% không còn mã nội bộ (`Rule 136`); các shot phủ kín `0..duration` không lặp `prop` hoặc `(biome, prop)` hoặc `camera` tĩnh liền kề; shot `>= 12` đạt tối thiểu `20%` `note` cards bằng ngôn ngữ bản địa; `_reconcile_script_casing_onto_whisper` khôi phục 100% tên riêng đã duyệt không làm lệch mốc thời gian; Timing Sheet + `foley_cues` nằm gọn trong biên cảnh.
+  - `Then`: `timeline["stageMode"] == "forensic_desk"`; tiêu đề sạch 100% không còn mã nội bộ (`Rule 136`); các shot phủ kín `0..duration` không lặp `prop` hoặc `(biome, prop)` hoặc `camera` tĩnh liền kề; shot `>= 12` đạt tối thiểu `20%` `note` cards bằng ngôn ngữ bản địa; `_reconcile_script_casing_onto_whisper` khôi phục 100% tên riêng đã duyệt không làm lệch mốc thời gian; Timing Sheet + `foley_cues` nằm gọn trong biên cảnh.
 - **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
 
 ---
@@ -20,12 +20,12 @@
 ### [TEST-302] Kiểm thử Papertrails Stills Gate, Parallel Renderer (`--quality vox`) & VPS Bridge (Mã FT-302)
 - **Mã Feature**: `FT-302`
 - **Lệnh kiểm thử (CLI)**:
-  - Trên VPS: `node --check /root/video_factory/vox/papertrails_engine/scripts/render_parallel.mjs && cd /root/video_factory/vox/papertrails_engine && npm run build`
+  - Trên VPS: `node --check /root/video_factory/vox/papertrails_engine/engine/src/video/print_textures.js && node --check /root/video_factory/vox/papertrails_engine/engine/src/video/forensic_desk.js && node --check /root/video_factory/vox/papertrails_engine/scripts/render_parallel.mjs`
   - Live Stills & Render Gate: `python -m orchestrator.run_pipeline --run-id <RUN_ID> --preset story_forensic --only s08_video_gen --stills-only --force`
 - **Tiêu chuẩn Gherkin**:
-  - `Given`: `timeline.json` (`1920x1080`) và `voice_narration.mp3` chuẩn EBU R128.
+  - `Given`: `timeline.json` (`1920x1080`, `stageMode: "forensic_desk"`) và `voice_narration.mp3` chuẩn EBU R128.
   - `When`: Chạy `--stills-only` rồi chạy `render_parallel.mjs --quality vox --render-fps 15 --frame-format jpeg --workers 2`.
-  - `Then`: Sinh đủ ảnh `stills/*.png` kiểm định thị giác không freeze/artifact; video hợp nhất đạt `1920x1080`, đúng số frame `30fps CFR`, `repeatFrameStable=true`, luồng H.264/AAC.
+  - `Then`: Sinh đủ ảnh `stills/*.png` 3D Bàn Hồ Sơ Vox (`0%` cây cối cổ tích), prop 3D in trực tiếp chữ/số liệu sắc nét, không bị Note Card che khuất; video hợp nhất đạt `1920x1080`, đúng số frame `30fps CFR`, `repeatFrameStable=true`, luồng H.264/AAC.
 - **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
 
 ---

@@ -22,14 +22,15 @@
 
 ### [FT-302] Papertrails Stills Gate & Macro Option-C Parallel VPS Renderer (`--quality vox`)
 - **Trạng thái**: `ACTIVE`
-- **File Code**: `app/services/papertrails_vps_bridge.py`, `stages/s08_video_gen.py`, `vox/papertrails_engine/scripts/render.mjs`, `vox/papertrails_engine/scripts/render_parallel.mjs`, `vox/papertrails_engine/scripts/lib/renderer.mjs`, `vox/papertrails_engine/engine/src/core/config/render.js`, `vox/papertrails_engine/engine/src/video/motion.js`, `vox/papertrails_engine/engine/src/video/props.js`, `vox/papertrails_engine/engine/src/video/index.js`, `vox/papertrails_engine/engine/video.html`
-- **Hàm/Service**: `render_papertrails_stills_on_vps`, `render_papertrails_on_vps`, `_run_papertrails_3d_stage`
-- **Input Contract**: `timeline.json` (`1920x1080`) & `voice_narration.mp3` (EBU R128 normalized)
+- **File Code**: `app/services/papertrails_vps_bridge.py`, `stages/s08_video_gen.py`, `vox/papertrails_engine/scripts/render.mjs`, `vox/papertrails_engine/scripts/render_parallel.mjs`, `vox/papertrails_engine/scripts/lib/renderer.mjs`, `vox/papertrails_engine/engine/src/core/config/render.js`, `vox/papertrails_engine/engine/src/video/motion.js`, `vox/papertrails_engine/engine/src/video/print_textures.js`, `vox/papertrails_engine/engine/src/video/forensic_desk.js`, `vox/papertrails_engine/engine/src/video/props.js`, `vox/papertrails_engine/engine/src/video/index.js`, `vox/papertrails_engine/engine/video.html`
+- **Hàm/Service**: `render_papertrails_stills_on_vps`, `render_papertrails_on_vps`, `_run_papertrails_3d_stage`, `createForensicDesk`, `createPrintedPaperMaterial`
+- **Input Contract**: `timeline.json` (`1920x1080`, `stageMode: "forensic_desk"`) & `voice_narration.mp3` (EBU R128 normalized)
 - **Output Contract**: `stills/*.png` (HG3 Gate) + `master_papertrails.mp4` (`1920x1080`, `vox`, `15->30fps CFR`, `jpeg` pipe, `2 workers`, H.264/AAC)
 - **Logic cốt lõi**:
-  1. Bổ sung `motion.js` (*Anticipation, Volume-Preserving Squash & Stretch, Overlap, Bezier Arc, easeOutBack*), vá tuyến tính `orbit`, vá tọa độ cục bộ 9 vạch chia `brass-caliper` (`y=0, z=0.04` trên `rail`), nâng cao camera `low` (`height=.42, dist=5.4-.5*p`) chống cây tiền cảnh chắn prop, và hỗ trợ font CJK (`Noto Sans CJK KR`/`JP`, `word-break:keep-all`) trong `video.html`.
-  2. Chạy `--stills-only` kết xuất nhanh ~12 ảnh PNG lossless đại diện (`quality=vox`) qua scene-seeking (`allowSeek`), upload `voice_narration.mp3` chuẩn bị trước và tải qua `download_vps_asset.py` để kiểm tra thị giác trước khi render full.
-  3. Chạy `render_parallel.mjs --workers 2 --quality vox --render-fps 15 --frame-format jpeg` (`msaa:0, aoTaps:0, bloom:false, shadowMapSize:1024, dof:'cheap', dofTaps:10, shadowTaps:[4,6]`, xuất đúng `30fps CFR` `renderFrames`), bảo vệ treo tiến trình bằng `abortAllWorkers()`, ghép lossless `-c:v copy` và kiểm chứng 3 cửa sổ chuyển động (`t=start/mid/end`).
+  1. Sân khấu **Vox 3D Forensic Paper Desk** (`forensic_desk.js`) thay thế hoàn toàn địa hình cây cối/sa mạc/người tuyết bằng mặt bàn hồ sơ lưu trữ 5 bề mặt (`#F4F1EA` giấy báo, `#C9BB9C` kraft, sổ kế toán, blueprint, broadsheet), chồng hồ sơ giấy đa lớp, ghim đồng & sợi chỉ đỏ nối bằng chứng (`H4_TETHER`).
+  2. `print_textures.js` tạo Dynamic Canvas2D Print Textures in tiêu đề cảnh, nguồn báo và con số kiểm chứng từ `timeline.json` trực tiếp lên mặt 3D của `chart`, `ledger`, `contract`, `hanko-stamp`, `forensic-loupe`, `brass-caliper`, `book` kèm font CJK (`Noto Sans CJK KR`/`JP`).
+  3. Camera 3D giữ **Side-Aware Card Framing** (dịch tâm chiếu sang phía đối diện khi có Note Card để không che prop), nâng góc `low`, vá tọa độ cục bộ `brass-caliper`, và giữ nhịp động học `motion.js`.
+  4. Chạy `--stills-only` kết xuất ~12 ảnh PNG đại diện (`quality=vox`) để audit thị giác trước khi chạy `render_parallel.mjs --workers 2 --quality vox --render-fps 15 --frame-format jpeg` xuất `30fps CFR` lossless `-c:v copy`.
 
 ---
 

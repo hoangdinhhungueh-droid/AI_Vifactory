@@ -210,6 +210,7 @@ def test_attach_grounded_evidence_cards_native_language_kr():
     )
     audit = audit_papertrails_timeline_antipatterns(tl)
     assert audit["passed"], audit
+    assert tl["stageMode"] == "forensic_desk"
     cards = [sc for sc in tl["scenes"] if sc.get("card")]
     assert len(cards) >= 3
     for sc in cards:

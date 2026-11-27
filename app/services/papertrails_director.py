@@ -288,7 +288,7 @@ def _normalize_llm_shots_to_words(
         for sh in balanced:
             s_i, e_i = sh["word_start_idx"], sh["word_end_idx"]
             dur = float(flat_words[e_i]["end"]) - float(flat_words[s_i]["start"])
-            if dur > 5.5 and (e_i - s_i + 1) >= 8:
+            if dur > 5.5 and (e_i - s_i + 1) >= 6:
                 mid_i = (s_i + e_i) // 2
                 left = dict(sh, word_start_idx=s_i, word_end_idx=mid_i)
                 right = dict(sh, word_start_idx=mid_i + 1, word_end_idx=e_i, _split_half=True)
@@ -729,8 +729,9 @@ def _attach_grounded_evidence_cards(
 
         fact_txt = str(sc.get("title") or narr[:36]).strip()
         clean_narr = re.sub(r"\s+", " ", narr).strip()
-        if len(clean_narr) > 40:
-            clean_narr = clean_narr[:39].rstrip() + "…"
+        if len(clean_narr) > 34:
+            words_clip = clean_narr[:34].rsplit(" ", 1)[0].rstrip(",.")
+            clean_narr = (words_clip if len(words_clip) >= 12 else clean_narr[:33].rstrip()) + "…"
         lines_raw: List[str] = [f"`{metric}` — {fact_txt}"[:44] if metric else fact_txt[:44]]
         if clean_narr and clean_narr != fact_txt:
             lines_raw.append(clean_narr)
@@ -949,6 +950,7 @@ def direct_papertrails_timeline_with_llm(
     foley_cues = _attach_timing_sheet_and_foley(timeline_scenes, captions)
     timeline_spec: Dict[str, Any] = {
         "version": 1,
+        "stageMode": "forensic_desk",
         "width": width,
         "height": height,
         "fps": fps,
@@ -965,7 +967,7 @@ def direct_papertrails_timeline_with_llm(
         },
         "direction": {
             "status": "agent-reviewed",
-            "engine": "Papertrails 3D WebGL (Three.js Pop-up Book)",
+            "engine": "Papertrails 3D WebGL (Vox Forensic Paper Desk)",
             "upstream_author": "Shikhar (xikhar/papertrails)",
         },
     }

@@ -1,14 +1,19 @@
 import * as THREE from 'three';
 import { clamp01, smooth, easeInOutCubic, easeOutBack, squashPreserveVolume, overlap, impactPulse, bezierArc } from './motion.js';
+import { makeDocumentPrintMaterial, makeChartBoardPrintMaterial, makeLedgerPagePrintMaterial } from './print_textures.js';
 
 // Extension point: add a named builder here and the same name to timeline.mjs PROPS.
 // Each builder returns real layered paper geometry, never a generic title slide.
-export function createProp(kind, { materials, assets, color = '#b26d42' }) {
+export function createProp(kind, { materials, assets, color = '#b26d42', sceneData = null }) {
   const root = new THREE.Group(); root.name = `subject-${kind}`;
   const anim = [];
   const paper = c => materials.paper({ color: c, side: THREE.DoubleSide });
   const mesh = (geo, c, x=0, y=0, z=0, parent=root) => {
     const m = new THREE.Mesh(geo,paper(c)); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; parent.add(m); return m;
+  };
+  const applyFace = (w, h, mat, x, y, z, parent=root) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    m.position.set(x, y, z); m.receiveShadow = true; parent.add(m); return m;
   };
   const rect = (w,h,c,x,y,z=.02,parent=root) => mesh(new THREE.BoxGeometry(w,h,.045),c,x,y,z,parent);
   const disc = (r,c,x,y,z=.06,parent=root) => mesh(new THREE.CylinderGeometry(r,r,.045,48).rotateX(Math.PI/2),c,x,y,z,parent);
@@ -27,14 +32,22 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
     for(const sign of [-1,1]) {
       const leaf=new THREE.Group();root.add(leaf);leaf.rotation.y=sign*.22;
       rect(1.12,1.55,color,sign*.57,.9,0,leaf);rect(1.04,1.43,cream,sign*.57,.92,.04,leaf);
-      for(let i=0;i<6;i++)rect(.74,.025,'#b5a58a',sign*.57,1.38-i*.15,.08,leaf);
+      if (sign > 0 && sceneData) {
+        applyFace(.96, 1.35, makeDocumentPrintMaterial(sceneData, { mode: 'dossier' }), sign*.57, .92, .068, leaf);
+      } else {
+        for(let i=0;i<6;i++)rect(.74,.025,'#b5a58a',sign*.57,1.38-i*.15,.08,leaf);
+      }
       anim.push((time,p)=>leaf.rotation.y=sign*(.12+.58*(1-p)));
     }
     rect(.08,1.6,ink,0,.9,.01);
   } else if (kind==='coin') {
     for(let i=0;i<3;i++){const c=disc(.58,gold,(i-1)*.64,.68+i*.16,.1*i);disc(.47,'#c88e35',(i-1)*.64,.68+i*.16,.1*i+.03);rect(.075,.5,cream,(i-1)*.64,.68+i*.16,.1*i+.08);anim.push((t)=>c.rotation.y=Math.sin(t*1.8+i)*.25);}
   } else if (kind==='chart') {
-    rect(2.6,1.9,cream,0,1);line(-1.05,.2,-1.05,1.8);line(-1.05,.2,1.1,.2);
+    rect(2.6,1.9,cream,0,1);
+    if (sceneData) {
+      applyFace(2.44, 1.76, makeChartBoardPrintMaterial(sceneData), 0, 1, .048);
+    }
+    line(-1.05,.2,-1.05,1.8);line(-1.05,.2,1.1,.2);
     for(let i=0;i<4;i++){const h=.4+i*.32;const bar=rect(.3,h,i%2?gold:color,-.7+i*.5,.22+h/2,.1);anim.push((t,p)=>{bar.scale.y=.12+.88*p;bar.position.y=.22+h*bar.scale.y/2;});}
     line(-.7,.8,.8,1.8,green,.06,.15);
   } else if (kind==='factory') {
@@ -172,14 +185,18 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
     rect(2.35,1.95,ink,0,1.02,-.03);
     rect(1.06,1.82,cream,-.55,1.04,.02);
     rect(1.06,1.82,cream,.55,1.04,.02);
+    if (sceneData) {
+      applyFace(1.0, 1.74, makeLedgerPagePrintMaterial(sceneData, 'left'), -.55, 1.04, .048);
+      applyFace(1.0, 1.74, makeLedgerPagePrintMaterial(sceneData, 'right'), .55, 1.04, .048);
+    }
     rect(.08,1.86,ink,0,1.04,.04);
     for(let i=0;i<5;i++){
       const w=.35+((i*37)%50)/100;
-      const bar=rect(w,.12,i%2?crimson:green,-.95+w/2,1.62-i*.28,.06);
+      const bar=rect(w,.12,i%2?crimson:green,-.95+w/2,1.62-i*.28,.076);
       anim.push((t,p)=>{bar.scale.x=Math.max(.1,Math.min(1,p*1.6-i*.15));});
-      rect(.72,.04,'#9e8f75',.55,1.62-i*.28,.06);
+      if (!sceneData) rect(.72,.04,'#9e8f75',.55,1.62-i*.28,.076);
     }
-    const cursor=rect(.92,.14,gold,.55,1.62,.08);
+    const cursor=rect(.92,.14,gold,.55,1.62,.098);
     anim.push(t=>{cursor.position.y=1.62-(((t*.65)%4)*.28);});
   } else if (kind==='container') {
     const teal='#2b6c7a', rust='#b84a32';
@@ -227,8 +244,12 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
     const crimson='#c83e2b';
     const doc=rect(1.65,1.95,cream,0,1.02,0);
     rect(1.8,.16,'#d8c7a3',0,1.98,.05);
-    rect(1.25,.1,ink,-.05,1.65,.06);
-    for(let i=0;i<5;i++)rect(1.22-(i%2)*.25,.045,'#9d8e74',-.05,1.35-i*.18,.06);
+    if (sceneData) {
+      applyFace(1.52, 1.82, makeDocumentPrintMaterial(sceneData, { mode: 'contract' }), 0, 0, .028, doc);
+    } else {
+      rect(1.25,.1,ink,-.05,1.65,.06);
+      for(let i=0;i<5;i++)rect(1.22-(i%2)*.25,.045,'#9d8e74',-.05,1.35-i*.18,.06);
+    }
     const seal=disc(.26,crimson,.45,.45,.12);
     const ribbon=rect(.18,.32,crimson,.45,.24,.09);
     anim.push((t,p,ctx)=>{
@@ -291,8 +312,12 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
   } else if (kind==='hanko-stamp') {
     const crimson='#c83e2b', lacquer='#6e1e19';
     rect(2.1,1.72,cream,0,.98,0);
-    rect(1.38,.09,ink,-.12,1.6,.04);
-    for(let i=0;i<4;i++)rect(1.22-(i%2)*.26,.045,'#9d8e74',-.18,1.35-i*.18,.04);
+    if (sceneData) {
+      applyFace(1.96, 1.58, makeDocumentPrintMaterial(sceneData, { mode: 'stamp' }), 0, .98, .028);
+    } else {
+      rect(1.38,.09,ink,-.12,1.6,.04);
+      for(let i=0;i<4;i++)rect(1.22-(i%2)*.26,.045,'#9d8e74',-.18,1.35-i*.18,.04);
+    }
     rect(.66,.38,ink,-.58,.42,.03);
     rect(.54,.28,crimson,-.58,.44,.06);
     const imprint=new THREE.Group();imprint.position.set(.42,.66,.055);root.add(imprint);
@@ -320,7 +345,11 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
   } else if (kind==='brass-caliper') {
     const crimson='#c83e2b';
     rect(2.25,1.76,cream,0,.98,-.03);
-    for(let i=0;i<5;i++)rect(.75,.04,'#a8987d',-.55,1.52-i*.24,.02);
+    if (sceneData) {
+      applyFace(2.1, 1.62, makeDocumentPrintMaterial(sceneData, { mode: 'caliper' }), 0, .98, -.002);
+    } else {
+      for(let i=0;i<5;i++)rect(.75,.04,'#a8987d',-.55,1.52-i*.24,.02);
+    }
     const targetBar=rect(.78,.42,crimson,.18,.94,.04);
     const rail=rect(1.92,.14,gold,0,1.42,.11);
     for(let i=0;i<9;i++)rect(.025,.07,ink,-.78+i*.19,0,.04,rail);
@@ -344,7 +373,11 @@ export function createProp(kind, { materials, assets, color = '#b26d42' }) {
   } else if (kind==='forensic-loupe') {
     const crimson='#c83e2b', paleGlass='#e6f0ee';
     rect(2.05,1.88,cream,0,1.0,-.03);
-    for(let i=0;i<6;i++)rect(1.45-(i%3)*.18,.045,'#9e8f75',0,1.62-i*.22,.02);
+    if (sceneData) {
+      applyFace(1.9, 1.72, makeDocumentPrintMaterial(sceneData, { mode: 'loupe' }), 0, 1.0, -.002);
+    } else {
+      for(let i=0;i<6;i++)rect(1.45-(i%3)*.18,.045,'#9e8f75',0,1.62-i*.22,.02);
+    }
     const clause=rect(.74,.14,gold,.26,.76,.05);
     const reticle=new THREE.Mesh(new THREE.RingGeometry(.24,.30,32),paper(crimson));
     reticle.position.set(.26,.76,.065);root.add(reticle);

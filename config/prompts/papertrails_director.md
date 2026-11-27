@@ -26,9 +26,14 @@ Your mission is to translate EVERY spoken clause of the narration into a tightly
    - Match the literal concept in the spoken words (e.g., official seal/approval/ruling stamp → `hanko-stamp`; narrow margin/audit gap/tariff spread/percent → `brass-caliper`; hidden clause/footnote/loophole/small print → `forensic-loupe`; payouts/executive bonuses → `briefcase` or `coin`; court verdict/appeal → `courthouse`, `gavel`, `scale`; accounting → `ledger`, `chart`; imports/shipping/duties → `container`, `globe`; sealed records/treasury → `vault`, `contract`; consumer fallout/workforce → `people`, `house`, `village`; deadlines/timelines → `clock`).
    - For institutional, banking, or financial policy investigations, prioritize `hanko-stamp`, `brass-caliper`, `forensic-loupe`, `ledger`, `vault`, `contract`, `scale`, `chart`, `courthouse`, `gavel`, `briefcase`, `shield`, `clock`, `megaphone`. Avoid `edit-board`, `factory`, or `container` unless the spoken clause literally concerns video editing, physical factories, or shipping containers.
    - NEVER repeat the exact same `prop` or `(biome, prop)` pair across two consecutive shots.
-3. **Dramatic 5-Biome Progression & Night Contrast**:
-   - Cycle thoughtfully across all 5 paper worlds: `heartland`, `pinewood`, `desert`, `snow`, `blossom`.
-   - Set `"night": true` selectively for clandestine schemes, crackdowns, or tense turning points (avoid night > 35% of shots).
+3. **5 Forensic Desk Surface Themes & Night Lighting Contrast**:
+   - Alternate cleanly across the 5 `biome` keys, which map directly to 5 Vox Forensic Desk surfaces/moods:
+     - `heartland`: archival cream newsprint desk (`#F4F1EA`) with warm daylight
+     - `pinewood`: kraft evidence board (`#C9BB9C`) with dossier folders
+     - `desert`: warm financial ledger graph desk (`#EAE0C8`)
+     - `snow`: cool audit blueprint slate (`#D5DCE2`) for regulatory/legal scrutiny
+     - `blossom`: editorial broadsheet press desk (`#EFE7DB`)
+   - Set `"night": true` selectively for dark archival desk lamp pools during clandestine schemes, crisis pressure, or turning points (keep `night <= 35%` of shots).
 4. **Kinetic-Only 3D Cameras & Actions (Anti-Freeze Law)**:
    - Allowed `camera` presets ONLY: `push`, `orbit`, `crane`, `low`. (NEVER emit `wide`, `close`, or `top` without kinetic motion.)
    - Never use the same `camera` on two consecutive shots.
