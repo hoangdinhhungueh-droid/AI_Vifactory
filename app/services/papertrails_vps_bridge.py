@@ -119,7 +119,7 @@ def render_papertrails_stills_on_vps(
     from scripts.download_vps_asset import download_file_chunked
     from scripts.vps_runner import run_vps_cmd
 
-    synced = _sync_timeline_and_audio_to_vps(timeline_path, include_audio=False)
+    synced = _sync_timeline_and_audio_to_vps(timeline_path, include_audio=True)
     vps_run_dir = synced["vps_run_dir"]
     vps_timeline = synced["vps_timeline"]
     vps_prefix = f"{vps_run_dir}/stills_preview.mp4"
