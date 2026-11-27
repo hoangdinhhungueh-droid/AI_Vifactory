@@ -719,7 +719,7 @@ def execute_pipeline(
                     dir_md = paths.root / "DIRECTION.md"
                     next_render_cmd = (
                         f"python -m orchestrator.run_pipeline --run-id {effective_run_id} "
-                        f"--preset {preset_name} --from s08_video_gen --to s11_qc --auto"
+                        f"--preset {preset_name} --from s08_video_gen --to s11_qc --force --auto"
                     )
                     print("\n" + "=" * 75)
                     print("🛑 [HUMAN GATE 3 REACHED: PAPERTRAILS 3D STILLS READY FOR VISUAL REVIEW]")
@@ -729,6 +729,19 @@ def execute_pipeline(
                     print("\n👉 NEXT STEP: Inspect stills/*.png, then launch full parallel 1080p render + QC:")
                     print(next_render_cmd)
                     print("=" * 75 + "\n")
+                    try:
+                        from app.services.telegram_buttons import send_hg3_images_verified
+                        still_cnt = len(list(stills_dir.glob("*.png"))) if stills_dir.exists() else 0
+                        send_hg3_images_verified(
+                            task_id=effective_run_id,
+                            image_count=still_cnt,
+                            preset=preset_name,
+                            next_cmd=next_render_cmd,
+                            composite_dir=str(stills_dir),
+                            master_sheet_dir=str(dir_md),
+                        )
+                    except Exception as _tg_err:
+                        logger.warning(f"[HG3] Telegram notification notice: {_tg_err}")
                     return 0
 
                 # ------------------------------------------------------------------

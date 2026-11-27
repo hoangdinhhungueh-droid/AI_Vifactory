@@ -32,14 +32,15 @@ Your mission is to translate EVERY spoken clause of the narration into a tightly
    - Allowed `camera` presets ONLY: `push`, `orbit`, `crane`, `low`. (NEVER emit `wide`, `close`, or `top` without kinetic motion.)
    - Never use the same `camera` on two consecutive shots.
    - Allowed `action` values: `reveal`, `grow`, `walk`, `celebrate`. Use `grow` for scaling metrics/structures, `reveal` for unfolding evidence/subjects, `walk` when the traveller moves across a setting, `celebrate` sparingly for windfall/verdict impact.
-5. **Zero Internal ID Leaks in On-Screen Badge (`title`)**:
+5. **Zero Internal ID Leaks in On-Screen Badge (`title`) & Native Market Language**:
    - `title` appears on a pinned cream paper tag in the upper-left corner.
    - Keep `title` short (**2 to 5 words**), viewer-facing, matching the format `<CLEAN TOPIC PHASE>` (no internal tags).
+   - **Native Market Language Mandate**: `title`, `card.head`, and `card.lines` MUST be written strictly in the native language matching `market` and the spoken narration (`KR` → Korean Hangul, `JA` → Japanese, `VN` → Vietnamese, `EN` → English). Zero stray English headers or labels on non-EN episodes.
    - NEVER output underscores, beat IDs, scene codes, or regex tokens (`<BEAT_ID>`, `<LINE_ID>`, `SC_01`).
 6. **Grounded Forensic Evidence Notes (`card`)**:
    - On shots presenting hard figures, legal filings, or key entity contrasts from the **S02 Grounding Table**, attach a taped paper `"card"` (`kind: "note"`):
-     - `head`: crisp uppercase evidence header matching `<EVIDENCE TYPE // SOURCE>`, <= 32 chars.
-     - `lines`: 2 to 3 short bullet strings (<= 44 chars each; wrap exact verified figures/dates in backticks like `` `<VERIFIED_METRIC>` ``). Every figure MUST trace strictly to the spoken narration or S02 Grounding claims provided — ZERO invented numbers.
+     - `head`: crisp uppercase evidence header in the native market language (`KR` Hangul / `JA` / `VN` / `EN`) matching `<EVIDENCE TYPE // SOURCE>`, <= 32 chars.
+     - `lines`: 2 to 3 short bullet strings in the native market language (<= 44 chars each; wrap exact verified figures/dates in backticks like `` `<VERIFIED_METRIC>` ``). Every figure MUST trace strictly to the spoken narration or S02 Grounding claims provided — ZERO invented numbers.
      - `side`: alternate `"left"` / `"right"`.
    - Attach cards on ~25%–40% of shots (do not clutter every shot).
 7. **Output Format**:

@@ -504,7 +504,7 @@ def _call_director_llm_via_vps(prompt_json: str, system_prompt: str) -> str:
             json.dumps({
                 "prompt": prompt_json,
                 "system_prompt": system_prompt,
-                "max_tokens": 8000,
+                "max_tokens": 6000,
                 "temperature": 0.35,
             }, ensure_ascii=False),
             encoding="utf-8",
@@ -524,8 +524,18 @@ def _call_director_llm_via_vps(prompt_json: str, system_prompt: str) -> str:
             "    max_tokens=req['max_tokens'],\n"
             "    temperature=req['temperature'],\n"
             "    timeout=180.0,\n"
+            "    fallback='gpt-6.1-sol',\n"
             ")\n"
-            f"open({remote_out!r}, 'w', encoding='utf-8').write(res)\n"
+            "if not (res or '').strip():\n"
+            "    res = gw.call_llm(\n"
+            "        prompt=req['prompt'],\n"
+            "        model='gpt-6.1-sol',\n"
+            "        system_prompt=req['system_prompt'],\n"
+            "        max_tokens=req['max_tokens'],\n"
+            "        temperature=req['temperature'],\n"
+            "        timeout=180.0,\n"
+            "    )\n"
+            f"open({remote_out!r}, 'w', encoding='utf-8').write(res or '')\n"
         )
         vps_python = "/root/video_factory/venv/bin/python3"
         launch_cmd = (
@@ -573,6 +583,7 @@ def direct_papertrails_timeline_with_llm(
     grounding_claims: Optional[List[Dict[str, Any]]] = None,
     s3_scenes: Optional[List[Dict[str, Any]]] = None,
     timing_source: str = "faster-whisper+edge-boundary",
+    market: str = "EN",
     orientation: str = "landscape",
     fps: int = 30,
     seed: int = 42,
@@ -623,6 +634,7 @@ def direct_papertrails_timeline_with_llm(
             if isinstance(sc, dict)
         ]
         user_payload = {
+            "market": market,
             "audio_duration_sec": round(float(audio_duration), 3),
             "total_words": len(flat_words),
             "indexed_words": "\n".join(word_lines),
@@ -640,10 +652,20 @@ def direct_papertrails_timeline_with_llm(
             raw_reply = gw.call_llm(
                 prompt=prompt_json,
                 system_prompt=system_prompt,
-                max_tokens=8000,
+                max_tokens=6000,
                 temperature=0.35,
                 timeout=120.0,
+                fallback="gpt-6.1-sol",
             )
+            if not (raw_reply or "").strip():
+                raw_reply = gw.call_llm(
+                    prompt=prompt_json,
+                    model="gpt-6.1-sol",
+                    system_prompt=system_prompt,
+                    max_tokens=6000,
+                    temperature=0.35,
+                    timeout=120.0,
+                )
         except (httpx.HTTPError, OSError) as direct_err:
             # Local corporate SWG firewall blocks hhtechapi.com -> relay cleanly via Hetzner VPS
             logger.warning("[papertrails_director] Direct gateway blocked (%s); relaying LLM call via VPS...", direct_err)

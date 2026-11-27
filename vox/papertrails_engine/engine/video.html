@@ -2,16 +2,16 @@
 <html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Papertrails — deterministic video stage</title>
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#30271f;font-family:"Segoe UI","Noto Sans","Helvetica Neue",Arial,sans-serif}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#30271f;font-family:"Segoe UI","Noto Sans","Noto Sans CJK KR","Noto Sans CJK JP","Helvetica Neue",Arial,sans-serif}
 #atlas{width:100%;height:100%;display:block}
 /* Scene title: a small paper tag pinned in the upper safe area (no dark slab). */
-#title{position:absolute;top:5.5%;left:5.5%;max-width:62%;padding:.42em .9em .46em 1.05em;font-size:clamp(13px,3.1vh,58px);font-weight:800;line-height:1.15;color:#3a2a1c;
+#title{position:absolute;top:5.5%;left:5.5%;max-width:62%;padding:.42em .9em .46em 1.05em;font-size:clamp(13px,3.1vh,58px);font-weight:800;line-height:1.15;color:#3a2a1c;word-break:keep-all;
   background:linear-gradient(176deg,#fbf3e1,#efe0bf);border-radius:.18em;box-shadow:0 .28em .7em rgba(40,24,10,.35),inset 0 0 0 .06em rgba(120,90,50,.18);transform-origin:12% 50%;letter-spacing:.01em}
 #title::before{content:"";position:absolute;left:.38em;top:50%;width:.34em;height:.34em;margin-top:-.17em;border-radius:50%;background:#c4532f;box-shadow:inset -.05em -.05em 0 rgba(0,0,0,.25)}
 #title:empty{display:none}
 /* Captions: a cream paper strip with torn edges, ink text; the word being spoken is inked red. */
 #capwrap{position:absolute;left:0;right:0;bottom:7%;display:flex;justify-content:center;pointer-events:none;filter:drop-shadow(0 .5vh .9vh rgba(35,20,8,.45))}
-#caption{position:relative;max-width:80%;padding:.38em .95em .44em;text-align:center;font-weight:800;font-size:clamp(12px,4.3vh,78px);line-height:1.28;color:#3b2a1a;
+#caption{position:relative;max-width:80%;padding:.38em .95em .44em;text-align:center;font-weight:800;font-size:clamp(12px,4.3vh,78px);line-height:1.28;color:#3b2a1a;word-break:keep-all;
   background:linear-gradient(178deg,#fbf2dc 0%,#f1e1bd 100%);white-space:pre-wrap;overflow-wrap:anywhere}
 #caption .w{display:inline-block;transition:none}
 #caption .w.on{color:#b8381f;transform:translateY(-.04em) scale(1.06)}
@@ -30,7 +30,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#30271f;fon
 #card .note h3{margin:0 0 .55em;font-size:1.45em;line-height:1.15;color:#2c1f14;font-weight:800}
 #card .note .ln{display:flex;gap:.55em;align-items:baseline;margin:.36em 0;font-weight:700}
 #card .note .ln .dot{flex:none;width:1.45em;height:1.45em;border-radius:50%;background:#c4532f;color:#fff;font-size:.78em;display:flex;align-items:center;justify-content:center;font-weight:800}
-#card .note .ln code{font-family:Consolas,"Cascadia Mono","Courier New",monospace;font-weight:700;background:rgba(60,40,20,.08);padding:.08em .35em;border-radius:.2em;font-size:.92em}
+#card .note .ln code{font-family:Consolas,"Cascadia Mono","Courier New","Noto Sans CJK KR","Noto Sans CJK JP",monospace;font-weight:700;background:rgba(60,40,20,.08);padding:.08em .35em;border-radius:.2em;font-size:.92em}
 #card .photo{position:relative;background:#fbf8f1;padding:2.2% 2.2% 7%;box-shadow:0 1.2em 2.4em rgba(30,18,8,.45);width:100%}
 #card .photo img{display:block;width:100%;height:auto}
 #card .photo .ph{position:relative}#card .photo svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}

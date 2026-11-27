@@ -1053,6 +1053,13 @@ def _run_papertrails_voice_first_director(
     ep_title = str(s3_payload.get("title") or ctx.topic or ctx.run_id).strip()
     fps = getattr(ctx.config.render, "fps", 30) if ctx.config else 30
 
+    from core.market_resolver import resolve_canonical_market
+
+    try:
+        market_code = resolve_canonical_market(ctx=ctx)
+    except ValueError:
+        market_code = "EN"
+
     direction_md_path = ctx.paths.root / "DIRECTION.md"
     timeline_spec = direct_papertrails_timeline_with_llm(
         transcript_segments=whisper_segs,
@@ -1061,6 +1068,7 @@ def _run_papertrails_voice_first_director(
         grounding_claims=grounding_claims,
         s3_scenes=s3_scenes,
         timing_source=timing_source,
+        market=market_code,
         orientation="landscape",
         fps=fps,
         seed=42,

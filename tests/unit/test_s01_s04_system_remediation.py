@@ -641,6 +641,36 @@ def test_kr_past_tense_softening_avoids_ungrammatical_ss_neun():
     assert "올렸는" not in out
 
 
+def test_s09_resolve_tts_voice_respects_market_over_en_preset():
+    """Ensure EN preset voice never overrides KR/JA/VN market voice resolution."""
+    from types import SimpleNamespace
+    from stages.s09_voice_tts import _resolve_tts_voice
+
+    voice_cfg = SimpleNamespace(
+        voice_en="en-US-ChristopherNeural",
+        voice_kr="ko-KR-InJoonNeural",
+        voice_jp="ja-JP-KeitaNeural",
+        voice_vn="vi-VN-NamMinhNeural",
+    )
+    ctx_with_en_preset = SimpleNamespace(
+        config=SimpleNamespace(voice=voice_cfg),
+        preset=SimpleNamespace(tts=SimpleNamespace(voice="en-US-ChristopherNeural", rate="+0%")),
+    )
+    assert _resolve_tts_voice("KR", ctx_with_en_preset) == "ko-KR-InJoonNeural"
+    assert _resolve_tts_voice("JA", ctx_with_en_preset) == "ja-JP-KeitaNeural"
+    assert _resolve_tts_voice("VN", ctx_with_en_preset) == "vi-VN-NamMinhNeural"
+    assert _resolve_tts_voice("EN", ctx_with_en_preset) == "en-US-ChristopherNeural"
+
+
+def test_s09_norm_tok_preserves_unicode_hangul_and_digits():
+    """Ensure _norm_tok preserves Korean Hangul and digits for 1:1 Whisper casing reconciliation."""
+    from stages.s09_voice_tts import _norm_tok
+
+    assert _norm_tok("10조원.") == "10조원"
+    assert _norm_tok("한국산업은행은,") == "한국산업은행은"
+
+
+
 
 
 

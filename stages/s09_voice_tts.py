@@ -227,7 +227,31 @@ def _measure_words_with_faster_whisper(
 
 
 def _norm_tok(token: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", token.lower())
+    return re.sub(r"[^\w]+", "", token.lower())
+
+
+def _resolve_tts_voice(market: str, ctx: RunContext) -> str:
+    """Resolves canonical Edge-TTS voice matching market; prevents EN presets overriding KR/JA/VN."""
+    m_up = str(market or "EN").strip().upper()
+    voice_cfg = getattr(getattr(ctx, "config", None), "voice", None)
+    if m_up in ("JA", "JP"):
+        default_voice = getattr(voice_cfg, "voice_jp", None) or "ja-JP-KeitaNeural"
+        req_prefix = "ja-"
+    elif m_up in ("KO", "KR"):
+        default_voice = getattr(voice_cfg, "voice_kr", None) or "ko-KR-InJoonNeural"
+        req_prefix = "ko-"
+    elif m_up in ("VI", "VN"):
+        default_voice = getattr(voice_cfg, "voice_vn", None) or "vi-VN-NamMinhNeural"
+        req_prefix = "vi-"
+    else:
+        default_voice = getattr(voice_cfg, "voice_en", None) or "en-US-ChristopherNeural"
+        req_prefix = "en-"
+
+    preset_tts = getattr(getattr(ctx, "preset", None), "tts", None)
+    preset_voice = str(getattr(preset_tts, "voice", "") or "").strip()
+    if preset_voice and preset_voice.lower().startswith(req_prefix):
+        return preset_voice
+    return default_voice
 
 
 def _group_word_boundaries_into_segments(
@@ -333,14 +357,19 @@ def run(ctx: RunContext) -> StageArtifact:
     words = full_text.split()
     is_min_profile = bool((ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1) or ctx.dry_run)
 
-    market = "EN"
-    s1_path = ctx.paths.artifact_file(StageID.S1_IDEATION.value)
-    if s1_path.exists():
-        try:
-            s1_data = json.loads(s1_path.read_text(encoding="utf-8"))
-            market = s1_data.get("payload", {}).get("market", "EN")
-        except (OSError, json.JSONDecodeError) as _m_err:
-            logger.debug("[s09_voice_tts] S1 read notice, using default EN: %s", _m_err)
+    from core.market_resolver import resolve_canonical_market
+
+    try:
+        market = resolve_canonical_market(ctx=ctx)
+    except ValueError:
+        market = "EN"
+        s1_path = ctx.paths.artifact_file(StageID.S1_IDEATION.value)
+        if s1_path.exists():
+            try:
+                s1_data = json.loads(s1_path.read_text(encoding="utf-8"))
+                market = s1_data.get("payload", {}).get("market", "EN")
+            except (OSError, json.JSONDecodeError) as _m_err:
+                logger.debug("[s09_voice_tts] S1 read notice, using default EN: %s", _m_err)
 
     edge_boundaries: List[Dict[str, Any]] = []
     synthesized_fresh = False
@@ -350,22 +379,13 @@ def run(ctx: RunContext) -> StageArtifact:
         if legacy_audio.exists() and legacy_audio.stat().st_size > 1000 and not ctx.force:
             shutil.copy2(str(legacy_audio), str(audio_file))
         else:
-            if ctx.preset and getattr(ctx.preset, "tts", None) and getattr(ctx.preset.tts, "voice", None):
-                voice = ctx.preset.tts.voice
-            else:
-                voice = ctx.config.voice.voice_en
-                m_low = market.lower()
-                if m_low in ("ja", "jp"):
-                    voice = ctx.config.voice.voice_jp
-                elif m_low in ("ko", "kr"):
-                    voice = ctx.config.voice.voice_kr
-                elif m_low in ("vi", "vn"):
-                    voice = ctx.config.voice.voice_vn
+            voice = _resolve_tts_voice(market, ctx)
 
             text_to_speak = full_text if full_text else "AI Video Factory master video narration."
             rate_opt = "+0%"
             if ctx.preset and getattr(ctx.preset, "tts", None) and getattr(ctx.preset.tts, "rate", None):
                 rate_opt = ctx.preset.tts.rate
+            logger.info("[s09_voice_tts] Synthesizing market=%s voice=%s rate=%s", market, voice, rate_opt)
 
             tts_success = False
             try:
