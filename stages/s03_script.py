@@ -474,6 +474,51 @@ def _soften_kr_reported_predicate(text: str, slot_idx: int = 0) -> str:
     return t
 
 
+def _upgrade_prefix_for_bucket(
+    pfx: str,
+    bkt: str,
+    market: str,
+    source_name: str = "",
+) -> str:
+    """Upgrade a generic attribution lead prefix so it satisfies a stricter provenance bucket
+    (such as unverified) without introducing predicate double-hedging.
+    """
+    m = (market or "EN").strip().upper()
+    if m == "KO":
+        m = "KR"
+    if bkt != "unverified":
+        return pfx
+
+    clean_src = re.sub(r"\s*\([^)]*\)", "", source_name or "").strip()
+    if m == "KR":
+        if "미확인" in pfx or "확인되지 않은" in pfx:
+            return pfx
+        if re.search(r"보도를\s*보면,?", pfx):
+            return re.sub(r"보도를\s*보면,?", "미확인 초기 보도를 보면,", pfx)
+        if re.search(r"보도에\s*(?:따르면|의하면),?", pfx):
+            return re.sub(r"보도에\s*(?:따르면|의하면),?", "미확인 초기 보도에 따르면,", pfx)
+        if re.search(r"(?:언론|매체|기사)(?:에\s*(?:따르면|의하면)|를\s*보면),?", pfx):
+            return re.sub(r"(?:에\s*(?:따르면|의하면)|를\s*보면),?", "의 미확인 초기 보도에 따르면,", pfx)
+        if clean_src:
+            return f"{clean_src}의 확인되지 않은 초기 보도에 따르면,"
+        return "초기 미확인 보도에 따르면,"
+    if m == "JA":
+        if "未確認" in pfx:
+            return pfx
+        return "未確認の初期報道によれば、"
+    if m == "VN":
+        if "chưa kiểm chứng" in pfx.lower():
+            return pfx
+        return "Theo thông tin sơ bộ chưa kiểm chứng,"
+    if "unverified" in pfx.lower():
+        return pfx
+    return (
+        f"According to early unverified reports by {clean_src},"
+        if clean_src
+        else "According to early unverified reports,"
+    )
+
+
 def _sanitize_unverified_kr_claim(text: str) -> str:
     """Sanitize unverified secondary claims to avoid prohibited regulator attribution or official recognition elevation."""
     t = text
@@ -2915,11 +2960,17 @@ def run(ctx: RunContext) -> StageArtifact:
                                     else:
                                         pfx_opts = ["According to official records, ", "Official documentation indicates that ", "Public records establish that "]
                                     if market == "KR":
+                                        clean_src = re.sub(r"\s*\([^)]*\)", "", src).strip()
+                                        _kr_unverified_pfx = (
+                                            f"{clean_src}의 미확인 초기 보도에 따르면, "
+                                            if (clean_src and clean_src not in clean_txt)
+                                            else "초기 미확인 보도에 따르면, "
+                                        )
                                         _kr_map = {
                                             "alleged_regulator": "당국 발표에 따르면, ",
                                             "alleged": "보도에 따르면, ",
                                             "corroborated_secondary": "보도에 따르면, ",
-                                            "unverified": "초기 미확인 보도에 따르면, ",
+                                            "unverified": _kr_unverified_pfx,
                                             "bill_proposed": "추진 중인 계획 보도에 따르면, ",
                                         }
                                         pfx = _kr_map.get(bkt, "공식 기록에 따르면, ")
@@ -3212,6 +3263,9 @@ def run(ctx: RunContext) -> StageArtifact:
                             from app.services.story_provenance_engine import (
                                 line_matches_expected_qualifier as _pre_match_qual,
                             )
+                            from app.services.story_provenance_engine import (
+                                strip_attribution_prefix as _pre_strip_pfx,
+                            )
 
                             c_objs = [evidence_map[cid] for cid in c_ids if cid in evidence_map]
                             if len(c_objs) > 1:
@@ -3247,12 +3301,6 @@ def run(ctx: RunContext) -> StageArtifact:
                                 ok_already, _ = _pre_match_qual(text, c_dict_q, market=market, peer_claims=c_objs_dicts)
                                 if ok_already:
                                     continue
-                                if (market or "EN").upper() in ("KR", "KO"):
-                                    text_soft = _soften_kr_reported_predicate(text, slot_idx=l_idx)
-                                    ok_soft, _ = _pre_match_qual(text_soft, c_dict_q, market=market, peer_claims=c_objs_dicts)
-                                    if ok_soft:
-                                        text = text_soft
-                                        continue
                                 bkt = _exp_bucket(
                                     legal_status=str(c_dict_q.get("legal_status", "alleged")),
                                     source_type=str(c_dict_q.get("source_type", "press")),
@@ -3262,6 +3310,25 @@ def run(ctx: RunContext) -> StageArtifact:
                                     verification_status=str(c_dict_q.get("verification_status", "corroborated_secondary")),
                                     credibility_tier=str(c_dict_q.get("credibility_tier", "") or ""),
                                 )
+                                stripped_body, _existing_pfx = _pre_strip_pfx(text, market=market)
+                                if _existing_pfx and bkt == "unverified" and (market or "EN").upper() in ("KR", "KO"):
+                                    upgraded_pfx = _upgrade_prefix_for_bucket(
+                                        _existing_pfx,
+                                        bkt,
+                                        market=market,
+                                        source_name=str(c_dict_q.get("source_name") or ""),
+                                    )
+                                    candidate_t = f"{upgraded_pfx} {stripped_body}".strip()
+                                    ok_up, _ = _pre_match_qual(candidate_t, c_dict_q, market=market, peer_claims=c_objs_dicts)
+                                    if ok_up:
+                                        text = candidate_t
+                                        continue
+                                if (market or "EN").upper() in ("KR", "KO") and not _existing_pfx:
+                                    text_soft = _soften_kr_reported_predicate(text, slot_idx=l_idx)
+                                    ok_soft, _ = _pre_match_qual(text_soft, c_dict_q, market=market, peer_claims=c_objs_dicts)
+                                    if ok_soft:
+                                        text = text_soft
+                                        continue
                                 if bkt == "fact" or (bkt != "settled" and applied_prefix_bucket):
                                     continue
                                 text = _apply_legal_qualifier(
@@ -3510,7 +3577,12 @@ def run(ctx: RunContext) -> StageArtifact:
             )
 
         # Systemic post-generation enforcement: ensure single hedging, living warning, and proper attribution
-        from app.services.story_provenance_engine import dehedge_predicate, strip_attribution_prefix
+        from app.services.story_provenance_engine import (
+            dehedge_predicate,
+            expected_qualifier_bucket as _post_exp_bkt,
+            line_matches_expected_qualifier as _post_match_qual,
+            strip_attribution_prefix,
+        )
 
         # 1. Normalize line texts across all beats for single-hedging and eliminate false supervisory attributions
         for b_tuple in raw_beats:
@@ -3561,8 +3633,49 @@ def run(ctx: RunContext) -> StageArtifact:
                             if not pfx.rstrip().endswith(("that", ":")):
                                 if pfx.rstrip().endswith(","):
                                     stripped_t = stripped_t[0].lower() + stripped_t[1:]
-                    t = f"{pfx} {stripped_t}".strip() if pfx else stripped_t
-                    t = dehedge_predicate(t, market=market)
+                    t_rebuilt = f"{pfx} {stripped_t}".strip()
+                    t_candidate = dehedge_predicate(t_rebuilt, market=market)
+                    if t_candidate != t_rebuilt and ln.claim_ids:
+                        post_peers = [
+                            (evidence_map[c].model_dump() if hasattr(evidence_map[c], "model_dump") else dict(evidence_map[c]))
+                            for c in ln.claim_ids
+                            if c in evidence_map
+                        ]
+                        for c_d in post_peers:
+                            ok_post, _ = _post_match_qual(t_candidate, c_d, market=market, peer_claims=post_peers)
+                            if not ok_post:
+                                bkt_post = _post_exp_bkt(
+                                    legal_status=str(c_d.get("legal_status", "alleged")),
+                                    source_type=str(c_d.get("source_type", "press")),
+                                    doc_type=str(c_d.get("doc_type", "unknown")),
+                                    speaker=c_d.get("speaker"),
+                                    procedural_status=str(c_d.get("procedural_status", "unknown")),
+                                    verification_status=str(c_d.get("verification_status", "corroborated_secondary")),
+                                    credibility_tier=str(c_d.get("credibility_tier", "") or ""),
+                                )
+                                if bkt_post != "fact":
+                                    upgraded_pfx = _upgrade_prefix_for_bucket(
+                                        pfx,
+                                        bkt_post,
+                                        market=market,
+                                        source_name=str(c_d.get("source_name") or ""),
+                                    )
+                                    t_upgraded = dehedge_predicate(f"{upgraded_pfx} {stripped_t}".strip(), market=market)
+                                    ok_up_post, _ = _post_match_qual(t_upgraded, c_d, market=market, peer_claims=post_peers)
+                                    if ok_up_post:
+                                        t_candidate = t_upgraded
+                                        pfx = upgraded_pfx
+                                    elif bkt_post == "unverified":
+                                        _fallback_pfx_map = {
+                                            "KR": "초기 미확인 보도에 따르면,",
+                                            "JA": "未確認の初期報道によれば、",
+                                            "VN": "Theo thông tin sơ bộ chưa kiểm chứng,",
+                                            "EN": "According to early unverified reports,",
+                                        }
+                                        fb_pfx = _fallback_pfx_map.get(market, _fallback_pfx_map["EN"])
+                                        t_candidate = f"{fb_pfx} {dehedge_predicate(stripped_t, market=market)}".strip()
+                                        pfx = fb_pfx
+                    t = t_candidate
                 ln.text = t
 
         # 2. Ensure Beat 5 contains a Living Warning / pattern interrupt reflecting on systemic risks

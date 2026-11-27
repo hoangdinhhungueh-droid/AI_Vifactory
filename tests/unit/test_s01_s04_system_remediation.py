@@ -496,5 +496,46 @@ def test_s04_multimarket_end_to_end_acceptance(tmp_path):
         assert res.payload["gates"]["claim_coverage_gate"] is True
 
 
+def test_kr_unverified_prefix_upgrade_survives_dehedging():
+    """Verify generic KR outlet prefix upgrades to unverified and passes both qualifier and single-hedge gates."""
+    from app.services.story_provenance_engine import (
+        check_script_double_hedging,
+        dehedge_predicate,
+        line_matches_expected_qualifier,
+        strip_attribution_prefix,
+    )
+    from stages.s03_script import _upgrade_prefix_for_bucket
+
+    claim = {
+        "claim_id": "C099",
+        "claim": "테스트경제는 자금 운용 과정에서 손실 분담 기준을 다룬 기사가 나왔다고 보도했다",
+        "source_url": "https://news.google.com/rss/articles/test123",
+        "source_name": "테스트경제 (Test Economy)",
+        "source_type": "press",
+        "doc_type": "news_article",
+        "speaker": "reporter",
+        "legal_status": "alleged",
+        "procedural_status": "bill_proposed",
+        "verification_status": "corroborated_secondary",
+        "credibility_tier": "unconfirmed_claim",
+    }
+    raw_line = "테스트경제 보도를 보면 자금 운용 과정에서 손실 분담 기준을 다룬 기사가 나왔던 것으로 전해졌습니다."
+    body, pfx = strip_attribution_prefix(raw_line, market="KR")
+    assert pfx
+    upgraded_pfx = _upgrade_prefix_for_bucket(
+        pfx,
+        "unverified",
+        market="KR",
+        source_name=claim["source_name"],
+    )
+    final_line = dehedge_predicate(f"{upgraded_pfx} {body}".strip(), market="KR")
+    assert "테스트경제" in final_line
+    ok_qual, reason = line_matches_expected_qualifier(final_line, claim, market="KR")
+    assert ok_qual, reason
+    ok_single, hedge_issues = check_script_double_hedging([{"line_id": "B3_L07", "text": final_line}], market="KR")
+    assert ok_single, hedge_issues
+
+
+
 
 
