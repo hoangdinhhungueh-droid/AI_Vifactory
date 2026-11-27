@@ -1339,7 +1339,7 @@ def expected_qualifier_bucket(
     ):
         if ls == "settled":
             return "settled"
-        if ps == "bill_proposed" or dt == "proposed_bill":
+        if dt == "proposed_bill" or (ps == "bill_proposed" and st in ("regulator", "gov")):
             return "proposed"
         return "unverified"
 

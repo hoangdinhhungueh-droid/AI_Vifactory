@@ -1058,6 +1058,18 @@ def run(ctx: RunContext) -> StageArtifact:
 
     emit_artifact(artifact, ctx.paths)
 
+    fb_path = ctx.paths.root / "s04_critic_feedback.json"
+    if is_story and (not all_gates_pass or critic_payload.verdict in ("fail", "revise")) and violations:
+        try:
+            fb_path.write_text(
+                json.dumps({"violations": violations[:20], "feedback": llm_feedback[:8]}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except OSError as _fb_werr:
+            logger.debug(f"[S04_CRITIC] Could not write feedback file: {_fb_werr}")
+    elif is_story and all_gates_pass and critic_payload.verdict == "pass":
+        fb_path.unlink(missing_ok=True)
+
     if is_story and not all_gates_pass:
         from core.gates import GateError
 

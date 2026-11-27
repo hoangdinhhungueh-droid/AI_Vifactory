@@ -2523,24 +2523,34 @@ def run(ctx: RunContext) -> StageArtifact:
                         else:
                             ln.claim_ids = [c for c in ln.claim_ids if c not in b1_cids]
 
-                # Dedup duplicate claims within B5 itself
+                # Dedup duplicate claims within B5 itself without duplicating living warning text
                 seen_b5_cids = set()
-                _living_warning_by_market = {
-                    "EN": "Until the underlying rules change, the structural accountability gap remains open.",
-                    "KR": "핵심 책임 기준이 명확히 공개되기 전까지 이 구조적 공백은 그대로 남아 있습니다.",
-                    "JA": "制度上の責任基準が明確化されない限り、この構造的な空白は残されたままです。",
-                    "VN": "Chừng nào quy định nền tảng chưa thay đổi, khoảng trống trách nhiệm này vẫn còn nguyên.",
-                }
+                _deduped_b5 = []
                 for ln in cand_beats[-1][2]:
                     if ln.claim_ids:
-                        dup = any(c in seen_b5_cids for c in ln.claim_ids)
-                        if dup:
-                            ln.claim_ids = []
-                            ln.visual_hook = "living_warning"
-                            ln.text = _living_warning_by_market.get(market, _living_warning_by_market["EN"])
-                        else:
-                            for c in ln.claim_ids:
-                                seen_b5_cids.add(c)
+                        if any(c in seen_b5_cids for c in ln.claim_ids):
+                            continue
+                        for c in ln.claim_ids:
+                            seen_b5_cids.add(c)
+                    _deduped_b5.append(ln)
+                _warn_tokens = ("빈틈", "경고", "남겨진", "loophole", "warning", "remain", "歪み", "残された", "hổng", "bỏ ngỏ")
+                _has_warn = any(any(wt in ln.text for wt in _warn_tokens) for ln in _deduped_b5)
+                if not _has_warn:
+                    _living_warning_by_market = {
+                        "EN": "The core accountability question remains open.",
+                        "KR": "남겨진 질문은 아직 풀리지 않았습니다.",
+                        "JA": "残された疑問はなお未解決のままです。",
+                        "VN": "Câu hỏi cốt lõi vẫn còn bỏ ngỏ.",
+                    }
+                    _deduped_b5.append(StorySceneLine(
+                        line_id="B5_L_warn",
+                        text=_living_warning_by_market.get(market, _living_warning_by_market["EN"]),
+                        claim_ids=[],
+                        visual_hook="living_warning",
+                    ))
+                for idx_b5, ln_b5 in enumerate(_deduped_b5, start=1):
+                    ln_b5.line_id = f"B5_L{idx_b5:02d}"
+                cand_beats[-1] = (cand_beats[-1][0], cand_beats[-1][1], _deduped_b5)
 
             # 5b. Ensure all verified primary catalysts (100%) and transmission mechanisms (>= 75%) are covered
             from app.services.story_provenance_engine import resolve_claim_credibility_tier as _res_tier
@@ -2987,7 +2997,11 @@ def run(ctx: RunContext) -> StageArtifact:
                         "   - Include at least ONE short, punchy 2-6 word Pattern Interrupt line in Beat 2, Beat 3, and Beat 4 reflecting the topic's dramatic tension (e.g. '경고는 무시됐습니다.', '위험은 은폐됐습니다.', '구멍은 커졌습니다.') without any boilerplate attribution prefixes and with visual_hook='pattern_interrupt' or 'grease_pencil'. Do NOT attach ungrounded claims to pattern interrupts.\n"
                         "5. STRICT CAUSAL DISCIPLINE & SOFTENED PREDICATES (Rule 130):\n"
                         "   - NEVER assert macro causal leaps (e.g. '손실이 공공으로 이전됐다', '청구서는 국가로 향했다') unless a cited claim explicitly proves that consequence.\n"
-                        "   - When citing analytical findings or allegations, use softened reported verbs ('넘겼다는 분석입니다', '넘긴 것으로 전해졌습니다'), NEVER definitive past tense ('넘겼습니다').\n\n"
+                        "   - When citing analytical findings or allegations, use softened reported verbs ('넘겼다는 분석입니다', '넘긴 것으로 전해졌습니다'), NEVER definitive past tense ('넘겼습니다').\n"
+                        "6. SOURCE SPECIFICITY & CLAIM INTEGRITY (S04 Audit Strict Gate):\n"
+                        "   - Name the exact media outlet (source_name) in EVERY press/secondary sentence; NEVER attribute unverified, RSS, or foreign press claims directly to government ministries, regulators, or financial institutions without naming the outlet and marking unverified status ('<매체명>의 확인되지 않은 초기 보도에 따르면' / '미확인 보도인 <매체명>에 따르면').\n"
+                        "   - Preserve each single claim's exact causal polarity, participants, scope, and numeric figure verbatim; NEVER merge two outlets with differing numbers into one sentence, and NEVER invent ungrounded dates, scene-setting phrases, or non-existent draft documents ('초안').\n"
+                        "   - Every factual line across ALL 5 beats (including B5_aftermath) MUST carry matching claim_ids; ONLY 2-6 word pattern interrupts or one short closing question may omit claim_ids.\n\n"
                     )
                 elif market == "JA":
                     user_prompt += (
@@ -3033,6 +3047,17 @@ def run(ctx: RunContext) -> StageArtifact:
                     )
 
                 min_req_claims = max(3, int(-(-len(evidence_ledger) * 60 // 100))) if evidence_ledger else 0
+                feedback_file = ctx.paths.root / "s04_critic_feedback.json"
+                if feedback_file.is_file():
+                    try:
+                        fb_data = json.loads(feedback_file.read_text(encoding="utf-8"))
+                        if fb_data.get("violations") or fb_data.get("feedback"):
+                            user_prompt += (
+                                "PRIOR S04 CRITIC AUDIT VIOLATIONS TO RESOLVE (FIX EVERY ITEM BELOW):\n"
+                                f"{json.dumps(fb_data, ensure_ascii=False, indent=2)}\n\n"
+                            )
+                    except (OSError, json.JSONDecodeError) as _fb_err:
+                        logger.debug(f"[S03_SCRIPT] Notice loading prior S04 feedback: {_fb_err}")
                 user_prompt += (
                     "MANDATORY GROUNDING & CAUSAL DISCIPLINE (Rule 130 & 131):\n"
                     f"- Cover at least {min_req_claims}/{len(evidence_ledger)} distinct claims substantively across the 5 beats (B1_hook, B2_setup, B3_scheme, B4_crack, B5_aftermath).\n"
