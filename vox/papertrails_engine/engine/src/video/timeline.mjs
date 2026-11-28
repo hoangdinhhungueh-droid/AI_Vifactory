@@ -22,6 +22,7 @@ const check = (ok, message) => { if (!ok) throw new Error(`Invalid timeline: ${m
 export function validateTimeline(t) {
   check(t && typeof t === 'object' && t.version === 1, 'version must be 1');
   if (t.stageMode !== undefined) check(['forensic_desk', 'storybook'].includes(t.stageMode), 'unsupported stageMode');
+  if (t.market !== undefined) check(typeof t.market === 'string' && /^[A-Z]{2}$/.test(t.market), 'market must be 2-letter uppercase code');
   check([t.width, t.height].every(n => Number.isInteger(n) && n >= 144 && n <= 3840 && n % 2 === 0), 'even dimensions between 144 and 3840');
   check(Math.abs(t.width / t.height - 16 / 9) < .005 || Math.abs(t.width / t.height - 9 / 16) < .005, 'aspect must be 16:9 or 9:16');
   check(Number.isInteger(t.fps) && t.fps >= 1 && t.fps <= 60, 'fps 1..60');

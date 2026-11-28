@@ -47,9 +47,9 @@ export function createProp(kind, { materials, assets, color = '#b26d42', sceneDa
     if (sceneData) {
       applyFace(2.44, 1.76, makeChartBoardPrintMaterial(sceneData), 0, 1, .048);
     }
-    line(-1.05,.2,-1.05,1.8);line(-1.05,.2,1.1,.2);
-    for(let i=0;i<4;i++){const h=.4+i*.32;const bar=rect(.3,h,i%2?gold:color,-.7+i*.5,.22+h/2,.1);anim.push((t,p)=>{bar.scale.y=.12+.88*p;bar.position.y=.22+h*bar.scale.y/2;});}
-    line(-.7,.8,.8,1.8,green,.06,.15);
+    line(-1.05,.2,-1.05,1.46);line(-1.05,.2,1.1,.2);
+    for(let i=0;i<4;i++){const h=.30+i*.25;const bar=rect(.3,h,i%2?gold:color,-.7+i*.5,.22+h/2,.1);anim.push((t,p)=>{bar.scale.y=.12+.88*p;bar.position.y=.22+h*bar.scale.y/2;});}
+    line(-.72,.62,.85,1.42,green,.06,.15);
   } else if (kind==='factory') {
     polygon([[-1.3,0],[1.3,0],[1.3,1.1],[.5,.8],[.5,1.25],[-.3,.9],[-.3,1.3],[-1.3,.9]],color);
     rect(.3,1.9,ink,.85,.95,-.06);
@@ -208,9 +208,11 @@ export function createProp(kind, { materials, assets, color = '#b26d42', sceneDa
     rect(1.15,.62,gold,0,-.88,0,hoist);
     anim.push(t=>{hoist.rotation.z=Math.sin(t*1.6)*.14;hoist.position.x=Math.sin(t*.8)*.35;});
   } else if (kind==='vault') {
-    const steel='#4a5863', dark='#262e35';
+    const steel='#6b7d8b', dark='#44525e';
+    rect(2.26,2.26,gold,0,1.12,-.065);
     rect(2.15,2.15,dark,0,1.12,-.04);
-    disc(.92,steel,0,1.12,.02);disc(.76,'#73828f',0,1.12,.06);
+    for(const sx of [-.94,.94])for(const sy of [.18,2.06])disc(.055,gold,sx,sy,.01);
+    disc(.92,steel,0,1.12,.02);disc(.76,'#8fa0ac',0,1.12,.06);
     const wheel=new THREE.Group();wheel.position.set(0,1.12,.14);root.add(wheel);
     disc(.28,gold,0,0,0,wheel);
     for(let i=0;i<6;i++){

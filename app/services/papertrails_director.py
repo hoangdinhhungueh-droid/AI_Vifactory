@@ -130,8 +130,72 @@ def detect_subject_and_biome(text: str) -> Tuple[str, str]:
     return "ledger", "heartland"
 
 
+_TITLE_LEAD_STOPWORDS = frozenset({
+    "따르면", "하지만", "그러나", "그런데", "또한", "그리고", "실제로", "결국", "반면", "이후",
+    "먼저", "당시", "한편", "즉", "만약", "다시", "바로", "특히", "앞서", "다만", "이를",
+    "however", "according", "meanwhile", "moreover", "therefore", "because", "although",
+    "finally", "actually", "and", "but", "so", "then", "that", "which",
+    "theo", "nhung", "nhưng", "tuy", "ngoai", "ngoài", "sau", "thuc", "thực",
+})
+
+_TITLE_TRAILING_VERB_RE = re.compile(
+    r"(?:보도했습니다|전했습니다|밝혔습니다|제안했습니다|제안했다고|설명했습니다|"
+    r"지적했습니다|말했습니다|나타났습니다|알려졌습니다|추정됩니다|집계됐습니다|"
+    r"나왔습니다|보도했다|밝혔다|전했다|제안했다|했습니다|됩니다|입니다|있습니다|없습니다|"
+    r"라고|이라고|다고|하자고|추가로|통해|위해|대한|관련해)$"
+)
+
+_KO_CASE_PARTICLE_RE = re.compile(r"([가-힣0-9A-Za-z%,.]+?)(?:으로는|에서도|에서는|이라고|이라는|에서|으로|에게|까지|부터|에도|에는|라고|다고|은|는|이|가|을|를|의|로|과|와)$")
+
+
+def _extract_headline_from_narration(narration: str, idx: int = 0) -> str:
+    """Builds a crisp 2-3 token (CJK) / up to 4 token (Latin) noun headline from spoken narration."""
+    raw_tokens = [
+        t.strip(".,!?;:\"'()[]{}")
+        for t in str(narration or "").split()
+    ]
+    tokens = [t for t in raw_tokens if len(t) > 1 or any(ch.isdigit() for ch in t)]
+    while tokens and tokens[0].lower() in _TITLE_LEAD_STOPWORDS:
+        tokens.pop(0)
+    while tokens and _TITLE_TRAILING_VERB_RE.search(tokens[-1]):
+        stem = _TITLE_TRAILING_VERB_RE.sub("", tokens[-1]).strip()
+        if len(stem) >= 2:
+            tokens[-1] = stem
+            break
+        tokens.pop()
+    if not tokens:
+        tokens = [t for t in raw_tokens if t][:3]
+    is_cjk = bool(re.search(r"[\uAC00-\uD7A3\u3040-\u30FF\u4E00-\u9FFF]", " ".join(tokens)))
+    selected = tokens[:3] if is_cjk else tokens[:4]
+    if selected:
+        # Strip trailing case particle on final token so headline stays noun-like (e.g. 약정액을 -> 약정액)
+        last_tok = selected[-1]
+        for _ in range(2):
+            m = _KO_CASE_PARTICLE_RE.match(last_tok)
+            if m and len(m.group(1)) >= 2:
+                last_tok = m.group(1)
+            else:
+                break
+        if _TITLE_TRAILING_VERB_RE.search(last_tok):
+            stem = _TITLE_TRAILING_VERB_RE.sub("", last_tok).strip()
+            if len(stem) >= 2:
+                last_tok = stem
+        selected[-1] = last_tok
+    if not selected:
+        return f"Record {idx + 1}"
+    out = " ".join(selected).strip()
+    max_len = 24 if is_cjk else 38
+    if len(out) > max_len:
+        # Drop last token if possible instead of mid-word clip
+        if len(selected) > 1 and len(" ".join(selected[:-1])) <= max_len:
+            out = " ".join(selected[:-1]).strip()
+        else:
+            out = out[:max_len].strip()
+    return out or f"Record {idx + 1}"
+
+
 def _sanitize_viewer_title(raw_title: Optional[str], narration: str = "", idx: int = 0) -> str:
-    """Ensures corner paper titles never leak internal beat/scene codes (Rule 136)."""
+    """Ensures corner paper titles never leak internal codes or raw trailing sentence verbs (Rule 136)."""
     candidate = str(raw_title or "").strip()
     # Strip internal prefixes like "B1_HOOK // B1_L01" or "SCENE_03:"
     candidate = re.sub(r"^[A-Z]\d+_[A-Z0-9_]+(\s*//\s*[A-Z0-9_]+)?\s*:?\s*", "", candidate).strip()
@@ -139,14 +203,21 @@ def _sanitize_viewer_title(raw_title: Optional[str], narration: str = "", idx: i
     candidate = candidate.replace("_", " ")
     candidate = re.sub(r"\s{2,}", " ", candidate).strip(" /:-.|")
 
-    # Reject if still mostly numeric/internal or empty
-    if not candidate or len(candidate) < 3 or re.fullmatch(r"[A-Z0-9_ /\-]+", candidate) and "//" in candidate:
-        words = [w.strip(".,!?;:\"'()") for w in narration.split() if len(w.strip(".,!?;:\"'()")) > 1]
-        candidate = " ".join(words[:4]) if words else f"Chapter {idx + 1}"
+    bad_raw = (
+        not candidate
+        or len(candidate) < 3
+        or (re.fullmatch(r"[A-Z0-9_ /\-]+", candidate) and "//" in candidate)
+        or any(candidate.lower().startswith(sw + " ") for sw in _TITLE_LEAD_STOPWORDS)
+        or bool(_TITLE_TRAILING_VERB_RE.search(candidate.split()[-1]))
+    )
+    if bad_raw:
+        # Clean the candidate itself if it came from a raw title with lead stopword/trailing verb, else narration
+        source_text = candidate if (candidate and len(candidate.split()) >= 2 and "//" not in candidate) else narration
+        return _extract_headline_from_narration(source_text, idx)
 
-    words_out = candidate.split()[:5]
+    words_out = candidate.split()[:4]
     clean = " ".join(words_out).strip()
-    return clean[:38] if len(clean) > 38 else clean
+    return clean[:34] if len(clean) > 34 else clean
 
 
 def build_caption_from_words(words: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -434,6 +505,14 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
             violations.append(f"{sid}: disallowed non-kinetic camera '{cam}'")
         if cam == prev_cam:
             violations.append(f"{sid}: consecutive duplicate camera '{cam}'")
+
+        title_str = str(sc.get("title") or "").strip()
+        title_toks = title_str.split()
+        if title_toks and (
+            title_toks[0].lower() in _TITLE_LEAD_STOPWORDS
+            or bool(_TITLE_TRAILING_VERB_RE.search(title_toks[-1]))
+        ):
+            violations.append(f"{sid}: unpolished raw-sentence title '{title_str}'")
 
         prop = str(sc.get("prop") or "")
         biome = str(sc.get("biome") or "")
@@ -826,6 +905,7 @@ def direct_papertrails_timeline_with_llm(
         }
 
         import httpx
+
         from app.services.model_gateway import AllProvidersFailed, ModelGatewayError, get_global_gateway
 
         prompt_json = json.dumps(user_payload, ensure_ascii=False, indent=2)
@@ -976,6 +1056,7 @@ def direct_papertrails_timeline_with_llm(
     timeline_spec: Dict[str, Any] = {
         "version": 1,
         "stageMode": "forensic_desk",
+        "market": str(market or "EN").strip().upper()[:2] or "EN",
         "width": width,
         "height": height,
         "fps": fps,
@@ -1012,6 +1093,7 @@ def build_papertrails_timeline(
     fps: int = 30,
     seed: int = 42,
     max_shot_seconds: float = 5.0,
+    market: str = "EN",
 ) -> Dict[str, Any]:
     """Deterministic Papertrails timeline builder used for e2e_min fixtures and unit tests."""
     if audio_duration <= 0:
@@ -1108,6 +1190,7 @@ def build_papertrails_timeline(
     foley_cues = _attach_timing_sheet_and_foley(timeline_scenes, captions)
     return {
         "version": 1,
+        "market": str(market or "EN").strip().upper()[:2] or "EN",
         "width": width,
         "height": height,
         "fps": fps,

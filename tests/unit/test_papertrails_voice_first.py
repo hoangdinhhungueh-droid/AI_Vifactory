@@ -243,3 +243,39 @@ def test_procedural_foley_filter_graph_builder():
     assert "adelay=2100:all=1" in graph_a
     assert "amix=inputs=4:normalize=0:duration=first[aout]" in graph_a
     assert inputs_a != inputs_b
+
+
+def test_sanitize_viewer_title_strips_korean_lead_stopwords_and_trailing_verbs():
+    assert _sanitize_viewer_title("", "따르면 산업은행이 2020년 약정액을") == "산업은행이 2020년 약정액"
+    assert _sanitize_viewer_title("", "출자 규모가 10조원이라고 보도했습니다") == "출자 규모가 10조원"
+    assert _sanitize_viewer_title("", "증권 유관기관이 7,600억원을 추가로") == "증권 유관기관이 7,600억원"
+    assert _sanitize_viewer_title("100조원으로 확대하자고 제안했다고 보도했습니다", "예비 문장") == "100조원으로 확대"
+
+
+def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
+    tl = build_papertrails_timeline(
+        scenes_script=[{"narration": "금융기관 25개 기관이 7,600억원을 출자했습니다.", "headline": "유관기관 출자 규모"}],
+        audio_path=Path("voice.mp3"),
+        audio_duration=4.0,
+        market="KR",
+    )
+    assert tl["market"] == "KR"
+    assert audit_papertrails_timeline_antipatterns(tl)["passed"]
+
+    root = Path(__file__).resolve().parent.parent.parent / "vox" / "papertrails_engine" / "engine"
+    print_js = (root / "src" / "video" / "print_textures.js").read_text(encoding="utf-8")
+    desk_js = (root / "src" / "video" / "forensic_desk.js").read_text(encoding="utf-8")
+    props_js = (root / "src" / "video" / "props.js").read_text(encoding="utf-8")
+    index_js = (root / "src" / "video" / "index.js").read_text(encoding="utf-8")
+    timeline_mjs = (root / "src" / "video" / "timeline.mjs").read_text(encoding="utf-8")
+    video_html = (root / "video.html").read_text(encoding="utf-8")
+
+    assert "핵심 기록 // 보도 분석" in print_js
+    assert "emissiveMap: tex" in print_js
+    assert "minCenterClearance = 2.6" in desk_js
+    assert "line(-.72,.62,.85,1.42,green" in props_js
+    assert "timeline.market" in index_js
+    assert "shift = s.card.side === 'left' ? -1.45 : 1.45" in index_js
+    assert "t.market !== undefined" in timeline_mjs
+    assert "width:39%" in video_html
+

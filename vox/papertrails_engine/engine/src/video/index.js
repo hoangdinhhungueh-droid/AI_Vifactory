@@ -48,7 +48,7 @@ window.__papertrails = {
       : await loadAssets({materials,renderer,quality});
     if(assets.textures) materials.setTextures(assets.textures);
     if(!isDeskMode && assets.source!=='gltf')throw new Error(`Required upstream glTF assets missing: ${assets.source}`);
-    const desk = isDeskMode ? createForensicDesk({ scene, materials, seed: timeline.seed, scenes: timeline.scenes }) : null;
+    const desk = isDeskMode ? createForensicDesk({ scene, materials, seed: timeline.seed, scenes: timeline.scenes, market: timeline.market }) : null;
     const wfc = isDeskMode ? null : createWFC({seed:timeline.seed});
     const world = isDeskMode ? desk : createWorld({scene,assets,wfc,materials,quality});
     const traveller = isDeskMode
@@ -65,7 +65,7 @@ window.__papertrails = {
     const lights=createLights({scene,quality});const daynight=createDayNight({scene});
     const post=createPost({renderer,scene,camera,quality});post.setSize(timeline.width,timeline.height);
     const subjects=new Map();
-    for(const s of timeline.scenes){const prop=createProp(s.prop,{materials,assets,color:s.color,sceneData:s});prop.group.visible=false;scene.add(prop.group);subjects.set(s.id,prop);}
+    for(const s of timeline.scenes){const prop=createProp(s.prop,{materials,assets,color:s.color,sceneData:{...s,market:timeline.market}});prop.group.visible=false;scene.add(prop.group);subjects.set(s.id,prop);}
     const originFor = biome => {
       const preferred={heartland:[0,0],desert:[22,0],snow:[-22,0],blossom:[0,22],pinewood:[0,-22]}[biome];
       if (isDeskMode) return new THREE.Vector3(...preferred);
@@ -101,16 +101,19 @@ window.__papertrails = {
           case 'crane': dist=8.5; height=.22+.72*p; break;                            // eased crane reveal
         }
       }
+      if (isDeskMode && !portrait && s.card && (s.card.side === 'left' || s.card.side === 'right')) {
+        dist = Math.max(dist, 6.2);
+      }
       const d=dist*k;
       if(s.camera==='top')camera.position.set(origin.x+.01+Math.sin(p*Math.PI)*.45,(13-0.7*p)*(portrait?1.2:1),origin.z+2);
       else camera.position.set(origin.x+Math.sin(angle)*d, Math.max(1.1,d*height),origin.z+Math.cos(angle)*d);
       if (isDeskMode && !portrait && s.card && (s.card.side === 'left' || s.card.side === 'right')) {
         const rightX = Math.cos(angle), rightZ = -Math.sin(angle);
-        const shift = s.card.side === 'left' ? -0.78 : 0.78;
+        const shift = s.card.side === 'left' ? -1.45 : 1.45;
         focus.x += rightX * shift;
         focus.z += rightZ * shift;
-        camera.position.x += rightX * shift * 0.35;
-        camera.position.z += rightZ * shift * 0.35;
+        camera.position.x += rightX * shift * 0.55;
+        camera.position.z += rightZ * shift * 0.55;
       }
       camera.lookAt(focus);camera.updateMatrixWorld();
       const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);state.listener.rightX=right.x;state.listener.rightZ=right.z;

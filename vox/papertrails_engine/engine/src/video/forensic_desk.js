@@ -17,7 +17,17 @@ function makeStationRng(seed, salt) {
   };
 }
 
-function addEvidenceThread(parent, a, b, mat) {
+function minDistOriginToSegmentXZ(a, b) {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const lenSq = dx * dx + dz * dz;
+  if (lenSq < 1e-6) return Math.hypot(a.x, a.z);
+  const t = Math.max(0, Math.min(1, -(a.x * dx + a.z * dz) / lenSq));
+  return Math.hypot(a.x + t * dx, a.z + t * dz);
+}
+
+function addEvidenceThread(parent, a, b, mat, minCenterClearance = 2.6) {
+  if (minDistOriginToSegmentXZ(a, b) < minCenterClearance) return;
   const dir = new THREE.Vector3().subVectors(b, a);
   const len = dir.length();
   if (len < 0.05) return;
@@ -29,7 +39,7 @@ function addEvidenceThread(parent, a, b, mat) {
   parent.add(mesh);
 }
 
-export function createForensicDesk({ scene, materials, seed = 42, scenes = [] }) {
+export function createForensicDesk({ scene, materials, seed = 42, scenes = [], market }) {
   const root = new THREE.Group();
   root.name = 'vox-forensic-desk';
 
@@ -65,7 +75,12 @@ export function createForensicDesk({ scene, materials, seed = 42, scenes = [] })
     const rand = makeRngSafe(seed, bIdx + 1);
     const deskTex = makeDeskSurfaceTexture(biome);
     const matGeo = new THREE.BoxGeometry(19.5, 0.06, 19.5);
-    const matMaterial = new THREE.MeshLambertMaterial({ map: deskTex });
+    const matMaterial = new THREE.MeshLambertMaterial({
+      map: deskTex,
+      emissive: new THREE.Color('#fff8eb'),
+      emissiveMap: deskTex,
+      emissiveIntensity: 0.20,
+    });
     const matMesh = new THREE.Mesh(matGeo, matMaterial);
     matMesh.position.set(0, -0.025, 0);
     matMesh.receiveShadow = true;
@@ -122,7 +137,7 @@ export function createForensicDesk({ scene, materials, seed = 42, scenes = [] })
       }
 
       if (sp.print && sampleSc) {
-        const pageMat = makeDocumentPrintMaterial(sampleSc, { mode: 'dossier' });
+        const pageMat = makeDocumentPrintMaterial({ ...sampleSc, market }, { mode: 'dossier' });
         const page = new THREE.Mesh(new THREE.PlaneGeometry(sp.w * 0.88, sp.d * 0.88), pageMat);
         page.rotation.x = -Math.PI / 2;
         page.position.set(0, sp.h + 0.012, 0);
@@ -152,13 +167,15 @@ export function createForensicDesk({ scene, materials, seed = 42, scenes = [] })
       stationPins.push(new THREE.Vector3(x, sp.h + 0.10, z));
     });
 
-    // Connect surrounding dossier stacks with taut red evidence yarn
-    for (let i = 0; i < stationPins.length - 1; i++) {
-      addEvidenceThread(station, stationPins[i], stationPins[i + 1], redThreadMat);
-    }
-    if (stationPins.length >= 5) {
-      addEvidenceThread(station, stationPins[0], stationPins[4], redThreadMat);
-      addEvidenceThread(station, stationPins[1], stationPins[5], redThreadMat);
+    // Connect ONLY outer rear-arc dossier pushpins so zero red yarn ever cuts across the central hero prop
+    const perimeterEdges = [
+      [5, 0], [0, 1], [1, 2], [2, 3], [3, 4], [4, 6],
+      [1, 7], [2, 7],
+    ];
+    for (const [ia, ib] of perimeterEdges) {
+      if (stationPins[ia] && stationPins[ib]) {
+        addEvidenceThread(station, stationPins[ia], stationPins[ib], redThreadMat, 2.6);
+      }
     }
 
     // Subtle dark vertical archival backdrop binder strips far behind camera horizon

@@ -2,6 +2,26 @@ import * as THREE from 'three';
 
 const FONT_STACK = '"Noto Sans CJK KR","Noto Sans CJK JP","Noto Sans","Segoe UI",Arial,sans-serif';
 
+const MARKET_COPY = {
+  KR: { tag: '핵심 기록 // 보도 분석', docTitle: '핵심 기록', chartTitle: '시장 지표', ledgerTitle: '자금 원장' },
+  KO: { tag: '핵심 기록 // 보도 분석', docTitle: '핵심 기록', chartTitle: '시장 지표', ledgerTitle: '자금 원장' },
+  JA: { tag: '検証記録 // 報道資料', docTitle: '検証記録', chartTitle: '市場指標', ledgerTitle: '資金台帳' },
+  JP: { tag: '検証記録 // 報道資料', docTitle: '検証記録', chartTitle: '市場指標', ledgerTitle: '資金台帳' },
+  VN: { tag: 'HỒ SƠ // ĐỐI CHIẾU', docTitle: 'HỒ SƠ ĐIỀU TRA', chartTitle: 'DỮ LIỆU THỊ TRƯỜNG', ledgerTitle: 'SỔ CÁI ĐỐI CHIẾU' },
+  VI: { tag: 'HỒ SƠ // ĐỐI CHIẾU', docTitle: 'HỒ SƠ ĐIỀU TRA', chartTitle: 'DỮ LIỆU THỊ TRƯỜNG', ledgerTitle: 'SỔ CÁI ĐỐI CHIẾU' },
+  EN: { tag: 'ARCHIVE // DOSSIER', docTitle: 'INVESTIGATIVE RECORD', chartTitle: 'MARKET DATA', ledgerTitle: 'AUDIT LEDGER' },
+};
+
+export function resolveMarket(sceneData) {
+  const m = String(sceneData?.market || '').trim().toUpperCase();
+  if (m && MARKET_COPY[m]) return m;
+  const txt = `${sceneData?.title || ''} ${sceneData?.narration || ''} ${sceneData?.card?.head || ''}`;
+  if (/[\uAC00-\uD7A3]/.test(txt)) return 'KR';
+  if (/[\u3040-\u30FF]/.test(txt)) return 'JA';
+  if (/[ăâđêôơưĂÂĐÊÔƠƯ]/.test(txt)) return 'VN';
+  return 'EN';
+}
+
 function hashStr(s) {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) {
@@ -72,8 +92,8 @@ export function extractDisplayMetric(sceneData) {
     if (m && m[1]) return m[1].trim();
   }
   const src = `${sceneData.title || ''} ${sceneData.narration || ''}`;
-  const numM = src.match(/\d[\d,.]*(?:\s*(?:조|억|만|%|곳|건|차례|년|개월|배|원|billion|million|trillion|percent|cases|years|months))?/i);
-  return numM ? numM[0].trim() : '';
+  const numM = src.match(/\d[\d,.]*(?:\s*(?:조\s*\d[\d,.]*\s*억\s*원|조\s*\d[\d,.]*\s*억|조\s*원|억\s*원|만\s*원|개\s*기관|개\s*은행|개\s*사|개\s*곳|개월|차례|퍼센트|조|억|만|원|%|곳|건|년|배|trillion|billion|million|thousand|percent|cases|years|months|banks|tỷ\s*USD|tỷ\s*đồng|triệu\s*đồng|tỷ|triệu|nghìn|năm|lần|兆円|億円|万円|兆|億|万|円|件|社))/i);
+  return numM ? numM[0].replace(/\s+/g, ' ').trim() : '';
 }
 
 export function extractSourceTag(sceneData) {
@@ -83,10 +103,10 @@ export function extractSourceTag(sceneData) {
     if (parts[1] && parts[1].trim()) return parts[1].trim();
   }
   if (head) return head;
-  return 'ARCHIVE // DOSSIER';
+  return (MARKET_COPY[resolveMarket(sceneData)] || MARKET_COPY.EN).tag;
 }
 
-export function createPrintedPaperMaterial({ width = 768, height = 768, baseColor = '#f4efe3', seed = 'doc', draw }) {
+export function createPrintedPaperMaterial({ width = 768, height = 768, baseColor = '#faf4e8', seed = 'doc', draw }) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -97,16 +117,24 @@ export function createPrintedPaperMaterial({ width = 768, height = 768, baseColo
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   tex.needsUpdate = true;
-  return new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
+  return new THREE.MeshLambertMaterial({
+    color: new THREE.Color('#ffffff'),
+    map: tex,
+    emissive: new THREE.Color('#fff9ee'),
+    emissiveMap: tex,
+    emissiveIntensity: 0.34,
+    side: THREE.DoubleSide,
+  });
 }
 
 export function makeDocumentPrintMaterial(sceneData, opts = {}) {
   const mode = opts.mode || 'dossier';
-  const title = String(sceneData?.title || 'INVESTIGATIVE RECORD').trim();
+  const copy = MARKET_COPY[resolveMarket(sceneData)] || MARKET_COPY.EN;
+  const title = String(sceneData?.title || copy.docTitle).trim();
   const narration = String(sceneData?.narration || '').trim();
   const metric = extractDisplayMetric(sceneData);
   const srcTag = extractSourceTag(sceneData);
-  const baseColor = opts.baseColor || (mode === 'stamp' ? '#f6efe0' : '#f4efe3');
+  const baseColor = opts.baseColor || (mode === 'stamp' ? '#fbf3e4' : '#faf4e8');
 
   return createPrintedPaperMaterial({
     width: 768,
@@ -169,21 +197,22 @@ export function makeDocumentPrintMaterial(sceneData, opts = {}) {
 }
 
 export function makeChartBoardPrintMaterial(sceneData) {
-  const title = String(sceneData?.title || 'MARKET DATA').trim();
+  const copy = MARKET_COPY[resolveMarket(sceneData)] || MARKET_COPY.EN;
+  const title = String(sceneData?.title || copy.chartTitle).trim();
   const metric = extractDisplayMetric(sceneData);
   const srcTag = extractSourceTag(sceneData);
 
   return createPrintedPaperMaterial({
     width: 1024,
     height: 768,
-    baseColor: '#f5efe2',
+    baseColor: '#faf4e8',
     seed: `${sceneData?.id || 'chart'}-board`,
     draw: (ctx, w, h) => {
-      // Faint horizontal chart gridlines
+      // Faint horizontal chart gridlines strictly inside lower plot area (below header/badge)
       ctx.strokeStyle = 'rgba(95,78,56,0.20)';
       ctx.lineWidth = 2;
       ctx.setLineDash([8, 8]);
-      for (let y = 190; y <= h - 120; y += 92) {
+      for (let y = 220; y <= h - 110; y += 92) {
         ctx.beginPath();
         ctx.moveTo(90, y);
         ctx.lineTo(w - 72, y);
@@ -194,30 +223,41 @@ export function makeChartBoardPrintMaterial(sceneData) {
       // Top editorial header
       ctx.fillStyle = '#8b6f4e';
       ctx.font = `800 22px ${FONT_STACK}`;
-      ctx.fillText(srcTag, 76, 62);
+      ctx.fillText(srcTag, 76, 56);
 
-      ctx.fillStyle = '#241a12';
-      ctx.font = `900 42px ${FONT_STACK}`;
-      const hLines = wrapLines(ctx, title, metric ? w - 380 : w - 150, 1);
-      if (hLines[0]) ctx.fillText(hLines[0], 76, 118);
-
+      let badgeW = 0;
       if (metric) {
-        const badgeW = Math.min(300, Math.max(170, ctx.measureText(metric).width + 64));
-        const bx = w - badgeW - 60;
+        let badgeFontPx = 38;
+        ctx.font = `900 ${badgeFontPx}px ${FONT_STACK}`;
+        let mWidth = ctx.measureText(metric).width;
+        if (mWidth > 320) {
+          badgeFontPx = 30;
+          ctx.font = `900 ${badgeFontPx}px ${FONT_STACK}`;
+          mWidth = ctx.measureText(metric).width;
+        }
+        badgeW = Math.min(430, Math.max(180, mWidth + 56));
+        const bx = w - badgeW - 56;
         ctx.fillStyle = '#c83e2b';
-        ctx.fillRect(bx, 46, badgeW, 82);
+        ctx.fillRect(bx, 38, badgeW, 74);
         ctx.fillStyle = '#fff8ee';
-        ctx.font = `900 40px ${FONT_STACK}`;
+        ctx.font = `900 ${badgeFontPx}px ${FONT_STACK}`;
         ctx.textAlign = 'center';
-        ctx.fillText(metric, bx + badgeW / 2, 101);
+        ctx.fillText(metric, bx + badgeW / 2, 88);
         ctx.textAlign = 'left';
       }
+
+      ctx.fillStyle = '#241a12';
+      ctx.font = `900 40px ${FONT_STACK}`;
+      const titleMaxW = metric ? Math.max(260, w - badgeW - 150) : w - 150;
+      const hLines = wrapLines(ctx, title, titleMaxW, 1);
+      if (hLines[0]) ctx.fillText(hLines[0], 76, 112);
     },
   });
 }
 
 export function makeLedgerPagePrintMaterial(sceneData, side = 'left') {
-  const title = String(sceneData?.title || 'AUDIT LEDGER').trim();
+  const copy = MARKET_COPY[resolveMarket(sceneData)] || MARKET_COPY.EN;
+  const title = String(sceneData?.title || copy.ledgerTitle).trim();
   const narration = String(sceneData?.narration || '').trim();
   const metric = extractDisplayMetric(sceneData);
   const srcTag = extractSourceTag(sceneData);
@@ -225,7 +265,7 @@ export function makeLedgerPagePrintMaterial(sceneData, side = 'left') {
   return createPrintedPaperMaterial({
     width: 640,
     height: 896,
-    baseColor: '#f4efe1',
+    baseColor: '#faf3e6',
     seed: `${sceneData?.id || 'ledger'}-${side}`,
     draw: (ctx, w, h) => {
       // Accounting vertical & horizontal column rules
