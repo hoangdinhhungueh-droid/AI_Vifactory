@@ -11,8 +11,9 @@ import { createPost } from '../render/post.js';
 import { createWFC } from '../world/wfc.js';
 import { createWorld } from '../world/world.js';
 import { createTraveller } from '../player/traveller.js';
-import { createForensicDesk } from './forensic_desk.js';
+import { createForensicDesk, computeJourneyOrigins } from './forensic_desk.js';
 import { createProp } from './props.js';
+import { preloadIllustrationImages } from './print_textures.js';
 import { validateTimeline, sampleTimeline, seededRandom, frameCount } from './timeline.mjs';
 import { smooth, easeInOutCubic, easeOutBack } from './motion.js';
 
@@ -24,6 +25,14 @@ function tornClip(seed) {
   return `polygon(${top.join(',')},${bottom.join(',')})`;
 }
 
+const BEAT_STUDIO_MOOD = {
+  1: { bg: '#18130f', fadeA: '#16110d', fadeB: '#100c09' },
+  2: { bg: '#1e1711', fadeA: '#1b140f', fadeB: '#130e0a' },
+  3: { bg: '#181412', fadeA: '#16120f', fadeB: '#0f0c0a' },
+  4: { bg: '#111722', fadeA: '#101620', fadeB: '#0a0f17' },
+  5: { bg: '#161412', fadeA: '#141210', fadeB: '#0c0b0a' },
+};
+
 let runtime;
 window.__papertrails = {
   ready: true,
@@ -34,7 +43,6 @@ window.__papertrails = {
     const quality=options.quality || 'med';
     const allowSeek=!!options.allowSeek;
     if(!['low','vox','med','high'].includes(quality))throw new Error('Invalid quality');
-    // Optional measured loudness of the ORIGINAL voice, one value (0..1) per output frame; drives waveform props only.
     const envelope=Array.isArray(options.envelope)?options.envelope:null;
     const levelAt=time=>{if(!envelope||!envelope.length)return null;const i=Math.min(envelope.length-1,Math.max(0,Math.round(time*timeline.fps)));return envelope[i];};
     Math.random=seededRandom(timeline.seed);
@@ -48,7 +56,10 @@ window.__papertrails = {
       : await loadAssets({materials,renderer,quality});
     if(assets.textures) materials.setTextures(assets.textures);
     if(!isDeskMode && assets.source!=='gltf')throw new Error(`Required upstream glTF assets missing: ${assets.source}`);
-    const desk = isDeskMode ? createForensicDesk({ scene, materials, seed: timeline.seed, scenes: timeline.scenes, market: timeline.market }) : null;
+    const illustrationImgs = await preloadIllustrationImages(timeline.illustrations || {});
+    const sceneIdxMap = new Map(timeline.scenes.map((s, idx) => [s.id, idx]));
+    const journeyOrigins = isDeskMode ? computeJourneyOrigins(timeline.scenes) : null;
+    const desk = isDeskMode ? createForensicDesk({ scene, materials, seed: timeline.seed, scenes: timeline.scenes, market: timeline.market, origins: journeyOrigins }) : null;
     const wfc = isDeskMode ? null : createWFC({seed:timeline.seed});
     const world = isDeskMode ? desk : createWorld({scene,assets,wfc,materials,quality});
     const traveller = isDeskMode
@@ -64,73 +75,141 @@ window.__papertrails = {
     const camera=new THREE.PerspectiveCamera(37,timeline.width/timeline.height,.05,250);
     const lights=createLights({scene,quality});const daynight=createDayNight({scene});
     const post=createPost({renderer,scene,camera,quality});post.setSize(timeline.width,timeline.height);
+    const origins=isDeskMode
+      ? journeyOrigins
+      : new Map(timeline.scenes.map(s=>{
+          const preferred={heartland:[0,0],desert:[22,0],snow:[-22,0],blossom:[0,22],pinewood:[0,-22]}[s.biome];
+          for(let r=0;r<=14;r+=2)for(let i=0;i<16;i++){const x=preferred[0]+Math.cos(i*Math.PI/8)*r,z=preferred[1]+Math.sin(i*Math.PI/8)*r;if(biomeAt(timeline.seed,x/2,z/2)===s.biome&&world.isWalkable(x-1.2,z+1.3))return [s.id, new THREE.Vector3(x,0,z)];}
+          return [s.id, new THREE.Vector3(preferred[0],0,preferred[1])];
+        }));
     const subjects=new Map();
-    for(const s of timeline.scenes){const prop=createProp(s.prop,{materials,assets,color:s.color,sceneData:{...s,market:timeline.market}});prop.group.visible=false;scene.add(prop.group);subjects.set(s.id,prop);}
-    const originFor = biome => {
-      const preferred={heartland:[0,0],desert:[22,0],snow:[-22,0],blossom:[0,22],pinewood:[0,-22]}[biome];
-      if (isDeskMode) return new THREE.Vector3(...preferred);
-      for(let r=0;r<=14;r+=2)for(let i=0;i<16;i++){const x=preferred[0]+Math.cos(i*Math.PI/8)*r,z=preferred[1]+Math.sin(i*Math.PI/8)*r;if(biomeAt(timeline.seed,x/2,z/2)===biome&&world.isWalkable(x-1.2,z+1.3))return new THREE.Vector3(x,0,z);}
-      return new THREE.Vector3(...[preferred[0],0,preferred[1]]);
-    };
-    const origins=new Map(timeline.scenes.map(s=>[s.id,originFor(s.biome)]));
-    // Consecutive shots in the same biome get a different viewing side so cuts carry new framing.
-    const sides=new Map();{let prev=null,k=0;for(const s of timeline.scenes){k=prev&&prev.biome===s.biome?k+1:0;sides.set(s.id,[.36,-.55,1.05,-1.2][k%4]);prev=s;}}
+    for(const s of timeline.scenes){
+      const illImg = s.illustrationKey ? (illustrationImgs.get(s.illustrationKey) || null) : null;
+      const prop=createProp(s.prop,{materials,assets,color:s.color,sceneData:{...s,market:timeline.market},isDeskMode,illustrationImg:illImg});
+      const o=origins.get(s.id);
+      if (isDeskMode && o) prop.group.position.copy(o);
+      prop.group.visible=false;
+      scene.add(prop.group);
+      subjects.set(s.id,prop);
+    }
+    const sides=new Map();{let prev=null,k=0;for(const s of timeline.scenes){k=prev&&prev.biome===s.biome?k+1:0;sides.set(s.id,[.32,-.44,.75,-.78][k%4]);prev=s;}}
     let active=null,lastFrame=-1;
     const focus=new THREE.Vector3();
-    function updateCamera(sample) {
-      const s=sample.scene,origin=origins.get(s.id),side=sides.get(s.id)??.36,p=easeInOutCubic(sample.progress);
-      const portrait=timeline.height>timeline.width,k=portrait?1.27:1;
-      focus.copy(origin);focus.y=isDeskMode?.95:.9;
-      let dist=9,height=.68,angle=side;
+
+    function computePoseForScene(s, progress) {
+      const origin = origins.get(s.id);
+      const side = sides.get(s.id) ?? .32;
+      const p = easeInOutCubic(progress);
+      const portrait = timeline.height > timeline.width;
+      const k = portrait ? 1.27 : 1;
+      const foc = origin.clone();
+      foc.y = isDeskMode ? 0.96 : 0.9;
+      let dist = 9, height = .68, angle = side;
       if (isDeskMode) {
-        switch(s.camera){
-          case 'close': dist=5.4-0.4*p; height=.48; angle=side+0.08*p; break;
-          case 'wide': dist=8.2-0.45*p; height=.56; angle=side+0.08*Math.sin(p*Math.PI); break;
-          case 'orbit': dist=6.8; height=.50; angle=side+.12+p*.42; break;
-          case 'push': dist=7.6-2.4*p; height=.56-.10*p; break;
-          case 'low': dist=5.0-.45*p; height=.30; angle=side+.12*p; focus.y=1.05; break;
-          case 'crane': dist=7.2; height=.34+.52*p; break;
+        // Gentle editorial desk framing showing hero plate + neighboring connected dossiers
+        angle = (side * 0.45);
+        switch (s.camera) {
+          case 'close': dist = 5.9 - 0.35 * p; height = .42; angle += 0.08 * p; break;
+          case 'wide': dist = 7.8 - 0.40 * p; height = .48; angle += 0.06 * Math.sin(p * Math.PI); break;
+          case 'orbit': dist = 6.7; height = .44; angle += -0.10 + p * 0.28; break;
+          case 'push': dist = 7.4 - 1.5 * p; height = .48 - 0.08 * p; break;
+          case 'low': dist = 5.6 - 0.35 * p; height = .32; angle += 0.10 * p; foc.y = 1.02; break;
+          case 'crane': dist = 7.1; height = .36 + .28 * p; break;
         }
+        if (s.connector === 'pullback_mosaic') dist = Math.max(dist, 7.6 + 0.6 * p);
       } else {
         switch(s.camera){
           case 'close': dist=6.8-0.45*p; angle=side+0.10*p; break;
           case 'wide': dist=11-0.55*p; angle=side+0.08*Math.sin(p*Math.PI); break;
-          case 'orbit': angle=side+.14+p*.45; break;                                   // non-linear S-curve orbit arc
-          case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;                       // eased dolly toward subject
-          case 'low': dist=5.4-.5*p; height=.42; angle=side+.12*p; focus.y=1.18; break;  // hero angle clearing foreground foliage
-          case 'crane': dist=8.5; height=.22+.72*p; break;                            // eased crane reveal
+          case 'orbit': angle=side+.14+p*.45; break;
+          case 'push': dist=10.5-4.2*p; height=.62-.12*p; break;
+          case 'low': dist=5.4-.5*p; height=.42; angle=side+.12*p; foc.y=1.18; break;
+          case 'crane': dist=8.5; height=.22+.72*p; break;
         }
       }
       if (isDeskMode && !portrait && s.card && (s.card.side === 'left' || s.card.side === 'right')) {
-        dist = Math.max(dist, 6.2);
+        dist = Math.max(dist, 6.6);
       }
-      const d=dist*k;
-      if(s.camera==='top')camera.position.set(origin.x+.01+Math.sin(p*Math.PI)*.45,(13-0.7*p)*(portrait?1.2:1),origin.z+2);
-      else camera.position.set(origin.x+Math.sin(angle)*d, Math.max(1.1,d*height),origin.z+Math.cos(angle)*d);
+      const d = dist * k;
+      const pos = new THREE.Vector3();
+      if (s.camera === 'top') pos.set(origin.x + .01 + Math.sin(p * Math.PI) * .45, (13 - 0.7 * p) * (portrait ? 1.2 : 1), origin.z + 2);
+      else pos.set(origin.x + Math.sin(angle) * d, Math.max(1.15, d * height), origin.z + Math.cos(angle) * d);
       if (isDeskMode && !portrait && s.card && (s.card.side === 'left' || s.card.side === 'right')) {
         const rightX = Math.cos(angle), rightZ = -Math.sin(angle);
-        const shift = s.card.side === 'left' ? -1.45 : 1.45;
-        focus.x += rightX * shift;
-        focus.z += rightZ * shift;
-        camera.position.x += rightX * shift * 0.55;
-        camera.position.z += rightZ * shift * 0.55;
+        const shift = s.card.side === 'left' ? -1.55 : 1.55;
+        foc.x += rightX * shift;
+        foc.z += rightZ * shift;
+        pos.x += rightX * shift * 0.58;
+        pos.z += rightZ * shift * 0.58;
       }
-      camera.lookAt(focus);camera.updateMatrixWorld();
-      const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);state.listener.rightX=right.x;state.listener.rightZ=right.z;
+      return { pos, foc };
     }
+
+    function updateCamera(sample) {
+      const s = sample.scene;
+      const curPose = computePoseForScene(s, sample.progress);
+      const idx = sceneIdxMap.get(s.id) ?? 0;
+      if (isDeskMode && idx > 0 && sample.local < 0.55) {
+        const prevScene = timeline.scenes[idx - 1];
+        const prevPose = computePoseForScene(prevScene, 1.0);
+        const u = easeInOutCubic(sample.local / 0.55);
+        camera.position.lerpVectors(prevPose.pos, curPose.pos, u);
+        focus.lerpVectors(prevPose.foc, curPose.foc, u);
+      } else {
+        camera.position.copy(curPose.pos);
+        focus.copy(curPose.foc);
+      }
+      camera.lookAt(focus); camera.updateMatrixWorld();
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+      state.listener.rightX = right.x; state.listener.rightZ = right.z;
+    }
+
+    function applyDeskStudioMood(s) {
+      const beat = BEAT_STUDIO_MOOD[s.beat || 1] || BEAT_STUDIO_MOOD[1];
+      CONFIG.lights.background = beat.bg;
+      CONFIG.lights.fade.color = beat.fadeA;
+      CONFIG.lights.fade.colorRight = beat.fadeB;
+      CONFIG.lights.fade.start = 10.5;
+      CONFIG.lights.fade.end = 26.0;
+      CONFIG.lights.fade.amount = 0.80;
+      CONFIG.lights.key.intensity = s.night ? 1.85 : 2.35;
+      CONFIG.lights.fill.intensity = s.night ? 0.55 : 0.78;
+      CONFIG.lights.hemi.intensity = 0.36;
+      CONFIG.post.bloom = 0.08;
+      CONFIG.post.vignette = 0.28;
+      CONFIG.post.exposure = 0.86;
+      CONFIG.dof.maxBlurPx = 4.5;
+    }
+
+    function syncVisibleNeighborhood(curId) {
+      if (!isDeskMode) {
+        for (const [id, p] of subjects.entries()) p.group.visible = (id === curId);
+        return;
+      }
+      const curIdx = sceneIdxMap.get(curId) ?? 0;
+      for (const s of timeline.scenes) {
+        const idx = sceneIdxMap.get(s.id) ?? 0;
+        const prop = subjects.get(s.id);
+        const vis = Math.abs(idx - curIdx) <= 3;
+        prop.group.visible = vis;
+        if (vis && s.id !== curId) {
+          prop.update(1.5, 1.0, 'idle', { time: state.time, scene: s });
+          prop.group.rotation.y = Math.sin(idx * 0.8) * 0.14;
+        }
+      }
+    }
+
     function enter(sample) {
       const s=sample.scene,origin=origins.get(s.id);
-      if(active)subjects.get(active).group.visible=false;active=s.id;
-      const prop=subjects.get(s.id);prop.group.visible=true;prop.group.position.copy(origin);
-      traveller.teleport(isDeskMode ? origin.x : origin.x-1.4, isDeskMode ? origin.z : origin.z+1.5, 1, -.2);
+      active=s.id;
+      syncVisibleNeighborhood(s.id);
+      traveller.teleport(origin.x, origin.z, 1, -.2);
       daynight.grade.force(s.biome);daynight.set(s.night,true);
       updateCamera(sample);
       if (!isDeskMode) {
-        // Fixed, scene-local preroll folds the genuine upstream page up before the cut.
         for(let i=0;i<90;i++){state.time=-3+i/30;world.update(1/30,traveller.position,traveller.moveDir);}
       }
     }
-    // ----- 2D paper overlays (title tag, caption strip, page wipe); all driven by timeline time, never CSS clocks.
     const elTitle=document.querySelector('#title'),elCap=document.querySelector('#caption'),elWrap=document.querySelector('#capwrap'),elWipe=document.querySelector('#wipe');
     const cuts=timeline.scenes.slice(1).map(s=>s.start);
     let capKey=null;
@@ -169,10 +248,13 @@ window.__papertrails = {
         elCap.style.transform=`rotate(${(Math.sin(sample.captionStart*7.3)*.8).toFixed(2)}deg)`;
       }
       if(timed)[...elCap.querySelectorAll('.w')].forEach((sp,i)=>{sp.className='w '+(i===sample.captionIndex?'on':i<sample.captionIndex?'done':'todo');});
-      // Page wipe: a paper sheet crosses the frame over 0.36 s, fully covering it at the cut.
-      const cut=cuts.find(c=>Math.abs(time-c)<=.18+1e-9);
-      if(cut===undefined){elWipe.style.display='none';}
-      else{const u=(time-(cut-.18))/.36;elWipe.style.display='block';elWipe.style.left=`${(-160+260*smooth(u)).toFixed(2)}%`;}
+      if (isDeskMode) {
+        elWipe.style.display = 'none';
+      } else {
+        const cut=cuts.find(c=>Math.abs(time-c)<=.18+1e-9);
+        if(cut===undefined){elWipe.style.display='none';}
+        else{const u=(time-(cut-.18))/.36;elWipe.style.display='block';elWipe.style.left=`${(-160+260*smooth(u)).toFixed(2)}%`;}
+      }
     }
     function simulate(frame) {
       const time=frame/timeline.fps,sample=sampleTimeline(timeline,time);
@@ -181,12 +263,15 @@ window.__papertrails = {
       const dt=1/timeline.fps;
       traveller.update(dt,sample.scene.action==='walk'?{x:.45,z:0}:{x:0,z:0});
       const p=traveller.position;Object.assign(state.traveller,{x:p.x,y:p.y,z:p.z,dirX:traveller.moveDir.x,dirZ:traveller.moveDir.z,speed:traveller.speed});
-      // Celebration is an explicit subject action, not continuous navigation.
       if(sample.scene.action==='celebrate')traveller.group.position.y+=Math.abs(Math.sin(sample.local*5))*.12;
-      world.update(dt,p,isDeskMode?time:traveller.moveDir);daynight.update(dt);materials.update(dt);updateCamera(sample);lights.update(dt,traveller,camera);
-      const prop=subjects.get(sample.scene.id);prop.update(sample.local,sample.progress,sample.scene.action,{level:levelAt(time),levelAt,time,scene:sample.scene});prop.group.position.x=origins.get(sample.scene.id).x;prop.group.position.z=origins.get(sample.scene.id).z;
-      // Show the paper face toward the camera but retain physical 3D folds and thickness.
-      prop.group.rotation.y=Math.atan2(camera.position.x-prop.group.position.x,camera.position.z-prop.group.position.z);
+      world.update(dt,p,isDeskMode?time:traveller.moveDir);daynight.update(dt);
+      if (isDeskMode) applyDeskStudioMood(sample.scene);
+      materials.update(dt);updateCamera(sample);lights.update(dt,traveller,camera);
+      const prop=subjects.get(sample.scene.id);
+      prop.update(sample.local,sample.progress,sample.scene.action,{level:levelAt(time),levelAt,time,scene:sample.scene});
+      prop.group.position.x=origins.get(sample.scene.id).x;prop.group.position.z=origins.get(sample.scene.id).z;
+      const rawYaw = Math.atan2(camera.position.x-prop.group.position.x,camera.position.z-prop.group.position.z);
+      prop.group.rotation.y = isDeskMode ? Math.max(-0.28, Math.min(0.28, rawYaw)) : rawYaw;
       overlays(sample,time);
       document.body.dataset.scene=sample.scene.id;
       return sample;
@@ -211,5 +296,5 @@ window.__papertrails = {
     await document.fonts.ready;
     return {assetSource:assets.source,frames:frameCount(timeline),width:timeline.width,height:timeline.height};
   },
-  renderFrame(frame){if(!runtime)throw new Error('Call init first');return runtime.renderFrame(frame);}
+  renderFrame(frame){if(!runtime)throw new Error('Call init(timeline) first');return runtime.renderFrame(frame);}
 };

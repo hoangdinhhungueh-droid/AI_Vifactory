@@ -3,13 +3,13 @@ import * as THREE from 'three';
 const FONT_STACK = '"Noto Sans CJK KR","Noto Sans CJK JP","Noto Sans","Segoe UI",Arial,sans-serif';
 
 const MARKET_COPY = {
-  KR: { tag: '핵심 기록 // 보도 분석', docTitle: '핵심 기록', chartTitle: '시장 지표', ledgerTitle: '자금 원장' },
-  KO: { tag: '핵심 기록 // 보도 분석', docTitle: '핵심 기록', chartTitle: '시장 지표', ledgerTitle: '자금 원장' },
-  JA: { tag: '検証記録 // 報道資料', docTitle: '検証記録', chartTitle: '市場指標', ledgerTitle: '資金台帳' },
-  JP: { tag: '検証記録 // 報道資料', docTitle: '検証記録', chartTitle: '市場指標', ledgerTitle: '資金台帳' },
-  VN: { tag: 'HỒ SƠ // ĐỐI CHIẾU', docTitle: 'HỒ SƠ ĐIỀU TRA', chartTitle: 'DỮ LIỆU THỊ TRƯỜNG', ledgerTitle: 'SỔ CÁI ĐỐI CHIẾU' },
-  VI: { tag: 'HỒ SƠ // ĐỐI CHIẾU', docTitle: 'HỒ SƠ ĐIỀU TRA', chartTitle: 'DỮ LIỆU THỊ TRƯỜNG', ledgerTitle: 'SỔ CÁI ĐỐI CHIẾU' },
-  EN: { tag: 'ARCHIVE // DOSSIER', docTitle: 'INVESTIGATIVE RECORD', chartTitle: 'MARKET DATA', ledgerTitle: 'AUDIT LEDGER' },
+  KR: { tag: '핵심 기록 // 보도 분석', docTitle: '핵심 기록', chartTitle: '시장 지표', ledgerTitle: '자금 원장', stamp: '핵심 확인' },
+  KO: { tag: '핵심 기록 // 보도 분석', docTitle: '핵심 기록', chartTitle: '시장 지표', ledgerTitle: '자금 원장', stamp: '핵심 확인' },
+  JA: { tag: '検証記録 // 報道資料', docTitle: '検証記録', chartTitle: '市場指標', ledgerTitle: '資金台帳', stamp: '検証済' },
+  JP: { tag: '検証記録 // 報道資料', docTitle: '検証記録', chartTitle: '市場指標', ledgerTitle: '資金台帳', stamp: '検証済' },
+  VN: { tag: 'HỒ SƠ // ĐỐI CHIẾU', docTitle: 'HỒ SƠ ĐIỀU TRA', chartTitle: 'DỮ LIỆU THỊ TRƯỜNG', ledgerTitle: 'SỔ CÁI ĐỐI CHIẾU', stamp: 'ĐỐI CHIẾU' },
+  VI: { tag: 'HỒ SƠ // ĐỐI CHIẾU', docTitle: 'HỒ SƠ ĐIỀU TRA', chartTitle: 'DỮ LIỆU THỊ TRƯỜNG', ledgerTitle: 'SỔ CÁI ĐỐI CHIẾU', stamp: 'ĐỐI CHIẾU' },
+  EN: { tag: 'ARCHIVE // DOSSIER', docTitle: 'INVESTIGATIVE RECORD', chartTitle: 'MARKET DATA', ledgerTitle: 'AUDIT LEDGER', stamp: 'VERIFIED' },
 };
 
 export function resolveMarket(sceneData) {
@@ -39,16 +39,23 @@ function makeRng(seed) {
   };
 }
 
-function paintPaperGrain(ctx, w, h, baseColor, seedStr) {
+function paintPaperGrain(ctx, w, h, baseColor, seedStr, vignetteStrength = 0.08) {
   ctx.fillStyle = baseColor;
   ctx.fillRect(0, 0, w, h);
   const rand = makeRng(hashStr(seedStr || baseColor));
-  for (let i = 0; i < Math.floor((w * h) / 420); i++) {
+  for (let i = 0; i < Math.floor((w * h) / 360); i++) {
     const x = rand() * w;
     const y = rand() * h;
-    const sz = 1 + rand() * 2.2;
-    ctx.fillStyle = rand() > 0.5 ? 'rgba(90,68,42,0.045)' : 'rgba(255,250,240,0.08)';
+    const sz = 1 + rand() * 2.4;
+    ctx.fillStyle = rand() > 0.5 ? 'rgba(62,44,24,0.055)' : 'rgba(255,248,232,0.07)';
     ctx.fillRect(x, y, sz, sz);
+  }
+  if (vignetteStrength > 0) {
+    const g = ctx.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.25, w * 0.5, h * 0.5, Math.max(w, h) * 0.72);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, `rgba(42,28,14,${vignetteStrength})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
   }
 }
 
@@ -106,92 +113,252 @@ export function extractSourceTag(sceneData) {
   return (MARKET_COPY[resolveMarket(sceneData)] || MARKET_COPY.EN).tag;
 }
 
-export function createPrintedPaperMaterial({ width = 768, height = 768, baseColor = '#faf4e8', seed = 'doc', draw }) {
+export function createPrintedPaperMaterial({ width = 768, height = 896, baseColor = '#ede4d0', seed = 'doc', draw, vignette = 0.08 }) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  paintPaperGrain(ctx, width, height, baseColor, seed);
+  paintPaperGrain(ctx, width, height, baseColor, seed, vignette);
   if (draw) draw(ctx, width, height);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   tex.needsUpdate = true;
-  return new THREE.MeshLambertMaterial({
+  const mat = new THREE.MeshLambertMaterial({
     color: new THREE.Color('#ffffff'),
     map: tex,
-    emissive: new THREE.Color('#fff9ee'),
+    emissive: new THREE.Color('#fff5e4'),
     emissiveMap: tex,
-    emissiveIntensity: 0.34,
+    emissiveIntensity: 0.14,
     side: THREE.DoubleSide,
   });
+  mat.userData.noDayNightGlow = true;
+  return mat;
 }
 
-export function makeDocumentPrintMaterial(sceneData, opts = {}) {
+export async function preloadIllustrationImages(illustrationsMap) {
+  const loaded = new Map();
+  if (!illustrationsMap || typeof illustrationsMap !== 'object') return loaded;
+  const entries = Object.entries(illustrationsMap);
+  await Promise.all(entries.map(async ([key, uri]) => {
+    if (typeof uri !== 'string' || !uri.startsWith('data:image/')) return;
+    const img = new Image();
+    img.src = uri;
+    try {
+      if (typeof img.decode === 'function') {
+        await img.decode();
+      } else {
+        await new Promise((res, rej) => {
+          img.onload = () => res();
+          img.onerror = (err) => rej(err);
+        });
+      }
+      loaded.set(key, img);
+    } catch {
+      // Skip malformed image data silently so remaining plates still render cleanly
+    }
+  }));
+  return loaded;
+}
+
+function drawInkStamp(ctx, label, x, y, angle = -0.14) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.strokeStyle = 'rgba(196, 54, 34, 0.85)';
+  ctx.lineWidth = 4;
+  ctx.fillStyle = 'rgba(250, 240, 224, 0.72)';
+  ctx.font = `900 22px ${FONT_STACK}`;
+  const tw = Math.max(118, ctx.measureText(label).width + 36);
+  ctx.fillRect(-tw / 2, -24, tw, 48);
+  ctx.strokeRect(-tw / 2, -24, tw, 48);
+  ctx.fillStyle = 'rgba(196, 54, 34, 0.92)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, 0, 1);
+  ctx.restore();
+}
+
+function drawNewsprintColumns(ctx, x, y, w, h, rand) {
+  const colW = (w - 28) / 2;
+  for (let c = 0; c < 2; c++) {
+    const cx = x + c * (colW + 28);
+    ctx.strokeStyle = 'rgba(72, 54, 34, 0.25)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, y);
+    ctx.lineTo(cx + colW, y);
+    ctx.stroke();
+    let ly = y + 20;
+    while (ly < y + h - 18) {
+      const barW = colW * (0.58 + rand() * 0.40);
+      ctx.fillStyle = rand() > 0.82 ? 'rgba(184, 56, 31, 0.22)' : 'rgba(58, 42, 26, 0.17)';
+      ctx.fillRect(cx, ly, barW, 9);
+      ly += 22;
+    }
+  }
+}
+
+export function makeEditorialClippingMaterial(sceneData, opts = {}) {
   const mode = opts.mode || 'dossier';
   const copy = MARKET_COPY[resolveMarket(sceneData)] || MARKET_COPY.EN;
   const title = String(sceneData?.title || copy.docTitle).trim();
   const narration = String(sceneData?.narration || '').trim();
   const metric = extractDisplayMetric(sceneData);
   const srcTag = extractSourceTag(sceneData);
-  const baseColor = opts.baseColor || (mode === 'stamp' ? '#fbf3e4' : '#faf4e8');
+  const baseColor = opts.baseColor || (mode === 'stamp' ? '#f0e6d2' : '#ede4d0');
 
   return createPrintedPaperMaterial({
     width: 768,
-    height: 896,
+    height: 920,
     baseColor,
-    seed: `${sceneData?.id || 'doc'}-${mode}`,
+    seed: `${sceneData?.id || 'clip'}-${mode}`,
+    vignette: 0.11,
     draw: (ctx, w, h) => {
-      // Subtle ruled ledger lines
-      ctx.strokeStyle = 'rgba(130,108,78,0.16)';
-      ctx.lineWidth = 2;
-      for (let y = 175; y < h - 70; y += 54) {
-        ctx.beginPath();
-        ctx.moveTo(56, y);
-        ctx.lineTo(w - 56, y);
-        ctx.stroke();
-      }
-      // Red editorial margin bar
+      const rand = makeRng(hashStr(`${sceneData?.id || 'clip'}-cols`));
+      // Top dark editorial press masthead bar
+      ctx.fillStyle = '#231b14';
+      ctx.fillRect(0, 0, w, 72);
+      ctx.fillStyle = '#f5ecd9';
+      ctx.font = `800 22px ${FONT_STACK}`;
+      ctx.fillText(srcTag, 48, 44);
       ctx.fillStyle = '#c83e2b';
-      ctx.fillRect(46, 56, 10, h - 112);
+      ctx.fillRect(0, 72, w, 7);
 
-      // Masthead tag + divider
-      ctx.fillStyle = '#b8381f';
-      ctx.font = `800 24px ${FONT_STACK}`;
-      ctx.fillText(srcTag, 76, 88);
-      ctx.strokeStyle = '#3b2e21';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(76, 106);
-      ctx.lineTo(w - 56, 106);
-      ctx.stroke();
+      // Left archival margin rule
+      ctx.fillStyle = '#c83e2b';
+      ctx.fillRect(36, 102, 8, h - 140);
 
-      // Main headline
-      ctx.fillStyle = '#241a12';
+      // Newspaper headline
+      ctx.fillStyle = '#1e160f';
       ctx.font = `900 44px ${FONT_STACK}`;
-      const titleLines = wrapLines(ctx, title, w - 140, 2);
-      titleLines.forEach((ln, idx) => ctx.fillText(ln, 76, 162 + idx * 54));
+      const titleLines = wrapLines(ctx, title, w - 120, 2);
+      titleLines.forEach((ln, idx) => ctx.fillText(ln, 64, 142 + idx * 54));
 
-      // Quantitative callout box
-      let bodyTop = titleLines.length > 1 ? 265 : 220;
+      // Rule under headline
+      let curY = titleLines.length > 1 ? 222 : 172;
+      ctx.strokeStyle = 'rgba(42,30,18,0.45)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(64, curY);
+      ctx.lineTo(w - 48, curY);
+      ctx.stroke();
+      curY += 28;
+
+      // Quantitative callout bar if metric exists
       if (metric) {
-        ctx.fillStyle = 'rgba(200,62,43,0.10)';
-        ctx.fillRect(76, bodyTop, w - 136, 98);
-        ctx.strokeStyle = '#c83e2b';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(76, bodyTop, w - 136, 98);
-        ctx.fillStyle = '#b8381f';
-        ctx.font = `900 54px ${FONT_STACK}`;
-        ctx.fillText(metric, 98, bodyTop + 66);
-        bodyTop += 132;
+        ctx.fillStyle = '#c83e2b';
+        ctx.fillRect(64, curY, w - 112, 88);
+        ctx.fillStyle = '#fff6e6';
+        ctx.font = `900 48px ${FONT_STACK}`;
+        ctx.fillText(metric, 88, curY + 60);
+        curY += 116;
       }
 
-      // Narration excerpt lines
-      ctx.fillStyle = '#3b2e21';
-      ctx.font = `700 30px ${FONT_STACK}`;
-      const maxExcerptLines = mode === 'contract' ? 4 : 5;
-      const bodyLines = wrapLines(ctx, narration, w - 144, maxExcerptLines);
-      bodyLines.forEach((ln, idx) => ctx.fillText(ln, 76, bodyTop + idx * 46));
+      // Narration excerpt lines WITH warm yellow felt-tip highlighter strokes underneath
+      ctx.font = `700 29px ${FONT_STACK}`;
+      const bodyLines = wrapLines(ctx, narration, w - 124, 4);
+      bodyLines.forEach((ln, idx) => {
+        const ly = curY + idx * 48;
+        if (idx < 2) {
+          const lw = Math.min(w - 116, ctx.measureText(ln).width + 18);
+          ctx.fillStyle = 'rgba(244, 206, 66, 0.56)';
+          ctx.fillRect(60, ly - 30, lw, 38);
+        }
+        ctx.fillStyle = '#241a12';
+        ctx.fillText(ln, 66, ly);
+      });
+      curY += Math.max(1, bodyLines.length) * 48 + 26;
+
+      // Fill lower half with realistic dense 2-column broadsheet copy blocks so zero void remains
+      const remH = h - curY - 48;
+      if (remH >= 80) {
+        drawNewsprintColumns(ctx, 64, curY, w - 112, remH, rand);
+      }
+
+      // Angled red archival verification stamp
+      drawInkStamp(ctx, copy.stamp, w - 148, h - 84, -0.13);
+    },
+  });
+}
+
+export function makeDocumentPrintMaterial(sceneData, opts = {}) {
+  return makeEditorialClippingMaterial(sceneData, opts);
+}
+
+export function makeIllustratedCollagePlateMaterial(sceneData, imgElement) {
+  const copy = MARKET_COPY[resolveMarket(sceneData)] || MARKET_COPY.EN;
+  const title = String(sceneData?.title || copy.docTitle).trim();
+  const metric = extractDisplayMetric(sceneData);
+  const srcTag = extractSourceTag(sceneData);
+
+  return createPrintedPaperMaterial({
+    width: 1024,
+    height: 820,
+    baseColor: '#efe6d2',
+    seed: `${sceneData?.id || 'plate'}-ill`,
+    vignette: 0.09,
+    draw: (ctx, w, h) => {
+      // Double deckle archival frame lines
+      ctx.strokeStyle = 'rgba(42, 30, 18, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(24, 24, w - 48, h - 48);
+
+      // Artwork viewport [48, 44, 928, 636] using cover crop to prevent distortion
+      const vx = 48, vy = 44, vw = w - 96, vh = 636;
+      if (imgElement && imgElement.width > 0 && imgElement.height > 0) {
+        const iw = imgElement.width, ih = imgElement.height;
+        const scale = Math.max(vw / iw, vh / ih);
+        const sw = vw / scale, sh = vh / scale;
+        const sx = (iw - sw) * 0.5, sy = (ih - sh) * 0.5;
+        ctx.drawImage(imgElement, sx, sy, sw, sh, vx, vy, vw, vh);
+      } else {
+        ctx.fillStyle = '#252d38';
+        ctx.fillRect(vx, vy, vw, vh);
+      }
+
+      // Bold Vox comic ink border around artwork
+      ctx.strokeStyle = '#1e160f';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(vx, vy, vw, vh);
+
+      // Corner translucent archival tape strips
+      ctx.fillStyle = 'rgba(232, 206, 146, 0.72)';
+      ctx.save();
+      ctx.translate(64, 48);
+      ctx.rotate(-0.42);
+      ctx.fillRect(-44, -14, 88, 28);
+      ctx.restore();
+      ctx.save();
+      ctx.translate(w - 64, 48);
+      ctx.rotate(0.42);
+      ctx.fillRect(-44, -14, 88, 28);
+      ctx.restore();
+
+      // Editorial caption strip strictly below artwork (y = 696..796)
+      ctx.fillStyle = '#211912';
+      ctx.fillRect(vx, 696, vw, 86);
+      ctx.fillStyle = '#f2ce58';
+      ctx.font = `800 20px ${FONT_STACK}`;
+      ctx.fillText(srcTag, vx + 24, 725);
+
+      let badgeW = 0;
+      if (metric) {
+        ctx.font = `900 30px ${FONT_STACK}`;
+        badgeW = Math.min(340, Math.max(130, ctx.measureText(metric).width + 44));
+        const bx = vx + vw - badgeW - 18;
+        ctx.fillStyle = '#c83e2b';
+        ctx.fillRect(bx, 710, badgeW, 58);
+        ctx.fillStyle = '#fff8ee';
+        ctx.textAlign = 'center';
+        ctx.fillText(metric, bx + badgeW / 2, 749);
+        ctx.textAlign = 'left';
+      }
+
+      ctx.fillStyle = '#faf2e1';
+      ctx.font = `900 34px ${FONT_STACK}`;
+      const hLines = wrapLines(ctx, title, metric ? vw - badgeW - 64 : vw - 48, 1);
+      if (hLines[0]) ctx.fillText(hLines[0], vx + 24, 764);
     },
   });
 }
@@ -205,25 +372,19 @@ export function makeChartBoardPrintMaterial(sceneData) {
   return createPrintedPaperMaterial({
     width: 1024,
     height: 768,
-    baseColor: '#faf4e8',
+    baseColor: '#eee5d2',
     seed: `${sceneData?.id || 'chart'}-board`,
+    vignette: 0.08,
     draw: (ctx, w, h) => {
-      // Faint horizontal chart gridlines strictly inside lower plot area (below header/badge)
-      ctx.strokeStyle = 'rgba(95,78,56,0.20)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 8]);
-      for (let y = 220; y <= h - 110; y += 92) {
-        ctx.beginPath();
-        ctx.moveTo(90, y);
-        ctx.lineTo(w - 72, y);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
+      // Dark editorial slate header bar
+      ctx.fillStyle = '#1f252e';
+      ctx.fillRect(0, 0, w, 134);
+      ctx.fillStyle = '#c83e2b';
+      ctx.fillRect(0, 134, w, 8);
 
-      // Top editorial header
-      ctx.fillStyle = '#8b6f4e';
+      ctx.fillStyle = '#e5bc3a';
       ctx.font = `800 22px ${FONT_STACK}`;
-      ctx.fillText(srcTag, 76, 56);
+      ctx.fillText(srcTag, 56, 46);
 
       let badgeW = 0;
       if (metric) {
@@ -236,21 +397,38 @@ export function makeChartBoardPrintMaterial(sceneData) {
           mWidth = ctx.measureText(metric).width;
         }
         badgeW = Math.min(430, Math.max(180, mWidth + 56));
-        const bx = w - badgeW - 56;
+        const bx = w - badgeW - 48;
         ctx.fillStyle = '#c83e2b';
-        ctx.fillRect(bx, 38, badgeW, 74);
+        ctx.fillRect(bx, 30, badgeW, 76);
         ctx.fillStyle = '#fff8ee';
         ctx.font = `900 ${badgeFontPx}px ${FONT_STACK}`;
         ctx.textAlign = 'center';
-        ctx.fillText(metric, bx + badgeW / 2, 88);
+        ctx.fillText(metric, bx + badgeW / 2, 81);
         ctx.textAlign = 'left';
       }
 
-      ctx.fillStyle = '#241a12';
+      ctx.fillStyle = '#faf2e1';
       ctx.font = `900 40px ${FONT_STACK}`;
-      const titleMaxW = metric ? Math.max(260, w - badgeW - 150) : w - 150;
+      const titleMaxW = metric ? Math.max(260, w - badgeW - 140) : w - 120;
       const hLines = wrapLines(ctx, title, titleMaxW, 1);
-      if (hLines[0]) ctx.fillText(hLines[0], 76, 112);
+      if (hLines[0]) ctx.fillText(hLines[0], 56, 102);
+
+      // Subtle Y-axis tick bands & gridlines strictly inside lower plot area
+      ctx.strokeStyle = 'rgba(72, 58, 42, 0.24)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      for (let y = 215; y <= h - 105; y += 92) {
+        ctx.beginPath();
+        ctx.moveTo(86, y);
+        ctx.lineTo(w - 56, y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // Editorial source rule footer
+      ctx.fillStyle = 'rgba(42,30,18,0.55)';
+      ctx.font = `700 20px ${FONT_STACK}`;
+      ctx.fillText(`${srcTag} // ${copy.chartTitle}`, 56, h - 34);
     },
   });
 }
@@ -265,55 +443,81 @@ export function makeLedgerPagePrintMaterial(sceneData, side = 'left') {
   return createPrintedPaperMaterial({
     width: 640,
     height: 896,
-    baseColor: '#faf3e6',
+    baseColor: '#ede4d0',
     seed: `${sceneData?.id || 'ledger'}-${side}`,
+    vignette: 0.09,
     draw: (ctx, w, h) => {
-      // Accounting vertical & horizontal column rules
-      ctx.strokeStyle = 'rgba(120,96,68,0.22)';
-      ctx.lineWidth = 2;
-      for (let y = 150; y < h - 60; y += 64) {
-        ctx.beginPath();
-        ctx.moveTo(40, y);
-        ctx.lineTo(w - 40, y);
-        ctx.stroke();
-      }
-      ctx.strokeStyle = 'rgba(184,56,31,0.35)';
-      ctx.beginPath();
-      ctx.moveTo(side === 'left' ? 56 : w - 165, 110);
-      ctx.lineTo(side === 'left' ? 56 : w - 165, h - 60);
-      ctx.stroke();
+      const rand = makeRng(hashStr(`${sceneData?.id || 'ledger'}-${side}-rows`));
+      // Top dark ledger binding header
+      ctx.fillStyle = '#231b14';
+      ctx.fillRect(0, 0, w, 86);
+      ctx.fillStyle = '#e5bc3a';
+      ctx.font = `800 20px ${FONT_STACK}`;
+      ctx.fillText(srcTag, 44, 34);
 
       if (side === 'left') {
-        ctx.fillStyle = '#b8381f';
-        ctx.font = `800 22px ${FONT_STACK}`;
-        ctx.fillText(srcTag, 74, 72);
-        ctx.fillStyle = '#241a12';
-        ctx.font = `900 36px ${FONT_STACK}`;
-        wrapLines(ctx, title, w - 110, 2).forEach((ln, i) => ctx.fillText(ln, 74, 122 + i * 44));
+        ctx.fillStyle = '#faf2e1';
+        ctx.font = `900 32px ${FONT_STACK}`;
+        wrapLines(ctx, title, w - 88, 1).forEach((ln) => ctx.fillText(ln, 44, 70));
       } else {
-        let topY = 92;
-        if (metric) {
-          ctx.fillStyle = '#241a12';
-          ctx.fillRect(46, 52, w - 92, 86);
-          ctx.fillStyle = '#f8efd8';
-          ctx.font = `900 44px ${FONT_STACK}`;
-          ctx.fillText(metric, 68, 110);
-          topY = 186;
+        ctx.fillStyle = '#faf2e1';
+        ctx.font = `900 30px ${FONT_STACK}`;
+        ctx.fillText(metric || copy.ledgerTitle, 44, 70);
+      }
+
+      // Alternating ledger row bands + accounting double lines
+      for (let idx = 0; idx < 11; idx++) {
+        const y = 112 + idx * 66;
+        if (idx % 2 === 0) {
+          ctx.fillStyle = 'rgba(110, 86, 56, 0.08)';
+          ctx.fillRect(36, y, w - 72, 56);
         }
-        ctx.fillStyle = '#3b2e21';
-        ctx.font = `700 27px ${FONT_STACK}`;
-        wrapLines(ctx, narration, w - 110, 6).forEach((ln, i) => ctx.fillText(ln, 48, topY + i * 48));
+        ctx.strokeStyle = 'rgba(95, 75, 52, 0.24)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(36, y + 56);
+        ctx.lineTo(w - 36, y + 56);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(196, 56, 32, 0.45)';
+      ctx.beginPath();
+      ctx.moveTo(side === 'left' ? 52 : w - 155, 98);
+      ctx.lineTo(side === 'left' ? 52 : w - 155, h - 42);
+      ctx.stroke();
+
+      if (side === 'right') {
+        ctx.font = `700 25px ${FONT_STACK}`;
+        const lines = wrapLines(ctx, narration, w - 108, 4);
+        lines.forEach((ln, i) => {
+          const ly = 152 + i * 66;
+          if (i === 0) {
+            const lw = Math.min(w - 110, ctx.measureText(ln).width + 16);
+            ctx.fillStyle = 'rgba(244, 206, 66, 0.52)';
+            ctx.fillRect(46, ly - 26, lw, 34);
+          }
+          ctx.fillStyle = '#241a12';
+          ctx.fillText(ln, 50, ly);
+        });
+        // Subtle lower tabular figure bars
+        for (let r = 5; r < 11; r++) {
+          const ry = 132 + r * 66;
+          ctx.fillStyle = 'rgba(56, 42, 28, 0.20)';
+          ctx.fillRect(50, ry, 180 + rand() * 140, 12);
+          ctx.fillStyle = r % 3 === 0 ? 'rgba(196,56,32,0.45)' : 'rgba(56,42,28,0.28)';
+          ctx.fillRect(w - 135, ry, 72, 12);
+        }
+        drawInkStamp(ctx, copy.stamp, w - 135, h - 78, -0.10);
       }
     },
   });
 }
 
 const DESK_PALETTES = {
-  heartland: { base: '#efe8d8', line: 'rgba(120,96,68,0.16)', accent: 'rgba(184,56,31,0.22)', kind: 'newsprint' },
-  pinewood: { base: '#cab894', line: 'rgba(84,64,40,0.18)', accent: 'rgba(160,48,30,0.20)', kind: 'kraft' },
-  desert: { base: '#e7dac0', line: 'rgba(110,88,58,0.18)', accent: 'rgba(184,56,31,0.20)', kind: 'graph' },
-  snow: { base: '#d5dde3', line: 'rgba(65,86,108,0.20)', accent: 'rgba(184,56,31,0.25)', kind: 'blueprint' },
-  blossom: { base: '#ede3d4', line: 'rgba(105,82,58,0.16)', accent: 'rgba(184,56,31,0.22)', kind: 'broadsheet' },
+  heartland: { base: '#251d16', line: 'rgba(225,186,120,0.10)', accent: 'rgba(218,162,72,0.28)', clip: 'rgba(235,218,186,0.05)' },
+  pinewood: { base: '#1e241c', line: 'rgba(182,208,164,0.10)', accent: 'rgba(218,162,72,0.26)', clip: 'rgba(222,230,206,0.05)' },
+  desert: { base: '#2a1f16', line: 'rgba(232,190,130,0.11)', accent: 'rgba(218,162,72,0.28)', clip: 'rgba(238,216,178,0.05)' },
+  snow: { base: '#16202b', line: 'rgba(155,192,232,0.12)', accent: 'rgba(220,170,80,0.28)', clip: 'rgba(205,222,240,0.05)' },
+  blossom: { base: '#241b1c', line: 'rgba(222,184,172,0.10)', accent: 'rgba(218,162,72,0.26)', clip: 'rgba(235,212,206,0.05)' },
 };
 
 export function makeDeskSurfaceTexture(themeId = 'heartland') {
@@ -322,13 +526,12 @@ export function makeDeskSurfaceTexture(themeId = 'heartland') {
   canvas.width = 1024;
   canvas.height = 1024;
   const ctx = canvas.getContext('2d');
-  paintPaperGrain(ctx, 1024, 1024, pal.base, `desk-${themeId}`);
+  paintPaperGrain(ctx, 1024, 1024, pal.base, `desk-${themeId}`, 0.18);
 
-  // Archival graph / editorial desk grid
-  const step = pal.kind === 'graph' || pal.kind === 'blueprint' ? 64 : 128;
+  // Subtle cutting-mat millimeter grid
   ctx.strokeStyle = pal.line;
-  ctx.lineWidth = 2;
-  for (let i = 0; i <= 1024; i += step) {
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i <= 1024; i += 64) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
     ctx.lineTo(i, 1024);
@@ -339,22 +542,34 @@ export function makeDeskSurfaceTexture(themeId = 'heartland') {
     ctx.stroke();
   }
 
-  // Subtle registration crosshairs & editorial column margin lines
+  // Faint ghosted newsprint editorial columns embedded into desk texture so background never looks sterile
+  const rand = makeRng(hashStr(`desk-cols-${themeId}`));
+  for (let b = 0; b < 4; b++) {
+    const bx = 64 + (b % 2) * 512;
+    const by = 64 + Math.floor(b / 2) * 512;
+    ctx.fillStyle = pal.clip;
+    ctx.fillRect(bx, by, 384, 320);
+    for (let ln = 0; ln < 7; ln++) {
+      ctx.fillRect(bx + 24, by + 32 + ln * 36, 180 + rand() * 140, 12);
+    }
+  }
+
+  // Brass registration crosshairs
   ctx.strokeStyle = pal.accent;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.5;
   for (const c of [256, 512, 768]) {
     ctx.beginPath();
-    ctx.moveTo(c - 18, c);
-    ctx.lineTo(c + 18, c);
-    ctx.moveTo(c, c - 18);
-    ctx.lineTo(c, c + 18);
+    ctx.moveTo(c - 16, c);
+    ctx.lineTo(c + 16, c);
+    ctx.moveTo(c, c - 16);
+    ctx.lineTo(c, c + 16);
     ctx.stroke();
   }
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 3);
+  tex.repeat.set(8, 4);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   tex.needsUpdate = true;

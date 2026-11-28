@@ -10,6 +10,7 @@ a shot-by-shot DIRECTION.md review sheet. Enforces 0ms word-level sync, kinetic-
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -18,6 +19,7 @@ import tempfile
 import time
 import unicodedata
 import uuid
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -61,6 +63,14 @@ KINETIC_CAMERAS = ["push", "orbit", "crane", "low"]
 VALID_CAMERAS = ["wide", "close", "orbit", "push", "low", "crane", "top"]
 KINETIC_ACTIONS = ["reveal", "grow", "walk", "celebrate"]
 VALID_ACTIONS = ["reveal", "idle", "walk", "celebrate", "grow"]
+VALID_CONNECTORS = (
+    "highlighter_sweep",
+    "timeline_rail",
+    "money_flow",
+    "red_yarn",
+    "paper_tear",
+    "pullback_mosaic",
+)
 PALETTE_COLORS = ["#d79a45", "#c4532f", "#3a5a40", "#2b4c7e", "#7d342b"]
 INVESTIGATIVE_FALLBACK_PROPS: Tuple[str, ...] = (
     "hanko-stamp", "brass-caliper", "forensic-loupe", "ledger", "vault",
@@ -155,8 +165,9 @@ _TITLE_LEAD_STOPWORDS = frozenset({
 _TITLE_TRAILING_VERB_RE = re.compile(
     r"(?:보도했습니다|전했습니다|밝혔습니다|제안했습니다|제안했다고|설명했습니다|"
     r"지적했습니다|말했습니다|나타났습니다|알려졌습니다|추정됩니다|집계됐습니다|"
-    r"나왔습니다|보도했다|밝혔다|전했다|제안했다|했습니다|됩니다|입니다|있습니다|없습니다|"
-    r"라고|이라고|다고|하자고|추가로|통해|위해|대한|관련해)$"
+    r"투입됐습니다|가동됐습니다|결정됐습니다|확인됐습니다|"
+    r"나왔습니다|보도했다|밝혔다|전했다|제안했다|했습니다|됐습니다|었습니다|았습니다|였습니다|"
+    r"됩니다|입니다|있습니다|없습니다|라고|이라고|다고|하자고|추가로|통해|위해|대한|관련해)$"
 )
 
 _KO_CASE_PARTICLE_RE = re.compile(r"([가-힣0-9A-Za-z%,.]+?)(?:으로는|에서도|에서는|이라고|이라는|에서|으로|에게|까지|부터|에도|에는|라고|다고|은|는|이|가|을|를|의|로|과|와)$")
@@ -561,12 +572,19 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
             night_count += 1
         if sc.get("card"):
             card_count += 1
+        beat_val = sc.get("beat")
+        if beat_val is not None and (not isinstance(beat_val, int) or beat_val < 1 or beat_val > 5):
+            violations.append(f"{sid}: invalid beat '{beat_val}'")
+        conn_val = sc.get("connector")
+        if conn_val is not None and conn_val not in VALID_CONNECTORS:
+            violations.append(f"{sid}: unsupported connector '{conn_val}'")
         props_used.add(prop)
         biomes_used.add(biome)
         prev_pair = (biome, prop)
         prev_prop = prop
         prev_cam = cam
 
+    red_yarn_count = sum(1 for sc in scenes if sc.get("connector") == "red_yarn")
     if len(scenes) >= 12:
         if len(props_used) < 6:
             violations.append(f"Low prop diversity: {len(props_used)} < 6 across {len(scenes)} shots")
@@ -575,6 +593,8 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
         min_cards = max(3, int(len(scenes) * 0.20))
         if card_count < min_cards:
             violations.append(f"Insufficient grounded evidence cards: {card_count} < {min_cards} across {len(scenes)} shots")
+        if (red_yarn_count / len(scenes)) > 0.25:
+            violations.append(f"Monotonous red_yarn overuse: {red_yarn_count}/{len(scenes)} (>25%)")
     min_req = _min_required_shots(duration)
     if duration >= 45.0 and len(scenes) < min_req:
         violations.append(f"Insufficient shot density: {len(scenes)} < {min_req} for {duration:.1f}s video")
@@ -864,6 +884,103 @@ def _attach_grounded_evidence_cards(
             side_idx += 1
 
 
+def _assign_beats_and_connectors(timeline_scenes: List[Dict[str, Any]]) -> None:
+    """Assigns 5-Beat emotional narrative arcs and non-monotonous dynamic connectors (caps red_yarn <= 18%)."""
+    total = len(timeline_scenes)
+    if total == 0:
+        return
+    max_red_yarn = max(1, int(total * 0.18))
+    red_yarn_used = 0
+    beat3_idx = 0
+    for idx, sc in enumerate(timeline_scenes):
+        u = idx / max(1, total)
+        if u < 0.15:
+            beat = 1
+            conn = "highlighter_sweep"
+        elif u < 0.38:
+            beat = 2
+            conn = "timeline_rail"
+        elif u < 0.66:
+            beat = 3
+            if beat3_idx % 3 == 1 and red_yarn_used < max_red_yarn:
+                conn = "red_yarn"
+                red_yarn_used += 1
+            else:
+                conn = "money_flow"
+            beat3_idx += 1
+        elif u < 0.86:
+            beat = 4
+            conn = "paper_tear"
+        else:
+            beat = 5
+            conn = "pullback_mosaic"
+        sc["beat"] = beat
+        sc["connector"] = conn
+
+
+def load_episode_illustrations(
+    composite_seeds_dir: Optional[Path],
+    max_w: int = 896,
+    max_h: int = 672,
+) -> Dict[str, str]:
+    """Loads authentic editorial illustrations from composite_seeds/ as compact JPEG data URIs."""
+    if composite_seeds_dir is None or not Path(composite_seeds_dir).exists():
+        return {}
+    seed_dir = Path(composite_seeds_dir)
+    exts = (".png", ".jpg", ".jpeg", ".webp")
+    files = sorted(
+        [p for p in seed_dir.iterdir() if p.is_file() and p.stem.lower().startswith("ill_") and p.suffix.lower() in exts],
+        key=lambda p: p.name.lower(),
+    )
+    if not files:
+        files = sorted(
+            [p for p in seed_dir.iterdir() if p.is_file() and p.stem.lower().startswith("composite_") and p.suffix.lower() in exts],
+            key=lambda p: p.name.lower(),
+        )
+    if not files:
+        return {}
+
+    from PIL import Image
+
+    out: Dict[str, str] = {}
+    for p in files[:16]:
+        try:
+            with Image.open(p) as im:
+                rgb = im.convert("RGB")
+                if rgb.width > max_w or rgb.height > max_h:
+                    rgb.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+                buf = BytesIO()
+                rgb.save(buf, format="JPEG", quality=84, optimize=True)
+                b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+                out[p.stem] = f"data:image/jpeg;base64,{b64}"
+        except Exception as exc:
+            logger.warning(f"[papertrails_director] Skipping unreadable illustration '{p.name}': {exc}")
+    return out
+
+
+def _bind_illustrations_to_scenes(
+    timeline_scenes: List[Dict[str, Any]],
+    illustrations: Dict[str, str],
+) -> None:
+    """Distributes available graphic novel illustrations chronologically without consecutive duplicates."""
+    keys = sorted(illustrations.keys())
+    if not keys or not timeline_scenes:
+        return
+    n = len(timeline_scenes)
+    prev_used_idx = -99
+    prev_key = None
+    stride = 2 if len(keys) >= 6 else 3
+    for i, sc in enumerate(timeline_scenes):
+        if i == 0 or (i % stride == 0 and (i - prev_used_idx) >= 2):
+            k_idx = min(len(keys) - 1, int((i / max(1, n)) * len(keys)))
+            cand = keys[k_idx]
+            if cand == prev_key and len(keys) > 1:
+                cand = keys[(k_idx + 1) % len(keys)]
+            sc["illustrationKey"] = cand
+            prev_used_idx = i
+            prev_key = cand
+
+
 def direct_papertrails_timeline_with_llm(
     transcript_segments: List[Dict[str, Any]],
     audio_path: Path,
@@ -876,6 +993,7 @@ def direct_papertrails_timeline_with_llm(
     fps: int = 30,
     seed: int = 42,
     direction_md_path: Optional[Path] = None,
+    composite_seeds_dir: Optional[Path] = None,
     dry_run: bool = False,
 ) -> Dict[str, Any]:
     """Directs a semantic 3D Papertrails timeline via ModelGateway on measured ASR word spans."""
@@ -1082,11 +1200,15 @@ def direct_papertrails_timeline_with_llm(
         prev_cam = cam
 
     _attach_grounded_evidence_cards(timeline_scenes, grounding_claims, market=market)
+    _assign_beats_and_connectors(timeline_scenes)
+    illustrations = load_episode_illustrations(composite_seeds_dir)
+    _bind_illustrations_to_scenes(timeline_scenes, illustrations)
     foley_cues = _attach_timing_sheet_and_foley(timeline_scenes, captions)
     timeline_spec: Dict[str, Any] = {
         "version": 1,
         "stageMode": "forensic_desk",
         "market": str(market or "EN").strip().upper()[:2] or "EN",
+        **({"illustrations": illustrations} if illustrations else {}),
         "width": width,
         "height": height,
         "fps": fps,

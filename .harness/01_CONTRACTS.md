@@ -88,6 +88,13 @@ class PapertrailsScene(BaseModel):
     camera: str = Field(default="push", pattern=r"^(push|orbit|crane|low|wide|close|top)$")
     color: str = Field(default="#d79a45", pattern=r"^#[0-9a-fA-F]{6}$")
     visual: str = Field(..., description="Ghi chú đạo diễn: subject -> action -> consequence")
+    beat: Optional[int] = Field(default=None, ge=1, le=5, description="Nhịp 5-Beat cảm xúc (1..5)")
+    connector: Optional[str] = Field(
+        default=None,
+        pattern=r"^(highlighter_sweep|timeline_rail|money_flow|red_yarn|paper_tear|pullback_mosaic)$",
+        description="Kiểu liên kết không gian động giữa các shot theo mạch cảm xúc",
+    )
+    illustrationKey: Optional[str] = Field(default=None, description="Mã ảnh minh họa Vox Graphic Novel (ill_01..ill_12)")
     timing: Optional[Dict[str, Any]] = Field(default=None, description="Contact-Frame Timing Sheet (±2f)")
     card: Optional[PapertrailsSceneCard] = Field(default=None)
 
@@ -97,6 +104,7 @@ class PapertrailsTimelineSpec(BaseModel):
     version: int = Field(default=1)
     stageMode: str = Field(default="forensic_desk", pattern=r"^(forensic_desk|storybook)$")
     market: Optional[str] = Field(default="EN", pattern=r"^[A-Z]{2}$")
+    illustrations: Optional[Dict[str, str]] = Field(default=None, description="Map ill_XX -> data:image/jpeg;base64,...")
     width: int = Field(default=1920)
     height: int = Field(default=1080)
     fps: int = Field(default=30)

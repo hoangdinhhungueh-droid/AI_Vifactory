@@ -1073,6 +1073,7 @@ def _run_papertrails_voice_first_director(
         fps=fps,
         seed=42,
         direction_md_path=direction_md_path,
+        composite_seeds_dir=ctx.paths.composite_seeds_dir,
         dry_run=ctx.dry_run,
     )
 

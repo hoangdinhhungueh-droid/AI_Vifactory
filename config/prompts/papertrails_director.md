@@ -24,16 +24,11 @@ Your mission is to translate EVERY spoken clause of the narration into a tightly
    - Investigative / Institutional / Financial: `courthouse`, `gavel`, `ledger`, `container`, `vault`, `scale`, `contract`, `megaphone`, `briefcase`, `shield`
    - Classic Papertrails: `coin`, `chart`, `factory`, `clock`, `book`, `globe`, `bridge`, `people`, `village`, `house`, `forest`, `tree`, `mountain`, `water`, `sun`, `moon`, `voice-note`, `edit-board`, `pop-up`, `film`, `bubble`, `mic`
    - Match the literal concept in the spoken words (e.g., official seal/approval/ruling stamp → `hanko-stamp`; narrow margin/audit gap/tariff spread/percent → `brass-caliper`; hidden clause/footnote/loophole/small print → `forensic-loupe`; payouts/executive bonuses → `briefcase` or `coin`; court verdict/appeal → `courthouse`, `gavel`, `scale`; accounting → `ledger`, `chart`; imports/shipping/duties → `container`, `globe`; sealed records/treasury → `vault`, `contract`; consumer fallout/workforce → `people`, `house`, `village`; deadlines/timelines → `clock`).
-   - For institutional, banking, or financial policy investigations, prioritize `hanko-stamp`, `brass-caliper`, `forensic-loupe`, `ledger`, `vault`, `contract`, `scale`, `chart`, `courthouse`, `gavel`, `briefcase`, `shield`, `clock`, `megaphone`. Avoid `edit-board`, `factory`, or `container` unless the spoken clause literally concerns video editing, physical factories, or shipping containers.
+   - For institutional, banking, or financial policy investigations, choose ONLY forensic editorial props: `hanko-stamp`, `brass-caliper`, `forensic-loupe`, `ledger`, `vault`, `contract`, `scale`, `chart`, `courthouse`, `gavel`, `briefcase`, `shield`, `clock`, `megaphone`, `book`, `coin`. NEVER use outdoor nature props (`village`, `forest`, `house`, `tree`, `bridge`, `mountain`, `water`, `sun`, `moon`).
    - NEVER repeat the exact same `prop` or `(biome, prop)` pair across two consecutive shots.
-3. **5 Forensic Desk Surface Themes & Night Lighting Contrast**:
-   - Alternate cleanly across the 5 `biome` keys, which map directly to 5 Vox Forensic Desk surfaces/moods:
-     - `heartland`: archival cream newsprint desk (`#F4F1EA`) with warm daylight
-     - `pinewood`: kraft evidence board (`#C9BB9C`) with dossier folders
-     - `desert`: warm financial ledger graph desk (`#EAE0C8`)
-     - `snow`: cool audit blueprint slate (`#D5DCE2`) for regulatory/legal scrutiny
-     - `blossom`: editorial broadsheet press desk (`#EFE7DB`)
-   - Set `"night": true` selectively for dark archival desk lamp pools during clandestine schemes, crisis pressure, or turning points (keep `night <= 35%` of shots).
+3. **5-Beat Dynamic Editorial Studio Desk & Moody Lighting**:
+   - Alternate cleanly across the 5 `biome` studio desk themes (`heartland` dark walnut archival desk, `pinewood` cutting-mat dossier desk, `desert` sepia folio desk, `snow` midnight blueprint desk, `blossom` pressroom desk) and match the 5-Beat emotional progression (`B1_hook` highlighter sweep -> `B2_setup` timeline rail -> `B3_scheme` money flow & limited red yarn -> `B4_crack` paper tear reveal -> `B5_aftermath` mosaic pullback).
+   - Set `"night": true` selectively for dark spotlight tension during crisis pressure or turning points (keep `night <= 35%` of shots).
 4. **Kinetic-Only 3D Cameras & Actions (Anti-Freeze Law)**:
    - Allowed `camera` presets ONLY: `push`, `orbit`, `crane`, `low`. (NEVER emit `wide`, `close`, or `top` without kinetic motion.)
    - Never use the same `camera` on two consecutive shots.

@@ -2,30 +2,30 @@
 <html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Papertrails — deterministic video stage</title>
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#30271f;font-family:"Segoe UI","Noto Sans","Noto Sans CJK KR","Noto Sans CJK JP","Helvetica Neue",Arial,sans-serif}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#181411;font-family:"Segoe UI","Noto Sans","Noto Sans CJK KR","Noto Sans CJK JP","Helvetica Neue",Arial,sans-serif}
 #atlas{width:100%;height:100%;display:block}
-/* Scene title: a small paper tag pinned in the upper safe area (no dark slab). */
-#title{position:absolute;top:5.5%;left:5.5%;max-width:62%;padding:.42em .9em .46em 1.05em;font-size:clamp(13px,3.1vh,58px);font-weight:800;line-height:1.15;color:#3a2a1c;word-break:keep-all;
-  background:linear-gradient(176deg,#fbf3e1,#efe0bf);border-radius:.18em;box-shadow:0 .28em .7em rgba(40,24,10,.35),inset 0 0 0 .06em rgba(120,90,50,.18);transform-origin:12% 50%;letter-spacing:.01em}
-#title::before{content:"";position:absolute;left:.38em;top:50%;width:.34em;height:.34em;margin-top:-.17em;border-radius:50%;background:#c4532f;box-shadow:inset -.05em -.05em 0 rgba(0,0,0,.25)}
+/* Scene title: archival press index tag pinned in the upper safe area */
+#title{position:absolute;top:5%;left:4.5%;max-width:58%;padding:.42em .95em .46em 1.1em;font-size:clamp(13px,2.9vh,52px);font-weight:800;line-height:1.15;color:#231a12;word-break:keep-all;
+  background:linear-gradient(176deg,#f7efe0,#eadbc0);border-radius:.14em;box-shadow:0 .32em .95em rgba(10,7,4,.58),inset 0 0 0 .06em rgba(90,64,36,.24);transform-origin:12% 50%;letter-spacing:.01em}
+#title::before{content:"";position:absolute;left:.38em;top:50%;width:.36em;height:.36em;margin-top:-.18em;border-radius:50%;background:#c83e2b;box-shadow:inset -.05em -.05em 0 rgba(0,0,0,.28)}
 #title:empty{display:none}
-/* Captions: a cream paper strip with torn edges, ink text; the word being spoken is inked red. */
-#capwrap{position:absolute;left:0;right:0;bottom:7%;display:flex;justify-content:center;pointer-events:none;filter:drop-shadow(0 .5vh .9vh rgba(35,20,8,.45))}
-#caption{position:relative;max-width:80%;padding:.38em .95em .44em;text-align:center;font-weight:800;font-size:clamp(12px,4.3vh,78px);line-height:1.28;color:#3b2a1a;word-break:keep-all;
-  background:linear-gradient(178deg,#fbf2dc 0%,#f1e1bd 100%);white-space:pre-wrap;overflow-wrap:anywhere}
+/* Captions: a warm torn archival paper strip with crisp ink typography */
+#capwrap{position:absolute;left:0;right:0;bottom:6.5%;display:flex;justify-content:center;pointer-events:none;filter:drop-shadow(0 .6vh 1.2vh rgba(10,6,3,.65))}
+#caption{position:relative;max-width:82%;padding:.36em .95em .42em;text-align:center;font-weight:800;font-size:clamp(12px,4.1vh,72px);line-height:1.28;color:#2b1e12;word-break:keep-all;
+  background:linear-gradient(178deg,#f7eedb 0%,#e9d8b5 100%);white-space:pre-wrap;overflow-wrap:anywhere}
 #caption .w{display:inline-block;transition:none}
-#caption .w.on{color:#b8381f;transform:translateY(-.04em) scale(1.06)}
-#caption .w.done{color:#3b2a1a}
-#caption .w.todo{color:rgba(59,42,26,.62)}
+#caption .w.on{color:#b8321c;transform:translateY(-.04em) scale(1.06)}
+#caption .w.done{color:#2b1e12}
+#caption .w.todo{color:rgba(43,30,18,.62)}
 #capwrap.empty{display:none}
-/* Page wipe at cuts: a sheet of paper slides across, like turning a pop-up page. */
-#wipe{position:absolute;top:-5%;bottom:-5%;width:150%;left:-160%;background:linear-gradient(90deg,#efe1c3 0%,#f8efdb 70%,#d9c49c 100%);box-shadow:0 0 3vh rgba(40,25,10,.45);display:none}
-#wipe::after{content:"";position:absolute;top:0;bottom:0;right:-2.2vh;width:2.2vh;background:linear-gradient(90deg,rgba(60,40,15,.35),rgba(60,40,15,0))}
-/* Optional paper cards: a taped note with lines that write in, or a pinned photo with a marker circle and a stamp. */
-#card{position:absolute;top:13%;bottom:22%;display:none;align-items:center;justify-content:center;width:39%;pointer-events:none}
-#card.right{right:3.5%}#card.left{left:3.5%}#card.center{left:50%;margin-left:-31%;width:62%}
-#card .note{position:relative;width:100%;padding:1.35em 1.45em 1.3em;background:linear-gradient(178deg,#fdf6e6,#f1e3c3);color:#3a2a1c;font-size:clamp(11px,2.35vh,42px);line-height:1.35;
-  box-shadow:0 .9em 2em rgba(40,24,10,.42);transform-origin:50% 0}
+/* Page wipe at cuts: subtle warm archival card edge */
+#wipe{position:absolute;top:-5%;bottom:-5%;width:150%;left:-160%;background:linear-gradient(90deg,#e4d3b2 0%,#f2e6ce 70%,#cbb388 100%);box-shadow:0 0 3vh rgba(15,10,5,.55);display:none}
+#wipe::after{content:"";position:absolute;top:0;bottom:0;right:-2.2vh;width:2.2vh;background:linear-gradient(90deg,rgba(20,14,8,.42),rgba(20,14,8,0))}
+/* Optional paper cards: editorial evidence note pinned beside the 3D plate */
+#card{position:absolute;top:14%;bottom:23%;display:none;align-items:center;justify-content:center;width:36%;pointer-events:none}
+#card.right{right:3.5%}#card.left{left:3.5%}#card.center{left:50%;margin-left:-30%;width:60%}
+#card .note{position:relative;width:100%;padding:1.25em 1.35em 1.2em;background:linear-gradient(178deg,#f8f0de,#eadbc0);color:#2a1d12;font-size:clamp(11px,2.25vh,39px);line-height:1.35;
+  box-shadow:0 1em 2.4em rgba(10,6,3,.62),inset 0 0 0 1px rgba(90,64,36,.22);transform-origin:50% 0}
 #card .note::before{content:"";position:absolute;top:-.55em;left:50%;width:5.5em;height:1.25em;margin-left:-2.75em;background:rgba(232,210,150,.82);transform:rotate(-2deg);box-shadow:0 .06em .2em rgba(0,0,0,.15)}
 #card .note h3{margin:0 0 .55em;font-size:1.45em;line-height:1.15;color:#2c1f14;font-weight:800}
 #card .note .ln{display:flex;gap:.55em;align-items:baseline;margin:.36em 0;font-weight:700}

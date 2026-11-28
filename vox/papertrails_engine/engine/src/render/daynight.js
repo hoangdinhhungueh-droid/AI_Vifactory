@@ -17,7 +17,7 @@ export function createDayNight({ scene, night = false }) {
       glow = new Set();
       scene.traverse((o) => {
         for (const m of (Array.isArray(o.material) ? o.material : o.material ? [o.material] : [])) {
-          if (m.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) glow.add(m);
+          if (m.emissive && !m.userData?.noDayNightGlow && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) glow.add(m);
         }
       });
     }

@@ -251,10 +251,13 @@ def test_sanitize_viewer_title_strips_korean_lead_stopwords_and_trailing_verbs()
     assert _sanitize_viewer_title("", "증권 유관기관이 7,600억원을 추가로") == "증권 유관기관이 7,600억원"
     assert _sanitize_viewer_title("100조원으로 확대하자고 제안했다고 보도했습니다", "예비 문장") == "100조원으로 확대"
     assert _sanitize_viewer_title("핵심 기관은 확대를 위해 총력을 기울였다", "예비 문장") == "핵심 기관은 확대"
+    assert _sanitize_viewer_title("", "다섯 차례 투입됐습니다") == "다섯 차례"
     assert not _sanitize_viewer_title("", "일각에서 확대를 위해 추가 검토를 진행했다").endswith("위해")
 
 
 def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
+    from app.services.papertrails_director import _assign_beats_and_connectors
+
     tl = build_papertrails_timeline(
         scenes_script=[{"narration": "금융기관 25개 기관이 7,600억원을 출자했습니다.", "headline": "유관기관 출자 규모"}],
         audio_path=Path("voice.mp3"),
@@ -265,6 +268,7 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     assert audit_papertrails_timeline_antipatterns(tl)["passed"]
 
     root = Path(__file__).resolve().parent.parent.parent / "vox" / "papertrails_engine" / "engine"
+    daynight_js = (root / "src" / "render" / "daynight.js").read_text(encoding="utf-8")
     print_js = (root / "src" / "video" / "print_textures.js").read_text(encoding="utf-8")
     desk_js = (root / "src" / "video" / "forensic_desk.js").read_text(encoding="utf-8")
     props_js = (root / "src" / "video" / "props.js").read_text(encoding="utf-8")
@@ -272,15 +276,26 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     timeline_mjs = (root / "src" / "video" / "timeline.mjs").read_text(encoding="utf-8")
     video_html = (root / "video.html").read_text(encoding="utf-8")
 
+    assert "noDayNightGlow" in daynight_js
     assert "핵심 기록 // 보도 분석" in print_js
-    assert "emissiveMap: tex" in print_js
-    assert "minCenterClearance = 2.6" in desk_js
-    assert "line(-.72,.62,.85,1.42,green" in props_js
+    assert "preloadIllustrationImages" in print_js
+    assert "makeIllustratedCollagePlateMaterial" in print_js
+    assert "computeJourneyOrigins" in desk_js
+    for conn_name in ("highlighter_sweep", "timeline_rail", "money_flow", "red_yarn", "paper_tear"):
+        assert conn_name in desk_js
+    assert "illustrationImg" in props_js
     assert "typeof assets.getTilePrototype === 'function'" in props_js
-    assert "timeline.market" in index_js
-    assert "shift = s.card.side === 'left' ? -1.45 : 1.45" in index_js
-    assert "t.market !== undefined" in timeline_mjs
-    assert "width:39%" in video_html
+    assert "preloadIllustrationImages" in index_js
+    assert "CONNECTORS" in timeline_mjs
+    assert "t.illustrations !== undefined" in timeline_mjs
+    assert "width:36%" in video_html
+
+    # Verify 5-Beat connector diversification & fail-closed red_yarn cap
+    sample_scenes = [{"id": f"shot-{i + 1:03d}"} for i in range(20)]
+    _assign_beats_and_connectors(sample_scenes)
+    assert {s["beat"] for s in sample_scenes} == {1, 2, 3, 4, 5}
+    red_cnt = sum(1 for s in sample_scenes if s["connector"] == "red_yarn")
+    assert red_cnt / len(sample_scenes) <= 0.20
 
     bad_desk = {
         **tl,
@@ -290,5 +305,18 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     bad_audit = audit_papertrails_timeline_antipatterns(bad_desk)
     assert not bad_audit["passed"]
     assert any("disallowed in forensic_desk mode" in v for v in bad_audit["violations"])
+
+    over_yarn_scenes = [
+        {**tl["scenes"][0], "id": f"shot-{i + 1:03d}", "start": i * 2.0, "end": (i + 1) * 2.0,
+         "prop": ["chart", "ledger", "scale", "vault"][i % 4],
+         "biome": ["heartland", "desert", "snow", "blossom", "pinewood"][i % 5],
+         "camera": ["push", "orbit", "crane", "low"][i % 4],
+         "connector": "red_yarn"}
+        for i in range(12)
+    ]
+    over_yarn = audit_papertrails_timeline_antipatterns({**tl, "duration": 24.0, "scenes": over_yarn_scenes})
+    assert not over_yarn["passed"]
+    assert any("Monotonous red_yarn overuse" in v for v in over_yarn["violations"])
+
 
 
