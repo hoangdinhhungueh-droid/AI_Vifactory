@@ -2,7 +2,6 @@ export const PROPS = ['none', 'village', 'forest', 'bridge', 'mountain', 'sun', 
 export const ACTIONS = ['walk', 'idle', 'reveal', 'celebrate', 'grow'];
 export const CAMERAS = ['wide', 'close', 'orbit', 'top', 'push', 'low', 'crane'];
 export const CONNECTORS = ['highlighter_sweep', 'timeline_rail', 'money_flow', 'red_yarn', 'paper_tear', 'pullback_mosaic'];
-export const CONNECTORS = ['highlighter_sweep', 'timeline_rail', 'money_flow', 'red_yarn', 'paper_tear', 'pullback_mosaic'];
 export function frameCount(t) { return Math.ceil(t.duration * t.fps - 1e-9); }
 export function sampleTimeline(t, time) {
   const scene = t.scenes.find(s => time >= s.start && time < s.end) || t.scenes.at(-1);
@@ -31,12 +30,6 @@ export function validateTimeline(t) {
       check(typeof k === 'string' && k.length > 0 && typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(v), `illustration ${k} must be data:image URI`);
     }
   }
-  if (t.illustrations !== undefined) {
-    check(t.illustrations && typeof t.illustrations === 'object' && !Array.isArray(t.illustrations), 'illustrations must be object map');
-    for (const [k, v] of Object.entries(t.illustrations)) {
-      check(typeof k === 'string' && k.length > 0 && typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(v), `illustration ${k} must be data:image URI`);
-    }
-  }
   check([t.width, t.height].every(n => Number.isInteger(n) && n >= 144 && n <= 3840 && n % 2 === 0), 'even dimensions between 144 and 3840');
   check(Math.abs(t.width / t.height - 16 / 9) < .005 || Math.abs(t.width / t.height - 9 / 16) < .005, 'aspect must be 16:9 or 9:16');
   check(Number.isInteger(t.fps) && t.fps >= 1 && t.fps <= 60, 'fps 1..60');
@@ -52,9 +45,6 @@ export function validateTimeline(t) {
     check(PROPS.includes(s.prop) && ACTIONS.includes(s.action) && CAMERAS.includes(s.camera), 'unsupported prop/action/camera');
     check(typeof s.night === 'boolean' && /^#[0-9a-f]{6}$/i.test(s.color), 'night boolean and #rrggbb color required');
     for (const k of ['narration','title','visual']) check(typeof s[k] === 'string', `${k} must be text`);
-    if (s.beat !== undefined) check(Number.isInteger(s.beat) && s.beat >= 1 && s.beat <= 5, `scene ${s.id} beat must be 1..5`);
-    if (s.connector !== undefined) check(CONNECTORS.includes(s.connector), `scene ${s.id} unsupported connector`);
-    if (s.illustrationKey !== undefined) check(typeof s.illustrationKey === 'string' && s.illustrationKey.length > 0, `scene ${s.id} illustrationKey must be string`);
     if (s.beat !== undefined) check(Number.isInteger(s.beat) && s.beat >= 1 && s.beat <= 5, `scene ${s.id} beat must be 1..5`);
     if (s.connector !== undefined) check(CONNECTORS.includes(s.connector), `scene ${s.id} unsupported connector`);
     if (s.illustrationKey !== undefined) check(typeof s.illustrationKey === 'string' && s.illustrationKey.length > 0, `scene ${s.id} illustrationKey must be string`);
