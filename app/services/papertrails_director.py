@@ -167,7 +167,7 @@ def _extract_headline_from_narration(narration: str, idx: int = 0) -> str:
         tokens = [t for t in raw_tokens if t][:3]
     is_cjk = bool(re.search(r"[\uAC00-\uD7A3\u3040-\u30FF\u4E00-\u9FFF]", " ".join(tokens)))
     selected = tokens[:3] if is_cjk else tokens[:4]
-    if selected:
+    while selected:
         # Strip trailing case particle on final token so headline stays noun-like (e.g. 약정액을 -> 약정액)
         last_tok = selected[-1]
         for _ in range(2):
@@ -179,8 +179,12 @@ def _extract_headline_from_narration(narration: str, idx: int = 0) -> str:
         if _TITLE_TRAILING_VERB_RE.search(last_tok):
             stem = _TITLE_TRAILING_VERB_RE.sub("", last_tok).strip()
             if len(stem) >= 2:
-                last_tok = stem
+                selected[-1] = stem
+                break
+            selected.pop()
+            continue
         selected[-1] = last_tok
+        break
     if not selected:
         return f"Record {idx + 1}"
     out = " ".join(selected).strip()
@@ -203,21 +207,26 @@ def _sanitize_viewer_title(raw_title: Optional[str], narration: str = "", idx: i
     candidate = candidate.replace("_", " ")
     candidate = re.sub(r"\s{2,}", " ", candidate).strip(" /:-.|")
 
+    words_pre = candidate.split()[:4]
+    clipped = " ".join(words_pre).strip()
     bad_raw = (
-        not candidate
-        or len(candidate) < 3
-        or (re.fullmatch(r"[A-Z0-9_ /\-]+", candidate) and "//" in candidate)
-        or any(candidate.lower().startswith(sw + " ") for sw in _TITLE_LEAD_STOPWORDS)
-        or bool(_TITLE_TRAILING_VERB_RE.search(candidate.split()[-1]))
+        not clipped
+        or len(clipped) < 3
+        or (re.fullmatch(r"[A-Z0-9_ /\-]+", clipped) and "//" in clipped)
+        or any(clipped.lower().startswith(sw + " ") or clipped.lower() == sw for sw in _TITLE_LEAD_STOPWORDS)
+        or bool(_TITLE_TRAILING_VERB_RE.search(words_pre[-1]))
     )
     if bad_raw:
         # Clean the candidate itself if it came from a raw title with lead stopword/trailing verb, else narration
         source_text = candidate if (candidate and len(candidate.split()) >= 2 and "//" not in candidate) else narration
-        return _extract_headline_from_narration(source_text, idx)
+        cleaned = _extract_headline_from_narration(source_text, idx)
+        # Double-guard: if cleaned itself was still flagged (e.g., all words were stopwords), fall back to narration
+        cl_toks = cleaned.split()
+        if not cl_toks or cl_toks[0].lower() in _TITLE_LEAD_STOPWORDS or _TITLE_TRAILING_VERB_RE.search(cl_toks[-1]):
+            cleaned = _extract_headline_from_narration(narration, idx)
+        return cleaned
 
-    words_out = candidate.split()[:4]
-    clean = " ".join(words_out).strip()
-    return clean[:34] if len(clean) > 34 else clean
+    return clipped[:34] if len(clipped) > 34 else clipped
 
 
 def build_caption_from_words(words: List[Dict[str, Any]]) -> Dict[str, Any]:

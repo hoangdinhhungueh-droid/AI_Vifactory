@@ -250,6 +250,8 @@ def test_sanitize_viewer_title_strips_korean_lead_stopwords_and_trailing_verbs()
     assert _sanitize_viewer_title("", "출자 규모가 10조원이라고 보도했습니다") == "출자 규모가 10조원"
     assert _sanitize_viewer_title("", "증권 유관기관이 7,600억원을 추가로") == "증권 유관기관이 7,600억원"
     assert _sanitize_viewer_title("100조원으로 확대하자고 제안했다고 보도했습니다", "예비 문장") == "100조원으로 확대"
+    assert _sanitize_viewer_title("핵심 기관은 확대를 위해 총력을 기울였다", "예비 문장") == "핵심 기관은 확대"
+    assert not _sanitize_viewer_title("", "일각에서 확대를 위해 추가 검토를 진행했다").endswith("위해")
 
 
 def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
