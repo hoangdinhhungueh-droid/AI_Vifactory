@@ -42,45 +42,44 @@ export function createProp(kind, { materials, assets, color = '#b26d42', sceneDa
     return plate;
   };
 
-  if (isDeskMode && illustrationImg) {
-    // HYBRID VOX GRAPHIC NOVEL COLLAGE DIORAMA (AI 4:3 Illustration + Overlapping Broadsheet + Kinetic Accent)
-    const heroPlate = new THREE.Group();
-    heroPlate.position.set(-0.34, 1.04, 0.08);
-    heroPlate.rotation.y = -0.07;
-    root.add(heroPlate);
-    rect(2.46, 1.98, kraft, 0, 0, -0.01, heroPlate);
-    rect(2.38, 1.90, cream, 0, 0, 0.015, heroPlate);
-    const illMat = makeIllustratedCollagePlateMaterial(sceneData, illustrationImg);
-    applyFace(2.30, 1.84, illMat, 0, 0, 0.044, heroPlate);
-    applyFace(2.30, 1.84, illMat, 0, 0, -0.036, heroPlate, Math.PI);
-    disc(0.11, crimson, 0, 0.92, 0.06, heroPlate);
+  if (isDeskMode) {
+    if (illustrationImg) {
+      // HYBRID VOX GRAPHIC NOVEL COLLAGE DIORAMA (AI 4:3 Illustration + Overlapping Broadsheet + Kinetic Accent)
+      const heroPlate = new THREE.Group();
+      heroPlate.position.set(-0.34, 1.04, 0.08);
+      heroPlate.rotation.y = -0.07;
+      root.add(heroPlate);
+      rect(2.46, 1.98, kraft, 0, 0, -0.01, heroPlate);
+      rect(2.38, 1.90, cream, 0, 0, 0.015, heroPlate);
+      const illMat = makeIllustratedCollagePlateMaterial(sceneData, illustrationImg);
+      applyFace(2.30, 1.84, illMat, 0, 0, 0.044, heroPlate);
+      applyFace(2.30, 1.84, illMat, 0, 0, -0.036, heroPlate, Math.PI);
+      disc(0.11, crimson, 0, 0.92, 0.06, heroPlate);
 
-    const sideClip = buildClippingPlate(1.52, 1.86, 1.04, 0.96, -0.14, 0.16, 'dossier', slate);
+      const sideClip = buildClippingPlate(1.52, 1.86, 1.04, 0.96, -0.14, 0.16, 'dossier', slate);
 
-    // Subtle 3D interactive accent matching kind & contactSec
-    const miniBars = [];
-    for (let i = 0; i < 3; i++) {
-      const h = 0.24 + i * 0.16;
-      const b = rect(0.16, h, i === 1 ? crimson : gold, 0.72 + i * 0.22, 0.16 + h / 2, 0.12);
-      miniBars.push({ mesh: b, h });
-    }
-    const stampBadge = disc(0.24, crimson, -1.08, 0.44, 0.16);
-    anim.push((t, p, ctx) => {
-      const stepT = Math.floor(t * 12) / 12;
-      heroPlate.position.y = 1.04 + Math.sin(stepT * 1.4) * 0.025;
-      sideClip.rotation.y = 0.16 + Math.sin(p * Math.PI) * 0.04;
-      const cSec = ctx?.scene?.timing?.contactSec ?? 0.44;
-      const pulse = impactPulse(t, cSec, 0.12, 0.14, 0.26);
-      stampBadge.scale.setScalar(0.88 + 0.24 * pulse.impact);
-      miniBars.forEach(({ mesh: bm, h }, idx) => {
-        const g = Math.max(0.15, Math.min(1, p * 1.5 - idx * 0.12));
-        bm.scale.y = g;
-        bm.position.y = 0.16 + (h * g) / 2;
+      // Interactive accents placed cleanly on sideClip perimeter so hero illustration & caption stay 100% clear
+      const miniBars = [];
+      for (let i = 0; i < 3; i++) {
+        const h = 0.24 + i * 0.16;
+        const b = rect(0.16, h, i === 1 ? crimson : gold, 0.72 + i * 0.22, 0.16 + h / 2, 0.12);
+        miniBars.push({ mesh: b, h });
+      }
+      const stampBadge = disc(0.17, crimson, 1.48, 0.34, 0.04);
+      anim.push((t, p, ctx) => {
+        const stepT = Math.floor(t * 12) / 12;
+        heroPlate.position.y = 1.04 + Math.sin(stepT * 1.4) * 0.025;
+        sideClip.rotation.y = 0.16 + Math.sin(p * Math.PI) * 0.04;
+        const cSec = ctx?.scene?.timing?.contactSec ?? 0.44;
+        const pulse = impactPulse(t, cSec, 0.12, 0.14, 0.26);
+        stampBadge.scale.setScalar(0.88 + 0.24 * pulse.impact);
+        miniBars.forEach(({ mesh: bm, h }, idx) => {
+          const g = Math.max(0.15, Math.min(1, p * 1.5 - idx * 0.12));
+          bm.scale.y = g;
+          bm.position.y = 0.16 + (h * g) / 2;
+        });
       });
-    });
-  } else if (isDeskMode) {
-    // PURE EDITORIAL BRIDGE / DATA PLATES (Zero toy shapes!)
-    if (['chart', 'coin', 'briefcase', 'factory', 'container'].includes(kind)) {
+    } else if (['chart', 'coin', 'briefcase', 'factory', 'container'].includes(kind)) {
       buildClippingPlate(1.48, 1.72, -1.16, 0.92, -0.22, -0.22, 'dossier', kraft);
       const board = new THREE.Group();
       board.position.set(0.22, 1.02, 0.04);
