@@ -73,7 +73,7 @@ export async function renderVideo(filename,output,{quality='med',stills=[],still
     await page.waitForFunction(()=>window.__papertrails?.ready);
     const envelope=await voiceEnvelope(t.audio,t.fps,frames);
     const ready=await deadline(page.evaluate(({t,quality,envelope,allowSeek})=>window.__papertrails.init(t,{quality,envelope,allowSeek}),{t,quality,envelope,allowSeek:stillsOnly}),timeoutMs,'Scene initialization');
-    await deadline(page.evaluate(()=>{}),timeoutMs,'Post-init browser settle');
+    await deadline(page.screenshot({type:'jpeg',quality:10,clip:{x:0,y:0,width:16,height:16},animations:'disabled'}),timeoutMs,'Post-init compositor warmup');
     if(errors.length)throw new Error(errors.join('\n'));
     const stillFrames=new Set(stills.map(s=>Math.min(frames-1,Math.round(s*t.fps))));
     if(stillsOnly){

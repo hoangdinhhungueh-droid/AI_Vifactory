@@ -291,7 +291,7 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     assert "let warmed = false" in index_js
     assert "if (!warmed)" in index_js
     renderer_mjs = (root.parent / "scripts" / "lib" / "renderer.mjs").read_text(encoding="utf-8")
-    assert "Post-init browser settle" in renderer_mjs
+    assert "Post-init compositor warmup" in renderer_mjs
     assert "CONNECTORS" in timeline_mjs
     assert "t.illustrations !== undefined" in timeline_mjs
     assert "width:36%" in video_html
