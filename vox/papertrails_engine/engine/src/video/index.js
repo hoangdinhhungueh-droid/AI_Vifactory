@@ -277,6 +277,7 @@ window.__papertrails = {
       document.body.dataset.scene=sample.scene.id;
       return sample;
     }
+    let warmed = false;
     runtime={renderFrame(frame){
       if(!Number.isInteger(frame)||frame<0||frame>=frameCount(timeline))throw new Error('Frame index out of range');
       if(frame<lastFrame)throw new Error('Frames must be nondecreasing; reload to rewind');
@@ -290,7 +291,14 @@ window.__papertrails = {
       }
       let sample;for(let f=lastFrame+1;f<=frame;f++)sample=simulate(f);
       lastFrame=frame;
-      post.setFocus(focus);post.render(1/timeline.fps);
+      post.setFocus(focus);
+      if (!warmed) {
+        // Warm up WebGL shaders, PCSS shadow state (paperState.pcss), and post targets so frame 0 is bit-identical on repeat.
+        post.render(1/timeline.fps);
+        lights.update(0, traveller, camera);
+        warmed = true;
+      }
+      post.render(1/timeline.fps);
       renderer.getContext().finish();
       return {frame,time:frame/timeline.fps,scene:document.body.dataset.scene,caption:document.querySelector('#caption').textContent,assetSource:assets.source};
     }};

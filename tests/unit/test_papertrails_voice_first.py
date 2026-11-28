@@ -288,6 +288,8 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     assert "preloadIllustrationImages" in index_js
     assert "BEAT_STUDIO_MOOD" in index_js
     assert "closeExposure" in index_js
+    assert "let warmed = false" in index_js
+    assert "if (!warmed)" in index_js
     assert "CONNECTORS" in timeline_mjs
     assert "t.illustrations !== undefined" in timeline_mjs
     assert "width:36%" in video_html
