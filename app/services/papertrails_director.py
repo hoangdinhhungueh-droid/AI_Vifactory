@@ -67,6 +67,20 @@ INVESTIGATIVE_FALLBACK_PROPS: Tuple[str, ...] = (
     "contract", "scale", "chart", "courthouse", "gavel",
     "briefcase", "shield", "clock", "megaphone",
 )
+STORYBOOK_TILE_PROPS = frozenset({
+    "village", "forest", "house", "tree", "bridge", "mountain", "water", "sun", "moon",
+})
+_FORENSIC_PROP_REMAP: Dict[str, str] = {
+    "bridge": "scale",
+    "house": "courthouse",
+    "village": "chart",
+    "forest": "ledger",
+    "tree": "chart",
+    "mountain": "vault",
+    "water": "brass-caliper",
+    "sun": "megaphone",
+    "moon": "forensic-loupe",
+}
 _MARKET_EVIDENCE_HEADERS: Dict[str, str] = {
     "KR": "핵심 근거 // 공시·보도",
     "KO": "핵심 근거 // 공시·보도",
@@ -480,6 +494,7 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
     """Fail-closed gate detecting static cameras, duplicate staging, or timing drift."""
     scenes = list(timeline.get("scenes") or [])
     duration = float(timeline.get("duration") or 0.0)
+    stage_mode = str(timeline.get("stageMode") or "")
     violations: List[str] = []
 
     if not scenes:
@@ -527,6 +542,8 @@ def audit_papertrails_timeline_antipatterns(timeline: Dict[str, Any]) -> Dict[st
         biome = str(sc.get("biome") or "")
         if prop not in VALID_PROPS:
             violations.append(f"{sid}: unknown prop '{prop}'")
+        if stage_mode == "forensic_desk" and prop in STORYBOOK_TILE_PROPS:
+            violations.append(f"{sid}: storybook tile prop '{prop}' disallowed in forensic_desk mode")
         if biome not in VALID_BIOMES:
             violations.append(f"{sid}: unknown biome '{biome}'")
         if prev_pair == (biome, prop):
@@ -1007,10 +1024,14 @@ def direct_papertrails_timeline_with_llm(
                 prop = d_prop
             if biome not in VALID_BIOMES:
                 biome = d_biome
+        if prop in STORYBOOK_TILE_PROPS:
+            prop = _FORENSIC_PROP_REMAP.get(prop, "ledger")
 
         # Guarantee zero consecutive identical props (including split long shots)
         if prev_prop == prop or (sh.get("_split_half") and prev_prop == prop):
             alt_prop, _ = detect_subject_and_biome(sh["narration"])
+            if alt_prop in STORYBOOK_TILE_PROPS:
+                alt_prop = _FORENSIC_PROP_REMAP.get(alt_prop, "ledger")
             if alt_prop in VALID_PROPS and alt_prop != prev_prop:
                 prop = alt_prop
             else:

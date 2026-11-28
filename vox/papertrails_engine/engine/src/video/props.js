@@ -21,13 +21,24 @@ export function createProp(kind, { materials, assets, color = '#b26d42', sceneDa
   const line = (x,y,x2,y2,c='#554637',w=.035,z=.10) => { const m=rect(w,Math.hypot(x2-x,y2-y),c,(x+x2)/2,(y+y2)/2,z);m.rotation.z=-Math.atan2(x2-x,y2-y);return m; };
   const cream='#f7e8c6', ink='#443e32', gold='#e2b54b', green='#6d966e';
   const tile = {village:'village',forest:'forest',house:'house',tree:'grove',bridge:'bridge',mountain:'hills',water:'pond'}[kind];
-  if (tile) {
+  if (tile && assets && typeof assets.getTilePrototype === 'function') {
     const t=assets.getTilePrototype(tile).clone(true); t.scale.setScalar({village:2.2,house:2.0,forest:1.6}[kind]||1.4);
     t.traverse(o=>{if(/^base/i.test(o.name))o.visible=false; if(o.userData.hinge)o.rotation.x=0;});root.add(t);
     // Pieces pop up one after another (trees growing, houses unfolding) instead of the whole tile flipping.
     const pieces=[];t.traverse(o=>{if(o.isMesh&&o.visible&&!/^base/i.test(o.name))pieces.push(o);});
     pieces.forEach((m,i)=>{m.userData.baseScale=m.scale.clone();m.userData.order=(i*0.618)%1;});
     root.userData.grow=(p)=>{for(const m of pieces){const k=THREE.MathUtils.smoothstep(p*1.35-m.userData.order*.55,0,.45);const o=1+.18*Math.sin(Math.min(1,k)*Math.PI);const sc=Math.max(.001,k*o);m.scale.set(m.userData.baseScale.x*sc,m.userData.baseScale.y*sc,m.userData.baseScale.z*sc);}};
+  } else if (tile) {
+    // Procedural 3D Vox archival evidence folder fallback when rendered without GLTF tiles (forensic_desk mode)
+    const folder = new THREE.Group(); root.add(folder);
+    rect(1.85, 1.45, color, 0, .92, -.02, folder);
+    rect(1.68, 1.32, cream, 0, .94, .03, folder);
+    if (sceneData) {
+      applyFace(1.56, 1.22, makeDocumentPrintMaterial(sceneData, { mode: 'dossier' }), 0, .94, .062, folder);
+    }
+    rect(.52, .12, gold, -.46, 1.66, .04, folder);
+    rect(.14, .28, '#c83e2b', .55, 1.56, .08, folder);
+    anim.push((time, p) => { folder.position.y = Math.sin(time * 1.4) * .03; folder.rotation.y = Math.sin(p * Math.PI) * .08; });
   } else if (kind==='book') {
     for(const sign of [-1,1]) {
       const leaf=new THREE.Group();root.add(leaf);leaf.rotation.y=sign*.22;

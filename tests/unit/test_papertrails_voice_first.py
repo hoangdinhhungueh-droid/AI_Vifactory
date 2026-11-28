@@ -276,8 +276,19 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     assert "emissiveMap: tex" in print_js
     assert "minCenterClearance = 2.6" in desk_js
     assert "line(-.72,.62,.85,1.42,green" in props_js
+    assert "typeof assets.getTilePrototype === 'function'" in props_js
     assert "timeline.market" in index_js
     assert "shift = s.card.side === 'left' ? -1.45 : 1.45" in index_js
     assert "t.market !== undefined" in timeline_mjs
     assert "width:39%" in video_html
+
+    bad_desk = {
+        **tl,
+        "stageMode": "forensic_desk",
+        "scenes": [{**tl["scenes"][0], "prop": "bridge"}],
+    }
+    bad_audit = audit_papertrails_timeline_antipatterns(bad_desk)
+    assert not bad_audit["passed"]
+    assert any("disallowed in forensic_desk mode" in v for v in bad_audit["violations"])
+
 
