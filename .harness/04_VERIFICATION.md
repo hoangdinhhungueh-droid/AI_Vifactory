@@ -17,15 +17,18 @@
 
 ---
 
-### [TEST-302] Kiểm thử Papertrails Stills Gate, Parallel Renderer (`--quality vox`) & VPS Bridge (Mã FT-302)
+### [TEST-302] Kiểm thử Papertrails Stills Gate, Mắt Thần HG3, Parallel Renderer (`--quality vox`) & VPS Bridge (Mã FT-302)
 - **Mã Feature**: `FT-302`
+- **Test File**: `tests/unit/test_papertrails_voice_first.py`
 - **Lệnh kiểm thử (CLI)**:
-  - Trên VPS: `node --check /root/video_factory/vox/papertrails_engine/engine/src/video/print_textures.js && node --check /root/video_factory/vox/papertrails_engine/engine/src/video/forensic_desk.js && node --check /root/video_factory/vox/papertrails_engine/scripts/render_parallel.mjs`
+  - Unit Test Mắt Thần HG3: `pytest -v tests/unit/test_papertrails_voice_first.py -k hg3_visual_audit`
+  - UI/Overlay Check: `cmd /c "C:/Users/hunghd2/.gemini/config/skills/impeccable/scripts/impeccable.cmd detect --json vox/papertrails_engine/engine/video.html"`
+  - Trên VPS: `node --check /root/video_factory/vox/papertrails_engine/engine/src/video/print_textures.js && node --check /root/video_factory/vox/papertrails_engine/engine/src/video/forensic_desk.js && node --check /root/video_factory/vox/papertrails_engine/engine/src/video/index.js && node --check /root/video_factory/vox/papertrails_engine/scripts/render_parallel.mjs`
   - Live Stills & Render Gate: `python -m orchestrator.run_pipeline --run-id <RUN_ID> --preset story_forensic --only s08_video_gen --stills-only --force`
 - **Tiêu chuẩn Gherkin**:
   - `Given`: `timeline.json` (`1920x1080`, `stageMode: "forensic_desk"`) và `voice_narration.mp3` chuẩn EBU R128.
-  - `When`: Chạy `--stills-only` rồi chạy `render_parallel.mjs --quality vox --render-fps 15 --frame-format jpeg --workers 2`.
-  - `Then`: Sinh đủ ảnh `stills/*.png` 3D Bàn Hồ Sơ Vox (`0%` cây cối cổ tích), prop 3D in trực tiếp chữ/số liệu sắc nét, không bị Note Card che khuất; video hợp nhất đạt `1920x1080`, đúng số frame `30fps CFR`, `repeatFrameStable=true`, luồng H.264/AAC.
+  - `When`: Chạy `--stills-only` -> `audit_hg3_stills` quét 12/12 ảnh rồi mới mở đường cho `render_parallel.mjs --quality vox --render-fps 15 --frame-format jpeg --workers 2`.
+  - `Then`: Sinh đủ ảnh `stills/*.png` và `stills/hg3_visual_audit.json` (`passed: true`, `78 <= mean_luma <= 208`, `crushed_black_pct <= 18%`, `blown_white_pct <= 16%`, `top30_luma >= 45`), `impeccable detect` trả về `[]`, prop 3D in trực tiếp chữ/số liệu sắc nét không bị Note Card che khuất; video hợp nhất đạt `1920x1080`, `30fps CFR`, H.264/AAC.
 - **Trạng thái thực tế**: `READY_FOR_VERIFICATION`
 
 ---

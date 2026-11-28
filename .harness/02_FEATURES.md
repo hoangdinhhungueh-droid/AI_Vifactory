@@ -20,17 +20,17 @@
 
 ---
 
-### [FT-302] Papertrails Stills Gate & Macro Option-C Parallel VPS Renderer (`--quality vox`)
+### [FT-302] Papertrails Stills Gate, Mắt Thần HG3 & Macro Option-C Parallel VPS Renderer (`--quality vox`)
 - **Trạng thái**: `ACTIVE`
-- **File Code**: `app/services/papertrails_vps_bridge.py`, `stages/s08_video_gen.py`, `vox/papertrails_engine/scripts/render.mjs`, `vox/papertrails_engine/scripts/render_parallel.mjs`, `vox/papertrails_engine/scripts/lib/renderer.mjs`, `vox/papertrails_engine/engine/src/core/config/render.js`, `vox/papertrails_engine/engine/src/video/motion.js`, `vox/papertrails_engine/engine/src/video/print_textures.js`, `vox/papertrails_engine/engine/src/video/forensic_desk.js`, `vox/papertrails_engine/engine/src/video/props.js`, `vox/papertrails_engine/engine/src/video/index.js`, `vox/papertrails_engine/engine/video.html`
-- **Hàm/Service**: `render_papertrails_stills_on_vps`, `render_papertrails_on_vps`, `_run_papertrails_3d_stage`, `createForensicDesk`, `createPrintedPaperMaterial`
+- **File Code**: `app/services/papertrails_vps_bridge.py`, `app/services/hg3_visual_audit.py`, `stages/s08_video_gen.py`, `vox/papertrails_engine/scripts/render.mjs`, `vox/papertrails_engine/scripts/render_parallel.mjs`, `vox/papertrails_engine/scripts/lib/renderer.mjs`, `vox/papertrails_engine/engine/src/core/config/render.js`, `vox/papertrails_engine/engine/src/video/motion.js`, `vox/papertrails_engine/engine/src/video/print_textures.js`, `vox/papertrails_engine/engine/src/video/forensic_desk.js`, `vox/papertrails_engine/engine/src/video/props.js`, `vox/papertrails_engine/engine/src/video/index.js`, `vox/papertrails_engine/engine/video.html`
+- **Hàm/Service**: `render_papertrails_stills_on_vps`, `audit_hg3_stills`, `analyze_still_frame`, `render_papertrails_on_vps`, `_run_papertrails_3d_stage`, `createForensicDesk`, `createPrintedPaperMaterial`
 - **Input Contract**: `timeline.json` (`1920x1080`, `stageMode: "forensic_desk"`) & `voice_narration.mp3` (EBU R128 normalized)
-- **Output Contract**: `stills/*.png` (HG3 Gate) + `master_papertrails.mp4` (`1920x1080`, `vox`, `15->30fps CFR`, `jpeg` pipe, `2 workers`, H.264/AAC)
+- **Output Contract**: `stills/*.png` + `stills/hg3_visual_audit.json` (Mắt Thần HG3 Gate) + `master_papertrails.mp4` (`1920x1080`, `vox`, `15->30fps CFR`, `jpeg` pipe, `2 workers`, H.264/AAC)
 - **Logic cốt lõi**:
-  1. Sân khấu **Vox 3D Forensic Paper Desk** (`forensic_desk.js`) thay thế hoàn toàn địa hình cây cối/sa mạc/người tuyết bằng mặt bàn hồ sơ lưu trữ 5 bề mặt (`#F4F1EA` giấy báo, `#C9BB9C` kraft, sổ kế toán, blueprint, broadsheet), chồng hồ sơ giấy đa lớp, ghim đồng & sợi chỉ đỏ nối bằng chứng (`H4_TETHER`).
-  2. `print_textures.js` tạo Dynamic Canvas2D Print Textures in tiêu đề cảnh, nguồn báo và con số kiểm chứng từ `timeline.json` trực tiếp lên mặt 3D của `chart`, `ledger`, `contract`, `hanko-stamp`, `forensic-loupe`, `brass-caliper`, `book` kèm font CJK (`Noto Sans CJK KR`/`JP`).
-  3. Camera 3D giữ **Side-Aware Card Framing** (dịch tâm chiếu sang phía đối diện khi có Note Card để không che prop), nâng góc `low`, vá tọa độ cục bộ `brass-caliper`, và giữ nhịp động học `motion.js`.
-  4. Chạy `--stills-only` kết xuất ~12 ảnh PNG đại diện (`quality=vox`) để audit thị giác trước khi chạy `render_parallel.mjs --workers 2 --quality vox --render-fps 15 --frame-format jpeg` xuất `30fps CFR` lossless `-c:v copy`.
+  1. Sân khấu **Vox 3D Forensic Paper Desk** (`forensic_desk.js`) sử dụng mặt bàn hồ sơ lưu trữ ấm sáng ban ngày (`#b89c74` / 5 `DESK_PALETTES`, `BEAT_STUDIO_MOOD` cân bằng không tối đen không cháy trắng), chồng hồ sơ giấy đa lớp, ghim đồng & sợi chỉ đỏ nối bằng chứng (`H4_TETHER`).
+  2. `print_textures.js` tạo Dynamic Canvas2D Print Textures in tiêu đề cảnh, nguồn báo, ảnh minh họa cắt dán và con số kiểm chứng từ `timeline.json` trực tiếp lên mặt 3D kèm font CJK (`Noto Sans CJK KR`/`JP`).
+  3. Camera 3D giữ **Side-Aware Card Framing** (dịch tâm chiếu sang phía đối diện khi có Note Card để không che prop), nâng góc `low`, `closeExposure: 0.94`, và nhịp động học `motion.js`.
+  4. Chạy `--stills-only` kết xuất 12 ảnh PNG đại diện (`quality=vox`), sau đó **Mắt Thần HG3 (`audit_hg3_stills`)** tự động kiểm định fail-closed từng khung hình (chặn tối đen `crushed_black_pct <= 18%`, `mean_luma >= 78`, `top30_luma >= 45`; chặn cháy trắng `blown_white_pct <= 16%`, `mean_luma <= 208`; kiểm dải tương phản & chi tiết cạnh) và xuất `hg3_visual_audit.json` trước khi cho phép `render_parallel.mjs`.
 
 ---
 

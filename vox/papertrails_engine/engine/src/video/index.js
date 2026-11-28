@@ -26,11 +26,11 @@ function tornClip(seed) {
 }
 
 const BEAT_STUDIO_MOOD = {
-  1: { bg: '#18130f', fadeA: '#16110d', fadeB: '#100c09' },
-  2: { bg: '#1e1711', fadeA: '#1b140f', fadeB: '#130e0a' },
-  3: { bg: '#181412', fadeA: '#16120f', fadeB: '#0f0c0a' },
-  4: { bg: '#111722', fadeA: '#101620', fadeB: '#0a0f17' },
-  5: { bg: '#161412', fadeA: '#141210', fadeB: '#0c0b0a' },
+  1: { bg: '#8c6f4b', fadeA: '#9d7f57', fadeB: '#856a49' },
+  2: { bg: '#967c5a', fadeA: '#a78c66', fadeB: '#8d7453' },
+  3: { bg: '#7b8792', fadeA: '#8b97a2', fadeB: '#737f8a' },
+  4: { bg: '#5b6c80', fadeA: '#6a7c91', fadeB: '#526275' },
+  5: { bg: '#86725d', fadeA: '#96816b', fadeB: '#7c6955' },
 };
 
 let runtime;
@@ -169,16 +169,17 @@ window.__papertrails = {
       CONFIG.lights.background = beat.bg;
       CONFIG.lights.fade.color = beat.fadeA;
       CONFIG.lights.fade.colorRight = beat.fadeB;
-      CONFIG.lights.fade.start = 10.5;
+      CONFIG.lights.fade.start = 11.5;
       CONFIG.lights.fade.end = 26.0;
-      CONFIG.lights.fade.amount = 0.80;
-      CONFIG.lights.key.intensity = s.night ? 2.25 : 2.45;
-      CONFIG.lights.fill.intensity = s.night ? 0.85 : 0.88;
-      CONFIG.lights.hemi.intensity = 0.42;
-      CONFIG.post.bloom = 0.08;
-      CONFIG.post.vignette = 0.28;
-      CONFIG.post.exposure = 0.86;
-      CONFIG.dof.maxBlurPx = 4.5;
+      CONFIG.lights.fade.amount = 0.72;
+      CONFIG.lights.key.intensity = s.night ? 2.55 : 2.85;
+      CONFIG.lights.fill.intensity = s.night ? 1.10 : 1.20;
+      CONFIG.lights.hemi.intensity = 0.62;
+      CONFIG.post.bloom = 0.06;
+      CONFIG.post.vignette = 0.12;
+      CONFIG.post.exposure = 0.88;
+      CONFIG.post.closeExposure = 0.94;
+      CONFIG.dof.maxBlurPx = 4.0;
     }
 
     function syncVisibleNeighborhood(curId) {

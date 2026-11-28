@@ -286,9 +286,13 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     assert "illustrationImg" in props_js
     assert "typeof assets.getTilePrototype === 'function'" in props_js
     assert "preloadIllustrationImages" in index_js
+    assert "BEAT_STUDIO_MOOD" in index_js
+    assert "closeExposure" in index_js
     assert "CONNECTORS" in timeline_mjs
     assert "t.illustrations !== undefined" in timeline_mjs
     assert "width:36%" in video_html
+    s08_src = (Path(__file__).resolve().parent.parent.parent / "stages" / "s08_video_gen.py").read_text(encoding="utf-8")
+    assert "audit_hg3_stills" in s08_src
 
     # Verify 5-Beat connector diversification & fail-closed red_yarn cap
     sample_scenes = [{"id": f"shot-{i + 1:03d}"} for i in range(20)]
@@ -317,6 +321,68 @@ def test_timeline_market_localization_and_forensic_desk_geometry_invariants():
     over_yarn = audit_papertrails_timeline_antipatterns({**tl, "duration": 24.0, "scenes": over_yarn_scenes})
     assert not over_yarn["passed"]
     assert any("Monotonous red_yarn overuse" in v for v in over_yarn["violations"])
+
+
+def test_hg3_visual_audit_rejects_crushed_black_and_blown_white_and_accepts_warm_editorial(tmp_path):
+    import numpy as np
+    from PIL import Image, ImageDraw
+    from app.services.hg3_visual_audit import audit_hg3_stills
+
+    dark_path = tmp_path / "dark_cave.png"
+    dark_arr = np.full((720, 1280, 3), (10, 8, 7), dtype=np.uint8)
+    dark_arr[260:360, 500:780] = (235, 224, 198)
+    Image.fromarray(dark_arr, mode="RGB").save(dark_path)
+
+    dark_audit = audit_hg3_stills([dark_path])
+    assert dark_audit["passed"] is False
+    dark_msg = " ".join(dark_audit["violations"])
+    assert "crushed_black_pct" in dark_msg
+    assert "mean_luma" in dark_msg
+
+    blown_path = tmp_path / "blown_white.png"
+    blown_arr = np.full((720, 1280, 3), (252, 250, 248), dtype=np.uint8)
+    blown_arr[300:340, 560:720] = (40, 32, 24)
+    Image.fromarray(blown_arr, mode="RGB").save(blown_path)
+
+    blown_audit = audit_hg3_stills([blown_path])
+    assert blown_audit["passed"] is False
+    blown_msg = " ".join(blown_audit["violations"])
+    assert "blown_white_pct" in blown_msg
+    assert "mean_luma" in blown_msg
+
+    flat_path = tmp_path / "flat_empty.png"
+    flat_arr = np.full((720, 1280, 3), (130, 125, 115), dtype=np.uint8)
+    Image.fromarray(flat_arr, mode="RGB").save(flat_path)
+
+    flat_audit = audit_hg3_stills([flat_path])
+    assert flat_audit["passed"] is False
+    flat_msg = " ".join(flat_audit["violations"])
+    assert "dynamic_range" in flat_msg
+    assert "edge_energy" in flat_msg
+
+    warm_path = tmp_path / "warm_editorial.png"
+    warm_arr = np.full((720, 1280, 3), (184, 156, 116), dtype=np.uint8)
+    rng = np.random.default_rng(42)
+    grain = rng.integers(-8, 9, size=(720, 1280, 1))
+    warm_arr = np.clip(warm_arr.astype(np.int16) + grain, 0, 255).astype(np.uint8)
+    warm_img = Image.fromarray(warm_arr, mode="RGB")
+    draw = ImageDraw.Draw(warm_img)
+    draw.rectangle([280, 120, 1000, 580], fill=(244, 236, 216), outline=(54, 38, 22), width=3)
+    draw.rectangle([280, 120, 1000, 196], fill=(31, 37, 46))
+    draw.rectangle([820, 134, 982, 184], fill=(200, 62, 43))
+    for r in range(6):
+        ry = 230 + r * 52
+        draw.rectangle([320, ry, 940, ry + 12], fill=(43, 30, 18))
+    warm_img.save(warm_path)
+
+    report_path = tmp_path / "hg3_visual_audit.json"
+    warm_audit = audit_hg3_stills([warm_path], report_path=report_path)
+    assert warm_audit["passed"] is True, warm_audit
+    assert report_path.exists()
+    m = warm_audit["frames"][0]["metrics"]
+    assert 78.0 <= m["mean_luma"] <= 208.0
+    assert m["crushed_black_pct"] <= 18.0
+    assert m["blown_white_pct"] <= 16.0
 
 
 

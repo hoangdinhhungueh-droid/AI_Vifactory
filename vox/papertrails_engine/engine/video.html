@@ -2,21 +2,21 @@
 <html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Papertrails — deterministic video stage</title>
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#181411;font-family:"Segoe UI","Noto Sans","Noto Sans CJK KR","Noto Sans CJK JP","Helvetica Neue",Arial,sans-serif}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#8c6f4b;font-family:"Segoe UI","Noto Sans","Noto Sans CJK KR","Noto Sans CJK JP","Helvetica Neue",Arial,sans-serif}
 #atlas{width:100%;height:100%;display:block}
 /* Scene title: archival press index tag pinned in the upper safe area */
-#title{position:absolute;top:5%;left:4.5%;max-width:58%;padding:.42em .95em .46em 1.1em;font-size:clamp(13px,2.9vh,52px);font-weight:800;line-height:1.15;color:#231a12;word-break:keep-all;
-  background:linear-gradient(176deg,#f7efe0,#eadbc0);border-radius:.14em;box-shadow:0 .32em .95em rgba(10,7,4,.58),inset 0 0 0 .06em rgba(90,64,36,.24);transform-origin:12% 50%;letter-spacing:.01em}
+#title{position:absolute;top:5%;left:4.5%;max-width:58%;padding:.42em .95em .46em 1.1em;font-size:clamp(13px,2.9vh,52px);font-weight:800;line-height:1.15;color:#1c140d;word-break:keep-all;
+  background:linear-gradient(176deg,#f7efe0,#eadbc0);border-radius:.14em;box-shadow:0 .26em .72em rgba(30,18,8,.34),inset 0 0 0 .06em rgba(90,64,36,.26);transform-origin:12% 50%;letter-spacing:.01em}
 #title::before{content:"";position:absolute;left:.38em;top:50%;width:.36em;height:.36em;margin-top:-.18em;border-radius:50%;background:#c83e2b;box-shadow:inset -.05em -.05em 0 rgba(0,0,0,.28)}
 #title:empty{display:none}
 /* Captions: a warm torn archival paper strip with crisp ink typography */
-#capwrap{position:absolute;left:0;right:0;bottom:6.5%;display:flex;justify-content:center;pointer-events:none;filter:drop-shadow(0 .6vh 1.2vh rgba(10,6,3,.65))}
-#caption{position:relative;max-width:82%;padding:.36em .95em .42em;text-align:center;font-weight:800;font-size:clamp(12px,4.1vh,72px);line-height:1.28;color:#2b1e12;word-break:keep-all;
+#capwrap{position:absolute;left:0;right:0;bottom:6.5%;display:flex;justify-content:center;pointer-events:none;filter:drop-shadow(0 .45vh .95vh rgba(30,18,8,.42))}
+#caption{position:relative;max-width:82%;padding:.36em .95em .42em;text-align:center;font-weight:800;font-size:clamp(12px,4.1vh,72px);line-height:1.28;color:#1c140d;word-break:keep-all;
   background:linear-gradient(178deg,#f7eedb 0%,#e9d8b5 100%);white-space:pre-wrap;overflow-wrap:anywhere}
 #caption .w{display:inline-block;transition:none}
 #caption .w.on{color:#b8321c;transform:translateY(-.04em) scale(1.06)}
-#caption .w.done{color:#2b1e12}
-#caption .w.todo{color:rgba(43,30,18,.62)}
+#caption .w.done{color:#1c140d}
+#caption .w.todo{color:rgba(28,20,13,.66)}
 #capwrap.empty{display:none}
 /* Page wipe at cuts: subtle warm archival card edge */
 #wipe{position:absolute;top:-5%;bottom:-5%;width:150%;left:-160%;background:linear-gradient(90deg,#e4d3b2 0%,#f2e6ce 70%,#cbb388 100%);box-shadow:0 0 3vh rgba(15,10,5,.55);display:none}
@@ -24,8 +24,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#181411;fon
 /* Optional paper cards: editorial evidence note pinned beside the 3D plate */
 #card{position:absolute;top:14%;bottom:23%;display:none;align-items:center;justify-content:center;width:36%;pointer-events:none}
 #card.right{right:3.5%}#card.left{left:3.5%}#card.center{left:50%;margin-left:-30%;width:60%}
-#card .note{position:relative;width:100%;padding:1.25em 1.35em 1.2em;background:linear-gradient(178deg,#f8f0de,#eadbc0);color:#2a1d12;font-size:clamp(11px,2.25vh,39px);line-height:1.35;
-  box-shadow:0 1em 2.4em rgba(10,6,3,.62),inset 0 0 0 1px rgba(90,64,36,.22);transform-origin:50% 0}
+#card .note{position:relative;width:100%;padding:1.25em 1.35em 1.2em;background:linear-gradient(178deg,#f8f0de,#eadbc0);color:#1c140d;font-size:clamp(11px,2.25vh,39px);line-height:1.35;
+  box-shadow:0 .85em 1.9em rgba(30,18,8,.36),inset 0 0 0 1px rgba(90,64,36,.26);transform-origin:50% 0}
 #card .note::before{content:"";position:absolute;top:-.55em;left:50%;width:5.5em;height:1.25em;margin-left:-2.75em;background:rgba(232,210,150,.82);transform:rotate(-2deg);box-shadow:0 .06em .2em rgba(0,0,0,.15)}
 #card .note h3{margin:0 0 .55em;font-size:1.45em;line-height:1.15;color:#2c1f14;font-weight:800}
 #card .note .ln{display:flex;gap:.55em;align-items:baseline;margin:.36em 0;font-weight:700}

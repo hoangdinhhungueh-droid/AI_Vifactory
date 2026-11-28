@@ -115,6 +115,35 @@ class PapertrailsTimelineSpec(BaseModel):
     scenes: List[PapertrailsScene] = Field(..., min_length=1)
     timing: Dict[str, Any] = Field(default_factory=dict)
     direction: Dict[str, Any] = Field(default_factory=dict)
+
+
+class HG3VisualThresholdsSchema(BaseModel):
+    """Mắt Thần HG3 deterministic pixel luminance, contrast, and edge-detail guardrails."""
+    min_width: int = Field(default=1280, ge=320)
+    min_height: int = Field(default=720, ge=240)
+    min_mean_luma: float = Field(default=78.0, ge=0.0, le=255.0)
+    max_mean_luma: float = Field(default=208.0, ge=0.0, le=255.0)
+    min_median_luma: float = Field(default=60.0, ge=0.0, le=255.0)
+    max_median_luma: float = Field(default=220.0, ge=0.0, le=255.0)
+    max_crushed_black_pct: float = Field(default=18.0, ge=0.0, le=100.0)
+    max_blown_white_pct: float = Field(default=16.0, ge=0.0, le=100.0)
+    min_top30_luma: float = Field(default=45.0, ge=0.0, le=255.0)
+    min_center_luma: float = Field(default=75.0, ge=0.0, le=255.0)
+    min_dynamic_range: float = Field(default=45.0, ge=0.0, le=255.0)
+    min_edge_energy: float = Field(default=4.5, ge=0.0)
+    max_failed_frame_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class HG3VisualAuditReport(BaseModel):
+    """Khế ước báo cáo `stills/hg3_visual_audit.json` do Mắt Thần HG3 xuất ra."""
+    passed: bool
+    total_stills: int = Field(..., ge=0)
+    passed_stills: int = Field(..., ge=0)
+    failed_stills: int = Field(..., ge=0)
+    failed_ratio: float = Field(..., ge=0.0, le=1.0)
+    summary: Dict[str, Any] = Field(default_factory=dict)
+    violations: List[str] = Field(default_factory=list)
+    frames: List[Dict[str, Any]] = Field(default_factory=list)
 ```
 
 ---

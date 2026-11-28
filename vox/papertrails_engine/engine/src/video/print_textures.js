@@ -129,7 +129,7 @@ export function createPrintedPaperMaterial({ width = 768, height = 896, baseColo
     map: tex,
     emissive: new THREE.Color('#fff5e4'),
     emissiveMap: tex,
-    emissiveIntensity: 0.14,
+    emissiveIntensity: 0.17,
     side: THREE.DoubleSide,
   });
   mat.userData.noDayNightGlow = true;
@@ -513,11 +513,11 @@ export function makeLedgerPagePrintMaterial(sceneData, side = 'left') {
 }
 
 const DESK_PALETTES = {
-  heartland: { base: '#251d16', line: 'rgba(225,186,120,0.10)', accent: 'rgba(218,162,72,0.28)', clip: 'rgba(235,218,186,0.05)' },
-  pinewood: { base: '#1e241c', line: 'rgba(182,208,164,0.10)', accent: 'rgba(218,162,72,0.26)', clip: 'rgba(222,230,206,0.05)' },
-  desert: { base: '#2a1f16', line: 'rgba(232,190,130,0.11)', accent: 'rgba(218,162,72,0.28)', clip: 'rgba(238,216,178,0.05)' },
-  snow: { base: '#16202b', line: 'rgba(155,192,232,0.12)', accent: 'rgba(220,170,80,0.28)', clip: 'rgba(205,222,240,0.05)' },
-  blossom: { base: '#241b1c', line: 'rgba(222,184,172,0.10)', accent: 'rgba(218,162,72,0.26)', clip: 'rgba(235,212,206,0.05)' },
+  heartland: { base: '#b89c74', line: 'rgba(54,38,22,0.22)', accent: 'rgba(148,96,26,0.48)', clip: 'rgba(72,50,28,0.08)' },
+  pinewood: { base: '#8fa189', line: 'rgba(34,48,32,0.22)', accent: 'rgba(142,96,26,0.46)', clip: 'rgba(42,58,40,0.08)' },
+  desert: { base: '#c2a274', line: 'rgba(66,44,20,0.22)', accent: 'rgba(156,94,22,0.48)', clip: 'rgba(84,56,28,0.08)' },
+  snow: { base: '#9cb0c4', line: 'rgba(28,44,64,0.22)', accent: 'rgba(156,104,28,0.46)', clip: 'rgba(36,54,76,0.08)' },
+  blossom: { base: '#bfa89c', line: 'rgba(62,40,36,0.21)', accent: 'rgba(148,88,28,0.46)', clip: 'rgba(76,48,44,0.08)' },
 };
 
 export function makeDeskSurfaceTexture(themeId = 'heartland') {
@@ -526,7 +526,7 @@ export function makeDeskSurfaceTexture(themeId = 'heartland') {
   canvas.width = 1024;
   canvas.height = 1024;
   const ctx = canvas.getContext('2d');
-  paintPaperGrain(ctx, 1024, 1024, pal.base, `desk-${themeId}`, 0.18);
+  paintPaperGrain(ctx, 1024, 1024, pal.base, `desk-${themeId}`, 0.06);
 
   // Subtle cutting-mat millimeter grid
   ctx.strokeStyle = pal.line;

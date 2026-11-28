@@ -130,8 +130,8 @@ export function createForensicDesk({ scene, materials, seed = 42, scenes = [], m
   const centerX = (minX + maxX) * 0.5;
   const spanX = Math.max(48, (maxX - minX) + 46);
 
-  // Warm dark walnut base slab
-  const walnutMat = materials.paper({ color: '#1b140e', side: THREE.FrontSide });
+  // Warm medium walnut base slab
+  const walnutMat = materials.paper({ color: '#6d5239', side: THREE.FrontSide });
   const baseTable = addDeskMatMesh(new THREE.BoxGeometry(spanX + 18, 0.28, 46), walnutMat, false, true);
   baseTable.position.set(centerX, -0.18, 0);
   root.add(baseTable);
@@ -142,9 +142,9 @@ export function createForensicDesk({ scene, materials, seed = 42, scenes = [], m
   const deskMat = new THREE.MeshLambertMaterial({
     color: new THREE.Color('#ffffff'),
     map: deskTex,
-    emissive: new THREE.Color('#2a2016'),
+    emissive: new THREE.Color('#fff3de'),
     emissiveMap: deskTex,
-    emissiveIntensity: 0.04,
+    emissiveIntensity: 0.12,
   });
   deskMat.userData.noDayNightGlow = true;
   const matMesh = addDeskMatMesh(new THREE.BoxGeometry(spanX, 0.06, 28), deskMat, false, true);

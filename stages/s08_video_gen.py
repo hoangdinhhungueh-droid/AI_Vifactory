@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, StageArtifact, StageID, VideoAsset
-from core.gates import compute_file_sha256, emit_artifact
+from core.gates import GateError, compute_file_sha256, emit_artifact
 from tools.codemap.runtime import pipeline_stage
 
 logger = logging.getLogger("s08_video_gen")
@@ -226,11 +226,31 @@ def _run_papertrails_3d_stage(
         logger.info(f"[s08_video_gen] Reusing {len(existing_stills)} verified preview stills newer than timeline.json")
         still_paths = existing_stills
 
+    from app.services.hg3_visual_audit import audit_hg3_stills
+
+    audit_report_path = stills_dir / "hg3_visual_audit.json"
+    hg3_audit = audit_hg3_stills(still_paths, report_path=audit_report_path)
+    if not hg3_audit["passed"]:
+        logger.error(f"[s08_video_gen] Mat Than HG3 Visual Audit FAILED: {hg3_audit['violations'][:4]}")
+        raise GateError(
+            STAGE,
+            f"Mat Than HG3 Visual Audit FAILED ({hg3_audit['failed_stills']}/{hg3_audit['total_stills']} stills). "
+            f"Report: {audit_report_path}. Top issues: {'; '.join(hg3_audit['violations'][:4])}",
+            details=hg3_audit,
+        )
+    hg3_audit_summary = {
+        "passed": True,
+        "report_path": str(audit_report_path),
+        "total_stills": hg3_audit["total_stills"],
+        "summary": hg3_audit["summary"],
+    }
+
     if getattr(ctx, "stills_only", False):
         payload = {
             "task_id": ctx.run_id,
             "stills_only": True,
             "stills": [str(p) for p in still_paths],
+            "hg3_visual_audit": hg3_audit_summary,
             "total_clips": 0,
             "total_veo_shots": 0,
             "total_vox_native_shots": 0,
@@ -292,6 +312,7 @@ def _run_papertrails_3d_stage(
         "task_id": ctx.run_id,
         "stills_only": False,
         "stills": [str(p) for p in still_paths],
+        "hg3_visual_audit": hg3_audit_summary,
         "master_papertrails_mp4": str(master_papertrails_mp4),
         "total_clips": 1,
         "total_veo_shots": 0,
